@@ -174,10 +174,17 @@ export function forkSlotMethods(
       if (typeof registration.subscribe !== "function") {
         throw new Error(`${kind} "${id}": subscribe must be a function`);
       }
+      for (const optional of ["folds", "expandFold"] as const) {
+        if (registration[optional] !== undefined && typeof registration[optional] !== "function") {
+          throw new Error(`${kind} "${id}": ${optional} must be a function`);
+        }
+      }
       collected.timelineFilters.push({
         id,
         get: registration.get,
         subscribe: registration.subscribe,
+        ...(registration.folds ? { folds: registration.folds } : {}),
+        ...(registration.expandFold ? { expandFold: registration.expandFold } : {}),
       });
     },
     experimental_linkHandler(registration) {

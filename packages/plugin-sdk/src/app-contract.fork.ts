@@ -263,8 +263,34 @@ export interface ExperimentalTimelineFilterRegistration {
   id: string;
   /** The filter for a thread's timeline, or null for none. */
   get(threadId: string): ExperimentalTimelineFilter | null;
-  /** Calls `listener` whenever any thread's filter changes; returns the unsubscribe. */
+  /** Calls `listener` whenever any thread's filter or folds change; returns the unsubscribe. */
   subscribe(listener: () => void): () => void;
+  /**
+   * Optional. Runs of a thread's timeline to fold, each into one line, while
+   * no filter is on (see {@link ExperimentalTimelineFold}). Same rules as
+   * `get`: cheap, pure, the same array while unchanged. Registrations are
+   * asked in plugin-id order; the first that returns folds wins.
+   */
+  folds?(threadId: string): readonly ExperimentalTimelineFold[] | null;
+  /** Optional. The user opened fold `id` of a thread (clicked its line). */
+  expandFold?(threadId: string, id: string): void;
+}
+
+/**
+ * One run of a thread's timeline folded into one line (Studio's runs of
+ * status replies). Every row of the listed turns, and every row between them
+ * that is neither a message the user typed nor another turn's reply, gives
+ * way to one line with `label` where the run's first such row was; a message
+ * the user typed stays. Clicking the line calls the registration's
+ * `expandFold`. Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalTimelineFold {
+  /** The plugin's id for the fold, passed back to `expandFold`. */
+  id: string;
+  /** The turns whose rows fold. */
+  turnIds: readonly string[];
+  /** The line shown in the run's place. */
+  label: string;
 }
 
 /**
