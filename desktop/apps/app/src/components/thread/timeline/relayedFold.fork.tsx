@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useSyncExternalStore,
   type ReactNode,
@@ -19,7 +20,18 @@ import {
   type ReplyClassifiers,
 } from "@/lib/fork-reply-classifiers";
 import { QuietTurnMarker } from "./ForkQuietTurnMarker.js";
-import { useTimelineFilterExpanded } from "@/lib/fork-timeline-filter";
+import {
+  expandTimelineFold,
+  useTimelineFilterExpanded,
+  useTimelineFoldsOf,
+} from "@/lib/fork-timeline-filter";
+import {
+  foldTurnRuns,
+  linkedRowId,
+  TurnRunMarkerLine,
+  type TurnRunMarker,
+} from "./turnRunFold.fork.js";
+import { useSearchMessageLocation } from "./useScrollToSearchedMessage.js";
 import {
   noticeFoldOf,
   noticeOf,
@@ -72,13 +84,17 @@ const QUIET_FOLD_PREFIX: Record<"running" | "done" | "skipped", string> = {
 
 export class FoldedRows extends Set<string> {
   readonly quiet: ReadonlyMap<string, QuietFold>;
+  /** Rows drawn as a plugin's folded run (turnRunFold.fork.tsx). */
+  readonly runs: ReadonlyMap<string, TurnRunMarker>;
 
   constructor(
     ids: Iterable<string> = [],
     quiet: ReadonlyMap<string, QuietFold> = new Map(),
+    runs: ReadonlyMap<string, TurnRunMarker> = new Map(),
   ) {
     super(ids);
     this.quiet = quiet;
+    this.runs = runs;
   }
 }
 
@@ -317,17 +333,58 @@ export function useRelayedFold(
     getPluginSlotSnapshot,
   );
   const unfold = useTimelineFilterExpanded();
-  return useMemo(
-    () =>
-      unfold
-        ? { rows, folded: NO_FOLDS }
-        : foldRelayedRows(
-            rows,
-            scopeActive ? findStreamingAssistantMessageId(rows) : null,
-            slots.replyClassifiers,
-            scopeActive,
-          ),
-    [rows, scopeActive, findStreamingAssistantMessageId, slots.replyClassifiers, unfold],
+  const threadId = rows[0]?.threadId ?? null;
+  const runFolds = useTimelineFoldsOf(threadId);
+  // A message link or search result into a folded run keeps that run open.
+  const { target } = useSearchMessageLocation();
+  const targetSeq = target?.seq ?? null;
+  const targetMatch = target?.match ?? null;
+  const fold = useMemo(() => {
+    if (unfold) return { rows, folded: NO_FOLDS, opened: NO_OPENED };
+    const relayed = foldRelayedRows(
+      rows,
+      scopeActive ? findStreamingAssistantMessageId(rows) : null,
+      slots.replyClassifiers,
+      scopeActive,
+    );
+    // A plugin's folded runs (status replies), over what the relayed fold left.
+    const runs = foldTurnRuns(relayed.rows, runFolds, {
+      isRelayed: (row) => isRelayedRow(row, slots.replyClassifiers),
+      kept: keptInRunFold,
+      isQuiet: (row) =>
+        row.kind === "conversation" &&
+        row.role === "assistant" &&
+        isQuietReply(row.text, slots.replyClassifiers),
+      targetRowId:
+        targetSeq === null || targetMatch === null
+          ? null
+          : linkedRowId(rows, { seq: targetSeq, match: targetMatch }),
+    });
+    if (runs.markers.size === 0) return { ...relayed, opened: runs.opened };
+    return {
+      rows: runs.rows,
+      folded: new FoldedRows(relayed.folded, relayed.folded.quiet, runs.markers),
+      opened: runs.opened,
+    };
+  }, [rows, scopeActive, findStreamingAssistantMessageId, slots.replyClassifiers, unfold, runFolds, targetSeq, targetMatch]);
+  const opened = fold.opened.join("\n");
+  useEffect(() => {
+    if (threadId === null || opened === "") return;
+    for (const id of opened.split("\n")) expandTimelineFold(threadId, id);
+  }, [threadId, opened]);
+  return fold;
+}
+
+const NO_OPENED: readonly string[] = [];
+
+/** What a folded run never hides: what the relayed fold keeps, alerts, and rows still running. */
+function keptInRunFold(row: ThreadTimelineViewRow): boolean {
+  const status = rowStatus(row);
+  return (
+    !hiddenInFold(row) ||
+    isAlertRow(row) ||
+    status === "pending" ||
+    status === "interrupted"
   );
 }
 
@@ -339,6 +396,8 @@ export function RelayedRowFolded({
   children: ReactNode;
 }) {
   const folds = useContext(RelayedFoldContext);
+  const run = folds.runs.get(rowId);
+  if (run !== undefined) return <TurnRunMarkerLine marker={run} />;
   const quiet = folds.quiet.get(rowId);
   if (quiet !== undefined) {
     return (

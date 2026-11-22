@@ -270,6 +270,21 @@ group row while the context is on (`useTimelineFilterExpandsRow`);
 `useQuietReply` (`lib/fork-reply-classifiers.ts`) and `useRelayedFold`
 (`relayedFold.fork.tsx`) read the same context.
 
+**Folded runs.** A registration may also give `folds(threadId)`: runs to
+fold, each `{ id, turnIds, label }` (Studio's runs of status replies), and
+`expandFold(threadId, id)`, called when the user opens one. While no filter
+is on, `useRelayedFold` (`relayedFold.fork.tsx`) applies them after its own
+folds (`turnRunFold.fork.tsx`): the rows of a fold's turns, and rows of no
+turn between two of them, give way to one line (`TurnRunMarkerLine`) in place
+of the run's first message that isn't a quiet reply. It never hides another
+turn's rows, or what the relayed fold keeps (errors, alerts, warnings, rows
+still running); a message the user typed ends the run there. A fold holding
+the message a link or search points at (`#msg=`, search state) stays open,
+and `expandFold` is called for it, so a jump never lands on a hidden row. The
+first registration that returns folds wins; folds that throw or are malformed
+count as none and are logged once (each returned array is checked once). No core file changed: the
+fold runs inside the relayed fold's existing hook and row wrapper.
+
 **Why not upstream's own API.** No add-in point can hide timeline rows or
 open collapsed ones; the timeline windows only the rows it has and pages
 them in one run.

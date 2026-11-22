@@ -91,8 +91,8 @@ export const SETTINGS_SEARCH_INDEX: Record<
         keywords: ["git", "worktree", "branch name"],
       },
       {
-        title: "bb CLI",
-        keywords: ["command line", "terminal", "path", "install"],
+        title: "bbs CLI",
+        keywords: ["command line", "terminal", "path", "install", "bbs", "bb-studio"],
         when: "cliCommand",
       },
       {
