@@ -1,3 +1,4 @@
+import { forkRedactSettingDescriptor, forkRedactSettingValue } from "./plugin-settings-view.fork.js";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -147,14 +148,14 @@ export async function buildPluginSettingsView(
           .catch(() => false),
       };
     } else if (effective[key] !== undefined) {
-      values[key] = effective[key];
+      values[key] = forkRedactSettingValue(descriptor, effective[key]);
     }
   }
   return {
     schema: Object.fromEntries(
       Object.entries(args.descriptors).map(([key, descriptor]) => [
         key,
-        publicSettingDescriptor(descriptor),
+        forkRedactSettingDescriptor(publicSettingDescriptor(descriptor)),
       ]),
     ),
     values,
