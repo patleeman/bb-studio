@@ -22,7 +22,7 @@ import {
 import { timelineFoldsOf } from "@/lib/fork-timeline-filter";
 import { TimelineFilterExpandContext } from "@/lib/fork-timeline-filter";
 import { ThreadTimelineRows } from "./ThreadTimelineRows";
-import { foldTurnRuns } from "./turnRunFold.fork";
+import { foldTurnRuns, linkedRowId } from "./turnRunFold.fork";
 
 afterEach(() => {
   cleanup();
@@ -134,6 +134,8 @@ describe("foldTurnRuns", () => {
       "a_command",
       "a_reply",
       "b_message",
+      "c_message",
+      "c_command",
       "c_reply",
       "e_message",
       "e_command",
@@ -141,6 +143,85 @@ describe("foldTurnRuns", () => {
     ]);
     expect([...fold.markers.keys()]).toEqual(["b_message"]);
     expect(foldTurnRuns(rows, []).rows).toBe(rows);
+  });
+
+  it("keeps the rows the caller keeps (an error, an alert) in view", () => {
+    const rows = buildTimelineViewRows(day());
+    const kept = new Set(["c_command", "c_message"]);
+    const fold = foldTurnRuns(rows, [FOLD], { kept: (row) => kept.has(row.id) });
+    expect(fold.rows.map((row) => row.id)).toEqual([
+      "a_message",
+      "a_reply",
+      "c_message",
+      "c_command",
+      "e_message",
+      "e_command",
+      "e_reply",
+    ]);
+  });
+
+  it("ends a run at a message the user typed, even when the plugin's run goes on", () => {
+    const rows = buildTimelineViewRows(day());
+    const fold = foldTurnRuns(rows, [
+      { ...FOLD, turnIds: ["turn_b", "turn_c", "turn_e"] },
+    ]);
+    expect(fold.rows.map((row) => row.id)).toEqual([
+      "a_message",
+      "a_command",
+      "a_reply",
+      "b_message",
+      "d_message",
+      "d_command",
+      "d_reply",
+      "e_message",
+      "e_command",
+      "e_reply",
+    ]);
+  });
+
+  it("never hides another turn's rows, even when a member turn's late row comes after them", () => {
+    const rows = buildTimelineViewRows([
+      ...day().slice(0, 9),
+      conversationRow({
+        id: "x_reply",
+        role: "assistant",
+        text: "Approve the deploy?",
+        sourceSeqStart: 5_000,
+        sourceSeqEnd: 5_000,
+        threadId: "thr_main",
+        turnId: "turn_x",
+      }),
+      commandRow({
+        id: "b_late",
+        command: "late",
+        exitCode: 0,
+        sourceSeqStart: 5_002,
+        sourceSeqEnd: 5_003,
+        threadId: "thr_main",
+        turnId: "turn_b",
+      }),
+    ]);
+    const fold = foldTurnRuns(rows, [{ ...FOLD, turnIds: ["turn_a", "turn_b", "turn_c"] }]);
+    expect(fold.rows.map((row) => row.id)).toEqual(["a_message", "a_reply", "x_reply"]);
+  });
+
+  it("never draws the line on a quiet reply", () => {
+    const rows = buildTimelineViewRows(day());
+    const fold = foldTurnRuns(rows, [FOLD], { isQuiet: (row) => row.id === "a_reply" });
+    expect([...fold.markers.keys()]).toEqual(["b_message"]);
+    expect(fold.rows.map((row) => row.id)).toContain("b_message");
+  });
+
+  it("leaves open the fold that holds the linked row, and says so", () => {
+    const rows = buildTimelineViewRows(day());
+    const target = rows.find((row) => row.id === "c_reply")!;
+    const id = linkedRowId(rows, { seq: target.sourceSeqStart, match: "message" });
+    expect(id).toBe("c_reply");
+    const fold = foldTurnRuns(rows, [FOLD], { targetRowId: id });
+    expect(fold.rows).toBe(rows);
+    expect(fold.opened).toEqual(["run_a"]);
+    expect(linkedRowId(rows, { seq: target.sourceSeqStart - 2, match: "sequence" })).toBe("c_command");
+    expect(linkedRowId(rows, null)).toBeNull();
   });
 });
 
@@ -165,10 +246,10 @@ function foldingStore(
   };
 }
 
-function renderRows(rows: TimelineRow[], expanded = false) {
+function renderRows(rows: TimelineRow[], expanded = false, at = "/threads/thr_main") {
   return render(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[at]}>
         <TimelineFilterExpandContext.Provider value={expanded}>
           <ThreadTimelineRows
             threadId="thr_main"
@@ -199,6 +280,20 @@ describe("a plugin's folded runs in the timeline", () => {
     act(() => {
       fireEvent.click(line!);
     });
+    expect(store.expandFold).toHaveBeenCalledWith("thr_main", "run_a");
+  });
+
+  it("opens the run a message link points into, and tells the plugin", () => {
+    const store = foldingStore([FOLD]);
+    setPluginSlotRegistrations(
+      "studio",
+      makePluginRegistrationSet({ timelineFilters: [store.registration] }),
+    );
+    const rows = day();
+    const target = rows.find((row) => row.id === "c_reply")!;
+    const { container } = renderRows(rows, false, `/threads/thr_main#msg=${target.sourceSeqStart}`);
+    expect(container.querySelector("[data-turn-run-fold]")).toBeNull();
+    expect(container.querySelector('[data-timeline-row-id="c_reply"]')).not.toBeNull();
     expect(store.expandFold).toHaveBeenCalledWith("thr_main", "run_a");
   });
 
