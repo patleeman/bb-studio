@@ -104,7 +104,7 @@ describe("CodeRendererSettings", () => {
       .getAllByRole("menuitem")
       .map((item) => item.textContent ?? "");
     expect(items).toHaveLength(4);
-    expect(items[3]).toContain("bb (built-in)");
+    expect(items[3]).toContain("BB Studio (built-in)");
     expect(items.some((text) => text.includes("From the inkwell plugin"))).toBe(
       true,
     );
