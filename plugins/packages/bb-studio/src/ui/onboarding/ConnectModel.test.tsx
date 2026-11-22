@@ -9,7 +9,7 @@ vi.mock("../../kit/ui/hooks/use-pointer-coarse.js", () => ({ usePointerCoarse: (
 vi.mock("../live", () => ({ useCall: () => async () => ({ sessionId: "s", state: "waiting", targetId: "provider:codex", name: "Codex", flow: "device", url: null, code: null, acceptsCode: false, expiresAt: null, pollMs: 1000, message: null }), useLive: () => ({ data: null, refresh: () => {} }) }));
 
 const { ConnectModelView } = await import("./ConnectModel");
-const { anyReady, canSignIn, cardsFrom, providerCards, sortCards } = await import("./providers");
+const { anyReady, canSignIn, cardsFrom, finishesOnboarding, providerCards, sortCards } = await import("./providers");
 
 installTestPluginRuntime();
 
@@ -59,4 +59,16 @@ it("finishes \"Connect a model\" only on a provider with a sign-in: an installed
   expect(anyReady(providerCards(providers, false))).toBe(false);
   // The composer's gate: the ready agent counts, so the picker (and Auto) shows.
   expect(anyReady(providerCards(providers, true))).toBe(true);
+});
+
+it("lists a ready agent with no sign-in as usable on \"Connect a model\", without finishing the step on it", () => {
+  const providers = [
+    { providerId: "codex", displayName: "Codex", status: "unauthenticated", loginCommand: "codex login" },
+    { providerId: "acp-ollama", displayName: "Ollama", status: "ready", loginCommand: null },
+  ];
+  const cards = providerCards(providers, true);
+  act(() => root.render(<ConnectModelView cards={cards} onSkip={() => undefined} />));
+  expect(host.querySelector("[data-provider=acp-ollama]")?.textContent).toContain("Ready");
+  expect(finishesOnboarding(cards)).toBe(false);
+  expect(finishesOnboarding(providerCards([{ ...providers[0]!, status: "ready" }], true))).toBe(true);
 });

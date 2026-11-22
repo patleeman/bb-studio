@@ -37,6 +37,8 @@ interface Options {
   /** Execution options by thread id (a parent thread), beside `execution` for the failed thread. */
   executions?: Record<string, { model: string | null; permissionMode: string | null }>;
   primaryHost?: string;
+  /** BB's provider list fails (a plugin reload, a host hiccup). */
+  providersFail?: boolean;
   threadHost?: string;
   usage?: Record<string, UsageSnapshot | null>;
   thread?: Partial<RouterThread>;
@@ -65,7 +67,10 @@ function harness(options: Options = {}) {
   const deps: RouterDeps = {
     kv: { get: async (key) => store.get(key), set: async (key, value) => { store.set(key, value); }, delete: async (key) => { store.delete(key); } },
     providerStates: async () => Object.entries(options.states ?? { "acp-opencode": "ready", "acp-antigravity": "ready", pi: "ready", codex: "ready" }).map(([providerId, status]) => ({ providerId, status })),
-    providers: async () => new Map(Object.keys(modes).map((id) => [id, { name: names[id]!, permissionModes: modes[id]! }] as const)),
+    providers: async () => {
+      if (options.providersFail) throw new Error("providers unavailable");
+      return new Map(Object.keys(modes).map((id) => [id, { name: names[id]!, permissionModes: modes[id]! }] as const));
+    },
     models: async (providerId) => {
       const list = catalogs[providerId];
       if (list === null || list === undefined) return null;
@@ -451,8 +456,8 @@ describe("review fixes: permission modes", () => {
     expect(await router.onTurnFailed(failed({ category: "rate-limit", providerCode: "rate_limit", httpStatusCode: 429 }))).toMatchObject({ target: glm, permissionMode: "accept-edits" });
   });
 
-  it("the handoff RPC names a narrowed mode even when the thread's mode can't be read", async () => {
-    const { router, spawned, store } = harness({ thread: { providerId: "codex" }, execution: { model: codex.model, permissionMode: null } });
+  it("the handoff RPC always names the mode, narrowed from the thread's", async () => {
+    const { router, spawned, store } = harness({ thread: { providerId: "codex" }, execution: { model: codex.model, permissionMode: "auto" } });
     await router.load();
     store.set(noticeKey("thr_1"), { threadId: "thr_1", target: glm, targetName: "GLM 5.3", permissionMode: "accept-edits" });
     await router.handoff("thr_1");
@@ -487,7 +492,7 @@ describe("review fixes: the failed turn's own error", () => {
 
 describe("review fixes: an unreachable model server is per machine", () => {
   it("a local model that didn't answer on another machine stays usable on Auto's machine", async () => {
-    const remote = harness({ rule: "private", execution: { model: qwenLocal.model, permissionMode: "full" }, errorText: "connect ECONNREFUSED 127.0.0.1:11434", threadHost: "host_red4" });
+    const remote = harness({ rule: "private", execution: { model: qwenLocal.model, permissionMode: "full" }, errorText: "connect ECONNREFUSED 127.0.0.1:11434", threadHost: "host_remote" });
     await remote.router.load();
     await remote.router.onTurnFailed(failed());
     expect((await remote.router.decide("My tax notes")).target).toEqual(qwenLocal);
@@ -495,5 +500,42 @@ describe("review fixes: an unreachable model server is per machine", () => {
     await local.router.load();
     await local.router.onTurnFailed(failed());
     expect((await local.router.decide("My tax notes")).skipped[0]).toMatchObject({ target: qwenLocal, why: "unreachable" });
+  });
+});
+
+describe("re-review fixes", () => {
+  it("N1: with BB's provider list failing, no target is picked under a permission mode (BB's defaults instead)", async () => {
+    const { router } = harness({ providersFail: true });
+    await router.load();
+    // A create with no mode: BB would fill in "auto", and Pi (full only) would get "full".
+    expect(await router.resolve({ text: "Fix tokenize()" })).toBeNull();
+    expect((await router.decide("Fix tokenize()", { permissionMode: "auto", exactPermission: true })).skipped.map((each) => each.why)).toEqual(["permission modes unknown", "permission modes unknown", "permission modes unknown", "permission modes unknown"]);
+    // Settings' check names no mode, so it isn't affected.
+    expect((await router.checkTargets()).every((check) => check.problem === null)).toBe(true);
+  });
+
+  it("N2: with the thread's mode unreadable, the notice offers no model and the handoff RPC refuses", async () => {
+    const { router, store, spawned } = harness({ thread: { providerId: "codex" }, execution: { model: codex.model, permissionMode: null } });
+    await router.setPolicy({ ...policy, rules: [{ id: "coding", text: "Pure coding", chain: [codex, glm] }] });
+    const notice = await router.onTurnFailed(failed({ category: "rate-limit", providerCode: "rate_limit", httpStatusCode: 429 }));
+    expect(notice).toMatchObject({ target: null, permissionMode: null });
+    expect(notice?.text).toContain("permission mode can't be read");
+    store.set(noticeKey("thr_1"), { threadId: "thr_1", target: glm, targetName: "GLM 5.3", permissionMode: "accept-edits" });
+    await expect(router.handoff("thr_1")).rejects.toThrow("permission mode can't be read");
+    expect(spawned).toEqual([]);
+  });
+
+  it("N8: catalog failures count per host and project, like the catalog", async () => {
+    const catalogs: Record<string, string[] | null | { error: string }> = { "acp-opencode": [glm.model], "acp-antigravity": { error: "timeout" }, pi: [piSonnet.model], codex: [codex.model] };
+    const { router } = harness({ catalogs });
+    await router.load();
+    // One failure read for project A, one for project B: neither project has failed twice.
+    await router.decide("Fix tokenize()", { permissionMode: "full", projectId: "prj_a" });
+    const second = await router.decide("Fix tokenize()", { permissionMode: "full", projectId: "prj_b" });
+    expect(second.target).toEqual(glm);
+    expect(second.skipped).toEqual([]);
+    clock.now += 20_000;
+    const again = await router.availability({ projectId: "prj_a", targets: [gemini] });
+    expect(again(gemini)).toBe("unreachable (its models can't be listed)");
   });
 });

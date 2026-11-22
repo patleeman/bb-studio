@@ -39,6 +39,11 @@ export function cardsFrom(providers: readonly { providerId: string; displayName:
     .map((each) => ({ providerId: each.providerId, displayName: each.displayName, status: each.status, accountEmail: each.accountEmail ?? null, loginCommand: each.loginCommand ?? null })));
 }
 
+/** Whether "Connect a model" is done: a provider you sign in to is ready. A ready agent with no sign-in is listed but doesn't count. */
+export function finishesOnboarding(cards: readonly Pick<ProviderCard, "status" | "loginCommand">[] | null): boolean {
+  return anyReady(cards?.filter((card) => !!card.loginCommand) ?? null);
+}
+
 /** The cards to show: providers with a sign-in, and with `withReadyAgents` also those ready without one. */
 export function providerCards(providers: Parameters<typeof cardsFrom>[0], withReadyAgents: boolean): ProviderCard[] {
   return cardsFrom(withReadyAgents ? providers : providers.filter((each) => !!each.loginCommand));

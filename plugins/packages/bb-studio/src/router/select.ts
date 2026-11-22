@@ -196,9 +196,10 @@ export function readFailure(failed: FailedTurn, now: number = Date.now(), timeZo
   return { kind: "usage-limit", reason: `${status}${code ?? "rate limit"}`, until: now + COOLDOWN_MS };
 }
 
-export function noticeText(input: { kind: NoticeKind; providerName: string; reason: string; targetName: string | null }): string {
+export function noticeText(input: { kind: NoticeKind; providerName: string; reason: string; targetName: string | null; modeUnknown?: boolean }): string {
   const what = input.kind === "sign-in" ? "a sign-in failure" : "a usage limit";
   const head = `The auto router detected ${what} on ${input.providerName} (${input.reason}).`;
+  if (input.modeUnknown) return `${head} This conversation's permission mode can't be read, so no model is offered to hand off to.`;
   return input.targetName ? `${head} Hand off to ${input.targetName}?` : `${head} No other model in its chain is available.`;
 }
 

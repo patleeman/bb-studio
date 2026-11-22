@@ -52,9 +52,17 @@ export function pickerChange(target: Target, next: { providerId: string; model: 
  * Those must not rewrite the saved entry, so reports count only once the
  * person has pressed or typed in this picker.
  */
-export function TargetPicker({ target, disabled, onChange, onAuto }: { target: Target; disabled: boolean; onChange(next: Target): void; onAuto(): void }) {
-  const touched = useRef(false);
-  const touch = () => { touched.current = true; };
+/** How soon after a press or key in a chain entry's picker its report counts as the person's pick. */
+export const PICK_WINDOW_MS = 2_000;
+
+export function TargetPicker({ target, disabled, onChange, onAuto, now = Date.now }: { target: Target; disabled: boolean; onChange(next: Target): void; onAuto(): void; now?: () => number }) {
+  // When the person last pressed or typed in this picker (the open menu's events reach here through React's portal), or null.
+  // A pick reports right after that press; the mark is cleared by the pick, by Escape, and by time, so a menu closed without a
+  // pick leaves nothing for a later fallback report (provider states refreshing) to ride on.
+  const touched = useRef<number | null>(null);
+  const touch = (event: { nativeEvent: Event }) => {
+    touched.current = (event.nativeEvent as KeyboardEvent).key === "Escape" ? null : now();
+  };
   return (
     <span className="contents" onPointerDownCapture={touch} onKeyDownCapture={touch} data-testid="router-target-picker">
       <ProviderModelPicker
@@ -62,7 +70,9 @@ export function TargetPicker({ target, disabled, onChange, onAuto }: { target: T
         align="start"
         value={{ providerId: target.providerId, model: target.model, reasoningLevel: target.reasoningLevel ?? "medium" }}
         onChange={(next) => {
-          if (!touched.current) return;
+          const at = touched.current;
+          if (at === null || now() - at > PICK_WINDOW_MS) return;
+          touched.current = null;
           if (next.providerId === AUTO_ID) return onAuto();
           const update = pickerChange(target, next);
           if (update) onChange(update);

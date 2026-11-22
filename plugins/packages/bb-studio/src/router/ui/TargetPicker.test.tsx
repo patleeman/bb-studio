@@ -38,3 +38,29 @@ it("keeps an entry for an agent that isn't installed when the picker falls back 
   });
   expect(changes).toEqual([{ providerId: "acp-opencode", model: "zai/glm-5.3", reasoningLevel: "medium" }]);
 });
+
+it("drops a fallback report that comes after the menu closed without a pick", async () => {
+  const changes: Target[] = [];
+  let clock = 1_000_000;
+  await act(async () => { root.render(<TargetPicker target={missing} disabled={false} now={() => clock} onAuto={() => undefined} onChange={(next) => changes.push(next)} />); });
+  const picker = element.querySelector('[data-testid="fake-picker"]') as HTMLButtonElement;
+  // Opened, then closed without a pick.
+  await act(async () => { picker.dispatchEvent(new Event("pointerdown", { bubbles: true })); });
+  clock += 30_000;
+  // Provider states refresh and the picker falls back on its own.
+  await act(async () => { picker.click(); });
+  expect(changes).toEqual([]);
+  // Escape also ends the interaction.
+  await act(async () => { picker.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+  await act(async () => { picker.click(); });
+  expect(changes).toEqual([]);
+});
+
+it("counts a pick once: a second report without a new press is dropped", async () => {
+  const changes: Target[] = [];
+  await act(async () => { root.render(<TargetPicker target={missing} disabled={false} onAuto={() => undefined} onChange={(next) => changes.push(next)} />); });
+  const picker = element.querySelector('[data-testid="fake-picker"]') as HTMLButtonElement;
+  await act(async () => { picker.dispatchEvent(new Event("pointerdown", { bubbles: true })); picker.click(); });
+  await act(async () => { picker.click(); });
+  expect(changes).toHaveLength(1);
+});

@@ -106,6 +106,7 @@ export class ModelRouter {
   private states: { at: number; value: ReadonlyMap<string, string> } | null = null;
   private readonly catalogs = new Map<string, { at: number; value: Promise<ReadonlySet<string> | null> }>();
   /** Failed catalog reads in a row, by provider, and whether the last one said the agent couldn't start. */
+  /** Failed catalog reads in a row, keyed like the catalog cache (provider, host, project). */
   private readonly catalogFailures = new Map<string, { count: number; connection: boolean }>();
   private readonly usages = new Map<string, { at: number; value: Promise<UsageSnapshot | null> }>();
 
@@ -172,8 +173,12 @@ export class ModelRouter {
   }
 
   /** A provider's catalog (cached), or null while it can't be read; failures are counted for `unreachable`. */
+  private catalogKey(providerId: string, scope: { hostId: string | null; projectId: string | null }): string {
+    return `${providerId}\0${scope.hostId ?? ""}\0${scope.projectId ?? ""}`;
+  }
+
   private catalog(providerId: string, scope: { hostId: string | null; projectId: string | null }): Promise<ReadonlySet<string> | null> {
-    const key = `${providerId}\0${scope.hostId ?? ""}\0${scope.projectId ?? ""}`;
+    const key = this.catalogKey(providerId, scope);
     const cached = this.catalogs.get(key);
     if (cached && this.now() - cached.at < CATALOG_TTL_MS) return cached.value;
     const value = this.deps.models(providerId, scope)
@@ -181,23 +186,23 @@ export class ModelRouter {
       .then((result) => {
         if (result === null) return null;
         if ("error" in result) {
-          const before = this.catalogFailures.get(providerId)?.count ?? 0;
-          this.catalogFailures.set(providerId, { count: before + 1, connection: isConnectionError(result.error) });
+          const before = this.catalogFailures.get(key)?.count ?? 0;
+          this.catalogFailures.set(key, { count: before + 1, connection: isConnectionError(result.error) });
           // Try a failed read again soon, so a second failure (or a recovery) shows quickly.
           const entry = this.catalogs.get(key);
           if (entry) entry.at = this.now() - CATALOG_TTL_MS + CATALOG_FAILED_TTL_MS;
           return null;
         }
-        this.catalogFailures.delete(providerId);
+        this.catalogFailures.delete(key);
         return result;
       });
     this.catalogs.set(key, { at: this.now(), value });
     return value;
   }
 
-  /** A Pi or ACP agent whose catalog failed twice in a row, or failed because the agent couldn't start. */
-  private unreachable(providerId: string): boolean {
-    const failures = this.catalogFailures.get(providerId);
+  /** A Pi or ACP agent whose catalog failed twice in a row, or failed because the agent couldn't start, counted per host and project like the catalog. */
+  private unreachable(providerId: string, scope: { hostId: string | null; projectId: string | null }): boolean {
+    const failures = this.catalogFailures.get(this.catalogKey(providerId, scope));
     return !!failures && (failures.connection || failures.count >= CATALOG_FAILURES_UNREACHABLE);
   }
 
@@ -254,12 +259,15 @@ export class ModelRouter {
       // A retired model is a lasting problem with the rule; say it before a passing block.
       const models = catalogs.get(target.providerId);
       if (models && !models.has(target.model)) return "model no longer offered";
-      if (models === null && multiBackend(target.providerId) && this.unreachable(target.providerId)) return "unreachable (its models can't be listed)";
+      if (models === null && multiBackend(target.providerId) && this.unreachable(target.providerId, { hostId, projectId: options.projectId ?? null })) return "unreachable (its models can't be listed)";
       const block = this.block(target, now, hostId);
       if (block) return block.reason;
       const spent = usageProblem(usages.get(target.providerId), now, undefined, target.providerId);
       if (spent) return spent;
       const modes = providers.get(target.providerId)?.permissionModes;
+      // Modes unknown (BB's provider list failed, or doesn't name this provider): the check can't run, so the target can't be
+      // picked under a mode. Otherwise BB could fill in "full" for Pi. Auto then falls back to BB's defaults.
+      if (options.permissionMode && modes === undefined) return "permission modes unknown";
       if (options.permissionMode && modes?.length) {
         if (options.exactPermission && !modes.includes(options.permissionMode)) return `doesn't offer ${options.permissionMode}, the mode this thread would get`;
         if (narrowPermission(options.permissionMode, modes) === null) return `no permission mode at or below ${options.permissionMode}`;
@@ -362,17 +370,21 @@ export class ModelRouter {
     // A Pi or ACP agent's other models run on other services (GLM through OpenCode and a local model through OpenCode),
     // so only the failed model is left out; any other provider's limit covers all its models. A sign-in failure covers the agent.
     const wholeProvider = !multi || !failed.model || reading.kind === "sign-in";
-    // Hand off names its mode explicitly, so a mode the target lacks is narrowed (never widened). Unknown counts as BB's default.
-    const requested = execution?.permissionMode ?? DEFAULT_PERMISSION_MODE;
-    const why = await this.availability({
-      exclude: (each) => ((wholeProvider && each.providerId === failed.providerId) || sameTarget(each, failed) ? "the model that failed" : null),
-      permissionMode: requested,
-      projectId: thread.projectId,
-      targets: chain,
-    });
-    const { target } = firstAvailable(chain, why, why.unsure);
+    // Hand off names its mode explicitly, so a mode the target lacks is narrowed (never widened). When the thread's mode can't be
+    // read there is nothing to narrow from, and guessing could widen access: the notice then offers no model.
+    const requested = execution?.permissionMode ?? null;
+    let target: Target | null = null;
+    if (requested) {
+      const why = await this.availability({
+        exclude: (each) => ((wholeProvider && each.providerId === failed.providerId) || sameTarget(each, failed) ? "the model that failed" : null),
+        permissionMode: requested,
+        projectId: thread.projectId,
+        targets: chain,
+      });
+      target = firstAvailable(chain, why, why.unsure).target;
+    }
     const targetModes = target ? providers.get(target.providerId)?.permissionModes ?? [] : [];
-    const permissionMode = target ? (targetModes.length ? narrowPermission(requested, targetModes) : requested) : null;
+    const permissionMode = target && requested ? (targetModes.length ? narrowPermission(requested, targetModes) : requested) : null;
     const failedProviderName = providers.get(thread.providerId)?.name ?? thread.providerId;
     const name = target ? targetName(target, providers.get(target.providerId)?.name) : null;
     const notice: Notice = {
@@ -385,7 +397,7 @@ export class ModelRouter {
       target,
       targetName: name,
       permissionMode,
-      text: noticeText({ kind: reading.kind, providerName: failedProviderName, reason: reading.reason, targetName: name }),
+      text: noticeText({ kind: reading.kind, providerName: failedProviderName, reason: reading.reason, targetName: name, modeUnknown: !requested }),
       createdAt: this.now(),
     };
     // A retry or a new message may have started while this was read: then the failure is old news.
@@ -429,8 +441,9 @@ export class ModelRouter {
     ]);
     if (!thread) throw new Error(`Thread ${threadId} is gone.`);
     const modes = providers.get(notice.target.providerId)?.permissionModes ?? [];
-    // A thread whose mode can't be read counts as on BB's default; the request always names the mode, so BB never fills in a wider one.
-    const requested = execution?.permissionMode ?? DEFAULT_PERMISSION_MODE;
+    // The request always names the mode, narrowed from the thread's own; with no mode to narrow from, nothing is guessed.
+    const requested = execution?.permissionMode ?? null;
+    if (!requested) throw new Error("This conversation's permission mode can't be read, so Hand off can't tell which mode the new conversation may have.");
     const permission = modes.length ? narrowPermission(requested, modes) : requested;
     if (permission === null) throw new Error(`${notice.targetName ?? notice.target.model} has no permission mode at or below ${requested}.`);
     const created = await this.deps.spawn(handoffRequest(thread, notice.target, permission));
