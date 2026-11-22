@@ -29,6 +29,9 @@ final class NoFadeUITests: ServerIsolatedUITestCase {
             let until = Date().addingTimeInterval(15)
             while !(0..<200).contains(composer.frame.minX), Date() < until { Thread.sleep(forTimeInterval: 0.25) }
         }
+        // A draft left by an earlier test (a photo, text) makes the composer taller.
+        command("draft?0")
+        for _ in 0..<3 where app.buttons["Remove attachment"].firstMatch.exists { app.buttons["Remove attachment"].firstMatch.tap() }
         Thread.sleep(forTimeInterval: 1)
         command("mid")
         _ = jump.waitForExistence(timeout: 5)
@@ -54,9 +57,10 @@ final class NoFadeUITests: ServerIsolatedUITestCase {
             print("NO FADE \(name) step=\(step) bright=\(count) jump=\(jump.frame) composer=\(composer.frame)")
             brightest = max(brightest, count)
             if count >= 20 || !jump.exists { break }
+            // From plain text well above the controls (a card there can keep the drag).
             let start = app.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: composer.frame.midX, dy: composer.frame.minY - 200))
-            start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 17)),
+                .withOffset(CGVector(dx: composer.frame.midX, dy: max(160, composer.frame.minY - 420)))
+            start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 29)),
                         withVelocity: .slow, thenHoldForDuration: 0.3)
             Thread.sleep(forTimeInterval: 0.6)
         }
