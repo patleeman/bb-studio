@@ -100,16 +100,12 @@ final class TranscriptPastEndUITests: ServerIsolatedUITestCase {
         let away: [(String, String?)] = [("plain", nil), ("again", nil), ("reply while away", "stream?While%20away"),
                                          ("burst while away", "burst?40"), ("after burst", nil)]
         for (name, change) in away {
-            let back = app.buttons["Bots"].firstMatch
-            XCTAssertTrue(back.waitForExistence(timeout: 10), "No way back to the Bots list")
-            back.tap()
-            let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Juniper'")).firstMatch
-            XCTAssertTrue(row.waitForExistence(timeout: 10), "The Bots list has no Juniper row")
+            leave()
             if let change {
                 command(change)
                 Thread.sleep(forTimeInterval: 6)
             }
-            row.tap()
+            reopen()
             XCTAssertTrue(app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch.waitForExistence(timeout: 10))
             watchStream("reopen \(name): opening", seconds: 3)
             expectAtEnd("reopen \(name)")
@@ -119,7 +115,7 @@ final class TranscriptPastEndUITests: ServerIsolatedUITestCase {
     }
 
     /// Patrick, Oct 25, on the Duo's outer screen: send, the reply streams
-    /// in, back to the Bots list, reopen: black between the header and an
+    /// in, away and back, reopen: black between the header and an
     /// empty composer until the composer is tapped. Not with a draft in the
     /// composer. Each round sends with the keyboard up, waits for the reply,
     /// and goes back with the keyboard still up or closed; the finished reply
@@ -139,13 +135,9 @@ final class TranscriptPastEndUITests: ServerIsolatedUITestCase {
             Thread.sleep(forTimeInterval: 9)
             if !keyboard { command("dismiss") }
             record("r\(round) replied, keyboard \(keyboard ? "up" : "closed")")
-            let back = app.buttons["Bots"].firstMatch
-            XCTAssertTrue(back.waitForExistence(timeout: 10), "No way back to the Bots list")
-            back.tap()
-            let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Juniper'")).firstMatch
-            XCTAssertTrue(row.waitForExistence(timeout: 10), "The Bots list has no Juniper row")
+            leave()
             Thread.sleep(forTimeInterval: 1)
-            row.tap()
+            reopen()
             XCTAssertTrue(composer.waitForExistence(timeout: 10))
             watchStream("r\(round) reopened", seconds: 3)
             expectAtEnd("r\(round) reopened at rest")
@@ -167,12 +159,8 @@ final class TranscriptPastEndUITests: ServerIsolatedUITestCase {
         command("dismiss")
         expectAtEnd("replied, quick replies up")
         for delay in [0.2, 0.8, 1.6, 2.4, 2.8, 3.4] {
-            let back = app.buttons["Bots"].firstMatch
-            XCTAssertTrue(back.waitForExistence(timeout: 10), "No way back to the Bots list")
-            back.tap()
-            let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Juniper'")).firstMatch
-            XCTAssertTrue(row.waitForExistence(timeout: 10), "The Bots list has no Juniper row")
-            row.tap()
+            leave()
+            reopen()
             Thread.sleep(forTimeInterval: delay)
             command("draft?4")
             Thread.sleep(forTimeInterval: 0.3)
@@ -216,6 +204,13 @@ final class TranscriptPastEndUITests: ServerIsolatedUITestCase {
         shot("folded")
         finish()
     }
+
+    /// Away from the chat: another conversation from the one list (the Bots
+    /// list it used to go back to is gone).
+    private func leave() { app.pickConversation("thr_demo_interview") }
+
+    /// Back to the Bot's chat, Main.
+    private func reopen() { app.pickConversation("thr_botdemo01") }
 
     private func open(stream: Bool = false, next: Bool = false) -> XCUIElement {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog",

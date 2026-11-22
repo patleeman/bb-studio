@@ -141,7 +141,11 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
 
         // Your last message: Edit puts it back in the composer. Sent from
         // here: the demo's answer is short, so it stays on screen.
-        composerField.tap()
+        // A closing menu can swallow the first tap.
+        for _ in 0..<3 where !app.keyboards.firstMatch.exists {
+            composerField.tap()
+            _ = app.keyboards.firstMatch.waitForExistence(timeout: 3)
+        }
         composerField.typeText("Edit me please")
         app.buttons["Send"].firstMatch.tap()
         command("dismiss")
@@ -386,8 +390,11 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         // newest in the tree.
         let matching = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != 'bot-reply-copy'", item))
         let before = matching.count
+        let beforeFrames = Set(matching.allElementsBoundByIndex.map { "\($0.frame)" })
         var opened = false
         for _ in 0..<2 where !opened {
+            // The reply is at the end; a closed menu can leave the view elsewhere.
+            if !element.exists { command("bottom"); _ = element.waitForExistence(timeout: 5) }
             let until = Date().addingTimeInterval(5)
             while !(element.exists && element.isHittable), Date() < until { Thread.sleep(forTimeInterval: 0.25) }
             element.press(forDuration: 1)
@@ -395,7 +402,9 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
             while matching.count <= before, Date() < deadline { Thread.sleep(forTimeInterval: 0.2) }
             opened = matching.count > before
         }
-        if opened { matching.element(boundBy: matching.count - 1).tap() } else { failures.append("\(step): no \(item) in the menu") }
+        // The menu's item: not one that was there before the press (a code block's Copy).
+        let added = matching.allElementsBoundByIndex.last { !beforeFrames.contains("\($0.frame)") }
+        if opened { (added ?? matching.element(boundBy: matching.count - 1)).tap() } else { failures.append("\(step): no \(item) in the menu") }
         Thread.sleep(forTimeInterval: 0.8)
     }
 
@@ -544,12 +553,13 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         if visible != shown { failures.append("\(step): the pill is \(visible ? "shown" : "hidden")") }
     }
 
-    /// The composer's resting gap: 8 pt over the home indicator (phone, outer
-    /// screen), or 8 pt over the window's edge beside two pages.
+    /// The composer's resting gap: on the home indicator's inset (phone, outer
+    /// screen; the room has no tab bar to sit 8 pt above), or 8 pt over the
+    /// window's edge beside two pages.
     private func expectGap(_ step: String) {
         guard let geometry = window() else { return failures.append("\(step): no layout") }
         let below = geometry.height - composer.frame.maxY - (layout == "split" ? 0 : app.frame.minY)
-        let expected: CGFloat = layout == "split" ? 8 : layout == "outer" ? geometry.safeBottom : 8 + geometry.safeBottom
+        let expected: CGFloat = layout == "split" ? 8 : geometry.safeBottom
         steps.append(String(format: "%@: composer gap %.1f (expected %.1f, safe bottom %.1f)", step, below, expected, geometry.safeBottom))
         // A tab bar under the Bot chat on a phone holds the composer higher.
         if layout == "split" ? abs(below - expected) > 2 : below < expected - 2 {
@@ -567,7 +577,8 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         let probe = window()?.keyboardTop ?? .nan
         steps.append(String(format: "%@: frames: composer bottom %.1f, keyboard frame top %.1f, XCUITest keyboard top %.1f",
                             step, composer.frame.maxY, probe, app.keyboards.firstMatch.frame.minY))
-        guard let gap = drawnGapUnderComposer() ?? (inRoom && probe.isFinite ? probe - composer.frame.maxY : nil) else {
+        // The room's backdrop draws no black band to measure: then the keyboard frame the app is told.
+        guard let gap = drawnGapUnderComposer() ?? (probe.isFinite ? probe - composer.frame.maxY : nil) else {
             return failures.append("\(step): no keyboard drawn under the composer")
         }
         steps.append(String(format: "%@: composer %.1f pt above the keyboard (drawn)", step, gap))
