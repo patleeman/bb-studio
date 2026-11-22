@@ -3,13 +3,21 @@
 import type { ReplyTagView, StrandAsk, StrandList, StrandView } from "../contract";
 
 type TagReply = Omit<ReplyTagView, "line"> & { line?: string | null };
-export type Tags = { tags: readonly { turnId: string; seq: number; strandId: string | null; kind?: "user" | "report" }[]; strands: readonly { id: string; title: string }[]; replies?: readonly TagReply[] };
+export type Tags = { tags: readonly { turnId: string; seq: number; strandId: string | null; kind?: "user" | "report"; at?: number | null; line?: string | null }[]; strands: readonly { id: string; title: string; done?: boolean }[]; replies?: readonly TagReply[] };
 
 /** A run of status replies shorter than this stays open. */
 export const RUN_MIN = 3;
 
 /** One run of status replies folded into one line (BB's timeline folds, slots.experimental_timelineFilter's `folds`). */
-export interface StatusRunFold { id: string; turnIds: string[]; label: string }
+export interface StatusRunFold {
+  id: string;
+  turnIds: string[];
+  label: string;
+  /** The line when BB folds only some of the run's turns (it cut the run short): their count and the last one's line. */
+  labelFor(turnIds: readonly string[]): string;
+}
+
+const runLabel = (count: number, last: string | null) => `${count} updates${last ? ` · last: ${last}` : ""}`;
 
 /**
  * The conversation's runs of status replies to fold: consecutive turns whose
@@ -34,9 +42,14 @@ export function statusRunFolds(tags: Tags | null | undefined, openTurns: Readonl
   }
   close();
   return runs
-    .map((each) => {
-      const last = each.at(-1)!.line;
-      return { id: `run:${each[0]!.turnId}`, turnIds: each.map((turn) => turn.turnId), label: `${each.length} updates${last ? ` · last: ${last}` : ""}` };
+    .map((each): StatusRunFold => {
+      const lines = new Map(each.map((turn) => [turn.turnId, turn.line]));
+      return {
+        id: `run:${each[0]!.turnId}`,
+        turnIds: each.map((turn) => turn.turnId),
+        label: runLabel(each.length, each.at(-1)!.line),
+        labelFor: (turnIds) => runLabel(turnIds.length, lines.get(turnIds.at(-1) ?? "") ?? null),
+      };
     })
     .filter((fold) => !fold.turnIds.some((turnId) => openTurns.has(turnId)));
 }

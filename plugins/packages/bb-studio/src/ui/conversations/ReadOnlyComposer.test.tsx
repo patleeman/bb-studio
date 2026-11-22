@@ -40,6 +40,7 @@ vi.mock("../../kit/app/index", () => ({
   DropdownMenuItem: ({ children, onSelect, ...rest }: { children: React.ReactNode; onSelect?: () => void }) => <div role="menuitem" {...rest} onClick={() => onSelect?.()}>{children}</div>,
 }));
 vi.mock("./ConversationApprovals", () => ({ ConversationApprovals: () => null, ConversationApprovalsBanner: () => null }));
+vi.mock("../../strands/ui/Zoom", () => ({ ZoomSwitch: () => null }));
 vi.mock("../../strands/ui/Strip", () => ({ StrandsBoxFor: ({ threadId }: { threadId: string }) => <div data-testid="strands-box" data-thread={threadId} /> }));
 
 import { ReadOnlyComposer, ReadOnlyFallbackBanner, readOnlyKind, registerReadOnlyComposer, setWorkerStatusInHeader, setWorkerStatusOnTop, useReadOnly, useStudioThreadHeader, WorkerFromRow, WorkerStatusBanner } from "./ReadOnlyComposer";

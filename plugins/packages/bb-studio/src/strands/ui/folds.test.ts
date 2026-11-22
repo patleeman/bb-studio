@@ -18,7 +18,11 @@ const status = (key: string, kind: "user" | "report" = "report"): Turn => ({ key
 describe("runs of status replies to fold", () => {
   it("folds consecutive status replies with no message the user typed between them; the turn the user started may open the run", () => {
     const day = tags([status("a", "user"), status("b"), status("c"), status("d"), { key: "e", kind: "user", tag: "status" }, status("f")]);
-    expect(statusRunFolds(day)).toEqual([{ id: "run:a", turnIds: ["a", "b", "c", "d"], label: "4 updates · last: d said" }]);
+    const [fold] = statusRunFolds(day);
+    expect(fold).toMatchObject({ id: "run:a", turnIds: ["a", "b", "c", "d"], label: "4 updates · last: d said" });
+    // BB cut the run short: the line counts what it folds.
+    expect(fold!.labelFor(["a", "b"])).toBe("2 updates · last: b said");
+    expect(statusRunFolds(day)).toHaveLength(1);
   });
 
   it("ends a run at a reply that needs the user or one with no tag; shorter runs stay open", () => {

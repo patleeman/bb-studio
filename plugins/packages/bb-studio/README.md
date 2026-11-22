@@ -4459,7 +4459,19 @@ strands. Quiet `[PASS]` replies and the backfill's history aren't tagged.
   the conversation's newest reply never folds. With a strand picked, nothing
   folds, and a jump to a folded reply opens its run first. This needs a BB
   whose timeline folds runs (the fork's `folds` on
-  `slots.experimental_timelineFilter`); an older BB folds nothing.
+  `slots.experimental_timelineFilter`); an older BB folds nothing. When BB
+  cuts a run short, the line counts only the replies it folds.
+- Semantic zoom: a conversation zooms out in place. **Messages** is the
+  chat; **Strands** shows one line per stretch of one strand: "|\" where a
+  strand starts, "|" where it goes on, a dot where it ends, then its name,
+  how many messages, its key moment (the open ask, in amber; an answered
+  ask; your message; else the newest status line) and the time. Pinch,
+  ⌥⌘− / ⌥⌘= (rebindable) or the header's Messages · Strands · Tree switch
+  move between them; the message in the middle stays in the middle, and a
+  click on a line zooms back in to its key moment. The header also shows
+  "N need you", which goes to the ask. Where BB zooms (the fork's `zoom` on
+  `slots.experimental_timelineFilter`) the strands box above the composer is
+  gone; an older BB keeps the box and has no zoom. Tree comes next.
 - It counts as an ask on its strand ("N need you" in the box, the overview,
   the sidebar), with **Jump to reply** and **Done**; picking the strand opens
   the reply. Jump to reply lands on the marked sentence and flashes it.

@@ -26,7 +26,7 @@ import type { StrandAsk, StrandView } from "../contract";
 import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, replyAskOf, rowWorkersOf, seqsOf, stepSeq, strayCountsOf, stripShown } from "./model";
 import { hostContextSegments, useHidePromptStack } from "./prompt-stack";
 import { flashReply } from "./ask-mark";
-import { openFoldOf, select, selectionOf, setStrandTurns, useSelection } from "./selection";
+import { openFoldOf, select, selectionOf, setStrandTurns, useSelection, zoomInHost } from "./selection";
 
 export const STRANDS_TAB = "strands";
 export const STRANDS_POLL_MS = 30_000;
@@ -78,7 +78,8 @@ export function StrandsBoxFor({ threadId }: { threadId: string }) {
     ...(shown && hasOpen(list.data) ? ["active-child-threads" as const] : []),
     ...(list.data?.enabled && hostContextSegments() ? ["thread-context" as const] : []),
   ]);
-  if (!shown) return null;
+  // Where BB zooms (the fork's zoom seam), the header's switch and "N need you" take the box's place.
+  if (!shown || zoomInHost()) return null;
   return <StrandsBox threadId={threadId} />;
 }
 
