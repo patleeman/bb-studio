@@ -1,0 +1,384 @@
+{
+ "id": "thr_synhome0001",
+ "title": "Household assistant",
+ "strands": [
+  {
+   "key": "bike",
+   "title": "Bike repair",
+   "parent": null
+  },
+  {
+   "key": "garden",
+   "title": "Garden beds",
+   "parent": null
+  },
+  {
+   "key": "recycling",
+   "title": "Recycling schedule",
+   "parent": null
+  },
+  {
+   "key": "groceries",
+   "title": "Weekly groceries",
+   "parent": null
+  },
+  {
+   "key": "party",
+   "title": "Birthday party",
+   "parent": null
+  },
+  {
+   "key": "party-cake",
+   "title": "Party cake",
+   "parent": "party"
+  }
+ ],
+ "today": [
+  {
+   "id": "str_today01",
+   "title": "Bike repair"
+  },
+  {
+   "id": "str_today02",
+   "title": "Garden beds"
+  },
+  {
+   "id": "str_today03",
+   "title": "Recycling schedule"
+  },
+  {
+   "id": "str_today04",
+   "title": "Weekly groceries"
+  },
+  {
+   "id": "str_today05",
+   "title": "Birthday party"
+  }
+ ],
+ "workers": [
+  {
+   "id": "thr_synwork0201",
+   "title": "Compare: brake pads and repair slots",
+   "createdAt": 1935824850000
+  },
+  {
+   "id": "thr_synwork0202",
+   "title": "Plan: niece's birthday party",
+   "createdAt": 1935826350000
+  }
+ ],
+ "turns": [
+  {
+   "seq": 1010,
+   "at": 1935824580000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_syndige0001] Morning digest: rain this afternoon; recycling pickup is tomorrow.",
+   "reply": "Morning: rain later today, and recycling goes out tomorrow. I'll remind you tonight.",
+   "finalReply": "Morning: rain later today, and recycling goes out tomorrow. I'll remind you tonight.",
+   "label": {
+    "strand": "recycling",
+    "also": []
+   },
+   "today": "str_today03"
+  },
+  {
+   "seq": 1020,
+   "at": 1935824820000,
+   "kind": "user",
+   "text": "My bike's back brake squeaks and barely stops. Fix or replace the pads?",
+   "reply": "Squeaking plus weak braking usually means worn or glazed pads. I'll have a worker compare pad options for your brake type and find the nearest repair slots.",
+   "finalReply": "Squeaking plus weak braking usually means worn or glazed pads. I'll have a worker compare pad options for your brake type and find the nearest repair slots.",
+   "label": {
+    "strand": "bike",
+    "also": []
+   },
+   "today": "str_today01"
+  },
+  {
+   "seq": 1030,
+   "at": 1935825000000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0201] Plan: identify the caliper model from the photo, list three pad options, check two shops' booking pages.",
+   "reply": "[PASS]",
+   "finalReply": "[PASS]",
+   "label": {
+    "strand": "bike",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1040,
+   "at": 1935825240000,
+   "kind": "user",
+   "text": "The tomato bed needs more sun. Should I move it to the south fence?",
+   "reply": "The south fence gets about two more hours of sun. Moving it is a good idea; do it on a dry day so the soil isn't heavy.",
+   "finalReply": "The south fence gets about two more hours of sun. Moving it is a good idea; do it on a dry day so the soil isn't heavy.",
+   "label": {
+    "strand": "garden",
+    "also": []
+   },
+   "today": "str_today02"
+  },
+  {
+   "seq": 1050,
+   "at": 1935825420000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_syndige0001] Hourly check: nothing new.",
+   "reply": "[PASS]",
+   "finalReply": "[PASS]",
+   "label": {
+    "strand": "none",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1060,
+   "at": 1935825600000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0201] Two shops have Saturday slots; pads are standard road caliper pads.",
+   "reply": "Both shops can do it Saturday. Want me to book the morning slot at the closer one?\n\n::next{reply=\"👍 Book it\" do=\"I'll do it myself\"}",
+   "finalReply": "Both shops can do it Saturday. Want me to book the morning slot at the closer one?\n\n::next{reply=\"👍 Book it\" do=\"I'll do it myself\"}",
+   "label": {
+    "strand": "bike",
+    "also": []
+   },
+   "today": "str_today01"
+  },
+  {
+   "seq": 1070,
+   "at": 1935825840000,
+   "kind": "user",
+   "text": "👍 Book it",
+   "reply": "Booked for Saturday at 10:00.",
+   "finalReply": "Booked for Saturday at 10:00.",
+   "label": {
+    "strand": "bike",
+    "also": [],
+    "clears": [
+     1060
+    ]
+   },
+   "today": "str_today01"
+  },
+  {
+   "seq": 1080,
+   "at": 1935826080000,
+   "kind": "user",
+   "text": "Plan groceries for the week: mostly vegetarian, one fish night.",
+   "reply": "Here's a plan: lentil soup, veggie tacos, pasta with greens, a fish night with rice, and a big salad. The list is on the page.",
+   "finalReply": "Here's a plan: lentil soup, veggie tacos, pasta with greens, a fish night with rice, and a big salad. The list is on the page.",
+   "label": {
+    "strand": "groceries",
+    "also": []
+   },
+   "today": "str_today04"
+  },
+  {
+   "seq": 1090,
+   "at": 1935826320000,
+   "kind": "user",
+   "text": "We're having a birthday party for my niece in two weeks. Help me plan it?",
+   "reply": "Happy to. I'll start a worker on a plan: guest list, games for eight-year-olds, food, and a timeline.",
+   "finalReply": "Happy to. I'll start a worker on a plan: guest list, games for eight-year-olds, food, and a timeline.",
+   "label": {
+    "strand": "party",
+    "also": []
+   },
+   "today": "str_today05"
+  },
+  {
+   "seq": 1100,
+   "at": 1935826500000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0202] Plan: 12 kids, garden games if dry, pizza, and a cake. Timeline on the page.",
+   "reply": "[PASS]",
+   "finalReply": "[PASS]",
+   "label": {
+    "strand": "party",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1110,
+   "at": 1935826680000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_syndige0001] Evening digest: recycling goes out tonight; it's paper week.",
+   "reply": "Reminder: recycling goes out tonight, and it's paper week.",
+   "finalReply": "Reminder: recycling goes out tonight, and it's paper week.",
+   "label": {
+    "strand": "recycling",
+    "also": []
+   },
+   "today": "str_today05"
+  },
+  {
+   "seq": 1120,
+   "at": 1935826920000,
+   "kind": "user",
+   "text": "ok",
+   "reply": "👍",
+   "finalReply": "👍",
+   "label": {
+    "strand": "recycling",
+    "also": []
+   },
+   "today": "str_today05"
+  },
+  {
+   "seq": 1130,
+   "at": 1935827160000,
+   "kind": "user",
+   "text": "What's on my plate this week?",
+   "reply": "This week:\n- **Bike:** repair booked Saturday at 10:00.\n- **Garden:** move the tomato bed on a dry day.\n- **Groceries:** list ready on the page.\n- **Party:** plan drafted; the cake isn't decided yet.\nShould I ask the bakery about a cake for twelve?",
+   "finalReply": "This week:\n- **Bike:** repair booked Saturday at 10:00.\n- **Garden:** move the tomato bed on a dry day.\n- **Groceries:** list ready on the page.\n- **Party:** plan drafted; the cake isn't decided yet.\nShould I ask the bakery about a cake for twelve?",
+   "label": {
+    "strand": "trunk",
+    "also": []
+   },
+   "today": "str_today05"
+  },
+  {
+   "seq": 1140,
+   "at": 1935827400000,
+   "kind": "user",
+   "text": "> Should I ask the bakery about a cake for twelve?\nYes, chocolate.",
+   "reply": "Asking the bakery for a chocolate cake for twelve.",
+   "finalReply": "Asking the bakery for a chocolate cake for twelve.",
+   "label": {
+    "strand": "party-cake",
+    "also": [
+     "party"
+    ],
+    "clears": [
+     1130
+    ]
+   },
+   "today": "str_today05"
+  },
+  {
+   "seq": 1150,
+   "at": 1935827520000,
+   "kind": "report",
+   "text": "",
+   "reply": "The bakery replied: chocolate for twelve is available; they need the order by Wednesday.",
+   "finalReply": "The bakery replied: chocolate for twelve is available; they need the order by Wednesday.",
+   "label": {
+    "strand": "party-cake",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1160,
+   "at": 1935827760000,
+   "kind": "user",
+   "text": "Order it.",
+   "reply": "Ordered; pickup on the party morning.",
+   "finalReply": "Ordered; pickup on the party morning.",
+   "label": {
+    "strand": "party-cake",
+    "also": []
+   },
+   "today": "str_today05"
+  },
+  {
+   "seq": 1170,
+   "at": 1935827940000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_syndige0001] Hourly check: nothing new.",
+   "reply": "[PASS]",
+   "finalReply": "[PASS]",
+   "label": {
+    "strand": "none",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1180,
+   "at": 1935828180000,
+   "kind": "user",
+   "text": "It's dry tomorrow. Remind me to move the tomato bed at 9.",
+   "reply": "Reminder set for 9:00 tomorrow.",
+   "finalReply": "Reminder set for 9:00 tomorrow.",
+   "label": {
+    "strand": "garden",
+    "also": []
+   },
+   "today": "str_today02"
+  },
+  {
+   "seq": 1190,
+   "at": 1935828360000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0202] Invitations drafted; garden games list done; backup indoor games if it rains.",
+   "reply": "The party invitations are drafted, with garden games and indoor backups. Want to see the invitation before it goes out?\n\n::next{reply=\"👍 Send them\" do=\"Show me\"}",
+   "finalReply": "The party invitations are drafted, with garden games and indoor backups. Want to see the invitation before it goes out?\n\n::next{reply=\"👍 Send them\" do=\"Show me\"}",
+   "label": {
+    "strand": "party",
+    "also": []
+   },
+   "today": "str_today05"
+  },
+  {
+   "seq": 1200,
+   "at": 1935828600000,
+   "kind": "user",
+   "text": "👍 Send them",
+   "reply": "Sent to the twelve families.",
+   "finalReply": "Sent to the twelve families.",
+   "label": {
+    "strand": "party",
+    "also": [],
+    "clears": [
+     1190
+    ]
+   },
+   "today": "str_today05"
+  },
+  {
+   "seq": 1210,
+   "at": 1935828840000,
+   "kind": "user",
+   "text": "Add birthday candles and juice to the grocery list.",
+   "reply": "Added candles and juice to this week's list.",
+   "finalReply": "Added candles and juice to this week's list.",
+   "label": {
+    "strand": "groceries",
+    "also": [
+     "party"
+    ]
+   },
+   "today": "str_today04"
+  },
+  {
+   "seq": 1220,
+   "at": 1935829020000,
+   "kind": "report",
+   "text": "[bb system] @thread:thr_synwork0201 completed: Shop confirmed Saturday 10:00; they'll also check the chain.",
+   "reply": "[PASS]",
+   "finalReply": "[PASS]",
+   "label": {
+    "strand": "bike",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1230,
+   "at": 1935829260000,
+   "kind": "user",
+   "text": "How's everything looking?",
+   "reply": "All on track:\n- **Bike:** Saturday 10:00, they'll check the chain too.\n- **Garden:** reminder at 9 tomorrow.\n- **Party:** invitations sent, cake ordered.\n- **Recycling:** paper went out.",
+   "finalReply": "All on track:\n- **Bike:** Saturday 10:00, they'll check the chain too.\n- **Garden:** reminder at 9 tomorrow.\n- **Party:** invitations sent, cake ordered.\n- **Recycling:** paper went out.",
+   "label": {
+    "strand": "trunk",
+    "also": []
+   },
+   "today": "str_today04"
+  }
+ ]
+}

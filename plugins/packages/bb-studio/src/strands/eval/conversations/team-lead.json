@@ -1,0 +1,514 @@
+{
+ "id": "thr_synlead0001",
+ "title": "Lumen team lead",
+ "strands": [
+  {
+   "key": "sync-bug",
+   "title": "Offline sync bug",
+   "parent": null
+  },
+  {
+   "key": "release-24",
+   "title": "Release 2.4",
+   "parent": "sync-bug"
+  },
+  {
+   "key": "onboarding",
+   "title": "Onboarding redesign",
+   "parent": null
+  },
+  {
+   "key": "billing",
+   "title": "Billing migration",
+   "parent": null
+  },
+  {
+   "key": "docs-search",
+   "title": "Docs search",
+   "parent": null
+  },
+  {
+   "key": "startup",
+   "title": "Startup time",
+   "parent": null
+  }
+ ],
+ "today": [
+  {
+   "id": "str_today01",
+   "title": "Offline sync bug"
+  },
+  {
+   "id": "str_today02",
+   "title": "Onboarding redesign"
+  },
+  {
+   "id": "str_today03",
+   "title": "Billing migration"
+  },
+  {
+   "id": "str_today04",
+   "title": "Docs search"
+  },
+  {
+   "id": "str_today05",
+   "title": "Startup time"
+  }
+ ],
+ "workers": [
+  {
+   "id": "thr_synwork0001",
+   "title": "Fix: offline edits lost on reconnect",
+   "createdAt": 1935824670000
+  },
+  {
+   "id": "thr_synwork0002",
+   "title": "Design: shorter onboarding",
+   "createdAt": 1935825270000
+  },
+  {
+   "id": "thr_synwork0003",
+   "title": "Plan: billing provider migration",
+   "createdAt": 1935827130000
+  },
+  {
+   "id": "thr_synwork0004",
+   "title": "Fix: docs search misses guides",
+   "createdAt": 1935828750000
+  }
+ ],
+ "turns": [
+  {
+   "seq": 1010,
+   "at": 1935824640000,
+   "kind": "user",
+   "text": "Notes edited offline on Android vanish after reconnecting. Can you find out why?",
+   "reply": "Looking at the sync queue now. I'm starting a worker to reproduce it on the emulator with airplane mode.",
+   "finalReply": "Looking at the sync queue now. I'm starting a worker to reproduce it on the emulator with airplane mode.",
+   "label": {
+    "strand": "sync-bug",
+    "also": []
+   },
+   "today": "str_today01"
+  },
+  {
+   "seq": 1020,
+   "at": 1935824820000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0001] Plan: reproduce with two devices, log the merge step, check the conflict resolver's clock handling. Report in about an hour.",
+   "reply": "[PASS]",
+   "finalReply": "[PASS]",
+   "label": {
+    "strand": "sync-bug",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1030,
+   "at": 1935825000000,
+   "kind": "report",
+   "text": "[bb system] @thread:thr_synwork0001 completed: Still reproducing; the emulator clock drifts, so I'm pinning it.",
+   "reply": "[PASS]",
+   "finalReply": "[PASS]",
+   "label": {
+    "strand": "sync-bug",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1040,
+   "at": 1935825240000,
+   "kind": "user",
+   "text": "Also, the onboarding flow feels long. Five screens before you can write anything.",
+   "reply": "Agreed, it's long. I'll ask a designer worker for two shorter flows: one with three screens, one that drops you straight into an empty note with tips inline.",
+   "finalReply": "Agreed, it's long. I'll ask a designer worker for two shorter flows: one with three screens, one that drops you straight into an empty note with tips inline.",
+   "label": {
+    "strand": "onboarding",
+    "also": []
+   },
+   "today": "str_today02"
+  },
+  {
+   "seq": 1050,
+   "at": 1935825420000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0001] Found it: the resolver compares device clocks, and the reconnecting device's clock was behind, so its edits lost every conflict. Fix: use the server's sequence numbers. Branch fix-sync-seq, tests green.",
+   "reply": "The sync fix is ready on fix-sync-seq: the resolver now trusts the server's sequence numbers instead of device clocks. Want me to merge it?\n\n::next{reply=\"👍 Merge the sync fix\" do=\"Wait for review\"}",
+   "finalReply": "The sync fix is ready on fix-sync-seq: the resolver now trusts the server's sequence numbers instead of device clocks. Want me to merge it?\n\n::next{reply=\"👍 Merge the sync fix\" do=\"Wait for review\"}",
+   "label": {
+    "strand": "sync-bug",
+    "also": []
+   },
+   "today": "str_today01"
+  },
+  {
+   "seq": 1060,
+   "at": 1935825660000,
+   "kind": "user",
+   "text": "👍 Merge the sync fix",
+   "reply": "Merged. It goes out with the next release.",
+   "finalReply": "Merged. It goes out with the next release.",
+   "label": {
+    "strand": "sync-bug",
+    "also": [],
+    "clears": [
+     1050
+    ]
+   },
+   "today": "str_today01"
+  },
+  {
+   "seq": 1070,
+   "at": 1935825840000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0002] Plan: two flows in the design, A (three screens) and B (empty note with inline tips). Screens by noon.",
+   "reply": "[PASS]",
+   "finalReply": "[PASS]",
+   "label": {
+    "strand": "onboarding",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1080,
+   "at": 1935826080000,
+   "kind": "user",
+   "text": "How long does the app take to start on an older phone? It felt slow this morning.",
+   "reply": "On a four-year-old Android it's about 3.1 seconds to the first note. Most of that is loading every notebook's index up front. Loading only the open notebook should cut it in half.",
+   "finalReply": "On a four-year-old Android it's about 3.1 seconds to the first note. Most of that is loading every notebook's index up front. Loading only the open notebook should cut it in half.",
+   "label": {
+    "strand": "startup",
+    "also": []
+   },
+   "today": "str_today05"
+  },
+  {
+   "seq": 1090,
+   "at": 1935826320000,
+   "kind": "user",
+   "text": "Do that, but keep the search index warm somehow.",
+   "reply": "I'll load the open notebook first and build the other indexes in the background after the first frame. Search waits on them only if you search right away.",
+   "finalReply": "I'll load the open notebook first and build the other indexes in the background after the first frame. Search waits on them only if you search right away.",
+   "label": {
+    "strand": "startup",
+    "also": []
+   },
+   "today": "str_today05"
+  },
+  {
+   "seq": 1100,
+   "at": 1935826440000,
+   "kind": "report",
+   "text": "",
+   "reply": "The startup trace finished: 3.1 s before, 1.4 s with lazy indexes on the same phone.",
+   "finalReply": "The startup trace finished: 3.1 s before, 1.4 s with lazy indexes on the same phone.",
+   "label": {
+    "strand": "startup",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1110,
+   "at": 1935826620000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0002] Both flows are in the design (screens 1a-1c and 2a-2b). I recommend B.",
+   "reply": "The designer drew both flows. A has three screens; B drops you into an empty note with tips inline, and the designer recommends B. Which one should we build?\n\n::next{reply=\"👍 Build B\" do=\"Build A\"}",
+   "finalReply": "The designer drew both flows. A has three screens; B drops you into an empty note with tips inline, and the designer recommends B. Which one should we build?\n\n::next{reply=\"👍 Build B\" do=\"Build A\"}",
+   "label": {
+    "strand": "onboarding",
+    "also": []
+   },
+   "today": "str_today02"
+  },
+  {
+   "seq": 1120,
+   "at": 1935826860000,
+   "kind": "user",
+   "text": "👍 Build B",
+   "reply": "Building B. The designer stays on it for the build.",
+   "finalReply": "Building B. The designer stays on it for the build.",
+   "label": {
+    "strand": "onboarding",
+    "also": [],
+    "clears": [
+     1110
+    ]
+   },
+   "today": "str_today02"
+  },
+  {
+   "seq": 1130,
+   "at": 1935827100000,
+   "kind": "user",
+   "text": "We need to move billing off the old payment provider before it shuts down in June.",
+   "reply": "I'll start a worker to plan the migration: map the old webhooks to the new provider's events, and a dry run against the sandbox. It reports with a plan first.",
+   "finalReply": "I'll start a worker to plan the migration: map the old webhooks to the new provider's events, and a dry run against the sandbox. It reports with a plan first.",
+   "label": {
+    "strand": "billing",
+    "also": []
+   },
+   "today": "str_today03"
+  },
+  {
+   "seq": 1140,
+   "at": 1935827280000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0003] Plan: 1) map 14 webhook types, 2) dual-write invoices for two weeks, 3) switch reads, 4) turn off the old provider. Dry run in the sandbox first.",
+   "reply": "[PASS]",
+   "finalReply": "[PASS]",
+   "label": {
+    "strand": "billing",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1150,
+   "at": 1935827460000,
+   "kind": "report",
+   "text": "[bb system] @thread:thr_synwork0002 completed: Flow B is built behind a flag; screenshots in the design.",
+   "reply": "[PASS]",
+   "finalReply": "[PASS]",
+   "label": {
+    "strand": "onboarding",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1160,
+   "at": 1935827700000,
+   "kind": "user",
+   "text": "Where are we on everything?",
+   "reply": "Here is where each thing stands:\n- **Offline sync:** fixed and merged; it ships with the next release.\n- **Onboarding:** flow B is built behind a flag.\n- **Startup:** lazy indexes cut it from 3.1 s to 1.4 s on an old phone; not merged yet.\n- **Billing:** the migration plan is in, dry run next.\nShould I cut release 2.4 with the sync fix and the startup change?",
+   "finalReply": "Here is where each thing stands:\n- **Offline sync:** fixed and merged; it ships with the next release.\n- **Onboarding:** flow B is built behind a flag.\n- **Startup:** lazy indexes cut it from 3.1 s to 1.4 s on an old phone; not merged yet.\n- **Billing:** the migration plan is in, dry run next.\nShould I cut release 2.4 with the sync fix and the startup change?",
+   "label": {
+    "strand": "trunk",
+    "also": []
+   },
+   "today": "str_today03"
+  },
+  {
+   "seq": 1170,
+   "at": 1935827940000,
+   "kind": "user",
+   "text": "> Should I cut release 2.4 with the sync fix and the startup change?\nYes, but leave onboarding B out of it.",
+   "reply": "Cutting 2.4 with the sync fix and the startup change; onboarding B stays behind its flag.",
+   "finalReply": "Cutting 2.4 with the sync fix and the startup change; onboarding B stays behind its flag.",
+   "label": {
+    "strand": "release-24",
+    "also": [
+     "sync-bug"
+    ],
+    "clears": [
+     1160
+    ]
+   },
+   "today": "str_today03"
+  },
+  {
+   "seq": 1180,
+   "at": 1935828060000,
+   "kind": "report",
+   "text": "",
+   "reply": "Release 2.4 is built and signed; the store review is pending.",
+   "finalReply": "Release 2.4 is built and signed; the store review is pending.",
+   "label": {
+    "strand": "release-24",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1190,
+   "at": 1935828240000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0003] Dry run done: 13 of 14 webhooks map cleanly; refunds need a new handler.",
+   "reply": "The billing dry run passed except refunds, which need a new handler on the new provider. The worker is writing it.",
+   "finalReply": "The billing dry run passed except refunds, which need a new handler on the new provider. The worker is writing it.",
+   "label": {
+    "strand": "billing",
+    "also": []
+   },
+   "today": "str_today03"
+  },
+  {
+   "seq": 1200,
+   "at": 1935828480000,
+   "kind": "user",
+   "text": "ok",
+   "reply": "Noted.",
+   "finalReply": "Noted.",
+   "label": {
+    "strand": "billing",
+    "also": []
+   },
+   "today": "str_today03"
+  },
+  {
+   "seq": 1210,
+   "at": 1935828720000,
+   "kind": "user",
+   "text": "The docs site search returns nothing for 'export'. Can someone look?",
+   "reply": "Starting a worker on docs search; the index probably skips the guides folder.",
+   "finalReply": "Starting a worker on docs search; the index probably skips the guides folder.",
+   "label": {
+    "strand": "docs-search",
+    "also": []
+   },
+   "today": "str_today04"
+  },
+  {
+   "seq": 1220,
+   "at": 1935828900000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0004] Right, the indexer's glob skipped guides/. Fixed and redeployed; 'export' finds four pages now.",
+   "reply": "Docs search is fixed: the indexer now includes the guides folder.",
+   "finalReply": "Docs search is fixed: the indexer now includes the guides folder.",
+   "label": {
+    "strand": "docs-search",
+    "also": []
+   },
+   "today": "str_today04"
+  },
+  {
+   "seq": 1230,
+   "at": 1935829080000,
+   "kind": "report",
+   "text": "[bb system] @thread:thr_synwork0001 completed: Watching the 2.4 rollout's sync error rate: 0.02%, down from 0.4%.",
+   "reply": "[PASS]",
+   "finalReply": "[PASS]",
+   "label": {
+    "strand": "release-24",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1240,
+   "at": 1935829320000,
+   "kind": "user",
+   "text": "Both the sync fix and the faster startup are in 2.4, right?",
+   "reply": "Yes, 2.4 has both: the sequence-number sync fix and the lazy indexes.",
+   "finalReply": "Yes, 2.4 has both: the sequence-number sync fix and the lazy indexes.",
+   "label": {
+    "strand": "release-24",
+    "also": [
+     "startup"
+    ]
+   },
+   "today": "str_today01"
+  },
+  {
+   "seq": 1250,
+   "at": 1935829440000,
+   "kind": "report",
+   "text": "",
+   "reply": "2.4 passed store review and is rolling out to 10% of users.",
+   "finalReply": "2.4 passed store review and is rolling out to 10% of users.",
+   "label": {
+    "strand": "release-24",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1260,
+   "at": 1935829680000,
+   "kind": "user",
+   "text": "Roll it to everyone if the crash rate holds tomorrow morning.",
+   "reply": "Will do: if the crash rate is still under 0.1% at 9:00, I'll go to 100%.",
+   "finalReply": "Will do: if the crash rate is still under 0.1% at 9:00, I'll go to 100%.",
+   "label": {
+    "strand": "release-24",
+    "also": []
+   },
+   "today": "str_today01"
+  },
+  {
+   "seq": 1270,
+   "at": 1935829860000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0003] Refund handler written and tested in the sandbox. Ready for dual-write.",
+   "reply": "Refunds now work on the new provider in the sandbox. Ready to start dual-writing invoices. Start it today?\n\n::next{reply=\"👍 Start dual-write\" do=\"Monday\"}",
+   "finalReply": "Refunds now work on the new provider in the sandbox. Ready to start dual-writing invoices. Start it today?\n\n::next{reply=\"👍 Start dual-write\" do=\"Monday\"}",
+   "label": {
+    "strand": "billing",
+    "also": []
+   },
+   "today": "str_today03"
+  },
+  {
+   "seq": 1280,
+   "at": 1935830100000,
+   "kind": "user",
+   "text": "Monday",
+   "reply": "Dual-write starts Monday morning.",
+   "finalReply": "Dual-write starts Monday morning.",
+   "label": {
+    "strand": "billing",
+    "also": [],
+    "clears": [
+     1270
+    ]
+   },
+   "today": "str_today03"
+  },
+  {
+   "seq": 1290,
+   "at": 1935830340000,
+   "kind": "user",
+   "text": "One more thing on onboarding: the tips should be dismissible.",
+   "reply": "I'll tell the designer: each tip gets a small close button, and closing one remembers it.",
+   "finalReply": "I'll tell the designer: each tip gets a small close button, and closing one remembers it.",
+   "label": {
+    "strand": "onboarding",
+    "also": []
+   },
+   "today": "str_today02"
+  },
+  {
+   "seq": 1300,
+   "at": 1935830520000,
+   "kind": "report",
+   "text": "[bb message from thread:thr_synwork0002] Tips are dismissible now; dismissals sync across devices.",
+   "reply": "[PASS]",
+   "finalReply": "[PASS]",
+   "label": {
+    "strand": "onboarding",
+    "also": []
+   },
+   "today": "unsorted"
+  },
+  {
+   "seq": 1310,
+   "at": 1935830760000,
+   "kind": "user",
+   "text": "What's still open?",
+   "reply": "Open now:\n- **Billing:** dual-write starts Monday.\n- **Onboarding B:** dismissible tips done; waiting for your go to turn the flag on.\n- **2.4 rollout:** at 10%, full rollout tomorrow if crashes stay low.",
+   "finalReply": "Open now:\n- **Billing:** dual-write starts Monday.\n- **Onboarding B:** dismissible tips done; waiting for your go to turn the flag on.\n- **2.4 rollout:** at 10%, full rollout tomorrow if crashes stay low.",
+   "label": {
+    "strand": "trunk",
+    "also": []
+   },
+   "today": "str_today02"
+  },
+  {
+   "seq": 1320,
+   "at": 1935831000000,
+   "kind": "user",
+   "text": "> **Onboarding B:** dismissible tips done; waiting for your go to turn the flag on.\nTurn it on for new users only.",
+   "reply": "Turning flow B on for new sign-ups only.",
+   "finalReply": "Turning flow B on for new sign-ups only.",
+   "label": {
+    "strand": "onboarding",
+    "also": []
+   },
+   "today": "str_today02"
+  }
+ ]
+}
