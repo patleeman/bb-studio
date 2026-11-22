@@ -148,6 +148,9 @@ final class TasksModel {
     }
 
     private var client: BBClient {
+        #if DEBUG
+        TasksDemo.installIfNeeded()
+        #endif
         let client = fixed ?? AppModel.shared.client
         if server != client.baseURL {
             server = client.baseURL
