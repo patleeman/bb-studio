@@ -6,8 +6,8 @@ import { leanFor } from "../context-lean";
 import type { Policy, Target } from "./contract";
 import type { RouterDecisions } from "./decide";
 import { errorEventText, labelled } from "./register";
-import { handoffRequest, ModelRouter, POLICY_KEY, UNREACHABLE_MS, type FailedTurnEvent, type RouterDeps, type RouterThread } from "./router";
-import { agentResetAt, firstAvailable, formatReset, readAgentError, readFailure, UNSURE_PASSED, UNSURE_PICKED, usageProblem, type UsageSnapshot } from "./select";
+import { effectivePermission, handoffRequest, ModelRouter, noticeKey, POLICY_KEY, UNREACHABLE_MS, type FailedTurnEvent, type RouterDeps, type RouterThread } from "./router";
+import { agentResetAt, firstAvailable, formatReset, readAgentErrorText, readAgentError, readFailure, UNSURE_PASSED, UNSURE_PICKED, usageProblem, type UsageSnapshot } from "./select";
 
 const now = Date.UTC(2026, 10, 21, 12, 0);
 
@@ -33,7 +33,11 @@ const piPolicy: Policy = { ...policy, rules: [], defaultChain: [piSonnet, codex]
 interface Options {
   rule?: string;
   states?: Record<string, string>;
-  catalogs?: Record<string, string[] | null>;
+  catalogs?: Record<string, string[] | null | { error: string }>;
+  /** Execution options by thread id (a parent thread), beside `execution` for the failed thread. */
+  executions?: Record<string, { model: string | null; permissionMode: string | null }>;
+  primaryHost?: string;
+  threadHost?: string;
   usage?: Record<string, UsageSnapshot | null>;
   thread?: Partial<RouterThread>;
   execution?: { model: string | null; permissionMode: string | null };
@@ -44,7 +48,10 @@ interface Options {
 const modes: Record<string, string[]> = { "acp-opencode": ["accept-edits", "full"], "acp-antigravity": ["accept-edits", "full"], pi: ["full"], codex: ["accept-edits", "auto", "full"] };
 const names: Record<string, string> = { "acp-opencode": "OpenCode", "acp-antigravity": "Antigravity", pi: "Pi", codex: "Codex" };
 
+const clock = { now };
+
 function harness(options: Options = {}) {
+  clock.now = now;
   const store = new Map<string, unknown>([[POLICY_KEY, policy]]);
   const spawned: Record<string, unknown>[] = [];
   const thread: RouterThread = { id: "thr_1", projectId: "prj_1", providerId: "acp-opencode", environmentId: "env_1", title: "Parser", status: "error", visibility: "visible", ...options.thread };
@@ -53,17 +60,21 @@ function harness(options: Options = {}) {
     completeText: null,
   };
   const catalogs = options.catalogs ?? { "acp-opencode": [glm.model, qwenLocal.model], "acp-antigravity": [gemini.model], pi: [piSonnet.model], codex: [codex.model] };
-  const errorText = vi.fn(async () => options.errorText ?? null);
+  // ACP's provider/error: BB's generic message, the agent's words in the detail.
+  const errorText = vi.fn(async (_threadId: string, _turnId: string) => (options.errorText ? { message: "Provider error", detail: options.errorText } : null));
   const deps: RouterDeps = {
     kv: { get: async (key) => store.get(key), set: async (key, value) => { store.set(key, value); }, delete: async (key) => { store.delete(key); } },
     providerStates: async () => Object.entries(options.states ?? { "acp-opencode": "ready", "acp-antigravity": "ready", pi: "ready", codex: "ready" }).map(([providerId, status]) => ({ providerId, status })),
     providers: async () => new Map(Object.keys(modes).map((id) => [id, { name: names[id]!, permissionModes: modes[id]! }] as const)),
     models: async (providerId) => {
       const list = catalogs[providerId];
-      return list === null || list === undefined ? null : new Set(list);
+      if (list === null || list === undefined) return null;
+      return Array.isArray(list) ? new Set(list) : list;
     },
+    primaryHostId: async () => options.primaryHost ?? "host_mac",
+    threadHost: async () => options.threadHost ?? "host_mac",
     thread: async (threadId) => (threadId === thread.id ? thread : null),
-    execution: async () => ({ reasoningLevel: null, ...(options.execution ?? { model: glm.model, permissionMode: "full" }) }),
+    execution: async (threadId) => ({ reasoningLevel: null, ...(options.executions?.[threadId] ?? options.execution ?? { model: glm.model, permissionMode: "full" }) }),
     spawn: async (request) => { spawned.push(request); return { id: "thr_new" }; },
     cancelRetries: async () => 0,
     changed: () => undefined,
@@ -73,13 +84,13 @@ function harness(options: Options = {}) {
     lean: (providerId, model) => leanFor({}, providerId, model),
     appHandlesSignIn: true,
     log: { info: () => undefined, warn: () => undefined },
-    now: () => now,
+    now: () => clock.now,
   };
   const router = new ModelRouter(deps);
   return { router, store, spawned, thread, errorText };
 }
 
-const failed = (errorInfo: FailedTurnEvent["errorInfo"] = null, rateLimits: FailedTurnEvent["rateLimits"] = null): FailedTurnEvent => ({ threadId: "thr_1", requestId: "req_1", errorInfo, rateLimits });
+const failed = (errorInfo: FailedTurnEvent["errorInfo"] = null, rateLimits: FailedTurnEvent["rateLimits"] = null): FailedTurnEvent => ({ threadId: "thr_1", requestId: "req_1", turnId: "turn_9", errorInfo, rateLimits });
 
 describe("ACP and Pi error words", () => {
   const kind = (text: string) => {
@@ -123,21 +134,34 @@ describe("ACP and Pi error words", () => {
     expect(agentResetAt("rate limited", now)).toBeNull();
   });
 
-  it("takes the text of the latest provider/error event, detail first", () => {
-    expect(errorEventText([{ type: "provider/error", data: { message: "Provider error", detail: "429 Too Many Requests" } }])).toBe("429 Too Many Requests\nProvider error");
-    expect(errorEventText([])).toBeNull();
+  it("takes only the failed turn's own provider/error, and none the provider is retrying", () => {
+    const row = (turnId: string, data: Record<string, unknown>) => ({ type: "provider/error", scope: { kind: "turn", turnId }, data });
+    const rows = [row("turn_9", { message: "Provider error", detail: "429 later, retrying", willRetry: true }), row("turn_9", { message: "Provider error", detail: "429 Too Many Requests" }), row("turn_3", { message: "rate limit" })];
+    expect(errorEventText(rows, "turn_9")).toEqual({ message: "Provider error", detail: "429 Too Many Requests" });
+    // An earlier turn's 429 says nothing about this failure.
+    expect(errorEventText([row("turn_3", { message: "Provider error", detail: "429 rate limit" })], "turn_9")).toBeNull();
+    expect(errorEventText([], "turn_9")).toBeNull();
   });
 });
 
 describe("usage snapshots", () => {
-  it("rules out a signed-out agent, one out of credit and a used-up window, and nothing else", () => {
-    expect(usageProblem({ status: "unauthenticated" }, now)).toBe("signed out");
+  it("rules out a provider out of credit or with a used-up window, and nothing else", () => {
+    // Sign-in is readiness's to say: OpenCode without a Go key and Claude Code on an API key read "unauthenticated" here.
+    expect(usageProblem({ status: "unauthenticated" }, now)).toBeNull();
+    expect(usageProblem({ status: "expired" }, now)).toBeNull();
     expect(usageProblem({ status: "ok", windows: [{ label: "Credits", usedPercent: 100, resetsAt: null, cost: { usedUsdCents: 2000, limitUsdCents: 2000 } }] }, now)).toBe("out of credit");
     expect(usageProblem({ status: "ok", windows: [{ label: "Day", usedPercent: 100, resetsAt: "2026-11-22T00:00:00Z" }] }, now, "UTC")).toBe("usage limit until 22 Nov, 00:00");
     expect(usageProblem({ status: "ok", windows: [{ label: "Day", usedPercent: 100, resetsAt: "2026-11-21T11:00:00Z" }] }, now)).toBeNull();
     expect(usageProblem({ status: "ok", windows: [{ label: "Day", usedPercent: 80, resetsAt: null }] }, now)).toBeNull();
     expect(usageProblem({ status: "error" }, now)).toBeNull();
     expect(usageProblem(null, now)).toBeNull();
+  });
+
+  it("doesn't apply a Pi or ACP agent's plan window to all its models", () => {
+    const full = { status: "ok", windows: [{ label: "Go weekly", usedPercent: 100, resetsAt: "2026-11-22T00:00:00Z" }] };
+    expect(usageProblem(full, now, "UTC", "acp-opencode")).toBeNull();
+    expect(usageProblem(full, now, "UTC", "pi")).toBeNull();
+    expect(usageProblem(full, now, "UTC", "codex")).toBe("usage limit until 22 Nov, 00:00");
   });
 });
 
@@ -155,17 +179,32 @@ describe("Auto with Pi and ACP agents", () => {
   it("picks an ACP agent's model first in a rule's chain", async () => {
     const { router } = harness();
     await router.load();
-    expect(await router.resolve({ text: "Fix tokenize()" })).toEqual(glm);
+    expect(await router.resolve({ text: "Fix tokenize()", permissionMode: "full" })).toEqual(glm);
   });
 
-  it("skips a signed-out, not installed, out-of-credit or unreachable agent", async () => {
+  it("skips a signed-out or not installed agent, and one that can't start", async () => {
     const signedOut = harness({ states: { "acp-opencode": "unauthenticated", "acp-antigravity": "not_installed", pi: "ready", codex: "ready" } });
     await signedOut.router.load();
     expect(await signedOut.router.decide("Fix tokenize()")).toMatchObject({ target: piSonnet, skipped: [{ target: glm, why: "unauthenticated" }, { target: gemini, why: "not installed" }] });
 
-    const broke = harness({ usage: { "acp-opencode": { status: "ok", windows: [{ label: "Credits", usedPercent: 100, resetsAt: null, cost: { usedUsdCents: 500, limitUsdCents: 500 } }] } }, catalogs: { "acp-opencode": [glm.model], "acp-antigravity": null, pi: [piSonnet.model], codex: [codex.model] } });
+    const broke = harness({ catalogs: { "acp-opencode": [glm.model], "acp-antigravity": { error: "provider_unavailable: spawn agy ENOENT" }, pi: [piSonnet.model], codex: [codex.model] } });
     await broke.router.load();
-    expect(await broke.router.decide("Fix tokenize()")).toMatchObject({ target: piSonnet, skipped: [{ target: glm, why: "out of credit" }, { target: gemini, why: "unreachable (its models can't be listed)" }] });
+    expect(await broke.router.decide("Fix tokenize()")).toMatchObject({ target: glm });
+    expect((await broke.router.checkTargets()).find((check) => check.providerId === "acp-antigravity")).toMatchObject({ problem: "unreachable (its models can't be listed)" });
+  });
+
+  it("calls an agent unreachable only after its catalog fails twice, and trusts it again once it answers", async () => {
+    const catalogs: Record<string, string[] | null | { error: string }> = { "acp-opencode": [glm.model], "acp-antigravity": { error: "timeout" }, pi: [piSonnet.model], codex: [codex.model] };
+    const { router } = harness({ catalogs });
+    await router.load();
+    const gem = async () => (await router.checkTargets()).find((check) => check.providerId === "acp-antigravity")!.problem;
+    // A cold start can time out once.
+    expect(await gem()).toBeNull();
+    clock.now += 20_000;
+    expect(await gem()).toBe("unreachable (its models can't be listed)");
+    catalogs["acp-antigravity"] = [gemini.model];
+    clock.now += 20_000;
+    expect(await gem()).toBeNull();
   });
 
   it("still trusts a catalog it can't read for Claude Code and Codex", async () => {
@@ -218,7 +257,7 @@ describe("the usage-limit notice for ACP and Pi", () => {
     const { router, errorText } = harness({ errorText: "429 Too Many Requests: rate limit for zai/glm-5.3" });
     await router.load();
     const notice = await router.onTurnFailed(failed());
-    expect(errorText).toHaveBeenCalledWith("thr_1");
+    expect(errorText).toHaveBeenCalledWith("thr_1", "turn_9");
     expect(notice).toMatchObject({ kind: "usage-limit", failedProviderName: "OpenCode", reason: "usage limit, reset unknown", target: gemini, text: "The auto router detected a usage limit on OpenCode (usage limit, reset unknown). Hand off to Gemini 3 Pro (Antigravity)?" });
   });
 
@@ -290,7 +329,7 @@ describe("the usage-limit notice for ACP and Pi", () => {
 
 describe("Hand off to and from Pi and ACP agents", () => {
   it("from ACP: BB's handoff request on the notice's model", async () => {
-    const { router, spawned } = harness({ errorText: "429" });
+    const { router, spawned } = harness({ errorText: "429 Too Many Requests" });
     await router.load();
     await router.onTurnFailed(failed());
     expect(await router.handoff("thr_1")).toMatchObject({ threadId: "thr_new", target: gemini });
@@ -331,4 +370,130 @@ it("saves a chain naming an agent that isn't installed: no catalog, so no label 
   expect(saved.rules[0]!.chain[0]).not.toHaveProperty("label");
   expect(saved.rules[0]!.chain[1]).toMatchObject({ label: "GLM-5.3" });
   expect(JSON.parse(JSON.stringify(saved))).toEqual(saved);
+});
+
+describe("review fixes: words that are not limits or sign-in", () => {
+  it("reads none of these as a usage limit or a sign-in failure", () => {
+    for (const text of [
+      "Max turns limit reached",
+      "Tool call limit reached (25)",
+      "Recursion limit reached",
+      "Token limit exceeded for this request",
+      "The model's output token limit exceeded",
+      "Agent exited with code 1\n429 tests passed",
+      "done\n401 lines of output truncated",
+      "MCP server unauthorized",
+      "Unauthorized tool call: permission denied",
+    ]) {
+      const reading = readAgentError(text, now);
+      expect([text, reading?.errorInfo.category ?? null]).toEqual([text, null]);
+    }
+  });
+
+  it("still reads real ones", () => {
+    expect(readAgentError("Error: 401 Unauthorized", now)?.errorInfo.category).toBe("unauthorized");
+    expect(readAgentError("Invalid API key provided", now)?.errorInfo.category).toBe("unauthorized");
+    expect(readAgentError("Daily request limit reached", now)?.errorInfo.category).toBe("rate-limit");
+    expect(readAgentError("Rate limit exceeded", now)?.errorInfo.category).toBe("rate-limit");
+    expect(readAgentError("HTTP 429", now)?.errorInfo.category).toBe("rate-limit");
+  });
+
+  it("reads the message first, and only the detail's first line", () => {
+    expect(readAgentErrorText({ message: "Rate limit exceeded", detail: "stack trace" }, now)?.errorInfo.category).toBe("rate-limit");
+    expect(readAgentErrorText({ message: "Provider error", detail: "429 RESOURCE_EXHAUSTED: quota" }, now)?.errorInfo.category).toBe("rate-limit");
+    // Tool output after the first line is not the agent's error.
+    expect(readAgentErrorText({ message: "Provider error", detail: "Agent crashed\nquota exceeded in test fixture" }, now)).toBeNull();
+    expect(readAgentErrorText(null, now)).toBeNull();
+  });
+});
+
+describe("review fixes: permission modes", () => {
+  it("treats a create with no mode as BB's fill-in, which the target must offer as is", () => {
+    expect(effectivePermission(null, null)).toEqual({ mode: "auto", exact: true });
+    expect(effectivePermission(undefined, "accept-edits")).toEqual({ mode: "accept-edits", exact: true });
+    expect(effectivePermission("accept-edits", "full")).toEqual({ mode: "accept-edits", exact: false });
+  });
+
+  it("never gives Pi or an ACP agent full access to a create that named no mode", async () => {
+    const { router } = harness();
+    await router.load();
+    // BB would fill in "auto", and an agent without it would run with "full".
+    expect(await router.resolve({ text: "Fix tokenize()" })).toEqual(codex);
+    const decision = await router.decide("Fix tokenize()", { permissionMode: "auto", exactPermission: true });
+    expect(decision.skipped.map((each) => [each.target.providerId, each.why])).toEqual([
+      ["acp-opencode", "doesn't offer auto, the mode this thread would get"],
+      ["acp-antigravity", "doesn't offer auto, the mode this thread would get"],
+      ["pi", "doesn't offer auto, the mode this thread would get"],
+    ]);
+  });
+
+  it("uses the parent's mode for a worker that names none", async () => {
+    const { router } = harness({ executions: { thr_parent: { model: "gpt-5.5-codex", permissionMode: "full" } } });
+    await router.load();
+    expect(await router.resolve({ text: "Fix tokenize()", parentThreadId: "thr_parent" })).toEqual(glm);
+    const narrow = harness({ executions: { thr_parent: { model: "gpt-5.5-codex", permissionMode: "accept-edits" } } });
+    await narrow.router.load();
+    // ACP offers accept-edits; Pi (full only) is never picked under it.
+    expect(await narrow.router.resolve({ text: "Fix tokenize()", parentThreadId: "thr_parent" })).toEqual(glm);
+    expect((await narrow.router.decide("Fix tokenize()", { permissionMode: "accept-edits", exactPermission: true })).skipped).toEqual([]);
+  });
+
+  it("an explicit mode is narrowed by BB, so a narrower ACP mode is fine and Pi still isn't", async () => {
+    const { router } = harness({ rule: "none" });
+    await router.load();
+    expect(await router.resolve({ text: "Hello", permissionMode: "auto" })).toEqual(codex);
+    expect((await router.decide("Hello", { permissionMode: "auto" })).skipped).toEqual([{ target: piSonnet, why: "no permission mode at or below auto" }]);
+  });
+
+  it("puts the narrowed mode on the notice: a Codex thread on auto hands off to ACP with accept-edits", async () => {
+    const { router } = harness({ thread: { providerId: "codex" }, execution: { model: codex.model, permissionMode: "auto" } });
+    await router.setPolicy({ ...policy, rules: [{ id: "coding", text: "Pure coding", chain: [codex, glm] }] });
+    expect(await router.onTurnFailed(failed({ category: "rate-limit", providerCode: "rate_limit", httpStatusCode: 429 }))).toMatchObject({ target: glm, permissionMode: "accept-edits" });
+  });
+
+  it("the handoff RPC names a narrowed mode even when the thread's mode can't be read", async () => {
+    const { router, spawned, store } = harness({ thread: { providerId: "codex" }, execution: { model: codex.model, permissionMode: null } });
+    await router.load();
+    store.set(noticeKey("thr_1"), { threadId: "thr_1", target: glm, targetName: "GLM 5.3", permissionMode: "accept-edits" });
+    await router.handoff("thr_1");
+    expect(spawned[0]).toMatchObject({ providerId: "acp-opencode", permissionMode: "accept-edits" });
+  });
+});
+
+describe("review fixes: the failed turn's own error", () => {
+  it("reads no error words without the failed turn, so an older turn's 429 can't raise a notice", async () => {
+    const { router, errorText } = harness({ errorText: "429 Too Many Requests" });
+    await router.load();
+    expect(await router.onTurnFailed({ ...failed(), turnId: null })).toBeNull();
+    expect(errorText).not.toHaveBeenCalled();
+  });
+
+  it("blocks a model that ran out of credits for an hour, though no reset was given", async () => {
+    const { router } = harness({ errorText: "Insufficient credits. Add more to continue." });
+    await router.load();
+    expect(await router.onTurnFailed(failed())).toMatchObject({ reason: "out of credits" });
+    expect((await router.decide("Fix tokenize()")).skipped[0]).toMatchObject({ target: glm, why: "out of credits" });
+    clock.now += 61 * 60_000;
+    expect((await router.decide("Fix tokenize()")).target).toEqual(glm);
+  });
+
+  it("ignores the thread's older rate-limit snapshot when the words of this turn say what happened", async () => {
+    const { router } = harness({ errorText: "Insufficient credits" });
+    await router.load();
+    const old = { status: "blocked", kind: "usage", windows: [{ label: null, status: "blocked", resetsAtMs: now + 5 * 3_600_000 }] };
+    expect(await router.onTurnFailed(failed(null, old))).toMatchObject({ reason: "out of credits" });
+  });
+});
+
+describe("review fixes: an unreachable model server is per machine", () => {
+  it("a local model that didn't answer on another machine stays usable on Auto's machine", async () => {
+    const remote = harness({ rule: "private", execution: { model: qwenLocal.model, permissionMode: "full" }, errorText: "connect ECONNREFUSED 127.0.0.1:11434", threadHost: "host_red4" });
+    await remote.router.load();
+    await remote.router.onTurnFailed(failed());
+    expect((await remote.router.decide("My tax notes")).target).toEqual(qwenLocal);
+    const local = harness({ rule: "private", execution: { model: qwenLocal.model, permissionMode: "full" }, errorText: "connect ECONNREFUSED 127.0.0.1:11434" });
+    await local.router.load();
+    await local.router.onTurnFailed(failed());
+    expect((await local.router.decide("My tax notes")).skipped[0]).toMatchObject({ target: qwenLocal, why: "unreachable" });
+  });
 });

@@ -39,7 +39,18 @@ export function cardsFrom(providers: readonly { providerId: string; displayName:
     .map((each) => ({ providerId: each.providerId, displayName: each.displayName, status: each.status, accountEmail: each.accountEmail ?? null, loginCommand: each.loginCommand ?? null })));
 }
 
-export function useProviderCards(enabled = true): ProviderCard[] | null {
+/** The cards to show: providers with a sign-in, and with `withReadyAgents` also those ready without one. */
+export function providerCards(providers: Parameters<typeof cardsFrom>[0], withReadyAgents: boolean): ProviderCard[] {
+  return cardsFrom(withReadyAgents ? providers : providers.filter((each) => !!each.loginCommand));
+}
+
+/**
+ * `withReadyAgents`: also count providers that are ready with no sign-in (for
+ * the composer's gate). The first-run "Connect a model" screen leaves it off:
+ * an ACP agent with no account check reads as ready as soon as it is
+ * installed, which doesn't mean a model is connected.
+ */
+export function useProviderCards(enabled = true, withReadyAgents = false): ProviderCard[] | null {
   const sdk = useSdk() as unknown as {
     system: {
       config(): Promise<{ primaryHostId?: string | null }>;
@@ -54,7 +65,7 @@ export function useProviderCards(enabled = true): ProviderCard[] | null {
       try {
         const { primaryHostId } = await sdk.system.config();
         const { providers } = await sdk.system.providerStates(primaryHostId ? { hostId: primaryHostId } : undefined);
-        if (live) setCards(cardsFrom(providers));
+        if (live) setCards(providerCards(providers, withReadyAgents));
       } catch {
         if (live) setCards((current) => current ?? []);
       }
@@ -62,6 +73,6 @@ export function useProviderCards(enabled = true): ProviderCard[] | null {
     void load();
     const timer = setInterval(() => void load(), PROVIDER_POLL_MS);
     return () => { live = false; clearInterval(timer); };
-  }, [sdk, enabled]);
+  }, [sdk, enabled, withReadyAgents]);
   return cards;
 }

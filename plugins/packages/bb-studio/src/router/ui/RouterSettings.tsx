@@ -45,6 +45,33 @@ export function pickerChange(target: Target, next: { providerId: string; model: 
   return { providerId: next.providerId, model: next.model, reasoningLevel, ...(sameModel && target.label ? { label: target.label } : {}) };
 }
 
+/**
+ * One chain entry's picker. The picker also reports values on its own when it
+ * opens: its default reasoning level, or another provider or model when the
+ * saved one isn't offered (an agent that isn't installed, a retired model).
+ * Those must not rewrite the saved entry, so reports count only once the
+ * person has pressed or typed in this picker.
+ */
+export function TargetPicker({ target, disabled, onChange, onAuto }: { target: Target; disabled: boolean; onChange(next: Target): void; onAuto(): void }) {
+  const touched = useRef(false);
+  const touch = () => { touched.current = true; };
+  return (
+    <span className="contents" onPointerDownCapture={touch} onKeyDownCapture={touch} data-testid="router-target-picker">
+      <ProviderModelPicker
+        disabled={disabled}
+        align="start"
+        value={{ providerId: target.providerId, model: target.model, reasoningLevel: target.reasoningLevel ?? "medium" }}
+        onChange={(next) => {
+          if (!touched.current) return;
+          if (next.providerId === AUTO_ID) return onAuto();
+          const update = pickerChange(target, next);
+          if (update) onChange(update);
+        }}
+      />
+    </span>
+  );
+}
+
 type Problems = ReadonlyMap<string, { problem: string | null; note?: string }>;
 const problemKey = (target: Pick<Target, "providerId" | "model">) => `${target.providerId}\0${target.model}`;
 
@@ -62,15 +89,13 @@ function Chain({ chain, disabled, onChange, starter, problems }: { chain: readon
         {chain.map((target, index) => (
           <li key={`${index}:${target.providerId}:${target.model}`} className="flex flex-wrap items-center gap-2" data-testid="router-chain-target">
             <span className="w-5 text-right text-xs text-muted-foreground">{index + 1}.</span>
-            <ProviderModelPicker
+            <TargetPicker
+              target={target}
               disabled={disabled}
-              align="start"
-              value={{ providerId: target.providerId, model: target.model, reasoningLevel: target.reasoningLevel ?? "medium" }}
-              onChange={(next) => {
-                if (next.providerId === AUTO_ID) return setError("A chain names real models, not Auto.");
+              onAuto={() => setError("A chain names real models, not Auto.")}
+              onChange={(update) => {
                 setError(null);
-                const update = pickerChange(target, next);
-                if (update) onChange(chain.map((each, at) => at === index ? update : each));
+                onChange(chain.map((each, at) => at === index ? update : each));
               }}
             />
             <Button type="button" size="sm" variant="ghost" disabled={disabled || index === 0} aria-label="Move up" onClick={() => onChange(moved(chain, index, index - 1))}>↑</Button>

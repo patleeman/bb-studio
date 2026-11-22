@@ -57463,6 +57463,12 @@
                   "null"
                 ]
               },
+              "permissionMode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "text": {
                 "type": "string"
               },

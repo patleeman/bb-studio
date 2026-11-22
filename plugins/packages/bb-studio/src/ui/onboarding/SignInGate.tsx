@@ -11,7 +11,7 @@ export function SignInButton() {
 }
 
 export function SignInGate({ children }: { hasSelectedModel: boolean; children: ReactNode }) {
-  const cards = useProviderCards();
+  const cards = useProviderCards(true, true);
   if (cards === null || anyReady(cards)) return <>{children}</>;
   return <SignInButton />;
 }

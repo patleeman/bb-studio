@@ -85,6 +85,12 @@ export const noticeSchema = z.object({
   reason: z.string(),
   target: targetSchema.nullable(),
   targetName: z.string().nullable(),
+  /**
+   * The permission mode the hand-off thread runs with: the failed thread's,
+   * narrowed to one the target offers (never wider). Hand off sets it in the
+   * composer and checks it before sending; null when it isn't known.
+   */
+  permissionMode: z.string().nullable().optional(),
   text: z.string(),
   createdAt: z.number(),
 });

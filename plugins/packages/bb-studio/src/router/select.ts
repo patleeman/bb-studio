@@ -147,6 +147,8 @@ export interface FailureReading {
 }
 
 const COOLDOWN_MS = 15 * 60_000;
+/** Credits and spend caps don't refill on their own soon: with no known reset, Auto keeps off the model this long. */
+export const CREDITS_COOLDOWN_MS = 60 * 60_000;
 
 /** A reset time as the person reads it: "23 Nov, 09:00" in their time zone (or `timeZone`). */
 export function formatReset(ms: number, timeZone?: string): string {
@@ -186,8 +188,8 @@ export function readFailure(failed: FailedTurn, now: number = Date.now(), timeZo
   if (info.category !== "rate-limit") return null;
   const limits = failed.rateLimits;
   const until = blockedUntil(failed);
-  if (limits?.status === "blocked" && limits.kind === "credits") return { kind: "usage-limit", reason: "out of credits", until };
-  if (limits?.status === "blocked" && limits.kind === "spend-control") return { kind: "usage-limit", reason: "spend limit reached", until };
+  if (limits?.status === "blocked" && limits.kind === "credits") return { kind: "usage-limit", reason: "out of credits", until: until ?? now + CREDITS_COOLDOWN_MS };
+  if (limits?.status === "blocked" && limits.kind === "spend-control") return { kind: "usage-limit", reason: "spend limit reached", until: until ?? now + CREDITS_COOLDOWN_MS };
   if (until !== null) return { kind: "usage-limit", reason: `usage limit until ${formatReset(until, timeZone)}`, until };
   if (limits?.status === "blocked") return { kind: "usage-limit", reason: "usage limit, reset unknown", until: now + COOLDOWN_MS };
   const status = info.httpStatusCode ? `${info.httpStatusCode} ` : "";
@@ -236,13 +238,23 @@ export interface AgentErrorReading extends FailedTurn {
   errorInfo: { category: Category; providerCode: null; httpStatusCode: number | null };
 }
 
-const HTTP_STATUS = /\b(?:HTTP(?:\/[\d.]+)?\s+|status(?:[_ ]?code)?["']?\s*[=:]?\s*|code["']?\s*[=:]\s*|error\s+|^)([45]\d{2})\b/im;
+// A status only with a word that makes it one ("HTTP 429", "status: 429", "code": 429, "API Error: 429"), never a number that starts a line ("429 tests passed").
+const HTTP_STATUS = /\b(?:HTTP(?:\/[\d.]+)?\s+|status(?:[_ ]?code)?["']?\s*[=:]?\s*|code["']?\s*[=:]\s*|error:?\s+)([45]\d{2})\b/i;
 const CONTEXT = /context (?:length|window)|maximum context|prompt is too long|too many (?:input )?tokens|context_length_exceeded/i;
 const CREDITS = /out of credits?|insufficient credits?|not enough credits?|credit balance (?:is )?too low|no credits? (?:left|remaining)|credits? (?:exhausted|depleted|used up)/i;
 const BILLING = /insufficient[_ ]quota|payment required|\bbilling\b|spend(?:ing)? (?:limit|cap)|budget (?:exceeded|limit)|monthly limit/i;
-const RATE = /rate[_ -]?limit|too many requests|resource[_ ]exhausted|quota (?:exceeded|exhausted|reached)|exceeded (?:your |the )?(?:current )?quota|usage limit|exhausted your (?:capacity|quota)|(?:daily|hourly|weekly) (?:limit|quota)|limit (?:reached|exceeded)|requests per (?:minute|hour|day)/i;
-const AUTH = /unauthori[sz]ed|unauthenticated|authentication (?:required|failed|error)|auth[_ ]required|not (?:logged|signed) in|please (?:log|sign) in|login required|invalid (?:api[_ ]?)?key|api[_ ]?key (?:is )?(?:invalid|not valid|missing)|(?:token|session) (?:has )?expired/i;
+// Only limits on how much the account may use: a turn, tool-call, recursion, step, token or context limit is not one.
+const RATE = /rate[_ -]?limit|too many requests|resource[_ ]exhausted|quota (?:exceeded|exhausted|reached)|exceeded (?:your |the )?(?:current )?quota|usage limit|exhausted your (?:capacity|quota)|(?:daily|hourly|weekly|monthly) (?:usage |request )?(?:limit|quota)|(?:rate|usage|request|quota|plan|subscription) limit (?:reached|exceeded|hit)|requests per (?:minute|hour|day)/i;
+// Sign-in words about the agent's own account. A bare "unauthorized" counts only with a 401 status, and never about an MCP server or a tool.
+const AUTH = /authentication (?:required|failed|error)|auth[_ ]required|not (?:logged|signed) in|please (?:log|sign) in|login required|invalid (?:api[_ ]?)?key|incorrect api[_ ]?key|api[_ ]?key (?:is )?(?:invalid|not valid|missing)|(?:auth |access |oauth )?(?:token|session|credentials) (?:has |have )?expired/i;
+const BARE_AUTH = /unauthori[sz]ed|unauthenticated/i;
+const NOT_THE_ACCOUNT = /\b(?:mcp|tool|tools|permission denied)\b/i;
 const CONNECTION = /\bE(?:CONNREFUSED|CONNRESET|TIMEDOUT|HOSTUNREACH|NOTFOUND)\b|connection refused|fetch failed|failed to connect|could not connect|socket hang up|network error|(?:host|server) (?:is )?unreachable/i;
+
+/** An error that says the agent or its model server couldn't be reached or started ("ECONNREFUSED", "provider_unavailable", "missing_executable"). */
+export function isConnectionError(text: string): boolean {
+  return CONNECTION.test(text) || /\b(?:provider_unavailable|missing_executable)\b/.test(text);
+}
 
 const UNIT_MS: Record<string, number> = { h: 3_600_000, m: 60_000, s: 1_000 };
 
@@ -277,6 +289,7 @@ export function agentResetAt(text: string, now: number): number | null {
  */
 export function readAgentError(text: string | null | undefined, now: number = Date.now()): AgentErrorReading | null {
   if (!text?.trim()) return null;
+  text = text.slice(0, 2_000);
   const status = text.match(HTTP_STATUS);
   const httpStatusCode = status ? Number(status[1]) : null;
   const info = (category: Category) => ({ category, providerCode: null, httpStatusCode });
@@ -287,9 +300,35 @@ export function readAgentError(text: string | null | undefined, now: number = Da
   if (CREDITS.test(text)) return limit("credits");
   if (httpStatusCode === 402 || BILLING.test(text)) return { errorInfo: info("billing"), rateLimits: null };
   if (httpStatusCode === 429 || RATE.test(text)) return limit(until === null ? "unknown" : "usage");
-  if (httpStatusCode === 401 || AUTH.test(text)) return { errorInfo: info("unauthorized"), rateLimits: null };
+  if (!NOT_THE_ACCOUNT.test(text) && (AUTH.test(text) || (httpStatusCode === 401 && BARE_AUTH.test(text)))) return { errorInfo: info("unauthorized"), rateLimits: null };
   if (CONNECTION.test(text)) return { errorInfo: info("connection-failed"), rateLimits: null };
   return null;
+}
+
+/** What BB's provider/error event says, with no codes: its message, then the detail an ACP agent puts its error in. */
+export interface AgentErrorText {
+  message: string | null;
+  detail: string | null;
+}
+
+/** BB's own wrapper message for an ACP error, which says nothing about it. */
+const GENERIC_MESSAGE = /^(?:provider error|error|unknown error)$/i;
+
+/**
+ * An error event read the safe way round: the message first; the detail only
+ * when the message says nothing, and then only its first line, since the rest
+ * of a detail is often the agent's stderr or a tool's output ("429 tests
+ * passed", "quota exceeded" in a file it printed).
+ */
+export function readAgentErrorText(text: AgentErrorText | null | undefined, now: number = Date.now()): AgentErrorReading | null {
+  if (!text) return null;
+  const message = text.message?.trim() ?? "";
+  if (message && !GENERIC_MESSAGE.test(message)) {
+    const reading = readAgentError(message, now);
+    if (reading) return reading;
+  }
+  const firstLine = (text.detail ?? "").trim().split("\n")[0]?.slice(0, 500) ?? "";
+  return readAgentError(firstLine, now);
 }
 
 /** BB's usage snapshot for a provider (`system.usageLimits`), as much as the router reads of it. */
@@ -298,11 +337,16 @@ export interface UsageSnapshot {
   windows?: readonly { label?: string | null; usedPercent: number; resetsAt: string | null; cost?: { usedUsdCents: number; limitUsdCents: number } }[];
 }
 
-/** Why a provider's usage snapshot rules it out now: signed out, out of credit, or a used-up window. Null when it doesn't. */
-export function usageProblem(usage: UsageSnapshot | null | undefined, now: number, timeZone?: string): string | null {
-  if (!usage) return null;
-  if (usage.status === "unauthenticated" || usage.status === "expired") return "signed out";
-  if (usage.status !== "ok") return null;
+/**
+ * Why a provider's usage snapshot rules it out now: out of credit, or a
+ * used-up window. Null when it doesn't. Sign-in is readiness's to say: a
+ * usage reader says "unauthenticated" for reasons that don't stop the agent
+ * (OpenCode with no Go key, Claude Code on an API key). A Pi or ACP agent's
+ * plan covers only some of its models, so its windows aren't read at all.
+ */
+export function usageProblem(usage: UsageSnapshot | null | undefined, now: number, timeZone?: string, providerId?: string): string | null {
+  if (!usage || usage.status !== "ok") return null;
+  if (providerId && multiBackend(providerId)) return null;
   const full = (usage.windows ?? []).filter((window) => {
     if (window.usedPercent < 100) return false;
     const reset = window.resetsAt === null ? null : Date.parse(window.resetsAt);

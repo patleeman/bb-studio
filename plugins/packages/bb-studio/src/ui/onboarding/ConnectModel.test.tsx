@@ -9,7 +9,7 @@ vi.mock("../../kit/ui/hooks/use-pointer-coarse.js", () => ({ usePointerCoarse: (
 vi.mock("../live", () => ({ useCall: () => async () => ({ sessionId: "s", state: "waiting", targetId: "provider:codex", name: "Codex", flow: "device", url: null, code: null, acceptsCode: false, expiresAt: null, pollMs: 1000, message: null }), useLive: () => ({ data: null, refresh: () => {} }) }));
 
 const { ConnectModelView } = await import("./ConnectModel");
-const { anyReady, canSignIn, cardsFrom, sortCards } = await import("./providers");
+const { anyReady, canSignIn, cardsFrom, providerCards, sortCards } = await import("./providers");
 
 installTestPluginRuntime();
 
@@ -48,4 +48,15 @@ it("counts a ready agent with no sign-in (an ACP agent on a local model), and le
   ]);
   expect(cards.map((card) => card.providerId)).toEqual(["codex", "acp-ollama"]);
   expect(anyReady(cards)).toBe(true);
+});
+
+it("finishes \"Connect a model\" only on a provider with a sign-in: an installed agent with no account check isn't a connected model", () => {
+  const providers = [
+    { providerId: "codex", displayName: "Codex", status: "unauthenticated", loginCommand: "codex login" },
+    { providerId: "acp-grok", displayName: "Grok", status: "ready", loginCommand: null },
+  ];
+  // First run (ConnectModel): only sign-in providers count.
+  expect(anyReady(providerCards(providers, false))).toBe(false);
+  // The composer's gate: the ready agent counts, so the picker (and Auto) shows.
+  expect(anyReady(providerCards(providers, true))).toBe(true);
 });
