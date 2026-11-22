@@ -1,3 +1,4 @@
+import { forkKeepRedactedSettings } from "./plugin-settings-redact.fork.js";
 import { forkReplacedInstallNote, releaseDeadBundledInstalls, withForkBundledPlugins } from "./builtin-registry.fork.js";
 import {
   capturePluginUse,
@@ -2104,12 +2105,13 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
         pluginId: id,
         descriptors: plugin.handle.settings.descriptors,
       };
-      const errors = validateSettingsUpdate(storeArgs.descriptors, values);
+      const prev = await readPluginSettingsValues(storeArgs);
+      const kept = forkKeepRedactedSettings(storeArgs.descriptors, values, prev);
+      const errors = validateSettingsUpdate(storeArgs.descriptors, kept);
       if (errors.length > 0) {
         throw new PluginSettingsValidationError(errors.join("; "));
       }
-      const prev = await readPluginSettingsValues(storeArgs);
-      await writePluginSettingsUpdate({ ...storeArgs, values });
+      await writePluginSettingsUpdate({ ...storeArgs, values: kept });
       const next = await readPluginSettingsValues(storeArgs);
       if (JSON.stringify(next) !== JSON.stringify(prev)) {
         for (const listener of plugin.handle.settings.listeners) {
