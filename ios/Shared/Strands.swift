@@ -45,7 +45,8 @@ public struct Strand: Decodable, Hashable, Sendable, Identifiable {
 
     public struct Ask: Decodable, Hashable, Sendable, Identifiable {
         public enum Kind: String, Decodable, Sendable {
-            case question, approval, gateway, other
+            /// `reply`: a reply that asks the user something; its `seq` is the reply's message.
+            case question, approval, gateway, reply, other
             public init(from decoder: Decoder) throws {
                 self = Kind(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .other
             }
@@ -60,17 +61,20 @@ public struct Strand: Decodable, Hashable, Sendable, Identifiable {
         public var details: [String]
         /// An approval's choices: `allow_once`, `allow_for_session`, `deny`.
         public var decisions: [String]
+        /// A reply's message; nil for every other kind.
+        public var seq: Double?
 
-        public init(id: String, kind: Kind, threadId: String, label: String, details: [String] = [], decisions: [String] = []) {
+        public init(id: String, kind: Kind, threadId: String, label: String, details: [String] = [], decisions: [String] = [], seq: Double? = nil) {
             self.id = id
             self.kind = kind
             self.threadId = threadId
             self.label = label
             self.details = details
             self.decisions = decisions
+            self.seq = seq
         }
 
-        enum CodingKeys: String, CodingKey { case id, kind, threadId, label, details, decisions }
+        enum CodingKeys: String, CodingKey { case id, kind, threadId, label, details, decisions, seq }
 
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -80,6 +84,7 @@ public struct Strand: Decodable, Hashable, Sendable, Identifiable {
             label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
             details = try c.decodeIfPresent([String].self, forKey: .details) ?? []
             decisions = try c.decodeIfPresent([String].self, forKey: .decisions) ?? []
+            seq = try? c.decodeIfPresent(Double.self, forKey: .seq)
         }
     }
 
@@ -150,6 +155,12 @@ public struct Strand: Decodable, Hashable, Sendable, Identifiable {
 
 /// What the box shows, from a list: desktop's `strands/ui/model.ts`.
 public enum StrandsBoxModel {
+    /// A needs-you strand's reply ask, when that's what it waits on first: picking the strand jumps to the reply.
+    public static func replyAsk(_ strand: Strand) -> Strand.Ask? {
+        guard strand.state == .needsYou, let ask = strand.asks.first, ask.kind == .reply, ask.seq != nil else { return nil }
+        return ask
+    }
+
     /// Done workers stay on their strand's row 2 days, failed ones 7 (as the sidebar lists them).
     static let rowDoneMs: Double = 2 * 24 * 60 * 60 * 1000
     static let rowFailedMs: Double = 7 * 24 * 60 * 60 * 1000

@@ -14,6 +14,12 @@ enum BotSpacesDemo {
     /// `-qaStrandsDemo`: Studio answers `strands.*`, and the Bot's view nests more workers (a worker's worker, runners under Main).
     static var strands: Bool { ProcessInfo.processInfo.arguments.contains("-qaStrandsDemo") }
 
+    /// `-qaReplyAskDemo` (with `-qaStrandsDemo`): Main's newest reply needs the user (`strands.tags` replies),
+    /// and a strand waits on it first, with Show.
+    static var replyAsk: Bool { ProcessInfo.processInfo.arguments.contains("-qaReplyAskDemo") }
+    /// The reply's message in the demo Main (m5, after the quiet [PASS] check).
+    static let replyAskSeq = 7
+
     /// `-qaRouterDemo`: Studio answers the model router's notice for Main (a usage limit with Hand off).
     static var router: Bool { ProcessInfo.processInfo.arguments.contains("-qaRouterDemo") }
 
@@ -355,7 +361,11 @@ enum BotSpacesDemo {
             ]
             let names: [[String: Any]] = [["id": "str_lisbon", "title": "Lisbon trip"], ["id": "str_fork", "title": "Studio-native BB fork"],
                                           ["id": "str_stills", "title": "Theme stills"]]
-            return ["tags": tags, "strands": names]
+            let replies: [[String: Any]] = BotSpacesDemo.replyAsk
+                ? [["turnId": "t1", "seq": 1, "tag": "status", "ask": NSNull(), "resolved": false],
+                   ["turnId": "t3", "seq": BotSpacesDemo.replyAskSeq, "tag": "needs-you", "ask": "Want me to draft the approval note?", "resolved": false]]
+                : []
+            return ["tags": tags, "strands": names, "replies": replies]
         }
 
         /// `strands.list` for the demo's Main and Launch prep: two asks, two running strands with workers, a finished one, a quiet one.
@@ -376,7 +386,7 @@ enum BotSpacesDemo {
                 let ended: Any = endedAgo.map { now - $0 } ?? NSNull()
                 return ["threadId": id, "title": title, "status": status, "endedAt": ended]
             }
-            let strands: [[String: Any]]
+            var strands: [[String: Any]]
             if threadId == "thr_demo_interview" {
                 strands = [strand("str_notes", "Release notes", "Short changelog or the full list?", "needs-you", seq: 9,
                                   asks: [["id": "ask_notes", "kind": "question", "threadId": threadId, "label": "Short changelog or the full list?", "details": [Any](), "turnId": NSNull(), "decisions": [Any]()]]),
@@ -402,6 +412,11 @@ enum BotSpacesDemo {
                     strand("str_lisbon", "Lisbon trip", "Passport is in the bag", "done-unseen", seq: 36),
                     strand("str_notes", "Release notes", "Shipped yesterday", "quiet", seq: 12, workers: [worker("thr_demo_w4", "Release notes", "done", endedAgo: 86_400_000)]),
                 ]
+                if BotSpacesDemo.replyAsk {
+                    strands.insert(strand("str_budget", "Lisbon offsite budget", "Wants your sign-off by 3pm", "needs-you", seq: 46,
+                                          asks: [["id": "ask_reply_budget", "kind": "reply", "threadId": threadId, "label": "Want me to draft the approval note?",
+                                                  "details": [Any](), "turnId": "t3", "decisions": [Any](), "seq": BotSpacesDemo.replyAskSeq]]), at: 0)
+                }
             }
             let stray: [Any] = threadId == "thr_demo_interview" ? [] : [worker("thr_demo_w9", "Flaky fixture hunt", "failed", endedAgo: 3_600_000)]
             let backfill: [String: Any] = ["done": true, "at": now, "messages": 40, "sorted": 40]

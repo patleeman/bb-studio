@@ -10,35 +10,95 @@ import SwiftUI
 /// are left out; see `Directive`.
 struct MarkdownText: View {
     let source: String
+    /// A reply that needs the user: its asking sentence (or last paragraph) marked in place.
+    var mark: ReplyAskMark?
+    @Environment(\.look) private var look
 
-    init(_ source: String) {
+    init(_ source: String, mark: ReplyAskMark? = nil) {
         self.source = source
+        self.mark = mark
+    }
+
+    /// A block of text the ask can be in: a heading, a paragraph, or one list item.
+    struct TextKey: Hashable {
+        var block: Int
+        var item = -1
     }
 
     var body: some View {
         let blocks = MarkdownBlock.parse(source)
+        let marked = mark.map { Self.marked(blocks, $0) } ?? [:]
         VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
-                view(for: block)
+                view(for: block, at: index, marked: marked)
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if let mark, !marked.isEmpty {
+                // For VoiceOver and the UI tests: the reply asks something, here.
+                Color.clear.frame(width: 1, height: 1)
+                    .accessibilityElement()
+                    .accessibilityLabel("Needs you: " + (mark.ask ?? "the last paragraph"))
+                    .accessibilityValue(mark.flash ? "flash" : "marked")
+                    .accessibilityIdentifier("replyAsk")
             }
         }
     }
 
+    /// Where the mark goes: the ask sentence in the blocks' shown text (`ReplyAsk.find`), or, when Jev named
+    /// no sentence, the last paragraph or list item. Empty when the sentence isn't there.
+    static func marked(_ blocks: [MarkdownBlock], _ mark: ReplyAskMark) -> [TextKey: Range<Int>] {
+        var keys: [TextKey] = []
+        var texts: [String] = []
+        var prose: [Bool] = []
+        for (index, block) in blocks.enumerated() {
+            switch block {
+            case .heading(_, let text):
+                keys.append(TextKey(block: index)); texts.append(String(inline(text).characters)); prose.append(false)
+            case .paragraph(let text):
+                keys.append(TextKey(block: index)); texts.append(String(inline(text).characters)); prose.append(true)
+            case .list(let items):
+                for (n, item) in items.enumerated() {
+                    keys.append(TextKey(block: index, item: n)); texts.append(String(inline(item.text).characters)); prose.append(true)
+                }
+            default:
+                break
+            }
+        }
+        guard let ask = mark.ask else {
+            guard let last = texts.indices.last(where: { prose[$0] && !texts[$0].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+            else { return [:] }
+            return [keys[last]: 0..<texts[last].count]
+        }
+        guard let found = ReplyAsk.find(ask, in: texts) else { return [:] }
+        return Dictionary(uniqueKeysWithValues: found.map { (keys[$0.key], $0.value) })
+    }
+
+    /// The block's text with the mark's faint amber (brighter while it flashes) over `range`.
+    private func highlighted(_ text: AttributedString, _ range: Range<Int>?) -> AttributedString {
+        guard let range, let mark, range.upperBound <= text.characters.count else { return text }
+        var out = text
+        let start = out.characters.index(out.characters.startIndex, offsetBy: range.lowerBound)
+        let end = out.characters.index(start, offsetBy: range.count)
+        out[start..<end].backgroundColor = look.needsYou.opacity(mark.flash ? 0.5 : 0.22)
+        return out
+    }
+
     @ViewBuilder
-    private func view(for block: MarkdownBlock) -> some View {
+    private func view(for block: MarkdownBlock, at index: Int, marked: [TextKey: Range<Int>]) -> some View {
         switch block {
         case .heading(let level, let text):
-            Text(Self.inline(text))
+            Text(highlighted(Self.inline(text), marked[TextKey(block: index)]))
                 .font(level == 1 ? .title3.bold() : level == 2 ? .headline : .subheadline.bold())
                 .padding(.top, 4)
         case .paragraph(let text):
-            Text(Self.inline(text))
+            Text(highlighted(Self.inline(text), marked[TextKey(block: index)]))
         case .list(let items):
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                ForEach(Array(items.enumerated()), id: \.offset) { n, item in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         marker(item)
-                        Text(Self.inline(item.text))
+                        Text(highlighted(Self.inline(item.text), marked[TextKey(block: index, item: n)]))
                     }
                     .padding(.leading, CGFloat(item.level) * 18)
                 }

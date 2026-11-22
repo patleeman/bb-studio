@@ -12,6 +12,9 @@ final class StrandsModel {
     private(set) var tags: [String: StrandTags] = [:]
     /// The strand a conversation shows only (a divider or a strand tapped); nil shows everything.
     var only: [String: String] = [:]
+    /// Jump to reply: the reply (its message seq) a conversation brings into view and flashes.
+    private(set) var flash: [String: Double] = [:]
+    private var flashEnds: [String: Task<Void, Never>] = [:]
     /// Per server: nil until asked, false when Studio has no strands.
     private(set) var supported: [URL: Bool] = [:]
     private var client: BBClient { AppModel.shared.client }
@@ -58,6 +61,22 @@ final class StrandsModel {
     func opened(_ strand: Strand, in threadId: String) async {
         try? await client.strandOpened(strand.id)
         await load(threadId)
+    }
+
+    /// Jump to reply: the conversation scrolls to the reply and its asking sentence flashes for a moment.
+    func flashReply(_ seq: Double, in threadId: String) {
+        flashEnds[threadId]?.cancel()
+        flash[threadId] = seq
+        var duration = 1_600
+        #if DEBUG
+        // Long enough for a UI test to see it past XCUITest's wait for the app to settle.
+        if BotSpacesDemo.replyAsk { duration = 4_000 }
+        #endif
+        flashEnds[threadId] = Task { [weak self, duration] in
+            try? await Task.sleep(for: .milliseconds(duration))
+            guard !Task.isCancelled else { return }
+            self?.flash[threadId] = nil
+        }
     }
 
     func decide(_ ask: Strand.Ask, _ decision: WorkerApproval.Decision, in threadId: String) async throws {
@@ -207,6 +226,7 @@ struct StrandsBox: View {
                 if strand.state == .doneUnseen { Task { await model.opened(strand, in: threadId) } }
                 if !panel { withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { open = false } }
                 model.only[threadId] = strand.id
+                if let reply = StrandsBoxModel.replyAsk(strand), reply.threadId == threadId, let seq = reply.seq { model.flashReply(seq, in: threadId) }
             } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     StrandMark(state: strand.state).frame(width: 12)
@@ -252,6 +272,18 @@ struct StrandsBox: View {
                 }
             case .gateway:
                 Text("Approve on the desktop").font(.caption).foregroundStyle(.secondary)
+            case .reply:
+                if let seq = ask.seq, ask.threadId == threadId {
+                    Button("Show") {
+                        if !panel { withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { open = false } }
+                        model.flashReply(seq, in: threadId)
+                    }
+                    .font(.footnote).buttonStyle(.bordered)
+                    .accessibilityIdentifier("strand-reply-\(Int(seq))")
+                } else if ask.threadId != threadId {
+                    Button("Open") { openThread(ask.threadId) }
+                        .font(.footnote).buttonStyle(.bordered)
+                }
             case .question, .other:
                 if ask.threadId != threadId {
                     Button("Open") { openThread(ask.threadId) }

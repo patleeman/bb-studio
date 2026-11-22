@@ -97,6 +97,8 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         var sameTurn = false
         var relayed: RelayedMessage?
         var quiet = false
+        /// A reply that needs the user: its asking sentence marked (its turn's newest message).
+        var ask: ReplyAskMark?
     }
 
     var id: String {
@@ -229,7 +231,7 @@ struct ThreadTranscriptRowView: View {
                             saveFiles: actions.saveFiles, thread: state.sideThread, replier: actions.replier,
                             replyInThread: actions.messageThread.flatMap { open in ConversationReplies.canThread(row) ? { open(row) } : nil },
                             fork: actions.forkConversation.flatMap { fork in ConversationReplies.canFork(row) ? { fork(row) } : nil },
-                            openSideThread: actions.openSideThread)
+                            openSideThread: actions.openSideThread, ask: state.ask)
                     case .activity(let rows):
                         ActivityGroup(rows: rows)
                     }
@@ -284,12 +286,13 @@ extension ThreadTranscriptRow {
     /// Strands in a conversation's rows (`StrandTimeline.plan`): dividers where
     /// the strand changes, or, showing only one strand, its rows with the others
     /// folded into "N other messages". Rows that aren't from a turn stay.
-    static func strands(_ rows: [Self], tags: StrandTags?, only: String?) -> [Self] {
+    static func strands(_ rows: [Self], tags: StrandTags?, only: String?, flash: Double? = nil) -> [Self] {
         guard let tags, !tags.tags.isEmpty else { return rows }
         let seqs: [Double?] = rows.map { row in
             if case .item(let item, _) = row { return item.rows.compactMap(\.sourceSeqEnd).max() }
             return nil
         }
+        let rows = asks(rows, seqs: seqs, tags: tags, flash: flash)
         let messages: [Bool] = rows.map { row in
             if case .item(.message, _) = row { return true }
             return false
@@ -302,6 +305,24 @@ extension ThreadTranscriptRow {
             if plan.keep[index] { out.append(row) }
         }
         for (n, mark) in (plan.marks[rows.count] ?? []).enumerated() { out.append(.strand(mark, key: "end:\(n)")) }
+        return out
+    }
+
+    /// Replies that still need the user (`strands.tags` replies): each is marked
+    /// in its turn's newest reply message; `flash` is the reply Jump to reply flashes.
+    static func asks(_ rows: [Self], seqs: [Double?], tags: StrandTags, flash: Double?) -> [Self] {
+        guard tags.replies.contains(where: \.open) else { return rows }
+        var newest: [String: Int] = [:]
+        for (index, row) in rows.enumerated() {
+            guard case .item(.message(let message), _) = row, !message.isUser, let turn = tags.turn(atSeq: seqs[index]) else { continue }
+            newest[turn.turnId] = index
+        }
+        var out = rows
+        for (turnId, index) in newest {
+            guard let reply = tags.openReply(turnId: turnId), case .item(let item, var state) = out[index] else { continue }
+            state.ask = ReplyAskMark(ask: reply.ask, seq: reply.seq, flash: flash == reply.seq)
+            out[index] = .item(item, state)
+        }
         return out
     }
 }

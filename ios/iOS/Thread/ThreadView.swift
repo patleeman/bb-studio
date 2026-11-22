@@ -1908,6 +1908,9 @@ struct ThreadView: View {
             guard conversation != nil else { return }
             await RouterNotices.shared.poll(model.threadId)
         }
+        .onChange(of: StrandsModel.shared.flash[model.threadId]) { _, seq in
+            if let seq { showReply(seq) }
+        }
         .task(id: conversation != nil || botChrome != nil ? model.threadId : "") {
             guard conversation != nil || botChrome != nil else { return }
             // Strands take In flight's place; a Studio without them keeps In flight.
@@ -2352,7 +2355,17 @@ extension ThreadView {
         let shown = inRoom ? RoomText.rows(rows) : rows
         // Strands in a Bot conversation: dividers where the strand changes, or only one strand.
         guard conversation != nil, strands.replacesInFlight() else { return shown }
-        return ThreadTranscriptRow.strands(shown, tags: strands.tags[model.threadId], only: strands.only[model.threadId])
+        return ThreadTranscriptRow.strands(shown, tags: strands.tags[model.threadId], only: strands.only[model.threadId],
+                                           flash: strands.flash[model.threadId])
+    }
+
+    /// Jump to reply (the strands box): the reply that asks comes into view while its sentence flashes.
+    fileprivate func showReply(_ seq: Double) {
+        guard let row = transcriptV2Rows.first(where: { row in
+            if case .item(_, let state) = row { return state.ask?.seq == seq }
+            return false
+        }) else { return }
+        transcriptV2.scrollTo(row.id, position: .center, animated: true)
     }
 
     fileprivate var transcriptV2Actions: ThreadTranscriptActions {

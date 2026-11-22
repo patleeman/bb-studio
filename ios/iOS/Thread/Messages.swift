@@ -18,6 +18,8 @@ struct MessageBubble: View {
     var fork: (() -> Void)? = nil
     /// Opens an existing side thread (a fork made at this message).
     var openSideThread: ((String) -> Void)? = nil
+    /// A reply that needs the user: its asking sentence marked in place.
+    var ask: ReplyAskMark? = nil
     @EnvironmentObject private var app: AppModel
 
     private var text: String { row.text ?? "" }
@@ -42,7 +44,7 @@ struct MessageBubble: View {
             QuietCheckMarker()
         } else {
             VStack(alignment: .leading, spacing: 10) {
-                MarkdownText(text)
+                MarkdownText(text, mark: ask)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(.contextMenuPreview, .rect(cornerRadius: 8))
                     .contextMenu { menu }
@@ -74,6 +76,14 @@ struct MessageBubble: View {
         if let createdAt = row.createdAt {
             Section {
                 Text(Self.sentLabel(createdAt))
+            }
+        }
+        if ask != nil {
+            // Done is the user's own, from BB Studio's app on the Mac; answering here clears it too.
+            Section {
+                Button {} label: { Label("Mark done in BB Studio on your Mac", systemImage: "checkmark.circle") }
+                    .disabled(true)
+                    .accessibilityIdentifier("replyAskDone")
             }
         }
         Button { UIPasteboard.general.string = plainText } label: { Label("Copy", systemImage: "doc.on.doc") }

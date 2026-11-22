@@ -21,21 +21,48 @@ public struct StrandTags: Decodable, Hashable, Sendable {
         public var title: String
     }
 
+    /// A turn's reply, tagged needs-you or status: its asking sentence (`ask`,
+    /// nil when Jev named none) and whether the user is past it.
+    public struct Reply: Decodable, Hashable, Sendable {
+        public var turnId: String
+        /// The reply's message.
+        public var seq: Double
+        public var tag: String
+        public var ask: String?
+        /// Answered, marked done, its strand marked done, or a week old.
+        public var resolved: Bool
+
+        public init(turnId: String, seq: Double, tag: String, ask: String?, resolved: Bool) {
+            self.turnId = turnId
+            self.seq = seq
+            self.tag = tag
+            self.ask = ask
+            self.resolved = resolved
+        }
+
+        /// Still asking the user.
+        public var open: Bool { tag == "needs-you" && !resolved }
+    }
+
     /// Oldest first.
     public var tags: [Tag]
     public var strands: [Name]
+    /// Oldest first.
+    public var replies: [Reply]
 
-    public init(tags: [Tag], strands: [Name] = []) {
+    public init(tags: [Tag], strands: [Name] = [], replies: [Reply] = []) {
         self.tags = tags.sorted { $0.seq < $1.seq }
         self.strands = strands
+        self.replies = replies
     }
 
-    enum CodingKeys: String, CodingKey { case tags, strands }
+    enum CodingKeys: String, CodingKey { case tags, strands, replies }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         tags = (try c.decodeIfPresent([Tag].self, forKey: .tags) ?? []).sorted { $0.seq < $1.seq }
         strands = try c.decodeIfPresent([Name].self, forKey: .strands) ?? []
+        replies = (try? c.decodeIfPresent([Reply].self, forKey: .replies)) ?? []
     }
 
     public func title(_ strandId: String) -> String? { strands.first { $0.id == strandId }?.title }
@@ -43,15 +70,21 @@ public struct StrandTags: Decodable, Hashable, Sendable {
     /// The strand of the turn a row came from: its last event (`sourceSeqEnd`)
     /// falls in the turn that starts at the last tag at or before it. Nil when
     /// it's older than every sorted turn or its turn has no strand.
-    public func strand(atSeq seq: Double?) -> String? {
+    public func strand(atSeq seq: Double?) -> String? { turn(atSeq: seq)?.strandId }
+
+    /// The sorted turn a row came from (as `strand(atSeq:)`).
+    public func turn(atSeq seq: Double?) -> Tag? {
         guard let seq, !tags.isEmpty, seq >= tags[0].seq else { return nil }
         var low = 0, high = tags.count - 1
         while low < high {
             let mid = (low + high + 1) / 2
             if tags[mid].seq <= seq { low = mid } else { high = mid - 1 }
         }
-        return tags[low].strandId
+        return tags[low]
     }
+
+    /// The turn's reply that still asks the user, the newest if several.
+    public func openReply(turnId: String) -> Reply? { replies.last { $0.turnId == turnId && $0.open } }
 }
 
 /// Where a transcript changes strand, and what "Only this strand" keeps.
