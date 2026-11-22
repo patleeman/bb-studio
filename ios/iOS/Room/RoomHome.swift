@@ -21,6 +21,10 @@ enum RoomHome {
 
     /// The conversation the app opens on: the last one opened, while it's still listed, else Main.
     static func opening(main: String, order: [String], botId: String) -> String {
+        #if DEBUG
+        // UI tests start each launch on Main unless one tests this memory (`-qaRoomRemember`).
+        if ProcessInfo.processInfo.arguments.contains("-qaRoomForget") { return main }
+        #endif
         guard let last = AppGroup.defaults.string(forKey: lastKey + "." + botId), order.contains(last) else { return main }
         return last
     }

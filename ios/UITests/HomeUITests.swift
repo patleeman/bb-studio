@@ -51,7 +51,7 @@ final class HomeUITests: ServerIsolatedUITestCase {
         shot("4-picked")
 
         app.terminate()
-        launch()
+        launch(["-qaRoomRemember"])
         XCTAssertTrue(any("conversationPageDots").waitForExistence(timeout: 30))
         XCTAssertEqual(any("conversationPageDots").label, dots.label, "it opens on the last conversation opened")
     }

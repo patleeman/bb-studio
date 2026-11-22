@@ -36,8 +36,10 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
     }
 
     private func backInTheRoom(_ what: String) {
+        // The list sheet and the menu are gone and a conversation shows.
         let composer = app.textViews["Message"]
-        let shown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND isHittable == true"), object: composer)
+        _ = app.descendants(matching: .any)["RoomSheet-conversations"].firstMatch.waitForNonExistence(timeout: 10)
+        let shown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true"), object: composer)
         XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 15), .completed, what)
     }
 
