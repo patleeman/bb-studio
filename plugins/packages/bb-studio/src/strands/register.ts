@@ -35,6 +35,8 @@ export interface StrandsRegisterDeps {
   extraAsks?(threadId: string): { id: string; kind: "area" | "flag"; label: string; at: number }[];
   /** Secret values to keep out of what strands send and keep: Studio's API keys, Tool Gateway's secrets. */
   secrets(): Promise<readonly string[]>;
+  /** The Studio setting strands_richSorting. */
+  richSorting?(): boolean;
   log(message: string): void;
 }
 
@@ -65,6 +67,7 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
     } as never) as unknown as EventRow[],
     jev: (input) => deps.decisions.systemOne({ ...input, questions: input.questions as never }, AbortSignal.timeout(JEV_TIMEOUT_MS)),
     secrets: deps.secrets,
+    richSorting: deps.richSorting,
     ...(completeText ? {
       completeText: async ({ prompt }: { prompt: string }) => {
         const result = await completeText({ prompt, timeoutMs: 8_000 });

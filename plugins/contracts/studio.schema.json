@@ -56637,6 +56637,17 @@
                     "string",
                     "null"
                   ]
+                },
+                "parentId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "trunk": {
+                  "default": false,
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -56657,7 +56668,9 @@
                 "unsure",
                 "pinned",
                 "origin",
-                "taskId"
+                "taskId",
+                "parentId",
+                "trunk"
               ],
               "additionalProperties": false
             }
@@ -56857,6 +56870,17 @@
                     "string",
                     "null"
                   ]
+                },
+                "parentId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "trunk": {
+                  "default": false,
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -56877,7 +56901,9 @@
                 "unsure",
                 "pinned",
                 "origin",
-                "taskId"
+                "taskId",
+                "parentId",
+                "trunk"
               ],
               "additionalProperties": false
             }
@@ -57166,6 +57192,17 @@
                           "string",
                           "null"
                         ]
+                      },
+                      "parentId": {
+                        "default": null,
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "trunk": {
+                        "default": false,
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -57186,7 +57223,9 @@
                       "unsure",
                       "pinned",
                       "origin",
-                      "taskId"
+                      "taskId",
+                      "parentId",
+                      "trunk"
                     ],
                     "additionalProperties": false
                   }
@@ -57275,6 +57314,13 @@
                     "string",
                     "null"
                   ]
+                },
+                "also": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               },
               "required": [
@@ -57283,7 +57329,8 @@
                 "strandId",
                 "kind",
                 "at",
-                "line"
+                "line",
+                "also"
               ],
               "additionalProperties": false
             }
@@ -57309,13 +57356,18 @@
                     "string",
                     "null"
                   ]
+                },
+                "trunk": {
+                  "default": false,
+                  "type": "boolean"
                 }
               },
               "required": [
                 "id",
                 "title",
                 "done",
-                "parentId"
+                "parentId",
+                "trunk"
               ],
               "additionalProperties": false
             }

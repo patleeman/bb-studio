@@ -88,6 +88,7 @@ export const STUDIO_SETTINGS = {
   decisions_customJevModel: { group: "jev", type: "string", label: "Model name", description: "The model the endpoint expects, such as jev-latest.", default: "", maxLength: 200 },
 
   // Advanced
+  strands_richSorting: { group: "advanced", type: "boolean", label: "Richer strand sorting", description: "Experimental. Jev also reads each strand's newest lines, the turn before and where quoted text came from, and may file a message under a second strand or say what a new strand grew out of. Off sorts as before, with the links the conversation states.", default: false },
   decisions_batchConfidence: { group: "advanced", type: "number", label: "Smart Queue batch confidence", description: "From 0 to 1. When a thread frees up, queued follow-ups the decision model is this sure belong together go as one turn. 1 sends each on its own.", default: 0.5, min: 0, max: 1 },
 
   // Bot ▸ Controls ▸ Attention

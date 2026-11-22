@@ -10,7 +10,7 @@ const MIN = 60_000;
 
 const view = (id: string, title: string, over: Partial<StrandView> = {}): StrandView => ({
   id, title, summary: null, named: true, state: "active", detail: null, asks: [], workers: [], lastAt: NOW - 10 * MIN, firstAt: NOW - 3 * 60 * MIN, firstSeq: 4,
-  latestSeq: 10, latestTurnId: `t_${id}`, messages: 1, unsure: 0, pinned: false, origin: "jev", taskId: null, ...over,
+  latestSeq: 10, latestTurnId: `t_${id}`, messages: 1, unsure: 0, pinned: false, origin: "jev", taskId: null, parentId: null, trunk: false, ...over,
 });
 const approval = (id: string, label: string) => ({ id, kind: "approval" as const, threadId: "thr_main", label, details: ["Command: npm publish --tag latest --access public --otp-from-env", "Cwd: /tmp/release"], turnId: "t5" as string | null, decisions: ["deny", "allow_once"] as ("deny" | "allow_once")[], seq: null as number | null });
 const LIST: StrandList = {

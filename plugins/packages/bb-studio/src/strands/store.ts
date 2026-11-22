@@ -8,8 +8,11 @@ import type { ReplyBy, ReplyTag } from "./reply";
 
 export type StrandOrigin = "jev" | "model" | "user" | "task" | "backfill";
 export type ItemKind = "user" | "reply" | "worker" | "ask" | "report";
-/** Who put an item in its strand. "fallback": the previous turn's strand, with no one to ask. "pending": the same, until the small model's batch sorts it. */
-export type ItemBy = "jev" | "model" | "user" | "inherit" | "fallback" | "pending";
+/**
+ * Who put an item in its strand. "fallback": the previous turn's strand, with no one to ask. "pending": the same, until the small model's batch sorts it.
+ * "quiet": only on a reply item, a report's reply that passed over it quietly ([PASS]): the user read nothing there (see previous()).
+ */
+export type ItemBy = "jev" | "model" | "user" | "inherit" | "fallback" | "pending" | "quiet";
 
 export interface Strand {
   id: string;
@@ -32,6 +35,10 @@ export interface Strand {
   doneAt: number | null;
   openedAt: number | null;
   createdAt: number;
+  /** The strand it branched from ("Release 1.0.13" from "Context cuts"); null for a root. */
+  parentId: string | null;
+  /** The conversation's whole-conversation strand (roundups, "where do we stand"): one per conversation. */
+  trunk: boolean;
 }
 
 export interface StrandItem {
@@ -46,6 +53,8 @@ export interface StrandItem {
   confidence: number | null;
   by: ItemBy;
   unsure: boolean;
+  /** Other strands the message is also about (the 1:04 "both are built" message is in two). */
+  also: string[];
 }
 
 export interface StrandRead { threadId: string; seenSeq: number; day: string | null; jevCalls: number; modelCalls: number; namedAt: number | null; batchedAt: number | null; backfill: string | null }
@@ -54,21 +63,28 @@ type StrandRow = {
   id: string; thread_id: string; title: string; summary: string | null; named: number; name_tries: number; summary_at: number | null;
   first_seq: number; last_seq: number; last_at: number; pinned: number; merged_into: string | null; origin: string; task_id: string | null;
   waiting_on: string | null; waiting_at: number | null; done_at?: number | null; opened_at: number | null; created_at: number;
+  parent_id?: string | null; kind?: string | null;
 };
 type ItemRow = {
   thread_id: string; seq: number; kind: string; ref: string; turn_id: string | null; at: number; line: string | null;
-  strand_id: string | null; confidence: number | null; by: string; unsure: number;
+  strand_id: string | null; confidence: number | null; by: string; unsure: number; also_strands?: string | null;
 };
 
 const strandOf = (row: StrandRow): Strand => ({
   id: row.id, threadId: row.thread_id, title: row.title, summary: row.summary, named: !!row.named, nameTries: row.name_tries, summaryAt: row.summary_at,
   firstSeq: row.first_seq, lastSeq: row.last_seq, lastAt: row.last_at, pinned: !!row.pinned, mergedInto: row.merged_into,
   origin: row.origin as StrandOrigin, taskId: row.task_id, waitingOn: row.waiting_on, waitingAt: row.waiting_at, doneAt: row.done_at ?? null, openedAt: row.opened_at, createdAt: row.created_at,
+  parentId: row.parent_id ?? null, trunk: row.kind === TRUNK,
 });
 const itemOf = (row: ItemRow): StrandItem => ({
   threadId: row.thread_id, seq: row.seq, kind: row.kind as ItemKind, ref: row.ref, turnId: row.turn_id, at: row.at, line: row.line,
-  strandId: row.strand_id, confidence: row.confidence, by: row.by as ItemBy, unsure: !!row.unsure,
+  strandId: row.strand_id, confidence: row.confidence, by: row.by as ItemBy, unsure: !!row.unsure, also: alsoOf(row.also_strands),
 });
+
+function alsoOf(value: string | null | undefined): string[] {
+  if (!value) return [];
+  try { const list = JSON.parse(value) as unknown; return Array.isArray(list) ? list.filter((each): each is string => typeof each === "string") : []; } catch { return []; }
+}
 
 /** A reply: its item, its tag (null while untagged), ask sentence, who tagged it (null: not yet), and whether the user is past it. */
 export interface ReplyRow { seq: number; turnId: string | null; at: number; strandId: string | null; tag: ReplyTag | null; ask: string | null; by: ReplyBy | null; resolved: boolean; /** The reply's first sentence (a folded run of status replies says it). */ line: string | null }
@@ -85,6 +101,13 @@ const replyOf = (row: ReplyDbRow): ReplyRow => ({
 
 /** The last user line kept with an item, for the prompt's "last user line". */
 export const LINE_MAX = 300;
+
+/** A message whose reply passed over it quietly (its reply item is marked "quiet"): filed, but not what the user was following. Rows from before the marker count as read. */
+const NOT_QUIET = "NOT EXISTS (SELECT 1 FROM strand_items q WHERE q.thread_id = i.thread_id AND q.kind = 'reply' AND q.turn_id = i.turn_id AND q.by = 'quiet')";
+
+/** strands.kind of the whole-conversation strand. */
+export const TRUNK = "trunk";
+export const TRUNK_TITLE = "Whole conversation";
 
 /** The strand_reads row that counts today's calls across every conversation. */
 export const ALL_CONVERSATIONS = "strands:all-conversations";
@@ -105,17 +128,38 @@ export class StrandStore {
 
   /** A conversation's strands that weren't merged into another, newest activity first. */
   list(threadId: string): Strand[] {
-    return (this.db.prepare("SELECT * FROM strands WHERE thread_id = ? AND merged_into IS NULL ORDER BY last_at DESC, id").all(threadId) as StrandRow[]).map(strandOf);
+    return (this.db.prepare("SELECT * FROM strands WHERE thread_id = ? AND merged_into IS NULL ORDER BY last_at DESC, rowid DESC").all(threadId) as StrandRow[]).map(strandOf);
   }
 
-  /** The newest `limit` strands of a conversation (not merged), for a prompt. */
+  /** The newest `limit` strands of a conversation (not merged; not the whole-conversation strand, which a prompt offers on its own), for a prompt. */
   recent(threadId: string, limit: number): Strand[] {
-    return (this.db.prepare("SELECT * FROM strands WHERE thread_id = ? AND merged_into IS NULL ORDER BY last_at DESC, id LIMIT ?").all(threadId, limit) as StrandRow[]).map(strandOf);
+    return (this.db.prepare("SELECT * FROM strands WHERE thread_id = ? AND merged_into IS NULL AND kind IS NOT 'trunk' ORDER BY last_at DESC, rowid DESC LIMIT ?").all(threadId, limit) as StrandRow[]).map(strandOf);
+  }
+
+  /** The conversation's whole-conversation strand, made on first use. */
+  trunk(threadId: string, at: number): Strand {
+    const row = this.db.prepare("SELECT * FROM strands WHERE thread_id = ? AND kind = 'trunk' AND merged_into IS NULL LIMIT 1").get(threadId) as StrandRow | undefined;
+    if (row) return strandOf(row);
+    const strand = this.create({ threadId, title: TRUNK_TITLE, named: true, origin: "jev", seq: null, at });
+    this.db.prepare("UPDATE strands SET kind = 'trunk' WHERE id = ?").run(strand.id);
+    return this.get(strand.id)!;
+  }
+
+  /** The conversation's whole-conversation strand, if it has one. */
+  trunkOf(threadId: string): Strand | null {
+    const row = this.db.prepare("SELECT * FROM strands WHERE thread_id = ? AND kind = 'trunk' AND merged_into IS NULL LIMIT 1").get(threadId) as StrandRow | undefined;
+    return row ? strandOf(row) : null;
+  }
+
+  /** Records the strand a strand branched from (never itself, never a loop). */
+  setParent(id: string, parentId: string | null): void {
+    for (let at = parentId, steps = 0; at && steps < 50; steps++) { if (at === id) return; at = this.get(at)?.parentId ?? null; }
+    this.db.prepare("UPDATE strands SET parent_id = ? WHERE id = ?").run(parentId, id);
   }
 
   /** Strands still waiting for the small model's name, oldest first. */
   unnamed(threadId: string, maxTries: number): Strand[] {
-    return (this.db.prepare("SELECT * FROM strands WHERE thread_id = ? AND merged_into IS NULL AND named = 0 AND name_tries < ? ORDER BY created_at, id").all(threadId, maxTries) as StrandRow[]).map(strandOf);
+    return (this.db.prepare("SELECT * FROM strands WHERE thread_id = ? AND merged_into IS NULL AND named = 0 AND name_tries < ? ORDER BY created_at, rowid").all(threadId, maxTries) as StrandRow[]).map(strandOf);
   }
 
   byTask(taskId: string): Strand | null {
@@ -128,12 +172,12 @@ export class StrandStore {
   }
 
   /** A new strand. With `seq` null it has no message yet: its span starts empty and grows with its first one. */
-  create(input: { threadId: string; title: string; summary?: string | null; named?: boolean; origin: StrandOrigin; seq: number | null; at: number; taskId?: string | null }): Strand {
+  create(input: { threadId: string; title: string; summary?: string | null; named?: boolean; origin: StrandOrigin; seq: number | null; at: number; taskId?: string | null; parentId?: string | null }): Strand {
     const id = `str_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
     const at = this.now();
-    this.db.prepare(`INSERT INTO strands (id, thread_id, title, summary, named, summary_at, first_seq, last_seq, last_at, origin, task_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, input.threadId, input.title, input.summary ?? null, input.named ? 1 : 0, input.summary ? at : null, input.seq ?? Number.MAX_SAFE_INTEGER, input.seq ?? 0, input.at, input.origin, input.taskId ?? null, at);
+    this.db.prepare(`INSERT INTO strands (id, thread_id, title, summary, named, summary_at, first_seq, last_seq, last_at, origin, task_id, created_at, parent_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, input.threadId, input.title, input.summary ?? null, input.named ? 1 : 0, input.summary ? at : null, input.seq ?? Number.MAX_SAFE_INTEGER, input.seq ?? 0, input.at, input.origin, input.taskId ?? null, at, input.parentId ?? null);
     return this.get(id)!;
   }
 
@@ -164,11 +208,21 @@ export class StrandStore {
     if (from === into) return false;
     const a = this.get(from);
     const b = this.get(into);
-    if (!a || !b || a.threadId !== b.threadId || a.mergedInto || b.mergedInto || (a.origin === "user" && !byUser)) return false;
+    if (!a || !b || a.threadId !== b.threadId || a.mergedInto || b.mergedInto || (a.origin === "user" && !byUser) || a.trunk !== b.trunk) return false;
     this.db.transaction(() => {
       // Each item remembers where it was, so the merge can be undone.
       this.db.prepare("UPDATE strand_items SET prev_strand_id = strand_id, strand_id = ? WHERE thread_id = ? AND strand_id = ?").run(into, a.threadId, from);
       this.db.prepare("UPDATE strands SET merged_into = ? WHERE id = ?").run(into, from);
+      // The messages also about `from` are also about `into` now: never the strand they are in, never twice.
+      const also = this.db.prepare("SELECT rowid AS row, strand_id, also_strands FROM strand_items WHERE thread_id = ? AND also_strands LIKE ?").all(a.threadId, `%${from}%`) as { row: number; strand_id: string | null; also_strands: string }[];
+      const write = this.db.prepare("UPDATE strand_items SET also_strands = ? WHERE rowid = ?");
+      for (const item of also) {
+        const next = [...new Set(alsoOf(item.also_strands).map((id) => (id === from ? into : id)))].filter((id) => id !== item.strand_id);
+        write.run(next.length ? JSON.stringify(next) : null, item.row);
+      }
+      // Its branches now grow from the strand it joined; the joined strand keeps its own parent (or takes this one's).
+      this.db.prepare("UPDATE strands SET parent_id = ? WHERE thread_id = ? AND parent_id = ? AND merged_into IS NULL AND id != ?").run(into, a.threadId, from, into);
+      if (!b.parentId && a.parentId && a.parentId !== into) this.db.prepare("UPDATE strands SET parent_id = ? WHERE id = ?").run(a.parentId, into);
       this.db.prepare(`UPDATE strands SET first_seq = MIN(first_seq, ?), last_seq = MAX(last_seq, ?), last_at = MAX(last_at, ?),
         task_id = COALESCE(task_id, ?), pinned = MAX(pinned, ?) WHERE id = ?`).run(a.firstSeq, a.lastSeq, a.lastAt, a.taskId, a.pinned ? 1 : 0, into);
     })();
@@ -215,7 +269,7 @@ export class StrandStore {
       const later = this.db.prepare("SELECT seq, turn_id FROM strand_items WHERE thread_id = ? AND strand_id = ? AND seq > ? AND kind IN ('user', 'report')").all(threadId, from, seq) as { seq: number; turn_id: string | null }[];
       for (const row of later) { seqs.push(row.seq); turnIds.push(row.turn_id); }
     }
-    const move = this.db.prepare("UPDATE strand_items SET prev_strand_id = strand_id, strand_id = ?, by = 'user', unsure = 0, confidence = NULL WHERE thread_id = ? AND ((seq = ? AND kind IN ('user', 'report', 'worker')) OR (? IS NOT NULL AND turn_id = ?))");
+    const move = this.db.prepare("UPDATE strand_items SET prev_strand_id = strand_id, strand_id = ?, by = 'user', unsure = 0, confidence = NULL, also_strands = NULL WHERE thread_id = ? AND ((seq = ? AND kind IN ('user', 'report', 'worker')) OR (? IS NOT NULL AND turn_id = ?))");
     this.db.transaction(() => {
       seqs.forEach((each, index) => move.run(to, threadId, each, turnIds[index] ?? null, turnIds[index] ?? null));
     })();
@@ -265,12 +319,28 @@ export class StrandStore {
   }
 
   /** Puts an item in a strand (or in none), replacing what it had. */
-  put(item: Omit<StrandItem, "unsure" | "ref"> & { ref?: string; unsure?: boolean }): void {
-    this.db.prepare(`INSERT INTO strand_items (thread_id, seq, kind, ref, turn_id, at, line, strand_id, confidence, by, unsure) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  put(item: Omit<StrandItem, "unsure" | "ref" | "also"> & { ref?: string; unsure?: boolean; also?: readonly string[] }): void {
+    const also = (item.also ?? []).filter((id) => id !== item.strandId);
+    this.db.prepare(`INSERT INTO strand_items (thread_id, seq, kind, ref, turn_id, at, line, strand_id, confidence, by, unsure, also_strands) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(thread_id, kind, seq, ref) DO UPDATE SET turn_id = COALESCE(excluded.turn_id, turn_id), at = excluded.at, line = COALESCE(excluded.line, line),
-        strand_id = excluded.strand_id, confidence = excluded.confidence, by = excluded.by, unsure = excluded.unsure`)
-      .run(item.threadId, item.seq, item.kind, item.ref ?? "", item.turnId, item.at, item.line?.slice(0, LINE_MAX) ?? null, item.strandId, item.confidence, item.by, item.unsure ? 1 : 0);
+        strand_id = excluded.strand_id, confidence = excluded.confidence, by = excluded.by, unsure = excluded.unsure, also_strands = excluded.also_strands`)
+      .run(item.threadId, item.seq, item.kind, item.ref ?? "", item.turnId, item.at, item.line?.slice(0, LINE_MAX) ?? null, item.strandId, item.confidence, item.by, item.unsure ? 1 : 0, also.length ? JSON.stringify([...new Set(also)]) : null);
     if (item.strandId) this.touched(item.strandId, item.seq, item.at);
+    // A strand the message is also about counts it as activity too.
+    for (const id of new Set(also)) this.touched(id, item.seq, item.at);
+  }
+
+  /** A turn's reply item, by the turn's id: its line is the reply's end (context for the next sort). */
+  replyItem(threadId: string, turnId: string): StrandItem | null {
+    const row = this.db.prepare("SELECT * FROM strand_items WHERE thread_id = ? AND kind = 'reply' AND turn_id = ? ORDER BY seq DESC LIMIT 1").get(threadId, turnId) as ItemRow | undefined;
+    return row ? itemOf(row) : null;
+  }
+
+  /** The newest sorted message before `seq` (user or report) whose reply the user read (it has a reply line): what a short answer answers. */
+  before(threadId: string, seq: number): StrandItem | null {
+    const row = this.db.prepare(`SELECT i.* FROM strand_items i WHERE i.thread_id = ? AND i.seq < ? AND i.kind IN ('user', 'report') AND ${NOT_QUIET}
+      ORDER BY i.seq DESC LIMIT 1`).get(threadId, seq) as ItemRow | undefined;
+    return row ? itemOf(row) : null;
   }
 
   /** The strand of the turn that was going on at `at`: the newest sorted message at or before it. */
@@ -279,9 +349,14 @@ export class StrandStore {
     return row ? { strandId: row.strand_id, seq: row.seq } : null;
   }
 
-  /** The strand of the newest sorted message before `seq` that had one. */
+  /**
+   * The strand of the newest sorted message before `seq` that had one. Only
+   * turns whose reply the user read count: a report the reply passed over
+   * quietly is filed too, but it isn't what the user was following.
+   */
   previous(threadId: string, seq: number): string | null {
-    const row = this.db.prepare("SELECT strand_id FROM strand_items WHERE thread_id = ? AND seq < ? AND kind IN ('user', 'report') AND strand_id IS NOT NULL ORDER BY seq DESC LIMIT 1").get(threadId, seq) as { strand_id: string } | undefined;
+    const row = this.db.prepare(`SELECT i.strand_id FROM strand_items i WHERE i.thread_id = ? AND i.seq < ? AND i.kind IN ('user', 'report') AND i.strand_id IS NOT NULL AND ${NOT_QUIET}
+      ORDER BY i.seq DESC LIMIT 1`).get(threadId, seq) as { strand_id: string } | undefined;
     return row?.strand_id ?? null;
   }
 
@@ -330,6 +405,19 @@ export class StrandStore {
   tagReply(threadId: string, seq: number, verdict: { tag: ReplyTag; ask: string | null } | null, line: string | null = null): void {
     this.db.prepare("UPDATE strand_items SET reply_tag = ?, reply_ask = ?, reply_by = ?, line = COALESCE(?, line) WHERE thread_id = ? AND kind = 'reply' AND seq = ? AND ref = ''")
       .run(verdict?.tag ?? null, verdict?.ask?.slice(0, LINE_MAX) ?? null, verdict ? "jev" : "none", line?.slice(0, LINE_MAX) ?? null, threadId, seq);
+  }
+
+  /** Keeps a reply's quick replies (the buttons it offered), so a message that is one of them is known to answer it. */
+  setQuickReplies(threadId: string, seq: number, quick: readonly string[]): void {
+    if (!quick.length) return;
+    this.db.prepare("UPDATE strand_items SET reply_quick = ? WHERE thread_id = ? AND kind = 'reply' AND seq = ? AND ref = ''").run(JSON.stringify(quick.slice(0, 8)), threadId, seq);
+  }
+
+  /** The buttons the user could press before `seq`: the newest reply they read (not a quiet one), if it offered quick replies. */
+  lastQuickReplies(threadId: string, seq: number): { seq: number; turnId: string | null; strandId: string | null; quick: string[] } | null {
+    const row = this.db.prepare("SELECT seq, turn_id, strand_id, reply_quick FROM strand_items WHERE thread_id = ? AND kind = 'reply' AND seq < ? AND by != 'quiet' ORDER BY seq DESC LIMIT 1").get(threadId, seq) as { seq: number; turn_id: string | null; strand_id: string | null; reply_quick: string | null } | undefined;
+    if (!row?.reply_quick) return null;
+    return { seq: row.seq, turnId: row.turn_id, strandId: row.strand_id, quick: alsoOf(row.reply_quick) };
   }
 
   /** A reply once tagged (or marked untagged), else null. */

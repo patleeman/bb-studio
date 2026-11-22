@@ -15,9 +15,11 @@ export const ENSURED_COLUMNS: Readonly<Record<string, readonly (readonly [string
   bots: [["main_provider_id", "TEXT"], ["main_model", "TEXT"], ["main_reasoning", "TEXT"]],
   // The strand an item was in before the user's (or a merge's) last move, so it can be undone (src/strands/store.ts).
   // A reply's tag (src/strands/reply.ts): needs-you or status, its ask line, who tagged it, and when the user marked it done.
-  strand_items: [["prev_strand_id", "TEXT"], ["reply_tag", "TEXT"], ["reply_ask", "TEXT"], ["reply_by", "TEXT"], ["reply_resolved_at", "INTEGER"]],
+  // The other strands a message is also about (a JSON array of strand ids; null: none), and a reply's quick replies (its ::next buttons, a JSON array).
+  strand_items: [["prev_strand_id", "TEXT"], ["reply_tag", "TEXT"], ["reply_ask", "TEXT"], ["reply_by", "TEXT"], ["reply_resolved_at", "INTEGER"], ["also_strands", "TEXT"], ["reply_quick", "TEXT"]],
   // When an agent marked a strand done (strand_note): it folds into Earlier until its next activity (src/strands/store.ts).
-  strands: [["done_at", "INTEGER"]],
+  // The strand it branched from (parent_id), and "trunk" for the conversation's whole-conversation strand (kind).
+  strands: [["done_at", "INTEGER"], ["parent_id", "TEXT"], ["kind", "TEXT"]],
 };
 
 /** Adds each missing column (a table that isn't there yet is left alone); returns what it added. */

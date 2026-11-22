@@ -41472,8 +41472,10 @@ public enum Studio {
     public var pinned: Bool?
     public var origin: StrandsListOutputStrandsItemOrigin?
     public var taskId: String?
+    public var parentId: String?
+    public var trunk: Bool?
 
-    public init(id: String? = nil, title: String? = nil, summary: String? = nil, named: Bool? = nil, state: StrandsListOutputStrandsItemState? = nil, detail: String? = nil, asks: [StrandsListOutputStrandsItemAsksItem]? = nil, workers: [StrandsListOutputStrandsItemWorkersItem]? = nil, lastAt: Double? = nil, firstAt: Double? = nil, firstSeq: Double? = nil, latestSeq: Double? = nil, latestTurnId: String? = nil, messages: Double? = nil, unsure: Double? = nil, pinned: Bool? = nil, origin: StrandsListOutputStrandsItemOrigin? = nil, taskId: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, summary: String? = nil, named: Bool? = nil, state: StrandsListOutputStrandsItemState? = nil, detail: String? = nil, asks: [StrandsListOutputStrandsItemAsksItem]? = nil, workers: [StrandsListOutputStrandsItemWorkersItem]? = nil, lastAt: Double? = nil, firstAt: Double? = nil, firstSeq: Double? = nil, latestSeq: Double? = nil, latestTurnId: String? = nil, messages: Double? = nil, unsure: Double? = nil, pinned: Bool? = nil, origin: StrandsListOutputStrandsItemOrigin? = nil, taskId: String? = nil, parentId: String? = nil, trunk: Bool? = nil) {
       self.id = id
       self.title = title
       self.summary = summary
@@ -41492,6 +41494,8 @@ public enum Studio {
       self.pinned = pinned
       self.origin = origin
       self.taskId = taskId
+      self.parentId = parentId
+      self.trunk = trunk
     }
   }
 
@@ -41712,8 +41716,10 @@ public enum Studio {
     public var pinned: Bool?
     public var origin: StrandsListOutputEarlierItemOrigin?
     public var taskId: String?
+    public var parentId: String?
+    public var trunk: Bool?
 
-    public init(id: String? = nil, title: String? = nil, summary: String? = nil, named: Bool? = nil, state: StrandsListOutputEarlierItemState? = nil, detail: String? = nil, asks: [StrandsListOutputEarlierItemAsksItem]? = nil, workers: [StrandsListOutputEarlierItemWorkersItem]? = nil, lastAt: Double? = nil, firstAt: Double? = nil, firstSeq: Double? = nil, latestSeq: Double? = nil, latestTurnId: String? = nil, messages: Double? = nil, unsure: Double? = nil, pinned: Bool? = nil, origin: StrandsListOutputEarlierItemOrigin? = nil, taskId: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, summary: String? = nil, named: Bool? = nil, state: StrandsListOutputEarlierItemState? = nil, detail: String? = nil, asks: [StrandsListOutputEarlierItemAsksItem]? = nil, workers: [StrandsListOutputEarlierItemWorkersItem]? = nil, lastAt: Double? = nil, firstAt: Double? = nil, firstSeq: Double? = nil, latestSeq: Double? = nil, latestTurnId: String? = nil, messages: Double? = nil, unsure: Double? = nil, pinned: Bool? = nil, origin: StrandsListOutputEarlierItemOrigin? = nil, taskId: String? = nil, parentId: String? = nil, trunk: Bool? = nil) {
       self.id = id
       self.title = title
       self.summary = summary
@@ -41732,6 +41738,8 @@ public enum Studio {
       self.pinned = pinned
       self.origin = origin
       self.taskId = taskId
+      self.parentId = parentId
+      self.trunk = trunk
     }
   }
 
@@ -42028,8 +42036,10 @@ public enum Studio {
     public var pinned: Bool?
     public var origin: StrandsOverviewOutputConversationsItemStrandsItemOrigin?
     public var taskId: String?
+    public var parentId: String?
+    public var trunk: Bool?
 
-    public init(id: String? = nil, title: String? = nil, summary: String? = nil, named: Bool? = nil, state: StrandsOverviewOutputConversationsItemStrandsItemState? = nil, detail: String? = nil, asks: [StrandsOverviewOutputConversationsItemStrandsItemAsksItem]? = nil, workers: [StrandsOverviewOutputConversationsItemStrandsItemWorkersItem]? = nil, lastAt: Double? = nil, firstAt: Double? = nil, firstSeq: Double? = nil, latestSeq: Double? = nil, latestTurnId: String? = nil, messages: Double? = nil, unsure: Double? = nil, pinned: Bool? = nil, origin: StrandsOverviewOutputConversationsItemStrandsItemOrigin? = nil, taskId: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, summary: String? = nil, named: Bool? = nil, state: StrandsOverviewOutputConversationsItemStrandsItemState? = nil, detail: String? = nil, asks: [StrandsOverviewOutputConversationsItemStrandsItemAsksItem]? = nil, workers: [StrandsOverviewOutputConversationsItemStrandsItemWorkersItem]? = nil, lastAt: Double? = nil, firstAt: Double? = nil, firstSeq: Double? = nil, latestSeq: Double? = nil, latestTurnId: String? = nil, messages: Double? = nil, unsure: Double? = nil, pinned: Bool? = nil, origin: StrandsOverviewOutputConversationsItemStrandsItemOrigin? = nil, taskId: String? = nil, parentId: String? = nil, trunk: Bool? = nil) {
       self.id = id
       self.title = title
       self.summary = summary
@@ -42048,6 +42058,8 @@ public enum Studio {
       self.pinned = pinned
       self.origin = origin
       self.taskId = taskId
+      self.parentId = parentId
+      self.trunk = trunk
     }
   }
 
@@ -42118,14 +42130,16 @@ public enum Studio {
     public var kind: StrandsTagsOutputTagsItemKind?
     public var at: Double?
     public var line: String?
+    public var also: [String]?
 
-    public init(turnId: String? = nil, seq: Double? = nil, strandId: String? = nil, kind: StrandsTagsOutputTagsItemKind? = nil, at: Double? = nil, line: String? = nil) {
+    public init(turnId: String? = nil, seq: Double? = nil, strandId: String? = nil, kind: StrandsTagsOutputTagsItemKind? = nil, at: Double? = nil, line: String? = nil, also: [String]? = nil) {
       self.turnId = turnId
       self.seq = seq
       self.strandId = strandId
       self.kind = kind
       self.at = at
       self.line = line
+      self.also = also
     }
   }
 
@@ -42134,12 +42148,14 @@ public enum Studio {
     public var title: String?
     public var done: Bool?
     public var parentId: String?
+    public var trunk: Bool?
 
-    public init(id: String? = nil, title: String? = nil, done: Bool? = nil, parentId: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, done: Bool? = nil, parentId: String? = nil, trunk: Bool? = nil) {
       self.id = id
       self.title = title
       self.done = done
       self.parentId = parentId
+      self.trunk = trunk
     }
   }
 

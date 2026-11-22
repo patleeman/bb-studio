@@ -1411,6 +1411,7 @@ export default async function plugin(bb: BbPluginApi) {
   };
   // Strands (src/strands): each turn of a Bot's conversations sorted into a line of work, with live states.
   const strands = registerStrands(bb, db, {
+    richSorting: () => studioSettings.current().strands_richSorting,
     // An area's item that needs the user, and the conversation's flag (bot_needs_you): "needs you" on their strand.
     extraAsks: (threadId) => {
       const flag = botThreads.store.get(threadId)?.needsYou ?? null;

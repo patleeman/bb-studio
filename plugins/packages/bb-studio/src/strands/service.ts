@@ -66,6 +66,10 @@ export function askOf(interaction: Interaction & { createdAt?: number }, threadI
 export const BACKFILL_RETRY_MS = 5 * 60 * 1000;
 export const BACKFILL_RETRY_MAX_MS = 60 * 60 * 1000;
 
+/** How long a worker whose spawn wasn't found yet waits before it is looked up again, and how many workers' spawn turns are kept. */
+export const SPAWN_MISS_MS = 60_000;
+export const SPAWN_CACHE = 500;
+
 /** Only conversations active this recently are backfilled. */
 export const BACKFILL_ACTIVE_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -76,6 +80,8 @@ export class StrandService {
   /** Conversations whose backfill failed: not tried again until `until` (5 minutes, doubling up to an hour). */
   private readonly backfillFailed = new Map<string, { until: number; delay: number }>();
   private backfilling: Promise<void> | null = null;
+  /** The turn that started each worker, once looked up; a miss (null) is kept for SPAWN_MISS_MS, then looked up again. At most SPAWN_CACHE workers. */
+  private readonly spawnTurns = new Map<string, { turnId: string | null; at: number }>();
   /** After a reload the old instance's database is closed: nothing new starts, and work in flight ends quietly. */
   private disposed = false;
 
@@ -85,7 +91,7 @@ export class StrandService {
       ...deps, store: this.store, openTasks: (threadId) => openAgentTasks(deps.db, threadId),
       workerStrand: async (threadId, workerThreadId) => {
         const worker = (await deps.workers(threadId).catch(() => [] as WorkerFact[])).find((each) => each.threadId === workerThreadId);
-        return worker ? this.workerStrand(threadId, worker, false) : undefined;
+        return worker ? await this.workerStrand(threadId, worker, false) : undefined;
       },
     });
   }
@@ -156,7 +162,8 @@ export class StrandService {
       this.deps.interactions(threadId).catch(() => []),
     ]);
     const runningStrandId = busy ? this.detector.runningStrand(threadId) : null;
-    const workers: WorkerSignal[] = workerFacts.map((worker) => ({ ...worker, strandId: this.workerStrand(threadId, worker, busy) }));
+    const workers: WorkerSignal[] = [];
+    for (const worker of workerFacts) workers.push({ ...worker, strandId: await this.workerStrand(threadId, worker, busy) });
     const turnStrand = (at: number) => (busy && this.detector.hasRunningTurn(threadId) ? runningStrandId : this.store.strandAt(threadId, at)?.strandId ?? null);
     // The turn an ask waits in: the running turn, else the newest sorted one at or before it.
     const turnOf = (at: number) => {
@@ -190,13 +197,33 @@ export class StrandService {
   }
 
   /**
-   * A worker's strand: the turn it started in (its conversation's newest
-   * sorted message at or before its start), kept once that turn is settled.
-   * While the turn it started in is still running and unsorted, none.
+   * A worker's strand: the strand of the turn that started it, a link read
+   * from the conversation (the spawn's item names the worker), kept once that
+   * turn is sorted. A turn about more than one strand asks Jev which one the
+   * worker's task is. While that turn isn't sorted yet, none, and nothing is
+   * kept. When no item names it (an older BB, a worker started elsewhere),
+   * the newest sorted message at or before its start, as before.
    */
-  private workerStrand(threadId: string, worker: WorkerFact, busy: boolean): string | null {
+  private async workerStrand(threadId: string, worker: WorkerFact, busy: boolean): Promise<string | null> {
     const kept = this.store.db.prepare("SELECT strand_id FROM strand_items WHERE thread_id = ? AND kind = 'worker' AND ref = ? LIMIT 1").get(threadId, worker.threadId) as { strand_id: string | null } | undefined;
     if (kept) return kept.strand_id;
+    const cached = this.spawnTurns.get(worker.threadId);
+    // Found, or not found once the conversation was idle (no item will name it), is kept; a miss while busy only for a while.
+    let turnId = cached && (cached.turnId !== null || !busy || this.now() - cached.at < SPAWN_MISS_MS) ? cached.turnId : undefined;
+    if (turnId === undefined) {
+      turnId = await this.detector.spawnTurn(threadId, worker.threadId, worker.createdAt).catch(() => null);
+      // A miss while its turn may still be writing is looked up again after a while, not on every read.
+      this.spawnTurns.delete(worker.threadId);
+      this.spawnTurns.set(worker.threadId, { turnId, at: this.now() });
+      while (this.spawnTurns.size > SPAWN_CACHE) this.spawnTurns.delete(this.spawnTurns.keys().next().value!);
+    }
+    if (turnId) {
+      const head = this.store.byTurn(threadId, turnId);
+      if (!head) return busy && this.detector.hasRunningTurn(threadId) ? this.detector.runningStrand(threadId) : null;
+      const strandId = head.strandId && head.also.length ? await this.detector.workerChoice(threadId, worker.title, [head.strandId, ...head.also]) : head.strandId;
+      this.store.put({ threadId, seq: head.seq, kind: "worker", ref: worker.threadId, turnId, at: worker.createdAt, line: worker.title, strandId, confidence: null, by: "inherit" });
+      return strandId;
+    }
     const at = this.store.strandAt(threadId, worker.createdAt);
     if (!at) return null;
     const later = this.store.db.prepare("SELECT 1 FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND at > ? LIMIT 1").get(threadId, worker.createdAt);
@@ -239,7 +266,7 @@ export class StrandService {
         id: strand.id, title: strand.title, summary: strand.summary, named: strand.named, state: live.state, detail: live.detail,
         asks: live.asks.map(({ id, kind, threadId: askThread, label, details, decisions, turnId, seq }) => ({ id, kind, threadId: askThread, label, details, decisions, turnId: turnId ?? null, seq: seq ?? null })), workers: live.workers,
         lastAt: strand.lastAt, firstAt: first?.at ?? null, firstSeq: first?.seq ?? null, latestSeq: latest?.seq ?? null, latestTurnId: latest?.turnId ?? null, messages: count?.messages ?? 0, unsure: count?.unsure ?? 0,
-        pinned: strand.pinned, origin: strand.origin, taskId: strand.taskId,
+        pinned: strand.pinned, origin: strand.origin, taskId: strand.taskId, parentId: strand.parentId, trunk: strand.trunk,
       };
     };
     const ordered = byState(rows);
@@ -254,15 +281,16 @@ export class StrandService {
 
   items(threadId: string, limit: number): StrandItemView[] {
     if (!this.enabled(threadId)) return [];
-    return this.store.items(threadId, limit, ["user", "report", "worker"]).map((item) => ({ ...item }));
+    return this.store.items(threadId, limit, ["user", "report", "worker"]).map((item) => ({ ...item, by: item.by === "quiet" ? "inherit" : item.by }));
   }
 
-  tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null; kind: "user" | "report"; at: number | null; line: string | null }[]; strands: { id: string; title: string; done: boolean }[]; replies: ReplyTagView[] } {
+  tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null; kind: "user" | "report"; at: number | null; line: string | null; also: string[] }[]; strands: { id: string; title: string; done: boolean; parentId: string | null; trunk: boolean }[]; replies: ReplyTagView[] } {
     if (!this.enabled(threadId)) return { tags: [], strands: [], replies: [] };
-    const rows = this.store.db.prepare("SELECT turn_id, seq, strand_id, kind, at, line FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq DESC LIMIT 2000").all(threadId) as { turn_id: string; seq: number; strand_id: string | null; kind: "user" | "report"; at: number | null; line: string | null }[];
+    const rows = this.store.db.prepare("SELECT turn_id, seq, strand_id, kind, at, line, also_strands FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq DESC LIMIT 2000").all(threadId) as { turn_id: string; seq: number; strand_id: string | null; kind: "user" | "report"; at: number | null; line: string | null; also_strands: string | null }[];
+    const alsoOf = (value: string | null): string[] => { try { const list = value ? JSON.parse(value) as unknown : []; return Array.isArray(list) ? list.filter((each): each is string => typeof each === "string") : []; } catch { return []; } };
     return {
-      tags: rows.reverse().map((row) => ({ turnId: row.turn_id, seq: row.seq, strandId: row.strand_id, kind: row.kind, at: row.at, line: row.line })),
-      strands: this.store.list(threadId).map((strand) => ({ id: strand.id, title: strand.title, done: strand.doneAt !== null, parentId: (strand as { parentId?: string | null }).parentId ?? null })),
+      tags: rows.reverse().map((row) => ({ turnId: row.turn_id, seq: row.seq, strandId: row.strand_id, kind: row.kind, at: row.at, line: row.line, also: alsoOf(row.also_strands) })),
+      strands: this.store.list(threadId).map((strand) => ({ id: strand.id, title: strand.title, done: strand.doneAt !== null, parentId: strand.parentId, trunk: strand.trunk })),
       replies: this.store.replies(threadId, this.now() - REPLY_OPEN_MS).flatMap((reply) => (reply.turnId && reply.tag ? [{ turnId: reply.turnId, seq: reply.seq, tag: reply.tag, ask: reply.ask, resolved: reply.resolved, line: reply.line }] : [])),
     };
   }

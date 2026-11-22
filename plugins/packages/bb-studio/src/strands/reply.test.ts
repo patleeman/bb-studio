@@ -254,7 +254,7 @@ describe("the strand push leaves reply asks to the reply's own push", () => {
     id: "str_1", title: "Furnace", summary: null, named: true, state: "needs-you" as const, detail,
     asks: asks.map((ask, index) => ({ id: `a${index}`, kind: ask.kind, threadId: "thr_main", label: ask.label ?? "x", details: [], decisions: [], turnId: null, seq: null })),
     workers: workers.map((worker, index) => ({ threadId: `w${index}`, title: worker.title ?? "w", status: worker.status, endedAt: null })),
-    lastAt: NOW, firstAt: NOW, firstSeq: 1, latestSeq: 1, latestTurnId: "t", messages: 1, unsure: 0, pinned: false, origin: "jev" as const, taskId: null,
+    lastAt: NOW, firstAt: NOW, firstSeq: 1, latestSeq: 1, latestTurnId: "t", messages: 1, unsure: 0, pinned: false, origin: "jev" as const, taskId: null, parentId: null, trunk: false,
   });
 
   it("knows a strand that needs you only for replies, and never uses a reply's ask as a strand push's body", async () => {
@@ -267,7 +267,7 @@ describe("the strand push leaves reply asks to the reply's own push", () => {
   });
 
   it("names a worker waiting on the user before a reply's ask in the strand's line", () => {
-    const strand = { id: "s1", threadId: "t", title: "Furnace", summary: null, named: true, nameTries: 0, summaryAt: null, firstSeq: 1, lastSeq: 1, lastAt: NOW, pinned: false, mergedInto: null, origin: "jev" as const, taskId: null, waitingOn: null, waitingAt: null, doneAt: null, openedAt: null, createdAt: NOW };
+    const strand = { id: "s1", threadId: "t", title: "Furnace", summary: null, named: true, nameTries: 0, summaryAt: null, firstSeq: 1, lastSeq: 1, lastAt: NOW, pinned: false, mergedInto: null, origin: "jev" as const, taskId: null, waitingOn: null, waitingAt: null, doneAt: null, openedAt: null, createdAt: NOW, parentId: null, trunk: false };
     const live = liveState(strand, { now: NOW, runningStrandId: null, tasks: [], workers: [{ threadId: "w", title: "Booking worker", status: "needs-you", strandId: "s1", endedAt: null }], asks: [{ id: "reply:9", kind: "reply", strandId: "s1", label: "Want me to book Ace?", threadId: "t", details: [], decisions: [], seq: 9 }] });
     expect(live).toMatchObject({ state: "needs-you", detail: "Booking worker needs you" });
   });

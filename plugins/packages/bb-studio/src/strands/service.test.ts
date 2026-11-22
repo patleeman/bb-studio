@@ -35,7 +35,7 @@ describe("reading turns from events", () => {
 
 const strand = (over: Partial<Strand> = {}): Strand => ({
   id: "s1", threadId: "t", title: "Model router", summary: null, named: true, nameTries: 0, summaryAt: null, firstSeq: 1, lastSeq: 1, lastAt: NOW - HOUR,
-  pinned: false, mergedInto: null, origin: "jev", taskId: null, waitingOn: null, waitingAt: null, doneAt: null, openedAt: null, createdAt: NOW - HOUR, ...over,
+  pinned: false, mergedInto: null, origin: "jev", taskId: null, waitingOn: null, waitingAt: null, doneAt: null, openedAt: null, createdAt: NOW - HOUR, parentId: null, trunk: false, ...over,
 });
 const signals = (over: Partial<Signals> = {}): Signals => ({ now: NOW, runningStrandId: null, workers: [], asks: [], tasks: [], ...over });
 
@@ -210,9 +210,9 @@ describe("strands.list", () => {
     const b = x.thread.turn("thanks", "Sure.");
     await x.svc.idle(x.thread.id);
     const { tags, strands } = x.svc.tags(x.thread.id);
-    expect(tags).toMatchObject([{ turnId: a.turnId, seq: a.seq, strandId: strands[0]!.id, kind: "user", line: "Look at the router" }, { turnId: b.turnId, seq: b.seq, strandId: null, kind: "user", line: "thanks" }]);
+    expect(tags).toMatchObject([{ turnId: a.turnId, seq: a.seq, strandId: strands[0]!.id, kind: "user", line: "Look at the router", also: [] }, { turnId: b.turnId, seq: b.seq, strandId: null, kind: "user", line: "thanks", also: [] }]);
     expect(typeof tags[0]!.at).toBe("number");
-    expect(strands[0]).toEqual({ id: strands[0]!.id, title: strands[0]!.title, done: false, parentId: null });
+    expect(strands[0]).toEqual({ id: strands[0]!.id, title: strands[0]!.title, done: false, parentId: null, trunk: false });
   });
 });
 

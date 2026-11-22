@@ -212,6 +212,9 @@ function AdvancedSection() {
         <Row label={STUDIO_SETTINGS.decisions_batchConfidence.label} description={STUDIO_SETTINGS.decisions_batchConfidence.description} testId="setting-decisions_batchConfidence">
           <SettingControl k="decisions_batchConfidence" />
         </Row>
+        <Row label={STUDIO_SETTINGS.strands_richSorting.label} description={STUDIO_SETTINGS.strands_richSorting.description} testId="setting-strands_richSorting">
+          <SettingControl k="strands_richSorting" />
+        </Row>
       </Card>
     </SectionState>
   );

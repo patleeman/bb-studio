@@ -50,6 +50,10 @@ export const strandView = z.object({
   pinned: z.boolean(),
   origin: z.enum(["jev", "model", "user", "task", "backfill"]),
   taskId: z.string().nullable(),
+  /** The strand it branched from (a tree draws it as a fork off that strand); null for a root. */
+  parentId: z.string().nullable().default(null),
+  /** The whole-conversation strand: roundups and status checks on everything (the tree's trunk). */
+  trunk: z.boolean().default(false),
 });
 export type StrandView = z.infer<typeof strandView>;
 
@@ -81,6 +85,8 @@ export const strandItemView = z.object({
   confidence: z.number().nullable(),
   by: z.enum(["jev", "model", "user", "inherit", "fallback", "pending"]),
   unsure: z.boolean(),
+  /** Other strands the message is also about. */
+  also: z.array(z.string()).default([]),
 });
 export type StrandItemView = z.infer<typeof strandItemView>;
 
@@ -136,9 +142,9 @@ export const rpcContract = defineRpcContract({
     input: z.object({ threadId }).strict(),
     output: z.object({
       /** Sorted turns, oldest first: each turn's first message (its seq) and its strand, null for none. */
-      tags: z.array(z.object({ turnId: z.string(), seq: z.number(), strandId: z.string().nullable(), /** "user": the user wrote it; "report": another thread's or a runner's message. */ kind: z.enum(["user", "report"]).default("user"), /** When it was sent (ms), and its first line. */ at: z.number().nullable().default(null), line: z.string().nullable().default(null) })),
-      /** The conversation's strands; `done`: an agent said it is done. */
-      strands: z.array(z.object({ id: z.string(), title: z.string(), done: z.boolean().default(false), /** The strand it branched from, when sorting knows one. */ parentId: z.string().nullable().default(null) })),
+      tags: z.array(z.object({ turnId: z.string(), seq: z.number(), strandId: z.string().nullable(), /** "user": the user wrote it; "report": another thread's or a runner's message. */ kind: z.enum(["user", "report"]).default("user"), /** When it was sent (ms), and its first line. */ at: z.number().nullable().default(null), line: z.string().nullable().default(null), /** Other strands the message is also about. */ also: z.array(z.string()).default([]) })),
+      /** The conversation's strands; `done`: an agent said it is done; `trunk`: the whole-conversation strand. */
+      strands: z.array(z.object({ id: z.string(), title: z.string(), done: z.boolean().default(false), /** The strand it branched from, when sorting knows one. */ parentId: z.string().nullable().default(null), trunk: z.boolean().default(false) })),
       /** Tagged replies, oldest first: each turn's reply needs-you or status, its ask line, and whether the user is past it. */
       replies: z.array(replyTagView).default([]),
     }),

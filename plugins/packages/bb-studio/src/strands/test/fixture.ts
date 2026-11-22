@@ -69,6 +69,11 @@ export class FakeThread {
     return { seq, turnId, requestSeq };
   }
 
+  /** A tool item in a running turn (a worker's spawn names it in its output). */
+  tool(turnId: string, output: string, at = FIXTURE_AT + this.seq): number {
+    return this.push({ type: "item/completed", createdAt: at, scope: { kind: "turn", turnId }, data: { item: { type: "commandExecution", command: "bb thread spawn", aggregatedOutput: output } } });
+  }
+
   /** Ends the newest turn. */
   finish(turnId: string, reply = "Done.", at = FIXTURE_AT + this.seq): void {
     this.push({ type: "item/completed", createdAt: at, scope: { kind: "turn", turnId }, data: { item: { type: "agentMessage", text: reply } } });

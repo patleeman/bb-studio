@@ -146,7 +146,7 @@ describe("level 2: the tree on one time axis (7c)", () => {
 
 const view = (id: string, title: string, over: Partial<StrandView> = {}): StrandView => ({
   id, title, summary: null, named: true, state: "active", detail: null, asks: [], workers: [], lastAt: T0, firstAt: T0, firstSeq: 10,
-  latestSeq: 80, latestTurnId: `t_${id}`, messages: 1, unsure: 0, pinned: false, origin: "jev", taskId: null, ...over,
+  latestSeq: 80, latestTurnId: `t_${id}`, messages: 1, unsure: 0, pinned: false, origin: "jev", taskId: null, parentId: null, trunk: false, ...over,
 });
 const LIST: StrandList = {
   threadId: "thr_main", enabled: true, backfill: { done: true, at: T0, messages: 9, sorted: 9 }, jevCallsToday: 1, jevDailyCap: 300, sortingTurn: false,
