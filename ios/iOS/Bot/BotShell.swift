@@ -212,6 +212,9 @@ final class BotShellModel: ObservableObject {
         detailPath = []
         selection = item
         compactColumn = .detail
+        // The room may show another conversation while this one is still the
+        // selection (it opened on the last one): ask it to show this one.
+        if case .conversation(let id) = item { roomFocus = id }
     }
 
     private var pendingPush: Route?
@@ -303,6 +306,7 @@ final class BotShellModel: ObservableObject {
             landed = true
             selection = BotShell.mainThreadId(bot, view: store.view(for: bot.id)).map(BotShellItem.conversation)
             compactColumn = .detail
+            if case .conversation(let id)? = selection { roomFocus = id }
         }
     }
 }
