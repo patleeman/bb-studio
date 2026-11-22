@@ -4525,7 +4525,15 @@ strands. Quiet `[PASS]` replies and the backfill's history aren't tagged.
   click on a line zooms back in to its key moment. The header also shows
   "N need you", which goes to the ask. Where BB zooms (the fork's `zoom` on
   `slots.experimental_timelineFilter`) the strands box above the composer is
-  gone; an older BB keeps the box and has no zoom. Tree comes next.
+  gone; an older BB keeps the box and has no zoom. **Tree**, one level
+  further out, draws the strands as branches on the same time axis: the
+  trunk on the left, each strand branching from its parent (or the trunk)
+  where it starts and ending in a dot when done, with nodes only for your
+  messages (◆), asks (amber ring), results (□) and the open ask (filled
+  amber). Clicking a node zooms in to that message. **Esc Esc** opens
+  keyboard mode on the tree: a search field at its top (typing fades the
+  branches that don't match), ↑↓ through the nodes, ←→ to the nearest node
+  on the neighbouring strand, Enter to zoom in, Esc to leave.
 - It counts as an ask on its strand ("N need you" in the box, the overview,
   the sidebar), with **Jump to reply** and **Done**; picking the strand opens
   the reply. Jump to reply lands on the marked sentence and flashes it.

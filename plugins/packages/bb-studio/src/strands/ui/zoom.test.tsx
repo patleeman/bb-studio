@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StrandList, StrandView } from "../contract";
 import type { Tags } from "./model";
-import { GAP_MS, lineAt, timeRange, WHOLE, zoomLines, type ZoomLine } from "./zoom-model";
+import { GAP_MS, lineAt, nodeAt, stepNode, timeRange, WHOLE, zoomLines, zoomTree, type ZoomLine } from "./zoom-model";
 
 const T0 = Date.parse("2026-11-21T11:33:00Z");
 const MIN = 60_000;
@@ -82,6 +82,47 @@ describe("level 1: one line per stretch of one strand (7b)", () => {
   });
 });
 
+describe("level 2: the tree on one time axis (7c)", () => {
+  it("draws a lane per strand from the trunk, nodes only for your messages, asks and results, and a gap for a long pause", () => {
+    const tree = zoomTree(DAY);
+    expect(tree.columns).toBe(4);
+    expect(tree.lanes.map((lane) => [lane.name, lane.column, lane.parentColumn, lane.endY !== null, lane.current])).toEqual([
+      ["iOS rebuild", 1, 0, false, true],
+      ["Context cuts", 2, 0, true, false],
+      ["Replies that need you", 3, 0, true, false],
+    ]);
+    expect(tree.nodes.map((node) => [node.kind, node.column, node.name, node.label])).toEqual([
+      ["dec", 0, null, "There is still a separate threads list"],
+      ["dec", 1, "iOS rebuild", "Is the iOS app a mess? Rebuild?"],
+      ["dec", 2, "Context cuts", "c message"],
+      ["ask", 2, null, "Pick one of two layouts"],
+      ["dec", 2, null, "Add the merges"],
+      ["dec", 3, "Replies that need you", "f message"],
+      ["res", 2, null, "Merged and pushed"],
+      ["open", 1, null, "It needs your go-ahead."],
+      ["res", 3, null, "Merged"],
+    ]);
+    expect(tree.gaps).toHaveLength(1);
+    expect(tree.nodes[7]!.y).toBeGreaterThan(tree.gaps[0]!.y);
+    // A strand with a parent branches from the parent's lane.
+    const nested = zoomTree({ ...DAY, strands: DAY.strands.map((strand) => (strand.id === "rn" ? { ...strand, parentId: "cx" } : strand)) });
+    expect(nested.lanes.find((lane) => lane.strandId === "rn")?.parentColumn).toBe(2);
+  });
+
+  it("finds the node of a message and steps through the nodes with the keys", () => {
+    const tree = zoomTree(DAY);
+    expect(nodeAt(tree, 47)?.label).toBe("Pick one of two layouts");
+    const ask = nodeAt(tree, 45)!;
+    expect(stepNode(tree, ask, "down")?.label).toBe("Add the merges");
+    expect(stepNode(tree, ask, "up")?.label).toBe("c message");
+    expect(stepNode(tree, ask, "left")?.column).toBe(1);
+    expect(stepNode(tree, ask, "right")?.column).toBe(3);
+    // With a search, ↑↓ go through the matches only.
+    expect(stepNode(tree, ask, "down", "merged")?.label).toBe("Merged and pushed");
+    expect(stepNode(tree, null, "up")?.label).toBe("Merged");
+  });
+});
+
 const view = (id: string, title: string, over: Partial<StrandView> = {}): StrandView => ({
   id, title, summary: null, named: true, state: "active", detail: null, asks: [], workers: [], lastAt: T0, firstAt: T0, firstSeq: 10,
   latestSeq: 80, latestTurnId: `t_${id}`, messages: 1, unsure: 0, pinned: false, origin: "jev", taskId: null, ...over,
@@ -114,7 +155,7 @@ vi.mock("../../kit/app/thread-panel", () => ({ openThreadTab: state.openTab }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
 
 const { ZoomSwitch, ZoomView, canZoom, zoomThreadBy } = await import("./Zoom");
-const { holdZoomable, registerTimelineFilter, resetSelectionForTests, select, selectionOf, setZoom, zoomInHost, zoomOf } = await import("./selection");
+const { holdZoomable, keyboardModeOf, registerTimelineFilter, resetSelectionForTests, select, selectionOf, setKeyboardMode, setZoom, zoomInHost, zoomOf } = await import("./selection");
 const { StrandsBoxFor } = await import("./Strip");
 const { promptStackSource, resetPromptStackForTests } = await import("./prompt-stack");
 
@@ -166,7 +207,7 @@ describe("the zoomed-out view BB draws in the timeline's place", () => {
     second();
     expect(registration.zoom?.level("thr_main")).toBe(0);
     setZoom("thr_main", 5);
-    expect(zoomOf("thr_main")).toBe(1);
+    expect(zoomOf("thr_main")).toBe(2);
   });
 
   it("on a BB that drops zoom: no switch, and the box stays with BB's running children hidden behind it", () => {
@@ -230,6 +271,67 @@ describe("the zoomed-out view BB draws in the timeline's place", () => {
   });
 });
 
+describe("the tree view and keyboard mode", () => {
+  it("draws the tree at level 2 and zooms in to a node that is clicked", () => {
+    zoomingHost();
+    const release = holdZoomable("thr_main");
+    setZoom("thr_main", 2);
+    render(<ZoomView threadId="thr_main" level={2} anchorSeq={47} latestUserSeq={null} />);
+    expect(container.querySelector('[data-zoom-view="2"]')).not.toBeNull();
+    expect(container.querySelectorAll("[data-zoom-node]")).toHaveLength(9);
+    expect(scrolled.map((element) => element.getAttribute("data-zoom-node"))).toEqual(["45"]);
+    expect(container.querySelector('[data-zoom-kind="open"]')?.textContent).toContain("It needs your go-ahead.");
+    act(() => { container.querySelector('[data-zoom-node="20"]')!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    expect(zoomOf("thr_main")).toBe(0);
+    expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=20", { replace: true });
+    release();
+  });
+
+  it("opens on Esc Esc: the tree with the search; ↑↓ move, typing fades the rest, Enter zooms in, Esc leaves", () => {
+    zoomingHost();
+    render(<ZoomSwitch threadId="thr_main" />);
+    const esc = (timeStamp: number) => {
+      const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+      Object.defineProperty(event, "timeStamp", { value: timeStamp });
+      act(() => { document.dispatchEvent(event); });
+    };
+    esc(1_000);
+    esc(2_000);
+    expect(keyboardModeOf("thr_main")).toBe(false);
+    esc(2_200);
+    expect(keyboardModeOf("thr_main")).toBe(true);
+    expect(zoomOf("thr_main")).toBe(2);
+    const tree = document.createElement("div");
+    document.body.appendChild(tree);
+    const treeRoot = createRoot(tree);
+    act(() => treeRoot.render(<ZoomView threadId="thr_main" level={2} anchorSeq={47} latestUserSeq={null} />));
+    const input = tree.querySelector<HTMLInputElement>('[data-zoom-search] input')!;
+    expect(document.activeElement).toBe(input);
+    const chosen = () => tree.querySelector("[data-zoom-chosen]")?.closest("[data-zoom-node]")?.getAttribute("data-zoom-node");
+    expect(chosen()).toBe("45");
+    const key = (name: string) => act(() => { input.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true })); });
+    key("ArrowDown");
+    expect(chosen()).toBe("50");
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "merged");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(tree.querySelector('[data-zoom-lane="ios"]')?.getAttribute("opacity")).toBe("0.18");
+    expect(tree.querySelector('[data-zoom-lane="cx"]')?.getAttribute("opacity")).toBe("1");
+    expect(chosen()).toBe("95");
+    key("Escape");
+    expect(keyboardModeOf("thr_main")).toBe(false);
+    expect(zoomOf("thr_main")).toBe(2);
+    act(() => setKeyboardMode("thr_main", true));
+    const again = tree.querySelector<HTMLInputElement>('[data-zoom-search] input')!;
+    act(() => { again.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); });
+    expect(zoomOf("thr_main")).toBe(0);
+    expect(keyboardModeOf("thr_main")).toBe(false);
+    act(() => treeRoot.unmount());
+    tree.remove();
+  });
+});
+
 describe("the header where BB zooms", () => {
   it("shows Messages · Strands · Tree (Tree not yet), All strands and N need you; the box goes and BB's running children show", () => {
     render(<ZoomSwitch threadId="thr_main" />);
@@ -239,7 +341,7 @@ describe("the header where BB zooms", () => {
     expect(container.querySelector('[data-testid="strands-strip"]')).toBeNull();
     expect(promptStackSource.get("thr_main")).not.toContain("active-child-threads");
     const levels = [...container.querySelectorAll<HTMLButtonElement>("[data-zoom-level]")];
-    expect(levels.map((button) => [button.textContent, button.disabled])).toEqual([["Messages", false], ["Strands", false], ["Tree", true]]);
+    expect(levels.map((button) => [button.textContent, button.disabled])).toEqual([["Messages", false], ["Strands", false], ["Tree", false]]);
     expect(levels[0]!.getAttribute("title")).toContain("⌃⌘−");
     click(levels[1]);
     expect(zoomOf("thr_main")).toBe(1);
@@ -308,15 +410,17 @@ describe("the header where BB zooms", () => {
     expect(zoomOf("thr_main")).toBe(1);
     pinch(row, 80, 1_100);
     expect(zoomOf("thr_main")).toBe(1);
-    // At the furthest level, pinching in further is left alone.
+    // The next pinch goes on to the tree; at the furthest level, pinching in further is left alone.
+    pinch(row, 80, 2_000);
+    expect(zoomOf("thr_main")).toBe(2);
     expect(pinch(row, 80, 3_000).defaultPrevented).toBe(false);
     // An image zooms itself; something that handled the pinch keeps it.
     expect(pinch(image, -80, 5_000).defaultPrevented).toBe(false);
     pinch(row, -80, 7_000, true);
-    expect(zoomOf("thr_main")).toBe(1);
+    expect(zoomOf("thr_main")).toBe(2);
     const plain = new WheelEvent("wheel", { deltaY: -200, bubbles: true, cancelable: true });
     act(() => { row.dispatchEvent(plain); });
     expect(plain.defaultPrevented).toBe(false);
-    expect(zoomOf("thr_main")).toBe(1);
+    expect(zoomOf("thr_main")).toBe(2);
   });
 });

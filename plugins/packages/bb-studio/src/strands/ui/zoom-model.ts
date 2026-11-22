@@ -157,3 +157,155 @@ export function timeRange(from: number | null, to: number | null, format: (at: n
 function clock(at: number): string {
   return new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
+
+// ---- level 2: the tree (design "Strands as shape", screen 7c) ----
+
+/** A node only for what matters: the open ask (filled amber), an ask (amber ring), the user's message (◆), a worker's result (□). */
+export type TreeNodeKind = "open" | "ask" | "dec" | "res";
+
+export interface TreeNode {
+  /** The message the node zooms in to. */
+  seq: number;
+  /** Its turn's first message. */
+  turnSeq: number;
+  kind: TreeNodeKind;
+  label: string;
+  at: number | null;
+  strandId: string | null;
+  column: number;
+  y: number;
+  /** The strand's name, on its first node (at the fork). */
+  name: string | null;
+}
+
+export interface TreeLane {
+  strandId: string;
+  name: string;
+  column: number;
+  /** The lane it branches from (0: the trunk). */
+  parentColumn: number;
+  startY: number;
+  /** Where it ends (done), or null: it runs on. */
+  endY: number | null;
+  current: boolean;
+  done: boolean;
+}
+
+export interface ZoomTree {
+  lanes: TreeLane[];
+  nodes: TreeNode[];
+  gaps: { y: number; hours: number }[];
+  height: number;
+  columns: number;
+}
+
+/** Vertical space for a turn with a node, and for one without. */
+export const TREE_STEP = 22;
+const TREE_QUIET = 4;
+const TREE_TOP = 22;
+const TREE_BOTTOM = 40;
+
+const stripRelay = (text: string) => text.replace(/^\[bb [^\]\n]*\]\s*/u, "").trim();
+
+/** The conversation as a tree on one vertical time axis: the trunk, a lane per strand branching from its parent, and its nodes. */
+export function zoomTree(tags: Tags | null | undefined): ZoomTree {
+  const turns = (tags?.tags ?? []) as readonly Turn[];
+  const empty: ZoomTree = { lanes: [], nodes: [], gaps: [], height: TREE_TOP + TREE_BOTTOM, columns: 1 };
+  if (!turns.length) return empty;
+  const replies = new Map<string, Reply>();
+  for (const reply of tags?.replies ?? []) replies.set(reply.turnId, reply);
+  const strands = new Map((tags?.strands ?? []).map((strand) => [strand.id, strand as Tags["strands"][number] & { parentId?: string | null }]));
+  const columns = new Map<string, number>();
+  for (const turn of turns) if (turn.strandId && !columns.has(turn.strandId)) columns.set(turn.strandId, columns.size + 1);
+  const open = turns.find((turn) => { const reply = replies.get(turn.turnId); return reply?.tag === "needs-you" && !reply.resolved; });
+  const currentStrand = open ? open.strandId : turns.at(-1)!.strandId;
+
+  const nodes: TreeNode[] = [];
+  const gaps: ZoomTree["gaps"] = [];
+  const ys = new Map<string, number>();
+  const named = new Set<string>();
+  let y = TREE_TOP;
+  turns.forEach((turn, index) => {
+    const node = nodeOf(turn, replies.get(turn.turnId));
+    if (index > 0) {
+      const previous = turns[index - 1]!;
+      const pause = previous.at != null && turn.at != null ? turn.at - previous.at : 0;
+      if (pause >= GAP_MS) {
+        gaps.push({ y: y + TREE_STEP / 2 + 4, hours: Math.round(pause / 3_600_000) });
+        y += TREE_STEP;
+      }
+      y += node ? TREE_STEP : TREE_QUIET;
+    }
+    ys.set(turn.turnId, y);
+    if (!node) return;
+    const strandId = turn.strandId;
+    const name = strandId && !named.has(strandId) ? strands.get(strandId)?.title ?? null : null;
+    if (strandId) named.add(strandId);
+    nodes.push({ ...node, at: turn.at ?? null, strandId, column: strandId ? columns.get(strandId)! : 0, y, name });
+  });
+  const height = y + TREE_BOTTOM;
+  const lanes: TreeLane[] = [...columns].map(([strandId, column]) => {
+    const own = turns.filter((turn) => turn.strandId === strandId);
+    const strand = strands.get(strandId);
+    const parent = strand?.parentId ? columns.get(strand.parentId) : undefined;
+    const done = !!strand?.done;
+    return {
+      strandId,
+      name: strand?.title ?? "Strand",
+      column,
+      parentColumn: parent !== undefined && parent < column ? parent : 0,
+      startY: ys.get(own[0]!.turnId)!,
+      endY: done ? ys.get(own.at(-1)!.turnId)! : null,
+      current: strandId === currentStrand,
+      done,
+    };
+  });
+  return { lanes, nodes, gaps, height, columns: columns.size + 1 };
+}
+
+function nodeOf(turn: Turn, reply: Reply | undefined): Pick<TreeNode, "seq" | "turnSeq" | "kind" | "label"> | null {
+  if (reply?.tag === "needs-you") {
+    return { seq: reply.seq, turnSeq: turn.seq, kind: reply.resolved ? "ask" : "open", label: clip(reply.ask ?? reply.line ?? "Asked you", 60) };
+  }
+  if (turn.kind === "user") return { seq: turn.seq, turnSeq: turn.seq, kind: "dec", label: clip(turn.line ?? "Your message", 60) };
+  if (turn.kind === "report") {
+    const text = reply?.line ?? stripRelay(turn.line ?? "");
+    return { seq: reply?.seq ?? turn.seq, turnSeq: turn.seq, kind: "res", label: clip(text || "A result", 60) };
+  }
+  return null;
+}
+
+/** The node nearest message `seq` (by its turn), or null. */
+export function nodeAt(tree: ZoomTree, seq: number | null): TreeNode | null {
+  if (seq === null || !tree.nodes.length) return null;
+  let found: TreeNode | null = null;
+  for (const node of tree.nodes) { if (node.turnSeq <= seq) found = node; else break; }
+  return found ?? tree.nodes[0]!;
+}
+
+/** Whether a node matches the keyboard search (its line or its strand's name). */
+export function nodeMatches(node: TreeNode, tree: ZoomTree, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  const strand = tree.lanes.find((lane) => lane.strandId === node.strandId)?.name ?? "";
+  return node.label.toLowerCase().includes(needle) || strand.toLowerCase().includes(needle);
+}
+
+/** Keyboard mode: the node a key moves to from `from` (↑↓ through the matches, ←→ to the nearest node on the neighbouring lane). */
+export function stepNode(tree: ZoomTree, from: TreeNode | null, key: "up" | "down" | "left" | "right", query = ""): TreeNode | null {
+  const shown = tree.nodes.filter((node) => nodeMatches(node, tree, query));
+  if (!shown.length) return from;
+  if (!from) return shown.at(-1)!;
+  if (key === "up" || key === "down") {
+    const at = shown.findIndex((node) => node.seq === from.seq);
+    if (at >= 0) return shown[Math.max(0, Math.min(shown.length - 1, at + (key === "down" ? 1 : -1)))]!;
+    // From a node the search hides: the nearest match that way.
+    return key === "down"
+      ? shown.find((node) => node.y > from.y) ?? shown.at(-1)!
+      : [...shown].reverse().find((node) => node.y < from.y) ?? shown[0]!;
+  }
+  const column = from.column + (key === "right" ? 1 : -1);
+  const lane = shown.filter((node) => node.column === column);
+  if (!lane.length) return from;
+  return lane.reduce((best, node) => (Math.abs(node.y - from.y) < Math.abs(best.y - from.y) ? node : best));
+}
