@@ -3733,26 +3733,35 @@ default budget (about 6,000 characters for a list, 8,000 for a skill's text,
 12,000 for a transcript, an app's source or text and a page, whole screens up
 to 30,000 for a design), the header first and right after it a line such as
 `(Showing 1–10 of 34 records. Next: memory { op: "search", query: "x", after: "mem_…" }.)`
-with the exact call for the next part under the name the session sees. A list
-part's cursor is the last item's id (`after`), so an item is never shown twice
-or skipped at a boundary; a text's is a character offset, cut at a line end.
-A cursor whose item is gone, or an offset past the end, gets a reply that
-says so instead of starting over. Lists show one short line per item (the
-schedule, areas, skills, conversations) and the full item through its own
-call: `schedule { op: "list", id }`, `area { op: "get" }`, `bot_skill { op: "view" }`.
+with the exact call for the next part under the name the session sees. Most
+lists page by keyset: the cursor (`after`, an opaque string) is the last shown
+item's place in an order that doesn't change while the item lives (creation
+time and id; areas by problems first, name and id; skills pinned first, then
+name), so items that change, arrive or go between parts never make another
+item repeat or go missing. Memory search orders by relevance, which shifts as
+records change, so it pages by `offset` and says to search again after
+changing records; `minis_data` find with an `order` pages by `offset` the
+same way (without `order`, newest created first, by keyset, which keeps a
+migration that patches each part's records whole). A text's cursor is a
+character offset, cut at a line end and never inside a surrogate pair. A
+cursor that can't be read, or an offset past the end, gets a reply with the
+exact call that starts again. A count that hit its fetch cap reads "At least
+N". Lists show one short line per item (the schedule, areas, skills,
+conversations) and the full item through its own call:
+`schedule { op: "list", id }`, `area { op: "get" }`, `bot_skill { op: "view" }`.
 
 | Tool | Part | Cursor |
 |---|---|---|
-| `memory` search | 10 records, 6,000 characters | `after` record id |
+| `memory` search | 10 records, 6,000 characters, most relevant first | `offset` |
 | `schedule` list | short lines, 6,000 characters (`id` for one in full) | `after` item id |
-| `bot_skill` list / view | 6,000 characters of lines / 8,000 of the skill | `after` name / `offset` |
+| `bot_skill` list / view | 6,000 characters of lines / 8,000 of the skill | `after` keyset / `offset` |
 | `bot_info` conversations, activity | 6,000 characters, sections repeated | `after` thread or line id |
-| `area` list | one JSON line per area, 6,000 characters (`area` get for one: its 10 newest runs) | `after` area id |
-| `talk` list, search / read | 30 recordings, 6,000 characters / 12,000 of the transcript | `after` recording id / `offset` |
-| `apps` list / read | 100 apps, 6,000 characters / 12,000 of a mini's source or an artifact's text | `after` app id / `offset` |
-| `minis_data` find | 25 records, 6,000 characters | `query.offset` |
+| `area` list | one JSON line per area, 6,000 characters (`area` get for one: its 10 newest runs) | `after` keyset |
+| `talk` list, search / read | 30 recordings, newest first (an excerpt only for those shown) / 12,000 of the transcript | `after` keyset / `offset` |
+| `apps` list / read | 100 apps, newest first, 6,000 characters / 12,000 of a mini's source or an artifact's text | `after` keyset / `offset` |
+| `minis_data` find | 25 records, 6,000 characters | `after` keyset (no order) / `query.offset` (with order) |
 | `pages_read` without page / with page / a design | 6,000 characters of the tree / 12,000 of the page / whole screens to 30,000 | `after` page id / `from` block / `screenIds` left |
-| `code_comments` | whole threads, 6,000 characters | `after` thread id |
+| `code_comments` | whole threads, 6,000 characters | `after` keyset (resolved threads drop out) |
 
 ## Tool scope and lean context
 
