@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 
+import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TimelineRow } from "@bb/server-contract";
@@ -22,6 +24,7 @@ import {
   withTimelineFilter,
 } from "./timelineFilter.fork";
 import { useRelayedFold } from "./relayedFold.fork";
+import { SearchMessageLocationProvider } from "./useScrollToSearchedMessage";
 
 afterEach(() => {
   cleanup();
@@ -197,9 +200,10 @@ describe("what a filter opens", () => {
     ] as never[];
     const results: { rows: readonly unknown[]; folded: number }[] = [];
     function Fold() { const fold = useRelayedFold(rows, true, () => null); results.push({ rows: fold.rows, folded: fold.folded.size + fold.folded.quiet.size }); return null; }
-    render(<Fold />);
+    const located = (children: ReactNode) => <MemoryRouter><SearchMessageLocationProvider threadId={undefined}>{children}</SearchMessageLocationProvider></MemoryRouter>;
+    render(located(<Fold />));
     expect(results.at(-1)!.folded).toBeGreaterThan(0);
-    render(<TimelineFilterExpandContext.Provider value><Fold /></TimelineFilterExpandContext.Provider>);
+    render(located(<TimelineFilterExpandContext.Provider value><Fold /></TimelineFilterExpandContext.Provider>));
     expect(results.at(-1)).toEqual({ rows, folded: 0 });
   });
 });
