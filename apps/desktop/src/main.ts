@@ -201,6 +201,7 @@ import { createDesktopUpdateService } from "./desktop-update-check.js";
 import {
   createDesktopUpdateFeedUrl,
   DESKTOP_RELEASE_CHANNEL,
+  DESKTOP_UPDATES_ENABLED,
   DESKTOP_RELEASE_INFO,
   resolveDesktopUpdateSupport,
 } from "./desktop-update-provider.js";
@@ -657,7 +658,7 @@ const desktopLogger = createDesktopLogger({ logDir: formatLogDirectory() });
 function resolveDataDirFromEnv(args: ResolveDataDirFromEnvArgs): string {
   const rawDataDir = args.env.BB_DATA_DIR?.trim();
   if (rawDataDir === undefined || rawDataDir.length === 0) {
-    return join(args.homeDir, ".bb");
+    return join(args.homeDir, ".bb-studio");
   }
   if (rawDataDir === "~") {
     return args.homeDir;
@@ -2986,8 +2987,8 @@ async function runDesktopApp(): Promise<void> {
 
   app.setAppUserModelId(
     DESKTOP_RELEASE_CHANNEL === "nightly"
-      ? "dev.bb.desktop.nightly"
-      : "dev.bb.desktop",
+      ? "nyc.plee.bbstudio.nightly"
+      : "nyc.plee.bbstudio",
   );
   if (app.isPackaged) {
     await hostToolchain.refresh();
@@ -3375,10 +3376,10 @@ async function runDesktopApp(): Promise<void> {
     },
   });
   if (desktopUpdateSupport.versionCheck) {
-    desktopUpdateService.start();
+    if (DESKTOP_UPDATES_ENABLED) desktopUpdateService.start();
   }
   if (desktopUpdateSupport.autoUpdate) {
-    desktopAutoUpdateService.start();
+    if (DESKTOP_UPDATES_ENABLED) desktopAutoUpdateService.start();
   } else {
     desktopLogger.info(
       "Desktop auto-install is disabled: only the Linux AppImage build can replace itself. Version checks still report new releases.",
