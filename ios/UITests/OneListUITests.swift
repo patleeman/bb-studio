@@ -1,6 +1,6 @@
 import XCTest
 
-/// One list, offline (`-qaConversationHome -qaSpacesDemo list -qaBotDemo
+/// One list, offline (`-qaSpacesDemo list -qaBotDemo
 /// chat`; the demo's BB thread list has two projects with threads of no Bot,
 /// and Bot threads in the personal project): the conversation list over the
 /// conversation is the only list. The Bot's conversations come first, then
@@ -11,7 +11,7 @@ final class OneListUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launch() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaConversationHome",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
                                "-qaRoomConversation", "thr_botdemo01"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")

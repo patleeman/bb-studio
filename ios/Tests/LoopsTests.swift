@@ -79,32 +79,6 @@ final class LoopsTests: XCTestCase {
 
     // MARK: An older Studio's lock-screen buttons
 
-    func testActionsBecomeContractRequests() throws {
-        func body(_ action: LoopAction) -> (String, JSONValue)? { LoopRequests.request("loop_1", action).map { ($0.method, $0.body) } }
-        XCTAssertEqual(body(.done)?.0, "loops.act")
-        XCTAssertEqual(body(.done)?.1, .object(["id": .string("loop_1"), "action": .string("done")]))
-        XCTAssertEqual(body(.snooze(.tonight))?.1, .object(["id": .string("loop_1"), "action": .string("snooze"), "snooze": .string("tonight")]))
-        XCTAssertEqual(body(.choose("A"))?.1["option"], .string("A"))
-        XCTAssertEqual(body(.takeBack)?.0, "loops.update")
-        XCTAssertNil(body(.nudge), "Nudge only drafts")
-    }
-
-    func testClientActsOnAnOlderStudiosLoop() async throws {
-        let client = BBClient(baseURL: URL(string: "https://loops.invalid")!)
-        final class Seen: @unchecked Sendable { var calls: [(String, JSONValue)] = [] }
-        let seen = Seen()
-        client.transport = { _, path, body in
-            let input = try JSONDecoder().decode(JSONValue.self, from: XCTUnwrap(body))
-            seen.calls.append((path, input))
-            let loop = #"{"id":"loop_a","title":"A","why":"","source":null,"kind":"decide","options":["X","Y"],"owner":"patrick","trigger":{"type":"none"},"priority":"normal","push":false,"status":"done","due":null,"area":null,"createdAt":1,"updatedAt":3,"closedAt":3,"closedBy":"patrick"}"#
-            return (200, Data(#"{"ok":true,"result":\#(loop)}"#.utf8))
-        }
-        let closed = try await client.loopAction("loop_a", .choose("Y"))
-        XCTAssertEqual(closed?.isClosed, true)
-        XCTAssertEqual(seen.calls.last?.0, "/api/v1/plugins/studio/rpc/loops.act")
-        XCTAssertEqual(seen.calls.last?.1, .object(["id": .string("loop_a"), "action": .string("choose"), "option": .string("Y")]))
-    }
-
     func testNotificationCategoriesStayRegistered() {
         XCTAssertEqual(LoopCategories.identifier(kind: "do", options: []), "BB_LOOP.do")
         XCTAssertEqual(LoopCategories.identifier(kind: nil, options: []), "BB_LOOP")

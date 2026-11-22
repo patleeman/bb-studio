@@ -58,24 +58,6 @@ final class EnergyTests: XCTestCase {
         XCTAssertEqual(failures, 8)
     }
 
-    // MARK: Bot Activity polling
-
-    func testActivityPollsOnlyWhileTheTabShowsInTheForeground() {
-        XCTAssertNil(BotActivityPoll.interval(visible: false, sceneActive: true, running: true))
-        XCTAssertNil(BotActivityPoll.interval(visible: true, sceneActive: false, running: true))
-        XCTAssertEqual(BotActivityPoll.interval(visible: true, sceneActive: true, running: true), .seconds(30))
-        XCTAssertEqual(BotActivityPoll.interval(visible: true, sceneActive: true, running: false), .seconds(120))
-    }
-
-    func testActivityRefreshesOnStatusChangesNotStreamedOutput() {
-        XCTAssertTrue(BotActivityPoll.refreshes(on: .changed(entity: "thread", id: "t", changes: ["status"])))
-        XCTAssertTrue(BotActivityPoll.refreshes(on: .changed(entity: "thread", id: "t", changes: [])))
-        XCTAssertTrue(BotActivityPoll.refreshes(on: .connected))
-        XCTAssertFalse(BotActivityPoll.refreshes(on: .changed(entity: "thread", id: "t", changes: ["events-appended"])))
-        XCTAssertFalse(BotActivityPoll.refreshes(on: .changed(entity: "page", id: "p", changes: ["status"])))
-        XCTAssertFalse(BotActivityPoll.refreshes(on: .pluginSignal(pluginId: "x", channel: "y", payload: .null)))
-    }
-
     // MARK: The thread list's subscription while idle
 
     @MainActor
@@ -94,9 +76,5 @@ final class EnergyTests: XCTestCase {
         XCTAssertEqual(entity, "thread")
         XCTAssertNil(id)
         XCTAssertTrue(changes.isEmpty, "not streaming: the list reloads soon")
-    }
-
-    func testTheCatchUpReloadsTheListsThatListen() {
-        XCTAssertTrue(BotActivityPoll.refreshes(on: .changed(entity: "thread", id: nil, changes: [])))
     }
 }

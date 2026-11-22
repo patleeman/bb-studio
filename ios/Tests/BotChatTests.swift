@@ -57,35 +57,6 @@ final class BotChatTests: XCTestCase {
         XCTAssertNil(BotPalette.rgb("green"))
     }
 
-    func testBotDecodesItsLook() async throws {
-        let client = BBClient(baseURL: URL(string: "https://bot-look.invalid")!)
-        client.transport = { _, _, _ in
-            (200, Data(##"{"ok":true,"result":{"bot":{"id":"bot_main","name":"Pip","avatar":"🤖","state":"paused","threadId":"thr_pip","shape":"cloud","color":"#2ba59a","role":"Keeps me honest.","createdAt":1,"updatedAt":1},"run":{"enabled":true,"cadence":"weekdays","time":"08:00"}}}"##.utf8))
-        }
-        let bot = try await client.bot()
-        XCTAssertEqual(bot?.look.shape, .cloud)
-        XCTAssertEqual(bot?.color, "#2ba59a")
-        XCTAssertEqual(bot?.role, "Keeps me honest.")
-        XCTAssertEqual(client.cachedBotLook.shape, .cloud)
-        XCTAssertEqual(BotStatus.line(state: bot?.state, running: true, thinking: nil, attention: "Asked you a question", lead: bot?.lead), "Paused")
-        XCTAssertEqual(BotStatus.line(state: .active, running: false, thinking: nil, attention: nil, lead: bot?.lead), "Checks in weekdays 8:00")
-        XCTAssertEqual(BotStatus.line(state: .active, running: true, thinking: nil, attention: nil, lead: bot?.lead), "Thinking…")
-        // The Bot's attention reason replaces "Needs you"; a blank one is nothing.
-        XCTAssertEqual(BotStatus.line(state: .active, running: true, thinking: nil, attention: "1 thing for you", lead: bot?.lead), "1 thing for you")
-        XCTAssertEqual(BotStatus.line(state: .active, running: false, thinking: nil, attention: "Asked you a question", lead: bot?.lead), "Asked you a question")
-        XCTAssertEqual(BotStatus.line(state: .active, running: false, thinking: nil, attention: " ", lead: bot?.lead), "Checks in weekdays 8:00")
-    }
-
-    func testShortAttentionForATightHeader() {
-        XCTAssertEqual(BotStatus.short(reason: "Asked you a question", count: 1), "1 question")
-        XCTAssertEqual(BotStatus.short(reason: "Asked you a question", count: 3), "3 questions")
-        XCTAssertEqual(BotStatus.short(reason: "Waiting for approval", count: 1), "Approval")
-        XCTAssertEqual(BotStatus.short(reason: "Waiting for approval", count: 2), "2 approvals")
-        XCTAssertEqual(BotStatus.short(reason: "1 thing for you", count: 1), "1 thing")
-        XCTAssertEqual(BotStatus.short(reason: "2 things for you", count: 2), "2 things")
-        XCTAssertEqual(BotStatus.short(reason: "Something else", count: 1), "Needs you")
-    }
-
     // MARK: Message grouping
 
     private func rows(_ json: String) throws -> [TimelineRow] {
@@ -95,61 +66,13 @@ final class BotChatTests: XCTestCase {
     private let day1 = 1_760_000_000_000.0
     private var day2: Double { day1 + 86_400_000 }
 
-    func testRunsShowTheAvatarOnceAndDaysSeparate() throws {
-        let timeline = try rows("""
-        [
-          {"id":"u1","kind":"conversation","role":"user","text":"Hi","createdAt":\(day1)},
-          {"id":"u2","kind":"conversation","role":"user","text":"You there?","createdAt":\(day1 + 1000)},
-          {"id":"w1","kind":"work","workKind":"tool","toolName":"pages_read","status":"completed","createdAt":\(day1 + 2000)},
-          {"id":"a1","kind":"conversation","role":"assistant","text":"Yes.","createdAt":\(day1 + 3000)},
-          {"id":"w2","kind":"work","workKind":"tool","toolName":"search","status":"completed","createdAt":\(day1 + 4000)},
-          {"id":"a2","kind":"conversation","role":"assistant","text":"Found it.","createdAt":\(day1 + 5000)},
-          {"id":"a3","kind":"conversation","role":"assistant","text":"Next day","createdAt":\(day2)}
-        ]
-        """)
-        let entries = BotChatEntry.build(timeline)
-        let shape: [String] = entries.map {
-            switch $0 {
-            case .day: "day"
-            case .message(let row, let first, let last): "\(row.id)\(first ? "F" : "")\(last ? "L" : "")"
-            case .work: "work"
-            case .child(_, let id): "child:\(id)"
-            case .autoCompacted: "compacted"
-            }
-        }
-        XCTAssertEqual(shape, ["day", "u1F", "u2L", "work", "a1F", "work", "a2L", "day", "a3FL"])
-    }
-
     private func thread(_ id: String, at: Double, parent: String? = nil, source: String? = nil, owner: String? = nil) throws -> ThreadEntry {
         let json: [String: Any?] = ["id": id, "projectId": "p", "status": "idle", "createdAt": at, "updatedAt": at,
                                     "parentThreadId": parent, "sourceThreadId": source, "lifecycleOwnerThreadId": owner]
         return try JSONDecoder().decode(ThreadEntry.self, from: JSONSerialization.data(withJSONObject: json.compactMapValues { $0 }))
     }
 
-    func testStartedThreadsComeFromMetadataWithLiveStatus() throws {
-        let activity = try JSONDecoder().decode(BotActivity.self, from: Data("""
-        {"attention":null,
-         "inProgress":[{"id":"t_ask","title":"Ask","status":"active","relation":"started","updatedAt":1,"waitingFor":"Waiting for an answer"},
-                       {"id":"t_run","title":"Run","status":"active","relation":"started","needsYou":false,"updatedAt":1},
-                       {"id":"thr_self","title":"Bot","status":"active","relation":"self","needsYou":false,"updatedAt":1}],
-         "scheduled":[],
-         "completed":[{"id":"t_done","title":"Done","status":"idle","relation":"started","needsYou":false,"updatedAt":1},
-                      {"id":"t_bad","title":"Bad","status":"error","relation":"started","needsYou":false,"updatedAt":1},
-                      {"id":"t_other","title":"Someone else's","status":"idle","relation":"started","needsYou":false,"updatedAt":1}],
-         "latest":null}
-        """.utf8))
-        let threads = Dictionary(uniqueKeysWithValues: try [
-            thread("t_ask", at: 4, source: "thr_old"), thread("t_run", at: 3, parent: "thr_self"),
-            thread("t_done", at: 1, owner: "thr_self"), thread("t_bad", at: 2, parent: "thr_self"),
-            thread("t_other", at: 5, parent: "thr_elsewhere"),
-        ].map { ($0.id, $0) })
-        let started = BotStartedThread.list(activity: activity, threads: threads, chain: ["thr_old", "thr_self"])
-        XCTAssertEqual(started.map(\.id), ["t_done", "t_bad", "t_run", "t_ask"])
-        // A thread held by a question is the Bot's to answer: it's running.
-        XCTAssertEqual(started.map(\.status), [.finished, .failed, .running, .running])
-    }
-
-    func testStartedCardsGoWhereTheyWereMadeAndSystemMessagesBecomeCards() throws {
+    func testSystemMessagesAboutThreadsBecomeCards() throws {
         let timeline = try rows("""
         [
           {"id":"a1","kind":"conversation","role":"assistant","text":"On it.","createdAt":\(day1)},
@@ -163,41 +86,11 @@ final class BotChatTests: XCTestCase {
           {"id":"a4","kind":"conversation","role":"assistant","text":" `[PASS]`\\n","createdAt":\(day1 + 43)}
         ]
         """)
-        let started = [BotStartedThread(id: "t_run", title: "Run", createdAt: day1 + 20, status: .running),
-                       BotStartedThread(id: "t_old", title: "Before", createdAt: day1 - 5, status: .finished)]
-        let shape: [String] = BotChatEntry.build(timeline, started: started).map {
-            switch $0 {
-            case .day: "day"
-            case .message(let row, _, _): row.id
-            case .work: "work"
-            case .child(let event, _): "\(event.verb == .started ? "started" : "update"):\(event.threadId ?? "-"):\(event.status.rawValue)"
-            case .autoCompacted: "compacted"
-            }
-        }
-        XCTAssertEqual(shape, ["day", "a1", "work", "started:t_run:running", "a2", "update:t_run:failed"])
-    }
-
-    func testStudiosCompactionIsAMarkerAndTheUsersStaysABubble() throws {
-        let timeline = try rows("""
-        [
-          {"id":"a1","kind":"conversation","role":"assistant","text":"Done.","createdAt":\(day1)},
-          {"id":"c1","kind":"conversation","role":"user","text":"/compact","createdAt":\(day1 + 60_000)},
-          {"id":"c2","kind":"conversation","role":"user","text":"/compact","createdAt":\(day1 + 3_600_000)}
-        ]
-        """)
-        let compactions = [BotActivity.Compaction(threadId: "thr_bot", at: day1 + 30_000, tokens: 181_234)]
-        let shape: [String] = BotChatEntry.build(timeline, compactions: compactions).map {
-            switch $0 {
-            case .day: "day"
-            case .message(let row, _, _): row.id
-            case .work: "work"
-            case .child: "child"
-            case .autoCompacted(_, let id): "compacted:\(id)"
-            }
-        }
-        XCTAssertEqual(shape, ["day", "a1", "compacted:c1", "c2"])
-        XCTAssertEqual(BotChatEntry.autoCompactedLabel(compactions[0]), "Auto-compacted by Studio before the cache expired · ~181k tokens")
-        XCTAssertEqual(BotChatEntry.autoCompactedLabel(.init(threadId: "t", at: 0)), "Auto-compacted by Studio before the cache expired")
+        // The room's conversation: BB's word about a thread becomes a card, plumbing and the quiet ✓ and [PASS] go.
+        let shown = timeline.filter(BotChatRows.shows)
+        XCTAssertEqual(shown.map(\.id), ["a1", "w1", "a2", "s1", "r1", "s1b"])
+        let cards = shown.compactMap { row in BotChatRows.childEvent(row).map { "\(row.id):\($0.threadId ?? "-"):\($0.status.rawValue)" } }
+        XCTAssertEqual(cards, ["s1:t_run:finished", "s1b:t_run:failed"])
     }
 
     func testPassRepliesAreSilent() throws {
@@ -209,7 +102,7 @@ final class BotChatTests: XCTestCase {
          {"id":"a2","kind":"conversation","role":"assistant","text":"Found one.","createdAt":3}]
         """)
         XCTAssertEqual(timeline.map(\.isPassReply), [false, true, false])
-        XCTAssertEqual(timeline.filter(BotChatEntry.shows).map(\.id), ["u1", "a2"])
+        XCTAssertEqual(timeline.filter(BotChatRows.shows).map(\.id), ["u1", "a2"])
     }
 
     func testChainMergeHidesHandoffRequests() throws {
@@ -233,52 +126,14 @@ final class BotChatTests: XCTestCase {
         XCTAssertEqual(twice.map(\.id), ["o1", "o2"])
     }
 
-    func testQuickRepliesComeFromTheLastReplyOnly() throws {
-        let answered = try rows("""
-        [{"id":"a1","kind":"conversation","role":"assistant","text":"Ready?\\n\\n::next{reply=\\"👍 Ship it|✋ Wait\\" do=\\"📄 Write it up\\"}"},
-         {"id":"u1","kind":"conversation","role":"user","text":"Ship it"}]
-        """)
-        XCTAssertEqual(BotQuickReplies.items(in: answered), [])
-        XCTAssertEqual(BotQuickReplies.items(in: Array(answered.prefix(1))), ["👍 Ship it", "✋ Wait", "📄 Write it up"])
-    }
-
-    func testDayLabels() {
-        let now = Date()
-        XCTAssertEqual(BotChatEntry.dayLabel(now, now: now), "Today")
-        XCTAssertEqual(BotChatEntry.dayLabel(now.addingTimeInterval(-86_400), now: now), "Yesterday")
-        XCTAssertEqual(BotChatEntry.date(1_760_000_000), Date(timeIntervalSince1970: 1_760_000_000))
-        XCTAssertEqual(BotChatEntry.date(1_760_000_000_000), Date(timeIntervalSince1970: 1_760_000_000))
-    }
-
     // MARK: Activity
-
-    func testOlderStudioWithoutWaitingStillDecodes() throws {
-        let activity = try JSONDecoder().decode(BotActivity.self, from: Data(#"{"needsYou":[],"inProgress":[],"scheduled":[],"completed":[{"id":"t","title":"Done","status":"idle","relation":"started","needsYou":false,"updatedAt":1}]}"#.utf8))
-        XCTAssertNil(activity.waiting)
-        XCTAssertEqual(BotThreadGroups(activity).recent.map(\.thread.id), ["t"])
-    }
 
     // MARK: Reply in thread
 
-    func testReplyActionRowOnEachReplyThatCanHaveAThread() {
-        // A reply with no thread yet: the icons alone.
-        let plain = BotReplyActions(messageId: "thr_bot:assistant:a1", isUser: false, canThread: true, thread: nil)
-        XCTAssertNotNil(plain)
-        XCTAssertNil(plain?.repliesLabel())
-        XCTAssertEqual(BotReplyActions.replyTitle, "Reply in thread")
-        XCTAssertEqual(BotReplyActions.copyTitle, "Copy")
-        // Your messages, a reply still on its way, and an earlier chat's replies: none.
-        XCTAssertNil(BotReplyActions(messageId: "thr_bot:user-seed:1", isUser: true, canThread: true, thread: nil))
-        XCTAssertNil(BotReplyActions(messageId: "pending:1", isUser: false, canThread: true, thread: nil))
-        XCTAssertNil(BotReplyActions(messageId: "thr_old:assistant:a1", isUser: false, canThread: false, thread: nil))
-    }
-
-    func testReplyActionRowShowsTheCompactRepliesLinkInTheRow() {
+    func testSideThreadsCompactLabel() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         let side = BotSideThread(messageId: "a1", threadId: "fork1", replies: 2, lastReplyAt: (now.timeIntervalSince1970 - 300) * 1000, working: false)
-        let actions = BotReplyActions(messageId: "a1", isUser: false, canThread: true, thread: side)
-        XCTAssertEqual(actions?.thread?.threadId, "fork1")
-        XCTAssertEqual(actions?.repliesLabel(now: now), "2 replies · 5m")
+        XCTAssertEqual(side.compactLabel(now: now), "2 replies · 5m")
         var one = side
         one.replies = 1
         one.lastReplyAt = (now.timeIntervalSince1970 - 10) * 1000
@@ -289,7 +144,7 @@ final class BotChatTests: XCTestCase {
         XCTAssertEqual(one.compactLabel(now: now), "1 reply · 2d")
         var working = side
         working.working = true
-        XCTAssertEqual(BotReplyActions(messageId: "a1", isUser: false, canThread: true, thread: working)?.repliesLabel(now: now), "2 replies · working…")
+        XCTAssertEqual(working.compactLabel(now: now), "2 replies · working…")
         var fresh = side
         fresh.replies = 0
         XCTAssertEqual(fresh.compactLabel(now: now), "Thread")

@@ -176,13 +176,9 @@ struct PageView: View {
             }
         }
         .environment(\.openURL, OpenURLAction { url in
-            if !app.inSpaces, AppLink.handles(url), let id = url.pathComponents.dropFirst().first, ["page", "thread"].contains(url.host() ?? "") {
-                app.push(url.host() == "page" ? .page(id: id) : .thread(id: id))
-                return .handled
-            }
             let text = AppLink.handles(url) && url.host() == "thread" ? "bb://conversation" + url.path(percentEncoded: true) : url.absoluteString
             guard let target = Links.parse(text, origin: app.client.baseURL), case .entity = target else { return .systemAction }
-            app.openLink(target, push: app.inSpaces ? nil : { app.push($0) })
+            app.openLink(target)
             return .handled
         })
         .navigationTitle(meta?.displayTitle ?? "Page")

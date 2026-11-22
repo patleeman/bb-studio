@@ -1,8 +1,7 @@
 import XCTest
 
-/// The new chat transcript (Settings ▸ Diagnostics ▸ New chat transcript,
-/// `-qaTranscriptV2`) with the real composer and keyboard, offline on the
-/// local Bot demo. In the Bot chat, a Bot thread and a normal thread, it
+/// The chat transcript (UIKit, `iOS/Transcript`) with the real composer and
+/// keyboard, offline on the local Bot demo. In the Bot chat, a Bot thread and a normal thread, it
 /// checks the rules the SwiftUI transcript broke:
 ///
 /// - never past the end, and at the end while following, sampled through
@@ -232,7 +231,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     /// Mini cards (`-qaDuoMinis`): offline they show their placeholder, which
     /// resizes as it loads; the chat stays at its end.
     func testMiniCards() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaTranscriptV2", "-qaScrollLog", "-qaBotDemo", "duo",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog", "-qaBotDemo", "duo",
             "-qaDuoMinis", "mini_0000000000000a01,mini_0000000000000b02,mini_0000000000000c03", "-qaDark", "-qaDuoPhone", "-openURL", "bbstudio://thread/thr_botdemo01"]
         if layout == "split" { app.launchArguments += ["-qaDuoColdWide"] }
         app.launchOffline()
@@ -266,7 +265,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     /// and its card is at the end; Quote, Select Text and Edit work.
     func testThreadParity() throws {
         guard layout == "split" else { throw XCTSkip("The demo lists its normal thread only on the Duo's inner screen") }
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaTranscriptV2", "-qaScrollLog", "-qaBotDemo", "duo",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog", "-qaBotDemo", "duo",
             "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles", "-qaDemoLatency", "300", "-qaDemoColdCache",
             "-qaDemoUnread", "8", "-qaDark", "-openURL", "bbstudio://bot"]
         app.launchOffline()
@@ -480,7 +479,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     // MARK: - Harness
 
     private func open(cold: Bool = true) {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaTranscriptV2", "-qaScrollLog",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog",
             "-qaBotDemo", layout == "phone" ? "chat" : "duo", "-qaDark", "-openURL", "bbstudio://bot"]
             + (cold ? ["-qaDemoLatency", "300", "-qaDemoColdCache"] : [])
         switch layout {
@@ -499,7 +498,6 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     private func standUpTheRoom() {
         if inRoom { XCTAssertTrue(app.buttons["RoomStage"].waitForExistence(timeout: 30), "the room shows on the folded Duo") }
         guard app.buttons["RoomStage"].waitForExistence(timeout: 10) else { return }
-        app.standRoomChat()
         XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10), "the room's chat stands up")
     }
 

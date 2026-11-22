@@ -1,6 +1,6 @@
 import XCTest
 
-/// The Strands screen, offline (`-qaConversationHome -qaSpacesDemo list
+/// The Strands screen, offline (`-qaSpacesDemo list
 /// -qaBotDemo chat -qaStrandsDemo`; the demo answers `strands.overview` for
 /// Juniper): from the home conversation, the conversation list's Strands
 /// shows every conversation with open strands, needs you first; a chip or an
@@ -13,7 +13,7 @@ final class StrandsOverviewUITests: ServerIsolatedUITestCase {
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     private func launch(strands: Bool = true) {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaConversationHome", "-qaReduceMotion"]
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaReduceMotion"]
             + (strands ? ["-qaStrandsDemo"] : [])
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the app opens on the conversation")

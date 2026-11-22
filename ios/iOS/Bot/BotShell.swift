@@ -63,32 +63,21 @@ struct BotSpaceDot: Equatable, Identifiable {
     var label: String { name + (amber ? ", needs you" : "") }
 }
 
-struct SpacesLaunch: Equatable {
-    enum Shown: Equatable { case loading, classic, room }
+/// What the root shows: the room once Studio's Bots answer (or from what
+/// they answered last time), loading until then, and Studio unreachable after
+/// a real failure (not installed, or an error answer) or `timeout`.
+enum StudioLaunch {
+    enum Shown: Equatable { case loading, room, unreachable }
 
-    static let fallback: Duration = .seconds(3)
+    static let timeout: Duration = .seconds(10)
     static let retries: [Duration] = [.seconds(5), .seconds(15), .seconds(60)]
 
-    var shown = Shown.loading
-    var timedOut = false
-
-    func next(support: BotSpacesSupport, idle: Bool, quiet: Bool = true, linked: Bool = false) -> Shown {
-        switch shown {
-        case .room:
-            return support == .available ? .room : .classic
-        case .loading:
-            if support == .available, idle { return .room }
-            if support == .unknown, idle, quiet, !linked, !timedOut { return .loading }
-            return .classic
-        case .classic:
-            return support == .available && idle && quiet ? .room : .classic
+    static func shown(support: BotSpacesSupport, failed: Bool, timedOut: Bool) -> Shown {
+        switch support {
+        case .available: .room
+        case .unavailable: .unreachable
+        case .unknown: failed || timedOut ? .unreachable : .loading
         }
-    }
-
-    @discardableResult
-    mutating func update(support: BotSpacesSupport, idle: Bool, quiet: Bool = true, linked: Bool = false) -> Shown {
-        shown = next(support: support, idle: idle, quiet: quiet, linked: linked)
-        return shown
     }
 
     static func retryDelay(_ attempt: Int, delays: [Duration] = retries) -> Duration {
@@ -98,11 +87,6 @@ struct SpacesLaunch: Equatable {
 }
 
 enum BotShell {
-    static func usesSpaces(support: BotSpacesSupport, showing: Bool, idle: Bool) -> Bool {
-        guard support == .available else { return false }
-        return showing || idle
-    }
-
     static func shownBot(_ spaces: BotSpaces?, chosen: String?) -> BotSpace? {
         guard let spaces else { return nil }
         return spaces.bots.first { $0.id == chosen } ?? spaces.current

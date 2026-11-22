@@ -85,7 +85,6 @@ struct RoomSpread: View {
     var close: () -> Void
     var chooseTheme: (String) -> Void
     @State private var detail: [Route] = []
-    @State private var task: String?
     @State private var item: RoomDetail?
     @Environment(\.look) private var look
 
@@ -138,12 +137,10 @@ struct RoomSpread: View {
             RoomPlaceSheet(place: place, bot: bot, store: store, mainThreadId: mainThreadId, open: open,
                            startedConversation: { open(.conversation($0)) }, closeToRoom: close,
                            theme: look.theme.id, chooseTheme: chooseTheme,
-                           path: Binding(get: { [] }, set: { routes in if !routes.isEmpty { task = nil; item = nil; detail = routes } }),
+                           path: Binding(get: { [] }, set: { routes in if !routes.isEmpty { item = nil; detail = routes } }),
                            back: close)
                 .environment(\.workbenchPane, true)
-                .environment(\.showTaskDetail, { id in detail = []; item = nil; task = id })
-                .environment(\.shownTaskDetail, task)
-                .environment(\.showDetail, { next in detail = []; task = nil; item = next })
+                .environment(\.showDetail, { next in detail = []; item = next })
                 .environment(\.shownDetail, item?.id)
                 .scrollContentBackground(.hidden)
         case .settings:
@@ -160,14 +157,6 @@ struct RoomSpread: View {
             }
             .id(item.id)
             .accessibilityIdentifier("roomSpreadDetail")
-        } else if let task {
-            ScrollView {
-                TaskCard(id: task, expanded: true)
-                    .padding(20)
-            }
-            .id(task)
-            .environment(\.openTaskThread, { open(.conversation($0)) })
-            .accessibilityIdentifier("roomSpreadTask")
         } else if let first = detail.first {
             NavigationStack(path: Binding(get: { Array(detail.dropFirst()) }, set: { detail = [first] + $0 })) {
                 RouteDestination(route: first)

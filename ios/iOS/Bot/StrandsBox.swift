@@ -2,8 +2,7 @@ import SwiftUI
 
 /// Each conversation's strands, polled while its screen is open
 /// (`strands.list`, every 30 s as on the desktop, longer while the phone is
-/// idle, and held in the background). A Studio without strands
-/// answers "unknown method": the conversation keeps In flight then.
+/// idle, and held in the background).
 @MainActor @Observable
 final class StrandsModel {
     static let shared = StrandsModel()
@@ -16,12 +15,7 @@ final class StrandsModel {
     /// Jump to reply: the reply (its message seq) a conversation brings into view and flashes.
     private(set) var flash: [String: Double] = [:]
     private var flashEnds: [String: Task<Void, Never>] = [:]
-    /// Per server: nil until asked, false when Studio has no strands.
-    private(set) var supported: [URL: Bool] = [:]
     private var client: BBClient { AppModel.shared.client }
-
-    /// The box replaces In flight: Studio has strands (or hasn't answered yet, so In flight doesn't flash in).
-    func replacesInFlight() -> Bool { supported[client.baseURL] != false }
 
     func list(_ threadId: String) -> StrandList? { lists[threadId] }
 
@@ -30,11 +24,7 @@ final class StrandsModel {
         do {
             let next = try await client.strandsList(threadId: threadId)
             guard base == client.baseURL else { return }
-            supported[base] = true
             if lists[threadId] != next { lists[threadId] = next }
-        } catch where BBClient.isUnknownRPC(error) {
-            supported[base] = false
-            return
         } catch {
             return
         }
@@ -53,7 +43,6 @@ final class StrandsModel {
     func poll(_ threadId: String) async {
         while !Task.isCancelled {
             await load(threadId)
-            if supported[client.baseURL] == false { return }
             await EnergyGate.shared.pollWait(.seconds(30))
         }
     }

@@ -17,7 +17,7 @@ final class BotSpacesStore: ObservableObject {
     private var lastFlush = ContinuousClock.now - .seconds(600)
     /// Something waits that mustn't be paced: a first load, a watch, a reconnect, a retry.
     private var unpaced = false
-    var retryDelays: [Duration] = SpacesLaunch.retries
+    var retryDelays: [Duration] = StudioLaunch.retries
 
     private(set) var watched: Set<String> = []
     private var client: BBClient?
@@ -100,13 +100,24 @@ final class BotSpacesStore: ObservableObject {
 
     var configured: Bool { serverURL != ServerScope.unconfiguredURL }
 
-    var skipsLoading: Bool { support == .unknown && BotSpacesSupport.answeredWithError(serverURL: serverURL) }
+    /// The server answered `bot_spaces` with an error last time: the root
+    /// shows Studio unreachable at once instead of loading.
+    var answeredWithError: Bool { support == .unknown && BotSpacesSupport.answeredWithError(serverURL: serverURL) }
 
     func askIfUnknown() {
         guard support == .unknown, client != nil, configured else { return }
         retryTask?.cancel()
         retryTask = nil
         retries = 0
+        schedule(spaces: true)
+    }
+
+    /// Try Again on the unreachable screen: ask now, whatever was answered.
+    func retryNow() {
+        guard client != nil, configured else { return }
+        stopRetrying()
+        BotSpacesSupport.rememberErrorAnswer(false, serverURL: serverURL)
+        if support == .unavailable { support = .unknown }
         schedule(spaces: true)
     }
 
@@ -223,7 +234,7 @@ final class BotSpacesStore: ObservableObject {
 
     private func retryLater() {
         guard retryTask == nil, configured else { return }
-        let delay = SpacesLaunch.retryDelay(retries, delays: retryDelays)
+        let delay = StudioLaunch.retryDelay(retries, delays: retryDelays)
         retries += 1
         retryTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
@@ -264,12 +275,6 @@ extension BotSpacesStore {
         support = .unknown
         spaces = nil
         views = [:]
-    }
-
-    func seedUnavailableForDemo() {
-        restored = true
-        stopRetrying()
-        support = .unavailable
     }
 }
 #endif

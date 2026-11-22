@@ -54,7 +54,6 @@ are unchanged, and old `bbgo://` links still open.
 | The model router's notice and the Tool Gateway: in a Bot conversation, while the router has a usage-limit or sign-in notice (`router.notice.get`, every 2 min, longer while idle), a line above the composer says so with Hand off to <model> (`router.handoff`: a new thread on the router's next model continues this one, and the phone opens it) and ✕ (`router.notice.dismiss`). Settings ▸ Tool Gateway shows Studio's MCP servers (status, on or off, tool count) and the requests waiting for approval, view-only (`toolGateway.overview`): adding, approving and signing in happen on the desktop. A Studio without them answers "unknown method" and nothing shows. `-qaRouterDemo` answers the notice offline; the spaces demo answers the gateway | `iOS/Bot/RouterNotice.swift`, `iOS/Tools/ToolGatewayView.swift` |
 | New conversation and switching Bots: the list's first row is "+ New conversation" (the + in the side column stays), and so is the unfolded Duo's left side. New thread and New conversation are one composer (`NewThreadView`): it says who the conversation is with ("New conversation with Juniper", the field "Message Juniper"), and chips pick the Bot (any Bot, or No Bot: a plain thread in a project), the project, the workspace and, in the composer's model button, provider (Auto, the model router, when the server offers it), model, reasoning and permissions. A Bot's conversation defaults to the Bot's model (`bot_get`; Auto when that is its default) over the project's defaults, in its Main's project, and starts with `bot_conversation_start` with the request's model and environment (`NewConversationChoice`); with no Bot it is `POST /threads` as before. Started with another Bot, that Bot's room opens on it. The Bot's name at the top of the list (and on the unfolded Duo's left) is a menu of the Bots: pick one to switch; swiping still pages through the current Bot's conversations. On the folded Duo the ↓ (jump to latest) is one of the rail's round buttons under the list, voice and ⋯, never beside the composer; with the keyboard up the rail has no room for it and it hides (sending jumps to the end). A phone keeps it beside the composer; two pages keep its centred lane. The spaces demo answers execution options (Claude Code, Codex, Auto), projects and each Bot's default model offline | `iOS/Inbox/NewThreadView.swift`, `Shared/NewConversationChoice.swift`, `iOS/Room/RoomHome.swift`, `iOS/Room/RoomMenu.swift`, `iOS/Thread/ThreadView.swift` |
 | One list: with Studio's Bots the conversation list over the conversation is the only list. The Bot's conversations come first (workers nested, runners under Main), then Projects: BB's threads that belong to no Bot, by project, closed until opened and each project closed too (`GET /sidebar-bootstrap` less every thread a Bot lists in `bot_threads_view` and `bot_threads_older`, and everything they started; `ProjectThreads`). The search field at the top of the list searches it all: the Bot's conversations and workers and the project threads. Automations is a row in the Bot's Schedules (All automations), not on a thread list. Nothing opens BB's own Threads screen any more: Settings has no All BB threads; opening a thread, a route or a `bbstudio://` link pushes it in the room (`AppModel.openThread`, `open`, `push`), an unknown link opens the list, and New thread (Siri, ⌘N, `bbstudio://new`) is the list's New conversation. Without Studio's Bots the tab bar and its Threads tab stay | `iOS/Room/RoomMenu.swift`, `Shared/ProjectThreads.swift`, `iOS/App/AppModel.swift`, `iOS/Bot/BotShell.swift` |
-| The room with the presence screen (before the conversation became home; Debug builds only, with `-qaPresenceHome`; iPhone and the Duo; the split view stays on iPad and with `-qaSplitShell`): the app opens on Main over the Bot's scene (the Bot's scene theme, else the phone's scene theme, else Aurora Fjord). At the top: the conversation's name and a small line under it (Main: the Bot's name, the date and the weather from today's morning card; another conversation: its role). The presence sits in the middle, and under it a live Now line: what this conversation's agent is doing (the running turn's current step, else its own task in progress, else the workers it waits on, else Idle), how long, and the last thing it finished; it updates in place. Under it, On it: this conversation's agent-owned open tasks (`tasks.flight`, `tasks.inFlight` on an older Studio) and running workers without a task, each a plain 44-point row with a small spinner and the task's step on the right; and Yours: the user's tasks (Main: today's, from `tasks.board`, `tasks.list` on an older Studio), "Nothing waiting on you" when empty. A short screen shows fewer rows and "N more" (opens Strands). Tapping a row opens its task (a worker's row opens its thread); a long press offers the task's actions (done, choose, snooze, hand off, take back). Swiping left or right pages through the conversations (Main first, then by recent activity); each conversation has its own light, a time of day picked from its id (Main keeps the scene's own), and the page dots name where you are. Swiping up, or tapping the input, opens the conversation itself (the input with the keyboard); the chevron or a tap between messages goes back. Swiping the presence switches Bots. The input is a slim field with a tinted mic: hold to talk and let go to send (slide left to cancel), or tap to record and tap again to send. The top-right button opens the menu over the scene: Strands (with how many need you), Conversations, Memory, Library, Schedules, what's working now, Theme and Settings. Each item's tap area is its text plus 12 pt (44 pt tall at least); the space beside it does nothing. Where the menu button sits on the rail (the folded Duo, and the rail column of the unfolded one), it turns into the menu's ✕ in the same spot; on a short page the menu tightens, then scrolls. Each place is a sheet with a sliver of sky above it; pulling down goes back to the menu (to the room when a row or a link opened it). Reduce Motion cross-fades. The unfolded Duo is one canvas across both screens: the scene runs edge to edge across the hinge, and content keeps off it. The left page (the top one in portrait) is the presence screen; the right page (the bottom one) is the conversation itself, standing, with its input. Swiping on the left pages both. The rail has the clock and the menu. Strands, Memory, Library and the other places open across both screens as list | detail: one header with Back, the place's search and +, the list on the left and the chosen item on the right, the scene faint behind. Settings uses its own two pages. Folding or unfolding keeps the room's state and puts the keyboard away. QA: `-qaRoomTheme forest\|none`, `-qaRoomMode talk\|read\|record\|recordLocked\|menu\|settings\|<place>`, `-qaRoomConversation <thread>`, `-qaRoomLead` (demo tasks in Launch prep), `-qaReduceMotion`, `-qaOneBot`; `-qaSplitShell` keeps the split view on a phone | `iOS/Room/RoomView.swift`, `iOS/Room/RoomPresence.swift`, `iOS/Room/RoomModel.swift`, `iOS/Room/RoomSpread.swift`, `iOS/Room/RoomMenu.swift` |
 | A Bot's pages, from the room's menu (as sheets) or the five buttons in the split view's list header, as desktop's: Strands (the Strands screen), Memory (the core profile folded with its length against the cap, opening in Pages to edit; records with search, topic chips from the data, sort, New, and a record's source, what it replaced, Edit as a new record and Archive or Restore; replaced records folded; `memory.*`), Library (the Bot's files by conversation, kind or date, with search and Kind chips, lookalikes folded with a count, 8 rows then "N more", each opening in its Studio viewer; Visual Chat from its ⋯; `bot_library`), Automations (the Bot's automations, pushed) and Archive (older and finished conversations and older workers, with search and All, Conversations, Workers and Failed; a finished one shows its summary and Reopen; `bot_threads_older`, `bot_finished`, `bot_reopen`) | `iOS/Bot/BotPages.swift`, `iOS/Bot/BotPagesModel.swift` |
 | Host settings: keep the Mac awake, and how many threads run at once | `iOS/Tools/ServerControls.swift` |
 | Installed plugin status and errors in Settings → Plugins. Today (Studio), Pages (Studio Pages), Drawings (Studio Draw) and Automations show "Install <plugin> to use this." when their plugin is missing or not running, instead of BB's raw 404 or 503 text | `iOS/Tools/PluginStatusView.swift`, `Shared/BBClient.swift` |
@@ -85,7 +84,6 @@ are unchanged, and old `bbgo://` links still open.
 | Artifacts (in Studio): files agents save from threads. Markdown rendered (or as source), code and text in monospace, images zoomable, HTML, PDF, audio and video in a sandboxed web view (WebKit plays media with its own controls). Versions, share the file, copy text, New Thread with This, Save as Page, open the source thread, rename, move, delete. `::app{…}` and `::artifact{…}` cards in replies and Studio links in messages open natively. `::inline-vis{…}` previews in replies (BB's built-in inline-vis plugin): HTML visualizations from the workspace or thread storage run in a sandboxed web view at the reply's height, Markdown files render natively, with collapse, full screen, and the web app's errors for a missing file or bad height. Save Files to Studio (from the thread menu or a reply's long-press) lists the files a reply made plus the thread's storage, and saves the chosen ones as artifacts or new versions | `iOS/Studio/ArtifactView.swift`, `iOS/Studio/SaveToStudioSheet.swift`, `iOS/Thread/InlineVis.swift` |
 | Dictation and recordings through Studio, with an offline segment outbox. Dictating from a page or a note puts the text straight into that field when you tap the check mark (the thread and New thread composers dictate inline instead). A standalone dictation can be saved as a page, and recordings open to their transcript with share, copy, new thread, rename, retry of failed transcription, and delete. Play a recording: segments play back to back as one timeline with a scrub bar, back and forward 15 seconds, 0.75× to 2× speed, and lock-screen controls; the transcript comes in paragraphs with their start times, the sentence playing is highlighted, and tapping any sentence plays from there. Browser recordings are WebM/Opus, which iOS can't open, so the app demuxes them and decodes the Opus itself | `iOS/Talk` |
 | Hands-free voice with the Bot (see [Dictation and hands-free voice](#dictation-and-hands-free-voice)): GPT-Live over WebRTC from the open conversation's waveform (it speaks as that conversation), or Talk to Bot, which means the current Bot's Main (`bbstudio://bot-talk/<botId>` for another Bot's) | `iOS/VoiceLive` |
-| Bot tab (first in the tab bar: Bot, Threads, Studio, Settings; was Chief of Staff; replaces Web). The app opens on it at every launch, with or without a Bot or Studio; a link, notification tap, widget, quick action or Siri opens its own target instead: with one bot it opens that bot's chat (‹ goes to the list); with several, a list (`bot_list`) of avatar, name, status and latest reply, primary first then by name; a bot that needs you says why in its status line ("Asked you a question", in orange) with a count badge (`bot_attention`); + New bot opens the same welcome as below (external bots are imported on desktop). With no bot, the tab is a welcome (see Bot: first-time setup). Each chat scopes every call by `botId`; external bots hide Memory and Skills. The bot chat's composer has the same model button as any thread (see Model & Permissions). Widgets, Siri and the watch stay on the primary bot. The primary bot's thread is the lead of BB's personal project; its emoji menu shows its state and offers Automations… (one list of check-ins, reminders, watchers and runners from `bot_automations`: swipe to pause or delete, tap for its schedule, instruction or script, recent runs with outcomes, Run now and Edit; + makes any kind with a native schedule editor of presets, day chips, several times, every N in a window, quiet hours, end date, timezone or raw cron, or a date for a reminder; Turn off check-ins pauses every check-in; `bot_automation_*`, `iOS/Bot/BotAutomationsSheet.swift`, `Shared/BotAutomations.swift`), Pause / Resume and Stop… (confirmed: stops the threads it started and its automations), all on `bot_get`, `bot_set_run`, `bot_pause`, `bot_resume`, `bot_stop`. Only the Bot itself needs you: `bot_activity`'s `attention` (its chat asked a question, wants an approval, or has replies you haven't read; cleared on the server when you read or answer it) badges the bell with its count, the chat header's status line says why ("Asked you a question", "1 thing for you") and otherwise shows what it did before, and the Activity sheet then leads with the Bot's chat row saying why ("Asked you a question") with the count. Activity lists the bot's sub-threads as the desktop Bots sidebar does: Running, Runners, Recurring, Recent and Earlier conversations, a worker nested under the thread that started it, each with the desktop status dot (running, waiting, failed, done) and age. A thread held by a question the Bot owns stays under Running with an amber ring and what it waits for under its title ("Waiting for approval", its `waitingFor`); runners show their schedule and next run in plain English ("Daily 7:05 AM and 5:05 PM · Next run Tue 7:05 AM", a port of desktop `describeCron`) and their state only (running, next run, quiet, reported, failed, paused; an urgent report is "reported", for the Bot to pass on), and swipe for Pause / Resume and Run now; Earlier conversations is the Bot's handoff chain with titles and starts collapsed (collapsed groups are remembered). A tap opens the thread in the normal thread view. It refreshes with the tab's Activity (BB's thread changes) and on pull, with no timers of its own (`bot_activity`, `bot_runners`, `bot_chain`, `bot_runner_*`; `iOS/Bot/BotThreadsSheet.swift`, `Shared/BotThreads.swift`); a paused or stopped Bot shows a banner with Resume. A thread's ⋯ menu has Make this my Bot (`bot_set_thread`); on the Bot's thread it reads "<emoji> <name> · your Bot" with Check-ins…. Hold the composer's mic to talk and send on release; slide left or tap Cancel to cancel, which never sends and deletes the recording from the phone and from Talk on the server it was recorded to (later, if that server is offline). The Action button, `bbstudio://bot-talk` (also `chief-talk`) and the "Talk to Bot" shortcut open hands-free voice with the Bot and start it at once, and the next press ends it; `bbstudio://bot` (also `chief`) opens the tab. Talking ends unsent and deleted when the thread closes, the app backgrounds, a call interrupts, or dictation opens. The Bot's thread, name and emoji are kept per server; with no Bot, or a server without Studio, the tab, widget, Siri and watch say so instead of sending. "Tell my bot" sends a message and reads the reply | `iOS/Thread/HoldToTalk.swift`, `iOS/App/RootView.swift`, `Shared/Bot.swift`, `iOS/Thread/BotMenu.swift`, `iOS/App/BotHeartbeat.swift`, `Widgets/BotWidget.swift`, `Watch/WatchApp.swift` |
 | Action button and Siri shortcuts: Dictate, Open thread, New thread, Write, "Ask BB" (Siri waits for the reply and reads it). Home Screen quick actions (long-press the icon): Dictate, Write, New Thread; `bbstudio://write` opens the same sheet | `iOS/App/Intents.swift`, `iOS/App/BBStudioApp.swift` |
 | Capture to BB opens one sheet for voice, dictation, a note, a photo or file, or a new thread. Add it in Settings → Action Button → Controls; it is also available in Control Center, Shortcuts, and Siri. | `iOS/Capture/CaptureSheet.swift`, `Widgets/Controls.swift` |
 | Control Center and lock screen controls: Dictate, New thread | `Widgets/Controls.swift` |
@@ -109,22 +107,10 @@ are unchanged, and old `bbgo://` links still open.
 | APNs push relay for BB's push-notifications plugin, with notification categories | `packages/bb-studio-mobile/` |
 | Push registration replaces this install's prior subscription when APNs changes its token. Simulator and QA runs skip registration | `iOS/App/PushRegistration.swift` |
 
-## Bot: first-time setup
+## A conversation: opening and sending
 
-With no bot, the Bot tab is the same welcome as desktop: **Meet your Bot**,
-one question (**What should your Bot help with?**), ideas that fill it, and
-**Create Bot**. Create makes the Bot as "Chief of Staff" with a drawn blob
-(`bot_create` with `setup`; `BotSetup` in `Shared/Bot.swift`) and opens its
-chat, where Studio's setup message has it introduce itself, ask a couple of
-questions, and then pick its own name, description and look. The Bots list's
-+ shows it as **Make another Bot** in a sheet. Debug builds show it with no
-server through `-qaBotDemo onboarding` (`iOS/Bot/BotDemo.swift`;
-`iOS/Bot/BotOnboarding.swift`).
-
-## Bot chat: opening and sending
-
-The Bot chat opens on what the phone last saw: the Bots list and the bot
-(`BotSnapshot` in `iOS/Bot/BotTab.swift`) and the thread's last 50 messages
+A conversation opens on what the phone last saw: Studio's Bots
+(`BotSpacesCache`) and the thread's last 50 messages
 (`TimelineCache`, one JSON file per thread, written after each load and
 update). With nothing cached it shows grey bubbles (`ChatSkeleton`), not a
 blank screen. The server's page goes in over the cached rows by id
@@ -417,17 +403,9 @@ Headless simulator runs: `-skipPushPrompt YES -openURL bbstudio://thread/<id>`.
 answers `strands.overview` for Juniper): Strands first among the conversation
 list's places, the header line, a card per conversation (needs you first,
 Main's asks as rows, chips), a chip opening its conversation showing only that
-strand, an ask doing the same, Open showing everything, and an older Studio
-(no `-qaStrandsDemo`) asking to update. `TEST_RUNNER_STRANDS_OUT` keeps PNGs.
+strand, an ask doing the same, and Open showing everything.
+`TEST_RUNNER_STRANDS_OUT` keeps PNGs.
 
-`TasksUITests` checks what is left of tasks offline (`-qaLoopsDemo` also
-answers `tasks.*` and `work.*` from a local store): the presence screen's
-Yours and On it rows and their menu, In flight above the composer on a Studio
-without strands (× per card, N done, Clear done; `tasks.flight`, and
-`tasks.inFlight` with `-qaTasksNoBoard`), old `::work` cards in the chat
-(read-only: Ended, a finding's severity, no action buttons; `-qaTaskCards`),
-and an older Studio's to-do push opening its conversation (`-qaPushTask <id>
--qaPushConversation <thread>`). `TEST_RUNNER_TASKS_OUT` keeps PNGs.
 `RoomMorningLoopsUITests` checks an old morning card's read-only rows.
 
 The folded Duo (466 × 678) has no navigation bar in a chat: the name and
@@ -525,8 +503,9 @@ points, bottom pinning, split-only back-button hiding, and keyboard layout. See
 list|needs` with `-qaBotDemo chat`: three local Bots, no server): launch opens
 Main, Back shows the list, the needs-you row and amber dot, switching Bots by
 dot and by swiping the header, Studio from the list's ⋯, and no All BB threads in Settings.
-`TEST_RUNNER_STEP4_OUT` keeps its PNGs. Without Bot spaces on the server the
-tab bar stays (`LaunchTabUITests`).
+`TEST_RUNNER_STEP4_OUT` keeps its PNGs. There is no tab bar: before Studio's
+Bots answer the app shows a loading state, and after a real failure or 10 s
+"Can't reach Studio" with Try Again (`SpacesLoadingUITests`).
 
 `ConversationsUITests` checks a Bot's conversations offline (`-qaSpacesDemo
 needs|list` with `-qaBotDemo chat`, answered by `BotSpacesDemo.State`): Reply in
@@ -546,8 +525,7 @@ with `-qaSpacesDemo list -qaBotDemo chat -qaStrandsDemo`): it opens on the
 conversation with its strands box, the Bot's mark and the name open the list
 with the Bot and its places, a picked conversation shows and is the one the app
 opens on next time, and (`TEST_RUNNER_HOME_DUO=1` on the iPhone Duo simulator)
-the unfolded Duo's context on the left. Every other UI suite launches with
-`-qaPresenceHome` (`StagedServerUITestCase`). `TEST_RUNNER_HOME_OUT` keeps PNGs.
+the unfolded Duo's context on the left. `TEST_RUNNER_HOME_OUT` keeps PNGs.
 
 `NewConversationUITests` checks New conversation offline (`-qaConversationHome
 -qaSpacesDemo list -qaBotDemo chat`): who it's with, the Bot, project,
@@ -598,44 +576,19 @@ answered from it, workers nested under their conversation with "N done" and a
 runner under Main, and swiping between conversations on the conversation
 screen. `TEST_RUNNER_CATCHUP_OUT` keeps its PNGs.
 
-`RoomUITests` checks the room offline (`-qaSpacesDemo list` with `-qaBotDemo
-chat` and `-qaLoopsDemo`): the name, Now, On it and Yours at rest, a
-conversation with nothing for the user, swiping up and going back, recording,
-the menu and each place's sheet, and Reduce Motion. `TEST_RUNNER_ROOM_OUT`
-keeps its PNGs; `TEST_RUNNER_ROOM_THEME` picks the Bot's theme (`forest` or
-`none`). `BotSpacesUITests` and `LookUITests` run the split view with
-`-qaSplitShell`. `RoomDuoUITests` (iPhone Duo simulator,
-`TEST_RUNNER_ROOM_DUO=1`) checks the room on the outer screen and the unfolded
-canvas in landscape and portrait (`qa-duo/landscape`, `shift?<points>`,
-`portrait`): the presence screen left of the hinge and the conversation right
-of it, no black band at the hinge, paging both, Memory, Library and Strands as
-list | detail, and the room again after folding; `qa-duo/capture?<name>` keeps
-whole-window PNGs in the app's Documents, and `TEST_RUNNER_ROOM_RECORD=1` runs
-`testTheRecording` with `qa-duo/record?start` frames. `RoomSwipeUITests` pages
-the conversations (each in its own light) and swipes the presence between Bots
-(`TEST_RUNNER_ROOM_SWIPE_RECORD=1` slows it for a screen recording);
 `RoomBottomStackUITests` (iPhone, or the Duo with `TEST_RUNNER_ROOM_DUO=1`
-for the folded and unfolded pages) stands the room's conversation up with In
-flight showing and checks, from the app's own frames (`qa-duo/layout` reports
+for the folded and unfolded pages) checks, from the app's own frames (`qa-duo/layout` reports
 each transcript's bottom stack, last row and ↓), that the last row ends above
 In flight and the composer with the keyboard down, up and with text, that the ↓
 sits above the stack while reading up and lands the last row above it; with
-`TEST_RUNNER_ROOM_OUT` it keeps the presence and conversation stills per
+`TEST_RUNNER_ROOM_OUT` it keeps the conversation stills per
 `TEST_RUNNER_ROOM_THEME`. Behind a conversation the room shows the scene
 frosted (`RoomFrost`, no light orb), so a scene's moon or light never sits
 behind messages; on the unfolded Duo only the conversation's page is frosted.
 The chat's bottom stack (In flight, the worker pill, the shelf cards and the composer) sits on one opaque band (`TranscriptChrome.stackBand`) from its top to the screen's or keyboard's edge, and the ↓ gets its own lane at the band's top that the bottom inset includes: the chat ends above the band and scrolls under it, never between its parts. `RoomBottomStackUITests.testTheBottomStackIsOneOpaqueBandWithTheJumpInItsOwnLane` checks it with In flight open and folded, the keyboard down and up, at the end and reading up, and `testAConversationWithoutWorkersOrInFlightHasTheSameStack` without the pill or In flight.
 While the composer has the keyboard, In flight shrinks to a chip on one row with the worker pill, and on one page (a phone, the folded Duo) the ↓ sits beside the composer card (`TranscriptChrome.PillPlacement.inline`), so it costs no height; beside two pages it keeps its centred lane. The composer row grows with its text by fixed padding (no flexible frame), line by line to six lines, then scrolls. `RoomComposerBandUITests` types about 1, 3 and 8 lines with the keyboard up, at the end and reading up, and checks that the text stays inside the composer card, that In flight, the pill, the composer and the ↓ never overlap, and that the band stays under 132 points plus 22 per extra line; `qa-duo/layout` lays the window out before it measures, so it reports what is drawn.
-`RoomLightUITests` checks that a scene's moon or sun, and a conversation's
-light orb, sit small (0.6 of desktop's size) in the top corner of the
-presence's page, clear of the presence, the title, Now, the menu and every
-row, on the iPhone and (with `TEST_RUNNER_ROOM_DUO=1`) the folded Duo and the
-unfolded Duo in landscape and portrait. The phone passes that spot to the scene
-as `light` (`SceneLight`, part of the still's cache key); desktop never sets it,
-so its scenes keep their own placement. `TEST_RUNNER_ROOM_OUT` keeps the stills.
-`RoomQAUITests` covers the rest of the room's QA matrix (one Bot, no tasks,
-XXL, background, long messages, an accessibility audit, slow and offline
-servers, landscape, and unfolding with the conversation open on the Duo). The simulator stretches the window across the
+The phone passes the scene its light spot as `light` (`SceneLight`, part of the
+still's cache key); desktop never sets it, so its scenes keep their own placement. The simulator stretches the window across the
 outer screen, so its status column still insets the left page and iOS still
 floats bar buttons where that column is; a device's inner screen has neither.
 

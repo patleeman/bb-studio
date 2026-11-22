@@ -1,6 +1,6 @@
 import XCTest
 
-/// Round 2 on the phone, offline (`-qaConversationHome -qaSpacesDemo list
+/// Round 2 on the phone, offline (`-qaSpacesDemo list
 /// -qaBotDemo chat`; the demo has three Bots: Juniper on Opus 5.5, Home on
 /// Auto, Research with no default model). New conversation says who it is
 /// with and lets you pick another Bot or none, the project, the workspace and
@@ -13,7 +13,7 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
     private var duo: Bool { ProcessInfo.processInfo.environment["ROUND2_DUO"] != nil }
 
     private func launch() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaConversationHome",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
                                "-qaRoomConversation", "thr_botdemo01"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")

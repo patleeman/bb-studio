@@ -676,31 +676,6 @@ public struct BotCacheState: Decodable, Hashable, Sendable {
     }
 }
 
-/// The action row under a reply in the Bot's chat, as on the desktop: quiet
-/// icons (Copy, Reply in thread) and, when the reply has side threads, the
-/// compact "2 replies · 5m" link in the same row. Reply in thread and the link
-/// open the reply's newest side thread; the icon starts one when it has none
-/// (Studio's bot_side_thread_open).
-public struct BotReplyActions: Equatable, Sendable {
-    public static let replyTitle = "Reply in thread"
-    public static let copyTitle = "Copy"
-    /// The reply's side threads, summed; nil before it has one.
-    public var thread: BotSideThread?
-
-    /// Nil where there's no row: your messages, a reply still on its way,
-    /// and replies that can't start a thread (an earlier chat's).
-    public init?(messageId: String, isUser: Bool, canThread: Bool, thread: BotSideThread?) {
-        guard !isUser, canThread, !messageId.hasPrefix("pending:") else { return nil }
-        self.thread = thread
-    }
-
-    /// The link's words after the icons, when the reply has side threads.
-    public func repliesLabel(now: Date = .now) -> String? {
-        guard let thread, !thread.isFork else { return nil }
-        return thread.compactLabel(now: now)
-    }
-}
-
 /// The forks made at a message: the newest, and how many.
 public struct BotForkLine: Codable, Hashable, Sendable {
     public var threadId: String

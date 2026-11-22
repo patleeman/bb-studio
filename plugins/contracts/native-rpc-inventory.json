@@ -998,12 +998,6 @@
       "coverage": "generated method"
     },
     {
-      "file": "ios/iOS/Loops/Loops.swift",
-      "plugin": "studio",
-      "method": "request",
-      "coverage": "dynamic dispatch; runtime validation required"
-    },
-    {
       "file": "ios/iOS/Room/BotControls.swift",
       "plugin": "studio",
       "method": "method",
@@ -1072,12 +1066,6 @@
     {
       "file": "ios/iOS/Tasks/TasksModel.swift",
       "plugin": "studio",
-      "method": "tasks.list",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
       "method": "tasks.get",
       "coverage": "generated method"
     },
@@ -1085,36 +1073,6 @@
       "file": "ios/iOS/Tasks/TasksModel.swift",
       "plugin": "studio",
       "method": "tasks.act",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "tasks.inFlight",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "tasks.flight",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "tasks.board",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "work.dismiss",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "work.clear",
       "coverage": "generated method"
     },
     {

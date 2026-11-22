@@ -79,20 +79,17 @@ final class LinksTests: XCTestCase {
         XCTAssertEqual(LinkRef(kind: .browser, id: "https://a.b/c d").link, "bb://browser/https%3A%2F%2Fa.b%2Fc%20d")
     }
 
-    func testAppLinksRouteNewKindsAlwaysAndOldOnesInSpaces() {
-        func target(_ text: String, spaces: Bool) -> LinkRef? {
-            guard case .entity(let ref)? = AppModel.linkTarget(URL(string: text)!, inSpaces: spaces) else { return nil }
+    func testAppLinksGoThroughTheLinkRouter() {
+        func target(_ text: String) -> LinkRef? {
+            guard case .entity(let ref)? = AppModel.linkTarget(URL(string: text)!) else { return nil }
             return ref
         }
-        XCTAssertEqual(target("bbstudio://memory", spaces: false), LinkRef(kind: .memory, id: nil))
-        XCTAssertEqual(target("bbstudio://worker/thr_w", spaces: false), LinkRef(kind: .worker, id: "thr_w"))
-        XCTAssertNil(target("bbstudio://page/pg_x", spaces: false), "old hosts keep their old screens without spaces")
-        XCTAssertEqual(target("bbstudio://page/pg_x", spaces: true), LinkRef(kind: .page, id: "pg_x"))
-        XCTAssertNil(target("bbstudio://thread/thr_x", spaces: false))
-        XCTAssertEqual(target("bbstudio://thread/thr_x", spaces: true), LinkRef(kind: .conversation, id: "thr_x"), "a thread opens in the Bot's list")
-        XCTAssertNil(target("bbstudio://file/a", spaces: true), "files open from their thread")
-        XCTAssertNil(target("bbstudio://bot", spaces: true), "the bare Bot link keeps its old meaning")
-        XCTAssertNil(target("bbstudio://capture", spaces: true))
+        XCTAssertEqual(target("bbstudio://memory"), LinkRef(kind: .memory, id: nil))
+        XCTAssertEqual(target("bbstudio://worker/thr_w"), LinkRef(kind: .worker, id: "thr_w"))
+        XCTAssertEqual(target("bbstudio://page/pg_x"), LinkRef(kind: .page, id: "pg_x"))
+        XCTAssertEqual(target("bbstudio://thread/thr_x"), LinkRef(kind: .conversation, id: "thr_x"), "a thread opens in the room")
+        XCTAssertNil(target("bbstudio://file/a"), "files open from their thread")
+        XCTAssertNil(target("bbstudio://capture"))
     }
 
     func testDestinations() {

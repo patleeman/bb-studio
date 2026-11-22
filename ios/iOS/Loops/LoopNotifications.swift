@@ -1,6 +1,6 @@
 import UserNotifications
 
-/// A tap on an Attention Router push's button: `loops.act` on the server the
+/// A tap on an Attention Router push's button: `tasks.act` on the server the
 /// push came from, in the background, with no app window.
 enum LoopNotifications {
     /// The loop action a button stands for.
@@ -24,12 +24,8 @@ enum LoopNotifications {
         let serverId = info["serverId"] as? String
         do {
             try await client.validateNotificationOrigin(serverId)
-            do {
-                guard let task = taskAction(action) else { throw BBError(status: 404, message: "") }
-                _ = try await client.taskAction(loopId, task)
-            } catch where BBClient.isUnknownRPC(error) && loopId.hasPrefix("loop_") {
-                try await client.loopAction(loopId, action)
-            }
+            guard let task = taskAction(action) else { throw BBError(status: 404, message: "") }
+            _ = try await client.taskAction(loopId, task)
         } catch {
             await NotificationActions.confirm(info["threadId"] as? String ?? "", "Didn't go through: \(BBClient.describe(error))", serverId: serverId)
         }

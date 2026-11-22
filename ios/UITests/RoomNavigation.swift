@@ -1,33 +1,25 @@
 import XCTest
 
+/// The conversation is home: helpers to reach the room's places.
 extension XCUIApplication {
+    /// The conversation shows (its composer).
     func waitForRoom(timeout: TimeInterval = 30) -> Bool {
-        buttons["roomInput"].waitForExistence(timeout: timeout)
+        textViews["Message"].waitForExistence(timeout: timeout)
     }
 
+    /// A place from the one conversation list (the header's Bot mark).
     func openRoomPlace(_ place: String, file: StaticString = #filePath, line: UInt = #line) {
         let row = buttons["roomPlace-\(place)"]
-        let down = buttons["roomLayDown"]
-        if !row.exists, down.exists, down.isHittable {
-            down.tap()
-            _ = buttons["roomInput"].waitForExistence(timeout: 10)
-        }
         if !row.exists {
-            let menu = buttons["roomMenuButton"]
-            XCTAssertTrue(menu.waitForExistence(timeout: 15), "the room's menu button", file: file, line: line)
-            for _ in 0..<3 where !row.exists {
-                let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: menu)
-                _ = XCTWaiter.wait(for: [hittable], timeout: 5)
-                menu.tap()
-                _ = row.waitForExistence(timeout: 3)
-            }
+            let list = buttons["roomList"]
+            XCTAssertTrue(list.waitForExistence(timeout: 15), "the header's Bot mark", file: file, line: line)
+            list.tap()
+            XCTAssertTrue(descendants(matching: .any)["RoomSheet-conversations"].firstMatch.waitForExistence(timeout: 10),
+                          "the conversation list", file: file, line: line)
         }
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "\(place) in the menu", file: file, line: line)
+        for _ in 0..<4 where !row.isHittable { swipeUp() }
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "\(place) in the list", file: file, line: line)
         row.tap()
-    }
-
-    func standRoomChat() {
-        buttons["RoomStage"].swipeUp()
     }
 
     func closeRoomSheet() {

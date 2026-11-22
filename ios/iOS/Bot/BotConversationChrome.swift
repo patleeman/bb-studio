@@ -197,44 +197,6 @@ struct ConversationTitle: View {
     }
 }
 
-struct WorkersLineView: View {
-    let line: WorkersLine
-    let open: (String) -> Void
-    @Environment(\.look) private var look
-
-    var body: some View {
-        Menu {
-            ForEach(line.workers) { worker in
-                Button { open(worker.threadId) } label: {
-                    Label(worker.title.isEmpty ? "Worker" : worker.title,
-                          systemImage: worker.status == .needsYou ? "exclamationmark.circle" : "arrow.triangle.2.circlepath")
-                }
-            }
-        } label: {
-            HStack(spacing: 8) {
-                HStack(spacing: 5) {
-                    if line.needsYou { Circle().fill(.orange).frame(width: 8, height: 8) }
-                    if line.running { ProgressView().controlSize(.mini).tint(.green) }
-                }
-                Text(line.label)
-                Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .padding(.leading, 12)
-            .padding(.trailing, 14)
-            .frame(height: 36)
-            .background(look.stackFill, in: .capsule)
-            .glassEffect(.regular, in: .capsule)
-            .contentShape(.capsule)
-        }
-        .tint(Color(uiColor: .secondaryLabel))
-        .accessibilityLabel(line.label)
-        .accessibilityIdentifier("conversationWorkers")
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
 struct WorkerTitle: View {
     let info: WorkerInfo
 

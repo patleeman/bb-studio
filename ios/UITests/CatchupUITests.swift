@@ -18,7 +18,6 @@ final class CatchupUITests: ServerIsolatedUITestCase {
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     private func stand() {
-        app.standRoomChat()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 

@@ -1,6 +1,6 @@
 import XCTest
 
-/// Slice 5, offline (`-qaConversationHome -qaSpacesDemo list -qaBotDemo chat
+/// Slice 5, offline (`-qaSpacesDemo list -qaBotDemo chat
 /// -qaRouterDemo`; `BotSpacesDemo.State` answers `router.notice.get`,
 /// `router.handoff`, `router.notice.dismiss` and `toolGateway.overview`): the
 /// usage-limit notice above the composer with Hand off, and the Tool Gateway,
@@ -9,7 +9,7 @@ final class RouterGatewayUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launch() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaRouterDemo", "-qaConversationHome",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaRouterDemo",
                                "-qaRoomConversation", "thr_botdemo01"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))

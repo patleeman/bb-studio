@@ -2,7 +2,7 @@ import XCTest
 
 /// No fade over the transcript above the composer and the jump button
 /// (docs/ios/no-fade): up in the history, rows stay at full brightness right
-/// up to the controls, on the old and the new transcript. Dark mode, so a
+/// up to the controls. Dark mode, so a
 /// fade to the page's black dims the white text.
 ///
 /// `TEST_RUNNER_NOFADE_LAYOUT`: `phone` (default, an iPhone) or `split` (the
@@ -17,14 +17,10 @@ final class NoFadeUITests: ServerIsolatedUITestCase {
         app.buttons.matching(NSPredicate(format: "identifier == 'jumpToLatest' OR label BEGINSWITH 'Jump to latest'")).firstMatch
     }
 
-    func testOldTranscript() throws { try check(v2: false) }
-    func testNewTranscript() throws { try check(v2: true) }
-
-    private func check(v2: Bool) throws {
-        let name = "\(layout)-\(v2 ? "new" : "old")"
+    func testTranscript() throws {
+        let name = layout
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", layout == "split" ? "duo" : "chat",
             "-qaDark", "-openURL", "bbstudio://bot"]
-            + [v2 ? "-qaTranscriptV2" : "-qaTranscriptV1"]
             + (layout == "split" ? ["-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles"] : [])
         app.launchOffline()
         XCTAssertTrue(composer.waitForExistence(timeout: 30), "\(name): composer")

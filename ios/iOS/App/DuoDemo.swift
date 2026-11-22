@@ -155,7 +155,6 @@ enum DuoDemo {
         case "tab":
             switch url.query() {
             case "bot": AppModel.shared.tab = .bot
-            case "threads": AppModel.shared.tab = .inbox
             case "studio": AppModel.shared.tab = .studio
             case "settings": AppModel.shared.tab = .settings
             default: return false
@@ -275,7 +274,6 @@ enum DuoDemo {
             return true
         case "focus":
             if let id = url.query() { AppModel.shared.replyThreadId = id }
-            else if case .thread(let id)? = AppModel.shared.path.last { AppModel.shared.replyThreadId = id }
             return true
         case "record":
             // Frames of the whole window for docs: the simulator's own screen

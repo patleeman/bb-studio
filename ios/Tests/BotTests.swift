@@ -286,19 +286,6 @@ final class BotTests: XCTestCase {
         XCTAssertEqual(BotSetup.ideas.map(\.label), ["Watch my projects", "Morning brief", "Plan my week", "Triage threads"])
     }
 
-    func testListPreviewIsPlainText() {
-        XCTAssertEqual(BotSummary.plain("**Hi** there\n\n- see [docs](https://x)\n::next{reply=\"a|b\"}"), "Hi there - see docs")
-        let bot = BotInfo(name: "B", avatar: "🤖", state: .active, lead: ThreadLead(threadId: nil))
-        XCTAssertEqual(bot.status(running: true), "Working…")
-        XCTAssertEqual(bot.key, "primary")
-    }
-
-    func testBotLeadFromOptionalBot() {
-        XCTAssertEqual(BotLead(nil), .none)
-        let info = BotInfo(name: "Bot", avatar: "🤖", state: .active, lead: ThreadLead(threadId: "thr_1"))
-        XCTAssertEqual(BotLead(info), .bot(info))
-    }
-
     func testCadenceIdKeepsUnknownValues() {
         XCTAssertEqual(ThreadLead.cadenceId(Studio.BotGetOutputRunCadence.every2hours), "every2hours")
         XCTAssertEqual(ThreadLead.cadenceId(Studio.BotGetOutputRunCadence.unknown("every10minutes")), "every10minutes")

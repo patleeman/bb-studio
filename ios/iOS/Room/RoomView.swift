@@ -42,6 +42,7 @@ enum RoomQA {
         #endif
     }
 
+    /// `-qaRoomMode settings|<place>`: opens Settings or a place over the conversation.
     static var mode: String? { value("-qaRoomMode") }
 
     static func value(_ flag: String) -> String? {
@@ -64,19 +65,9 @@ struct RoomView: View {
     let pages: DuoPages?
     @StateObject private var pager: RoomSessions
     @State private var room = RoomModel()
-    @State private var dragAxis: RoomPager.Axis?
-    @State private var dragOnPresence = false
     @State private var pageOffset: CGFloat = 0
     @State private var slide: Edge = .trailing
-    @State private var nudge: CGFloat = 0
     @State private var toast: String?
-    @State private var tasks = TasksModel.shared
-    @State private var overviews = StrandOverviewModel.shared
-    @State private var sceneSize: CGSize = .zero
-    @State private var sceneLight: SceneLight?
-    @State private var presenceSize: CGFloat = 0
-    @State private var presenceFrame: CGRect = .zero
-    @State private var switching = false
     /// New conversation over the room: the unfolded Duo's context pane, and New thread from anywhere else (Siri, ⌘N, a link).
     @State private var startingConversation = false
     @State private var composeText = ""
@@ -85,8 +76,6 @@ struct RoomView: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.scenePhase) private var phase
     @Environment(\.duoLayout) private var layout
-    @Environment(\.displayScale) private var displayScale
-    @Environment(\.colorScheme) private var scheme
 
     init(store: BotSpacesStore, shell: BotShellModel, bot: BotSpace, mainThreadId: String, pages: DuoPages? = nil) {
         self.store = store
@@ -104,37 +93,10 @@ struct RoomView: View {
     private var shownConversation: BotConversation? {
         isMain ? nil : view?.conversations.first { $0.threadId == pager.shown }
     }
-    private var shownRecord: BotConversation? { view?.conversations.first { $0.threadId == pager.shown } }
     private var light: RoomLight { RoomLight.lights(order: order, main: mainThreadId)[pager.shown] ?? .natural }
 
     private var view: BotThreadsView? { store.view(for: bot.id) }
     private var reduceMotion: Bool { systemReduceMotion || RoomQA.reduceMotion }
-    /// Strands that need you, beside Strands in the menu.
-    private var needsCount: Int? { overviews.overview(bot.id)?.needs }
-
-    private var flight: [TaskItem] { tasks.flights[pager.shown]?.tasks ?? [] }
-
-    private var yours: [TaskItem]? {
-        if tasks.supported == false { return [] }
-        let own = RoomNow.yours(flight)
-        if isMain {
-            guard tasks.list != nil else { return nil }
-            let cards = tasks.roomCards().filter { $0.isMine && !$0.isClosed }
-            return cards + own.filter { task in !cards.contains { $0.id == task.id } }
-        }
-        if tasks.flights[pager.shown] == nil && tasks.flightErrors[pager.shown] == nil { return nil }
-        return own
-    }
-
-    private var onIt: [RoomOnIt] {
-        RoomOnIt.rows(threadId: pager.shown, tasks: flight, workers: view?.workers(of: pager.shown) ?? [])
-    }
-
-    private var title: String {
-        guard let conversation = shownConversation else { return bot.name }
-        return conversation.title.isEmpty ? "Untitled" : conversation.title
-    }
-
     var body: some View {
         lifecycle(polling(routing(canvas)))
             .modifier(TalkLifecycle(talk: session.talk))
@@ -158,9 +120,6 @@ struct RoomView: View {
                 folded(proxy)
             }
         }
-        .background {
-            RoomTalkWatcher(talk: session.talk) { state in syncTalk(state) } failed: { app.flash($0) }
-        }
     }
 
     private func routing<Content: View>(_ content: Content) -> some View {
@@ -171,7 +130,7 @@ struct RoomView: View {
             .onChange(of: shell.roomList, initial: true) { _, open in
                 guard open else { return }
                 shell.roomList = false
-                if room.home { showList() }
+                showList()
             }
             .onChange(of: shell.roomCompose, initial: true) { _, text in
                 guard let text else { return }
@@ -185,10 +144,6 @@ struct RoomView: View {
 
     private func polling<Content: View>(_ content: Content) -> some View {
         content
-            .task(id: phase) { await pollTasks() }
-            .task(id: flightKey) { await pollFlight() }
-            .onChange(of: room.mode) { _, mode in modeChanged(mode) }
-            .task(id: workersKey) { syncLeads() }
             .onChange(of: bot.appearance?.themeId) { _, saved in themeSaved(saved) }
     }
 
@@ -196,18 +151,13 @@ struct RoomView: View {
         content
             .task { applyQAMode() }
             .task(id: pager.shown) {
-                if room.home { RoomHome.remember(pager.shown, botId: bot.id) }
+                RoomHome.remember(pager.shown, botId: bot.id)
                 await session.start(app)
             }
             .onDisappear { pager.current.stop() }
             .overlay(alignment: .top) { toastView }
             .task { await showToast() }
-            .task(id: warmKey) { await warmNeighbours() }
     }
-
-    private var flightKey: String { "\(pager.shown)|\(phase == .active)|\(tasks.supported != false)" }
-    private var workersKey: String? { view?.workers.map(\.id).joined(separator: ",") }
-    private var warmKey: String { "\(bot.id)|\(Int(sceneSize.width))x\(Int(sceneSize.height))|\(Int(presenceSize))" }
 
     @ViewBuilder private var toastView: some View {
         if let toast {
@@ -220,13 +170,8 @@ struct RoomView: View {
         }
     }
 
-    private func syncTalk(_ state: HoldToTalk.State) {
-        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .snappy) { room.sync(talk: state) }
-    }
-
     private func pagesChanged() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        if pages != nil, room.standing { room.show(.rest) }
         if pages != nil, app.tab == .settings {
             app.tab = .bot
             settingsOpen = true
@@ -245,13 +190,13 @@ struct RoomView: View {
     private func roomFocusChanged(_ id: String?) {
         guard let id else { return }
         shell.roomFocus = nil
-        focus(on: id, stand: id != mainThreadId)
+        focus(on: id)
     }
 
     private func detailPathChanged(_ path: [Route]) {
         guard !path.isEmpty else { return }
         settingsOpen = false
-        if room.place != nil || room.showsMenu { room.show(.rest) }
+        if room.place != nil { room.closePlace() }
     }
 
     private func orderChanged(_ old: [String], _ new: [String]) {
@@ -263,39 +208,6 @@ struct RoomView: View {
             pageOffset = 0
             pager.show(next)
         }
-    }
-
-    private func pollTasks() async {
-        guard phase == .active, !room.home else { return }
-        while !Task.isCancelled {
-            await refreshTasks()
-            await overviews.load(bot.id)
-            await EnergyGate.shared.pollWait(.seconds(60))
-        }
-    }
-
-    private func pollFlight() async {
-        guard phase == .active, tasks.supported != false, !room.home else { return }
-        while !Task.isCancelled {
-            await tasks.loadFlight(pager.shown)
-            await EnergyGate.shared.pollWait(.seconds(20))
-        }
-    }
-
-    private func modeChanged(_ mode: RoomMode) {
-        if mode == .rest { Task { await refreshTasks() } }
-    }
-
-    private func syncLeads() {
-        tasks.botThreadId = mainThreadId
-        if tasks.botName != bot.name { tasks.botName = bot.name }
-        var leads: [(id: String, title: String)] = (view?.workers ?? []).filter { $0.status == .running }.map { (id: $0.threadId, title: $0.title) }
-        #if DEBUG
-        if LoopsDemo.mode != nil { leads.insert((LoopsDemo.leadId, "Larkspur lead"), at: 0) }
-        #endif
-        let next: [String] = leads.map { $0.id + "\u{1F}" + $0.title }
-        let current: [String] = tasks.leads.map { $0.id + "\u{1F}" + $0.title }
-        if next != current { tasks.leads = leads }
     }
 
     private func themeSaved(_ saved: String?) {
@@ -310,55 +222,27 @@ struct RoomView: View {
         withAnimation(.easeInOut(duration: 0.3)) { toast = nil }
     }
 
-    private func warmNeighbours() async {
-        try? await Task.sleep(for: .seconds(1.2))
-        for step in [1, -1] {
-            guard !Task.isCancelled else { return }
-            if let id = BotShell.step(store.spaces, from: bot.id, by: step) { await warm(id) }
-        }
-    }
-
     private func folded(_ proxy: GeometryProxy) -> some View {
         NavigationStack(path: $shell.detailPath) {
-            ZStack {
-                if !room.standing {
-                    rest(proxy)
-                        .transition(.opacity)
-                        .zIndex(1)
-                }
-                chat(standing: room.standing)
-                    .offset(y: room.standing ? 0 : proxy.size.height + proxy.safeAreaInsets.bottom + 40)
-                    .animation(reduceMotion ? nil : room.standing ? .smooth(duration: 0.36) : .smooth(duration: 0.28), value: room.standing)
-                    .opacity(room.standing ? 1 : 0)
-                    .allowsHitTesting(room.standing)
-                    .accessibilityHidden(!room.standing)
-                    .zIndex(room.standing ? 1 : 0)
-            }
-            .animation(reduceMotion ? .easeInOut(duration: 0.2) : room.standing ? .smooth(duration: 0.34) : .smooth(duration: 0.26), value: room.standing)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background { backdrop(proxy) }
-            .toolbar(room.standing && !columnHeader ? .automatic : .hidden, for: .navigationBar)
-            .toolbar {
-                if room.standing && !columnHeader {
-                    ToolbarItem(placement: .topBarLeading) {
-                        if room.home {
+            chat()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background { backdrop(proxy) }
+                .toolbar(columnHeader ? .hidden : .automatic, for: .navigationBar)
+                .toolbar {
+                    if !columnHeader {
+                        ToolbarItem(placement: .topBarLeading) {
                             RoomHomeButton(bot: bot, view: view, needsYou: BotShell.needsYou(bot, view: view), action: showList)
-                        } else {
-                            Button { layDown() } label: { Image(systemName: "chevron.down") }
-                                .accessibilityLabel("Back to the room")
-                                .accessibilityIdentifier("roomLayDown")
                         }
                     }
                 }
-            }
-            .navigationDestination(for: Route.self) { route in destination(route) }
+                .navigationDestination(for: Route.self) { route in destination(route) }
         }
         .sheet(item: placeBinding) { place in
             RoomPlaceSheet(place: place, bot: bot, store: store, mainThreadId: mainThreadId,
                            open: openItem, startedConversation: { id in openItem(.conversation(id)) },
-                           closeToRoom: { room.show(.rest) }, theme: look.theme.id, chooseTheme: chooseTheme,
-                           home: room.home, shown: pager.shown, settings: {
-                               room.handle(.closePlace)
+                           closeToRoom: { room.closePlace() }, theme: look.theme.id, chooseTheme: chooseTheme,
+                           shown: pager.shown, settings: {
+                               room.closePlace()
                                openSettings()
                            }, switchBot: { botId, conversation in switchTo(botId, opening: conversation) })
                 .presentationDetents([.height(max(320, proxy.size.height + proxy.safeAreaInsets.bottom - RoomPlaceSheet.sliver))])
@@ -372,24 +256,19 @@ struct RoomView: View {
         ZStack {
             RoomCanvas(pages: pages, layout: layout) {
                 ZStack(alignment: .bottom) {
-                    if room.home {
-                        RoomContextPane(bot: bot, view: view, shown: pager.shown, mainThreadId: mainThreadId, order: order,
-                                        pick: { id in
-                                            shell.detailPath = []
-                                            show(id)
-                                        },
-                                        openThread: { id in shell.detailPath = [.thread(id: id)] },
-                                        openPlace: { room.showPlace($0) }, settings: openSettings,
-                                        refresh: { [store] in await store.refresh() },
-                                        switchBot: { switchTo($0, opening: nil) },
-                                        newConversation: {
-                                            composeText = ""
-                                            startingConversation = true
-                                        })
-                    } else {
-                        stage(proxy, menuButton: false)
-                        if room.showsMenu { menu(closeInColumn: true) }
-                    }
+                RoomContextPane(bot: bot, view: view, shown: pager.shown, mainThreadId: mainThreadId, order: order,
+                                    pick: { id in
+                                        shell.detailPath = []
+                                        show(id)
+                                    },
+                                    openThread: { id in shell.detailPath = [.thread(id: id)] },
+                                    openPlace: { room.showPlace($0) }, settings: openSettings,
+                                    refresh: { [store] in await store.refresh() },
+                                    switchBot: { switchTo($0, opening: nil) },
+                                    newConversation: {
+                                        composeText = ""
+                                        startingConversation = true
+                                    })
                 }
                 .padding(.trailing, pages == .stacked ? max(0, FoldedChrome.column - proxy.safeAreaInsets.trailing) : 0)
                 .padding(.top, proxy.safeAreaInsets.top)
@@ -398,7 +277,7 @@ struct RoomView: View {
                 .environment(\.colorScheme, .dark)
             } second: {
                 NavigationStack(path: $shell.detailPath) {
-                    chat(standing: true)
+                    chat()
                         .containerBackground(.clear, for: .navigation)
                         .navigationDestination(for: Route.self) { route in destination(route) }
                 }
@@ -418,13 +297,6 @@ struct RoomView: View {
             .opacity(spreadOpen ? 0 : 1)
             .allowsHitTesting(!spreadOpen)
             .accessibilityHidden(spreadOpen)
-            if !spreadOpen && !room.home {
-                FoldedColumn {
-                    RoomColumnMenuButton(open: room.showsMenu, reduceMotion: reduceMotion) {
-                        if room.showsMenu { closeMenu() } else { openMenu() }
-                    }
-                }
-            }
             if spreadOpen {
                 Group {
                     if settingsOpen {
@@ -456,187 +328,42 @@ struct RoomView: View {
 
     private func backdrop(_ proxy: GeometryProxy) -> some View {
         let spot = RoomSceneLight.spot(proxy, pages: pages, rail: columnHeader)
-        let covered = pages == nil && room.standing
+        let covered = pages == nil
         return ZStack {
             SceneBackdrop(theme: look.theme, botId: bot.id, view: view, light: spot, paused: covered, motion: !covered)
-                .onGeometryChange(for: CGSize.self) { $0.size } action: { sceneSize = SceneBackdrop.stillSize($0) }
-                .onChange(of: spot, initial: true) { _, now in sceneLight = now }
             RoomLightLayer(light: light, seed: pager.shown, spot: spot)
                 .id(pager.shown)
                 .transition(.opacity)
             RoomFrost(pages: pages, layout: layout, light: light, seed: pager.shown, spot: spot, botId: bot.id, view: view)
-                .opacity(pages != nil || room.standing ? 1 : 0)
-                .animation(reduceMotion ? .easeInOut(duration: 0.2) : .smooth(duration: 0.34), value: room.standing)
             #if DEBUG
             Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityIdentifier("roomScene").accessibilityValue(look.theme.id)
             Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityIdentifier("roomLight").accessibilityValue(light.name)
             if let spot { RoomLightMarker(spot: spot) }
             #endif
-            RoomShade(standing: room.standing && pages == nil)
-                .animation(.easeInOut(duration: 0.35), value: room.mode)
+            RoomShade(standing: pages == nil)
         }
         .animation(reduceMotion ? .easeInOut(duration: 0.2) : .easeInOut(duration: 0.5), value: pager.shown)
         .allowsHitTesting(false)
     }
 
-    private func rest(_ proxy: GeometryProxy) -> some View {
-        ZStack(alignment: .bottom) {
-            stage(proxy, menuButton: !columnHeader)
-            if room.showsMenu { menu(closeInColumn: columnHeader) }
-            if (room.showsDay || room.showsMenu) && columnHeader {
-                FoldedColumn {
-                    RoomColumnMenuButton(open: room.showsMenu, reduceMotion: reduceMotion) {
-                        if room.showsMenu { closeMenu() } else { openMenu() }
-                    }
-                }
-                .transition(.opacity)
-            }
-        }
-        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 0.9), value: room.mode)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            ZStack {
-                if room.showsMenu {
-                    Color.clear.frame(height: 70)
-                } else {
-                    dock.transition(.opacity)
-                }
-            }
-            .animation(.easeInOut(duration: 0.2), value: room.mode)
-        }
-        .ignoresSafeArea(.keyboard)
-        .padding(.top, proxy.safeAreaInsets.top)
-        .ignoresSafeArea(.container, edges: .top)
-        .environment(\.colorScheme, .dark)
-    }
-
-    private func menu(closeInColumn: Bool) -> some View {
-        RoomMenu(bot: bot, store: store, view: view, needsCount: needsCount, closeInColumn: closeInColumn, close: closeMenu,
-                 openPlace: { room.handle(.open($0)) }, openWorker: { openItem(.worker($0)) },
-                 theme: { room.handle(.open(.theme)) }, settings: openSettings,
-                 switchBot: { shell.show($0, store: store, compact: false) })
-            .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97)))
-    }
-
-    private func stage(_ proxy: GeometryProxy, menuButton: Bool) -> some View {
-        ZStack {
-            stageElement
-            presenceLayer(menuButton: menuButton)
-            if pages != nil && order.count > 1 && room.showsDay {
-                pageDots.frame(maxHeight: .infinity, alignment: .bottom).padding(.bottom, 8)
-            }
-        }
-        .highPriorityGesture(stageDrag)
-    }
-
-    private var stageValue: String {
-        guard order.count > 1 else { return "" }
-        let at = (order.firstIndex(of: pager.shown) ?? 0) + 1
-        return "Conversation \(at) of \(order.count)"
-    }
-
-    private var stageElement: some View {
-        Color.clear
-            .contentShape(.rect)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(title)
-            .accessibilityHint(pages == nil ? "Opens the conversation" : "Moves to the conversation's reply box")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { openChat() }
-            .accessibilityValue(stageValue)
-            .modifier(RoomPaging(pages: order.count, page: page))
-            .accessibilityIdentifier("RoomStage")
-    }
-
-    private var presenceTransition: AnyTransition {
-        if reduceMotion { return .opacity }
-        let away: Edge = slide == .trailing ? .leading : .trailing
-        return .asymmetric(insertion: .opacity.combined(with: .move(edge: slide)), removal: .opacity.combined(with: .move(edge: away)))
-    }
-
-    private var dayAnimation: Animation {
-        if reduceMotion { return .easeInOut(duration: 0.2) }
-        return room.showsDay ? .easeOut(duration: 0.28) : .easeOut(duration: 0.14)
-    }
-
-    private func presenceHost(menuButton: Bool) -> RoomPresenceHost {
-        RoomPresenceHost(model: session.model, bot: bot, view: view, title: title, main: isMain, record: shownRecord,
-                         flight: flight, onIt: onIt, yours: yours, names: tasks.names, menuButton: menuButton, shown: room.showsDay,
-                         bottomClear: pages != nil && order.count > 1 ? 24 : 0, nudge: nudge,
-                         canSwitch: (store.spaces?.bots.count ?? 1) > 1, openMenu: openMenu, openChat: openChat,
-                         openTask: openTask, openThread: { openItem(.worker($0)) }, openTasks: { room.showPlace(.strands) },
-                         act: act, switchBot: switchBot, reportPresence: { presenceSize = $0 },
-                         reportPresenceFrame: { presenceFrame = $0 })
-    }
-
-    private func presenceLayer(menuButton: Bool) -> some View {
-        ZStack {
-            presenceHost(menuButton: menuButton)
-                .id(pager.shown)
-                .transition(presenceTransition)
-        }
-        .offset(x: pageOffset)
-        .opacity(room.showsDay ? 1 : 0)
-        .animation(dayAnimation, value: room.showsDay)
-        .allowsHitTesting(room.showsDay)
-        .accessibilityHidden(!room.showsDay)
-    }
-
-    private var stageDrag: some Gesture {
-        DragGesture(minimumDistance: 10, coordinateSpace: .global)
-            .onChanged { value in
-                guard room.mode == .rest else { return }
-                if dragAxis == nil {
-                    dragAxis = RoomPager.axis(value.translation)
-                    dragOnPresence = presenceFrame.insetBy(dx: -10, dy: -10).contains(value.startLocation)
-                }
-                guard dragAxis == .horizontal, !dragOnPresence, !reduceMotion else { return }
-                let edge = RoomPager.step(order, from: pager.shown, by: value.translation.width < 0 ? 1 : -1) == nil
-                pageOffset = value.translation.width * (edge ? 0.2 : 0.5)
-            }
-            .onEnded { value in
-                defer {
-                    dragAxis = nil
-                    dragOnPresence = false
-                }
-                guard room.mode == .rest else { return }
-                switch dragAxis {
-                case .horizontal:
-                    if dragOnPresence {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { pageOffset = 0 }
-                        guard abs(value.translation.width) > 50 else { return }
-                        switchBot(value.translation.width < 0 ? 1 : -1)
-                    } else {
-                        page(RoomPager.page(after: value.translation, predicted: value.predictedEndTranslation))
-                    }
-                case .vertical:
-                    let rise = min(value.translation.height, value.predictedEndTranslation.height)
-                    if rise < -RoomPager.swipe { openChat() }
-                case nil:
-                    break
-                }
-            }
-    }
-
-    private func chat(standing: Bool) -> some View {
+    private func chat() -> some View {
         ZStack {
             ThreadView(threadId: pager.shown, session: session)
                 .id(pager.shown)
                 .transition(reduceMotion ? .opacity : .push(from: slide))
         }
-        .offset(x: pages == nil && room.mode == .rest ? 0 : pageOffset)
+        .offset(x: pageOffset)
         .environment(\.botConversation, context(pager.shown, kind: .conversation))
-        .environment(\.roomChat, RoomChat(focusRequests: room.focusRequests, away: !standing, layDown: layDown,
-                                          showList: room.home && pages == nil ? showList : nil,
+        .environment(\.roomChat, RoomChat(focusRequests: room.focusRequests, away: false, layDown: dismissKeyboard,
+                                          showList: pages == nil ? showList : nil,
                                           page: order.count > 1 ? chatPage : nil,
                                           pages: RoomChatPages(index: order.firstIndex(of: pager.shown) ?? 0, count: order.count),
-                                          strandsBeside: room.home && pages != nil))
-        .environment(\.openTaskThread, { openItem(.conversation($0)) })
+                                          strandsBeside: pages != nil))
     }
 
     /// A sideways drag on the open conversation's messages: it follows the
     /// finger (less at the first or last), then pages, as the room does.
     private func chatPage(_ translation: CGFloat, _ predicted: CGFloat?) {
-        guard pages != nil || room.mode != .rest else { return }
         if let predicted {
             page(RoomPager.page(after: CGSize(width: translation, height: 0), predicted: CGSize(width: predicted, height: 0)))
             return
@@ -659,24 +386,10 @@ struct RoomView: View {
         }
     }
 
-    private func warm(_ botId: String) async {
-        guard let next = store.spaces?.bots.first(where: { $0.id == botId }), sceneSize.width > 1, presenceSize > 0 else { return }
-        let looks = LookStore.shared
-        let theme = RoomTheme.resolve(botThemeId: shell.themeOverride[next.id] ?? next.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog)
-        let look = LookRoot.look(theme, store: looks, scheme: scheme)
-        _ = await SceneStills.shared.still(theme: theme, mode: look.mode, size: sceneSize, scale: min(2, displayScale), light: sceneLight?.shifted(by: SceneBackdrop.parallax))
-        let live = store.view(for: next.id)
-        var spec = PresenceSpec(bot: next, state: next.presenceState(live: live),
-                                workers: live?.workers.filter { $0.status == .running }.count ?? next.activity.workers,
-                                look: look, size: presenceSize, scale: displayScale, custom: PresenceCatalog.shared.entry(next.presence?.form))
-        spec.room = PresenceSpec.roomHeadroom
-        _ = await PresenceStills.shared.still(spec)
-    }
-
     /// Another Bot from the list's header (or a conversation just started with it): its room, on that conversation or its Main.
     private func switchTo(_ botId: String, opening conversation: String?) {
         guard botId != bot.id else { return }
-        if room.place != nil { room.handle(.closePlace) }
+        if room.place != nil { room.closePlace() }
         shell.botToast = store.spaces?.bots.first { $0.id == botId }?.name
         withAnimation(.easeInOut(duration: reduceMotion ? 0.25 : 0.4)) {
             shell.show(botId, store: store, compact: false)
@@ -684,81 +397,8 @@ struct RoomView: View {
         }
     }
 
-    private func switchBot(_ step: Int) {
-        guard !switching else { return }
-        guard let next = BotShell.step(store.spaces, from: bot.id, by: step) else {
-            guard !reduceMotion else { return }
-            withAnimation(.spring(response: 0.18, dampingFraction: 0.5)) { nudge = CGFloat(-step) * 22 }
-            Task {
-                try? await Task.sleep(for: .milliseconds(180))
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) { nudge = 0 }
-            }
-            return
-        }
-        switching = true
-        Task {
-            await RoomWarmth.wait(upTo: .milliseconds(700)) { await warm(next) }
-            switching = false
-            shell.botToast = store.spaces?.bots.first { $0.id == next }?.name
-            withAnimation(.easeInOut(duration: reduceMotion ? 0.25 : 0.4)) { shell.show(next, store: store, compact: false) }
-        }
-    }
-
-    private var pageDots: some View {
-        HStack(spacing: 6) {
-            ForEach(order, id: \.self) { id in
-                Capsule().fill(.white.opacity(id == pager.shown ? 0.85 : 0.3))
-                    .frame(width: id == pager.shown ? 16 : RoomDock.dots, height: RoomDock.dots)
-            }
-        }
-        .animation(.snappy, value: pager.shown)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Conversation \((order.firstIndex(of: pager.shown) ?? 0) + 1) of \(order.count)")
-        .accessibilityIdentifier("roomPageDots")
-    }
-
-    private var dock: some View {
-        VStack(spacing: RoomDock.spacing) {
-            if room.mode.recording {
-                RoomHint(talk: session.talk).transition(.opacity)
-            } else if order.count > 1 {
-                pageDots
-            }
-            HStack(spacing: 0) {
-                if room.mode.recording {
-                    RoomWave(talk: session.talk)
-                } else {
-                    Button { stand() } label: {
-                        Text(isMain ? "Talk to \(bot.name)" : "Message \(title)")
-                            .id(pager.shown)
-                            .transition(.asymmetric(insertion: .opacity.animation(.easeOut(duration: 0.15).delay(0.1)),
-                                                    removal: .opacity.animation(.easeIn(duration: 0.1))))
-                            .font(.body)
-                            .foregroundStyle(.white.opacity(0.5))
-                            .lineLimit(1)
-                            .frame(maxWidth: .infinity, minHeight: RoomDock.field, alignment: .leading)
-                            .padding(.leading, 20)
-                            .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(isMain ? "Talk to \(bot.name)" : "Message \(title)")
-                    .accessibilityIdentifier("roomInput")
-                }
-                RoomMic(talk: session.talk, tint: look.roomTint)
-                    .padding(.trailing, 2)
-            }
-            .frame(height: RoomDock.field)
-            .background(.black.opacity(0.4), in: .capsule)
-            .overlay(Capsule().strokeBorder(.white.opacity(0.08)))
-        }
-        .padding(.horizontal, 18)
-        .padding(.top, RoomDock.top)
-        .padding(.bottom, RoomDock.bottom)
-        .animation(.snappy, value: room.mode)
-    }
-
     private var placeBinding: Binding<RoomPlace?> {
-        Binding(get: { pages == nil ? room.place : nil }, set: { value in if value == nil, pages == nil { room.handle(.closePlace) } })
+        Binding(get: { pages == nil ? room.place : nil }, set: { value in if value == nil, pages == nil { room.closePlace() } })
     }
 
     private func openSettings() {
@@ -767,42 +407,22 @@ struct RoomView: View {
             return
         }
         settingsOpen = true
-        room.show(.rest)
+        room.closePlace()
     }
 
     private func closeSpread() {
         settingsOpen = false
-        room.show(.rest)
+        room.closePlace()
     }
 
-    private func stand() {
-        guard room.mode == .rest else { return }
-        room.handle(.tapInput)
-    }
-
-    private func openChat() {
-        guard room.mode == .rest else { return }
-        if pages == nil { room.handle(.openChat) } else { room.focusInput() }
-    }
-
-    /// The conversation list over the conversation (the conversation is home).
+    /// The conversation list over the conversation.
     private func showList() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        dismissKeyboard()
         room.showPlace(.conversations)
     }
 
-    private func layDown() {
-        guard room.standing else { return }
+    private func dismissKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        room.handle(.chevron)
-    }
-
-    private func openMenu() {
-        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .smooth(duration: 0.4)) { _ = room.handle(.menuButton) }
-    }
-
-    private func closeMenu() {
-        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .smooth(duration: 0.4)) { _ = room.handle(.closeMenu) }
     }
 
     private func open(_ page: BotPage) {
@@ -821,10 +441,10 @@ struct RoomView: View {
         switch item {
         case .conversation(let id) where order.contains(id):
             shell.detailPath = []
-            focus(on: id, stand: true, keyboard: id == mainThreadId)
+            focus(on: id, keyboard: id == mainThreadId)
         case .conversation(let id), .worker(let id):
             settingsOpen = false
-            room.show(.rest)
+            room.closePlace()
             shell.detailPath = [.thread(id: id)]
         case .page(let page):
             open(page)
@@ -841,20 +461,15 @@ struct RoomView: View {
         }
     }
 
-    private func focus(on id: String, stand: Bool, keyboard: Bool = false) {
+    private func focus(on id: String, keyboard: Bool = false) {
         settingsOpen = false
-        if room.place != nil || room.showsMenu || room.mode.recording { room.show(.rest) }
+        if room.place != nil { room.closePlace() }
         guard order.contains(id) else {
             shell.detailPath = [.thread(id: id)] + shell.detailPath
             return
         }
         show(id)
-        guard stand, shell.detailPath.isEmpty else { return }
-        if pages == nil {
-            if room.mode == .rest { room.handle(keyboard ? .tapInput : .openChat) } else if keyboard { room.focusInput() }
-        } else if keyboard {
-            room.focusInput()
-        }
+        if keyboard, shell.detailPath.isEmpty { room.focusInput() }
     }
 
     private func chooseTheme(_ themeId: String) {
@@ -875,25 +490,6 @@ struct RoomView: View {
         }
     }
 
-    private func openTask(_ id: String) {
-        app.sheet = .task(id: id)
-    }
-
-    private func act(_ task: TaskItem, _ action: TaskAction) {
-        Task {
-            do {
-                if let note = try await tasks.perform(task.id, action) { app.flash(note) }
-            } catch {
-                app.flash("Couldn't update the task: \(BBClient.describe(error))")
-            }
-            await refreshTasks()
-        }
-    }
-
-    private func refreshTasks() async {
-        await tasks.refresh()
-    }
-
     @ViewBuilder private func destination(_ route: Route) -> some View {
         switch route {
         case .thread(let id):
@@ -910,234 +506,24 @@ struct RoomView: View {
                          openConversation: { id in openItem(.conversation(id)) },
                          showList: { [shell] in
                              shell.detailPath = []
-                             if room.home { showList() } else { layDown() }
+                             showList()
                          },
                          refresh: { [store] in Task { await store.refresh() } })
     }
 
     private func applyQAMode() {
-        if let id = RoomQA.value("-qaTaskFocus") { tasks.focus = id }
-        if let id = RoomQA.value("-qaPushTask") {
-            Task {
-                try? await Task.sleep(for: .seconds(RoomQA.value("-qaPushDelay").flatMap(Double.init) ?? 1.5))
-                if let route = NotificationActions.taskRoute(["loopId": id, "conversationId": RoomQA.value("-qaPushConversation") ?? "", "threadId": mainThreadId]) {
-                    app.openTaskPush(route.id, conversation: route.conversation)
-                }
-            }
-        }
-        if let id = RoomQA.value("-qaTaskSheet") {
-            Task {
-                try? await Task.sleep(for: .seconds(1.5))
-                app.sheet = .task(id: id)
-            }
-        }
         if let id = RoomQA.value("-qaRoomConversation"), order.contains(id) {
             slide = .trailing
             pager.show(id)
-        } else if room.home {
+        } else {
             let opening = RoomHome.opening(main: mainThreadId, order: order, botId: bot.id)
             if opening != pager.shown { pager.show(opening) }
         }
         guard let mode = RoomQA.mode else { return }
-        switch mode {
-        case "talk": room.handle(.tapInput)
-        case "read": room.handle(.openChat)
-        case "record", "recordLocked":
-            #if DEBUG
-            session.talk.qaPretend(mode == "record" ? .recording : .handsFree)
-            #endif
-        case "menu": room.show(.menu)
-        case "settings": settingsOpen = true
-        default:
-            if let place = RoomPlace(rawValue: mode) { room.show(.menu, place: place) }
-        }
-    }
-}
-
-struct RoomPresenceHost: View {
-    @ObservedObject var model: ThreadModel
-    let bot: BotSpace
-    let view: BotThreadsView?
-    let title: String
-    let main: Bool
-    let record: BotConversation?
-    let flight: [TaskItem]
-    let onIt: [RoomOnIt]
-    let yours: [TaskItem]?
-    let names: TaskNames
-    var menuButton: Bool
-    var shown: Bool
-    var bottomClear: CGFloat
-    var nudge: CGFloat
-    var canSwitch: Bool
-    var openMenu: () -> Void
-    var openChat: () -> Void
-    var openTask: (String) -> Void
-    var openThread: (String) -> Void
-    var openTasks: () -> Void
-    var act: (TaskItem, TaskAction) -> Void
-    var switchBot: (Int) -> Void
-    var reportPresence: (CGFloat) -> Void
-    var reportPresenceFrame: (CGRect) -> Void
-
-    var body: some View {
-        let now = RoomNow.make(threadId: model.threadId, main: main, running: model.thread?.isRunning ?? record?.running ?? false, tasks: flight,
-                               todos: model.shelf.todos, rows: model.rows, workers: view?.workers(of: model.threadId) ?? [], latest: record?.latest)
-        RoomPresenceScreen(bot: bot, view: view, title: title, subline: RoomHeader.subline(main: main, title: title, rows: model.rows),
-                           now: now, onIt: onIt, yours: yours, names: names, menuButton: menuButton, shown: shown, bottomClear: bottomClear,
-                           nudge: nudge, canSwitch: canSwitch, openMenu: openMenu, openChat: openChat, openTask: openTask,
-                           openThread: openThread, openTasks: openTasks, act: act, switchBot: switchBot,
-                           reportPresence: reportPresence, reportPresenceFrame: reportPresenceFrame)
-    }
-}
-
-struct RoomTalkWatcher: View {
-    @ObservedObject var talk: HoldToTalk
-    var changed: (HoldToTalk.State) -> Void
-    var failed: (String) -> Void
-
-    var body: some View {
-        Color.clear
-            .onChange(of: talk.state, initial: true) { _, state in changed(state) }
-            .onChange(of: talk.error) { _, error in if let error { failed(error) } }
-            .accessibilityHidden(true)
-    }
-}
-
-struct RoomHint: View {
-    @ObservedObject var talk: HoldToTalk
-
-    var body: some View {
-        if let hint = RoomModel.hint(talk.state) {
-            Text(hint).font(.footnote).foregroundStyle(.white.opacity(0.7))
-                .accessibilityIdentifier("roomHint")
-        }
-    }
-}
-
-enum RoomDock {
-    static let spacing: CGFloat = 12
-    static let field: CGFloat = 48
-    static let top: CGFloat = 10
-    static let bottom: CGFloat = 8
-    static let dots: CGFloat = 6
-
-    static func height(dots shown: Bool) -> CGFloat { top + field + bottom + (shown ? dots + spacing : 0) }
-}
-
-extension View {
-    func roomPresenceSlot(_ size: CGFloat) -> some View {
-        frame(maxWidth: .infinity).frame(height: size * PresenceSpec.roomHeadroom)
-    }
-}
-
-struct RoomWave: View {
-    @ObservedObject var talk: HoldToTalk
-
-    var body: some View {
-        HStack(spacing: 10) {
-            LevelBars(tint: Color(red: 1, green: 0.54, blue: 0.54)) { [weak talk] in talk?.state == .sending ? 0 : talk?.level ?? 0 }
-            Spacer(minLength: 8)
-            HStack(spacing: 4) {
-                Text("Listening ·")
-                if let startedAt = talk.startedAt { Text(startedAt, style: .timer).monospacedDigit() }
-            }
-            .font(.subheadline)
-            .foregroundStyle(.white.opacity(0.7))
-        }
-        .padding(.leading, 20)
-        .padding(.trailing, 8)
-        .frame(maxWidth: .infinity, minHeight: RoomDock.field)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Listening")
-        .accessibilityIdentifier("roomWave")
-    }
-}
-
-struct RoomMic: View {
-    @ObservedObject var talk: HoldToTalk
-    var tint: Color = .white
-    @GestureState private var holding = false
-    @State private var heldUntil: Date?
-
-    var body: some View {
-        Image(systemName: talk.isActive ? "mic.fill" : "mic")
-            .font(.title3.weight(.medium))
-            .foregroundStyle(talk.isActive ? Color.white : tint)
-            .frame(width: 44, height: 44)
-            .background(talk.isActive ? (talk.state == .cancelling ? Color.gray : Color(red: 1, green: 0.35, blue: 0.35)) : .clear, in: .circle)
-            .scaleEffect(talk.isActive ? 1.12 : 1)
-            .animation(.snappy(duration: 0.2), value: talk.state)
-            .contentShape(.circle)
-            .onTapGesture {
-                if let heldUntil, Date.now.timeIntervalSince(heldUntil) < 0.5 { return }
-                switch talk.state {
-                case .idle: talk.press(handsFree: true)
-                case .handsFree: talk.release()
-                default: break
-                }
-            }
-            .simultaneousGesture(hold)
-            .onChange(of: holding) { _, holding in
-                if !holding { heldUntil = .now; talk.holdLost() }
-            }
-            .accessibilityAddTraits(.isButton)
-            .accessibilityIdentifier("roomMic")
-            .accessibilityLabel(talk.state == .handsFree ? "Send recording" : "Record")
-            .accessibilityHint("Tap to record, then tap again to send. Or hold to talk and let go to send; slide left to cancel.")
-    }
-
-    private var hold: some Gesture {
-        LongPressGesture(minimumDuration: 0.25)
-            .sequenced(before: DragGesture(minimumDistance: 0))
-            .updating($holding) { value, holding, _ in
-                if case .second(true, _) = value { holding = true }
-            }
-            .onChanged { value in
-                guard case .second(true, let drag) = value else { return }
-                if talk.state == .idle { talk.press() }
-                if let drag { talk.drag(drag.translation) }
-            }
-            .onEnded { _ in
-                if talk.state == .recording || talk.state == .cancelling { talk.release() }
-            }
-    }
-}
-
-@MainActor
-final class RoomWarmth {
-    private var continuation: CheckedContinuation<Void, Never>?
-
-    static func wait(upTo limit: Duration, _ work: @escaping @MainActor () async -> Void) async {
-        let warmth = RoomWarmth()
-        await withCheckedContinuation { continuation in
-            warmth.continuation = continuation
-            Task { @MainActor in
-                await work()
-                warmth.finish()
-            }
-            Task { @MainActor in
-                try? await Task.sleep(for: limit)
-                warmth.finish()
-            }
-        }
-    }
-
-    private func finish() {
-        continuation?.resume()
-        continuation = nil
-    }
-}
-
-struct RoomPaging: ViewModifier {
-    let pages: Int
-    let page: (Int) -> Void
-
-    func body(content: Content) -> some View {
-        if pages > 1 {
-            content.accessibilityAdjustableAction { direction in page(direction == .increment ? 1 : -1) }
-        } else {
-            content
+        if mode == "settings" {
+            settingsOpen = true
+        } else if let place = RoomPlace(rawValue: mode) {
+            room.showPlace(place)
         }
     }
 }

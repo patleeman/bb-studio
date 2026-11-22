@@ -1,6 +1,6 @@
 import XCTest
 
-/// The Bot's controls (slice 3), offline (`-qaConversationHome -qaSpacesDemo
+/// The Bot's controls (slice 3), offline (`-qaSpacesDemo
 /// list -qaBotDemo chat`; `BotSpacesDemo.State` answers `bot_pause`,
 /// `bot_resume`, `bot_stop`, `bot_make_main` and `bot_spaces`' state): Pause
 /// from the list's header, the paused line above the composer with Resume,
@@ -10,7 +10,7 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launch() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaConversationHome",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
                                "-qaRoomConversation", "thr_botdemo01"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")

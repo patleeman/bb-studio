@@ -13,7 +13,6 @@ final class ApprovalsUITests: ServerIsolatedUITestCase {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "needs"]
         app.launchOffline()
         XCTAssertTrue(app.waitForRoom(), "the app opens on the room")
-        app.standRoomChat()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 

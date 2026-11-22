@@ -1,7 +1,6 @@
 import XCTest
 
-/// Strands in the timeline (slice 4), offline (`-qaConversationHome
-/// -qaSpacesDemo list -qaBotDemo chat -qaStrandsDemo`; the demo answers
+/// Strands in the timeline (slice 4), offline (`-qaSpacesDemo list -qaBotDemo chat -qaStrandsDemo`; the demo answers
 /// `strands.tags` for Main): dividers where the strand changes, a divider or
 /// a strand tapped shows only that strand with "N other messages" in place of
 /// the rest, and ✕ shows everything again. `TEST_RUNNER_FILTER_OUT` keeps PNGs.
@@ -11,7 +10,7 @@ final class StrandFilterUITests: ServerIsolatedUITestCase {
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     func testDividersAndOnlyThisStrand() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaStrandsDemo", "-qaConversationHome",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaStrandsDemo",
                                "-qaRoomConversation", "thr_botdemo01"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))

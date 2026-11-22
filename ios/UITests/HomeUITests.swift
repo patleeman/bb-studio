@@ -1,7 +1,7 @@
 import XCTest
 
 /// The conversation is home (slice 2), offline (`-qaSpacesDemo list -qaBotDemo
-/// chat -qaStrandsDemo -qaConversationHome`): the app opens on the
+/// chat -qaStrandsDemo`): the app opens on the
 /// conversation with its strands box; the header's Bot mark (or the name)
 /// opens the one list with the Bot and its places; picking a conversation
 /// shows it, and the app opens on it next time; the unfolded Duo shows the
@@ -10,7 +10,7 @@ final class HomeUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launch(_ extra: [String] = []) {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaStrandsDemo", "-qaConversationHome"] + extra
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaStrandsDemo"] + extra
         app.launchOffline()
     }
 

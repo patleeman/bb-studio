@@ -5,7 +5,8 @@ import os
 enum BotSpacesDemo {
     static var variant: String? {
         let arguments = ProcessInfo.processInfo.arguments
-        guard let index = arguments.firstIndex(of: "-qaSpacesDemo") else { return nil }
+        // `-qaBotDemo` alone means the real home around its chat: there's no other shell.
+        guard let index = arguments.firstIndex(of: "-qaSpacesDemo") else { return BotDemo.variant != nil ? "list" : nil }
         return arguments.indices.contains(index + 1) && !arguments[index + 1].hasPrefix("-") ? arguments[index + 1] : "list"
     }
 
@@ -31,10 +32,7 @@ enum BotSpacesDemo {
     }
 
     @MainActor static func install(_ store: BotSpacesStore) {
-        guard variant != nil else {
-            if BotDemo.variant != nil { store.seedUnavailableForDemo() }
-            return
-        }
+        guard variant != nil else { return }
         let state = State.shared
         let previous = BBClient.demoTransport
         let pages = PageQA.shared

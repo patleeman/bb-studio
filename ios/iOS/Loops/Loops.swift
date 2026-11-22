@@ -1,9 +1,8 @@
 import Foundation
 
-/// An older Studio's loops (`loops.*`): what its pushes and old `::loop{id}`
-/// cards name. Personal to-dos are gone from the phone; what is left reads a
-/// loop (`LoopItem`, which tasks reuse for priority and trigger) and runs a
-/// lock-screen button's action on a Studio without `tasks.act`.
+/// Loops' types, which old `::loop{id}` cards and the loop pushes' lock-screen
+/// buttons still use: a task's priority and trigger (`LoopItem`), snoozes,
+/// actions and options. Personal to-dos are gone from the phone.
 struct LoopItem: Identifiable, Hashable, Sendable {
     enum Kind: String, Sendable { case `do`, decide, read, waiting }
     enum Priority: String, Sendable { case urgent, normal, low }
@@ -214,56 +213,5 @@ struct LoopOption: Hashable {
         }
         title = raw
         detail = nil
-    }
-}
-
-/// The `loops.*` request bodies, from the generated contract.
-enum LoopRequests {
-    /// The request an action makes: `loops.act`, or `loops.update` for a
-    /// picked time, Take back and Undo. Nil for Nudge, which only drafts.
-    static func request(_ id: String, _ action: LoopAction) -> (method: String, body: JSONValue)? {
-        func act(_ action: Studio.LoopsActInputAction, option: String? = nil, owner: String? = nil,
-                 snooze: Studio.LoopsActInputSnooze? = nil) -> (String, JSONValue) {
-            (Studio.Method.loops_act, json(Studio.LoopsActInput(id: id, action: action, option: option, owner: owner, snooze: snooze)))
-        }
-        func update(_ changes: Studio.LoopsUpdateInputChanges) -> (String, JSONValue) {
-            (Studio.Method.loops_update, json(Studio.LoopsUpdateInput(id: id, changes: changes)))
-        }
-        switch action {
-        case .done: return act(.done)
-        case .gotIt: return act(.got_it)
-        case .drop: return act(.drop)
-        case .keep: return act(.keep)
-        case .nudge: return nil
-        case .choose(let option): return act(.choose, option: option)
-        case .handOff(let owner): return act(.hand_off, owner: owner)
-        case .snooze(let snooze):
-            if let preset = snooze.preset { return act(.snooze, snooze: preset) }
-            guard let date = snooze.date() else { return nil }
-            return update(.init(trigger: .init(type: .time, at: date.milliseconds), status: .snoozed))
-        case .takeBack: return update(.init(owner: "patrick", status: .surfaced))
-        case .undo: return update(.init(status: .surfaced))
-        }
-    }
-
-    private static func json<T: Encodable>(_ value: T) -> JSONValue {
-        (try? JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))) ?? .null
-    }
-}
-
-extension BBClient {
-    /// Runs an action on an older Studio's loop (a lock-screen button's
-    /// fallback); nil for one that only drafts (Nudge).
-    @discardableResult
-    func loopAction(_ id: String, _ action: LoopAction) async throws -> LoopItem? {
-        guard let request = LoopRequests.request(id, action) else { return nil }
-        let output: Studio.LoopsActOutput = try await rpc("studio", request.method, request.body)
-        return LoopItem(Self.loop(output))
-    }
-
-    /// `loops.act` and `loops.update` answer with the loop; read it as `loops.get`'s.
-    private static func loop(_ output: Studio.LoopsActOutput) -> Studio.LoopsGetOutputLoop {
-        let data = (try? JSONEncoder().encode(output)) ?? Data()
-        return (try? JSONDecoder().decode(Studio.LoopsGetOutputLoop.self, from: data)) ?? .init()
     }
 }

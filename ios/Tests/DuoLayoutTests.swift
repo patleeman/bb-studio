@@ -83,11 +83,11 @@ final class DuoLayoutTests: XCTestCase {
     @MainActor
     func testResizeDoesNotChangeSelectedRouteOrStoredDraft() {
         let app = AppModel.shared
-        let previousPath = app.path
+        let previousLink = app.shellLink
         let previousTab = app.tab
         let id = "duo-retention-\(UUID())"
         defer {
-            app.path = previousPath
+            app.shellLink = previousLink
             app.tab = previousTab
             Drafts.save(id, text: "", mentions: [], serverURL: app.serverURL)
         }
@@ -95,7 +95,7 @@ final class DuoLayoutTests: XCTestCase {
         Drafts.save(id, text: "Keep this unsent draft", mentions: [], serverURL: app.serverURL)
         for size in [CGSize(width: 466, height: 678), CGSize(width: 951, height: 669), CGSize(width: 669, height: 951)] {
             _ = DuoLayout(size: size)
-            XCTAssertEqual(app.path, [.thread(id: id)])
+            XCTAssertEqual(app.shellLink, .thread(id, worker: false))
             XCTAssertEqual(Drafts.load(id, serverURL: app.serverURL)?.text, "Keep this unsent draft")
         }
     }

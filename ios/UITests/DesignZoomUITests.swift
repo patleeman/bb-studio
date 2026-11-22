@@ -11,7 +11,7 @@ final class DesignZoomUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launch() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaConversationHome",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
                                "-qaRoomConversation", "thr_botdemo01", "-qaDesignDemo"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))

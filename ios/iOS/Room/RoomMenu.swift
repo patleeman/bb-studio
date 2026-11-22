@@ -1,148 +1,5 @@
 import SwiftUI
 
-struct RoomMenu: View {
-    static let hitPadding: CGFloat = 12
-
-    let bot: BotSpace
-    @ObservedObject var store: BotSpacesStore
-    let view: BotThreadsView?
-    /// Strands that need you, beside Strands.
-    let needsCount: Int?
-    var closeInColumn = false
-    var close: () -> Void
-    var openPlace: (RoomPlace) -> Void
-    var openWorker: (String) -> Void
-    var theme: () -> Void
-    var settings: () -> Void
-    var switchBot: (String) -> Void
-    @Environment(\.look) private var look
-
-    private var working: BotWorker? {
-        view?.workers.filter { $0.status == .running }.max { $0.updatedAt < $1.updatedAt }
-    }
-
-    var body: some View {
-        ViewThatFits(in: .vertical) {
-            menu(compact: false)
-            menu(compact: true)
-            ScrollView { menu(compact: true) }.scrollBounceBehavior(.basedOnSize)
-        }
-        .frame(maxWidth: 640, maxHeight: .infinity, alignment: .top)
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("RoomMenu")
-    }
-
-    private func menu(compact: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                botName
-                Spacer()
-                if !closeInColumn {
-                    Button(action: close) {
-                        Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .lookGlass(look, \.hud, in: .circle, interactive: true)
-                    .accessibilityLabel("Back to the room")
-                    .accessibilityIdentifier("roomMenuClose")
-                }
-            }
-            .frame(minHeight: 44)
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(RoomPlace.menu) { place in
-                    Button { openPlace(place) } label: {
-                        HStack(alignment: .firstTextBaseline, spacing: 12) {
-                            Text(place.title).font(.system(size: compact ? 28 : 34, weight: .semibold))
-                            if place == .strands, let needsCount, needsCount > 0 {
-                                Text(StrandOverviewRules.line(needs: needsCount, running: 0)).font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.55))
-                            }
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, RoomMenu.hitPadding)
-                        .frame(minHeight: compact ? 46 : 56)
-                        .contentShape(.rect)
-                        .lookHalo(look)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("roomPlace-\(place.rawValue)")
-                }
-            }
-            .padding(.horizontal, -RoomMenu.hitPadding)
-            .padding(.top, compact ? 12 : 40)
-            Spacer(minLength: compact ? 10 : 16)
-            if let working {
-                Button { openWorker(working.threadId) } label: {
-                    HStack(spacing: 12) {
-                        Circle().fill(look.success).frame(width: 8, height: 8)
-                            .background(Circle().fill(look.success.opacity(0.18)).frame(width: 16, height: 16))
-                        Text(working.title.isEmpty ? "Worker" : working.title).font(.subheadline.weight(.medium)).lineLimit(1)
-                        Spacer(minLength: 8)
-                        Text(BotShell.shortAge(working.updatedAt)).font(.footnote).foregroundStyle(.white.opacity(0.5))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(14)
-                    .frame(minHeight: 56)
-                    .background(look.canvas.opacity(0.82), in: .rect(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.white.opacity(0.08)))
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Working now: \(working.title)")
-                .accessibilityIdentifier("roomWorkingNow")
-            }
-            HStack(spacing: 0) {
-                Button(action: theme) { Text("Theme").padding(.horizontal, 11).frame(minHeight: 44).contentShape(.rect) }.accessibilityIdentifier("roomTheme")
-                Button(action: settings) { Text("Settings").padding(.horizontal, 11).frame(minHeight: 44).contentShape(.rect) }.accessibilityIdentifier("roomSettings")
-            }
-            .padding(.horizontal, -11)
-            .font(.subheadline)
-            .foregroundStyle(.white.opacity(0.65))
-            .frame(minHeight: 44)
-            .padding(.top, compact ? 4 : 10)
-        }
-        .padding(.horizontal, 22)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
-    }
-
-    @ViewBuilder private var botName: some View {
-        let bots = store.spaces?.bots ?? []
-        if bots.count > 1 {
-            Menu {
-                ForEach(bots) { each in
-                    Button(each.name) { switchBot(each.id) }
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Text(bot.name)
-                    Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
-                }
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.7))
-                .frame(minHeight: 44)
-            }
-            .accessibilityLabel("\(bot.name), switch Bot")
-        } else {
-            Text(bot.name).font(.subheadline).foregroundStyle(.white.opacity(0.7))
-        }
-    }
-}
-
-struct RoomColumnMenuButton: View {
-    let open: Bool
-    let reduceMotion: Bool
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Label(open ? "Back to the room" : "Everything else", systemImage: open ? "xmark" : "line.3.horizontal")
-                .contentTransition(reduceMotion ? .opacity : .symbolEffect(.replace))
-        }
-        .accessibilityIdentifier(open ? "roomMenuClose" : "roomMenuButton")
-    }
-}
-
 struct RoomPlaceSheet: View {
     static let sliver: CGFloat = 12
 
@@ -157,8 +14,7 @@ struct RoomPlaceSheet: View {
     var chooseTheme: (String) -> Void = { _ in }
     var path: Binding<[Route]>? = nil
     var back: (() -> Void)? = nil
-    /// The conversation is home: the list carries the Bot and its places; `shown` is the open conversation.
-    var home = false
+    /// The open conversation.
     var shown: String? = nil
     var settings: (() -> Void)? = nil
     var switchBot: ((String, String?) -> Void)? = nil
@@ -205,7 +61,7 @@ struct RoomPlaceSheet: View {
         case .conversations:
             RoomConversations(bot: bot, store: store, mainThreadId: mainThreadId, open: open,
                               started: startedConversation, closeToRoom: closeToRoom,
-                              home: home, shown: shown ?? mainThreadId, settings: settings,
+                              shown: shown ?? mainThreadId, settings: settings,
                               placeView: { AnyView(content(for: $0)) }, switchBot: switchBot)
         }
     }
@@ -218,7 +74,6 @@ struct RoomConversations: View {
     var open: (BotShellItem) -> Void
     var started: (String) -> Void
     var closeToRoom: () -> Void
-    var home = false
     var shown: String? = nil
     var settings: (() -> Void)? = nil
     var placeView: ((RoomPlace) -> AnyView)? = nil
@@ -247,10 +102,8 @@ struct RoomConversations: View {
         let lines = searching ? all.filter { $0.title.localizedCaseInsensitiveContains(query) } : all
         let nests = BotWorkerNests.make(conversations: all.map(\.threadId), workers: view?.workers ?? [])
         List {
-            if home {
-                Section { RoomListHeader(bot: bot, view: view, refresh: { await store.refresh() }, switchBot: switchBot.map { pick in { pick($0, nil) } }) }
-                    .listRowBackground(Color.clear)
-            }
+            Section { RoomListHeader(bot: bot, view: view, refresh: { await store.refresh() }, switchBot: switchBot.map { pick in { pick($0, nil) } }) }
+                .listRowBackground(Color.clear)
             Section {
                 searchField
             }
@@ -276,7 +129,7 @@ struct RoomConversations: View {
                     workerLines(other, parent: "other")
                 }
             }
-            if home { projectsSection }
+            projectsSection
             if !searching { placesSection }
         }
         .listStyle(.insetGrouped)
@@ -286,7 +139,7 @@ struct RoomConversations: View {
             if projects.loaded { await loadProjects() }
         }
         .task(id: projectsOpen || searching) {
-            if (projectsOpen || searching) && home && !projects.loaded { await loadProjects() }
+            if (projectsOpen || searching) && !projects.loaded { await loadProjects() }
         }
         .modifier(PageChrome(title: "Conversations") {
             Button { starting = true } label: { Image(systemName: "plus") }
@@ -474,7 +327,7 @@ struct RoomConversations: View {
 
     private var placesSection: some View {
             Section {
-                if home, let placeView {
+                if let placeView {
                     ForEach(RoomPlace.homeList) { place in
                         NavigationLink { placeView(place) } label: { Label(place.title, systemImage: place.symbol) }
                             .accessibilityIdentifier("roomPlace-\(place.rawValue)")
@@ -486,7 +339,7 @@ struct RoomConversations: View {
                     Label("Archive", systemImage: "archivebox")
                 }
                 .accessibilityIdentifier("roomArchive")
-                if home, let settings {
+                if let settings {
                     Button(action: settings) { Label("Settings", systemImage: "gearshape") }
                         .tint(.primary)
                         .accessibilityIdentifier("roomSettings")

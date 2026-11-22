@@ -109,17 +109,14 @@ struct ThreadView: View {
     /// own thread keeps it.
     private let hidesTabBar: Bool
 
-    /// Set for the Bot tab: draws the thread as the Bot's chat.
-    private let botChrome: BotChrome?
     /// Counts sends, for the send haptic.
     @State private var sends = 0
     /// The new chat transcript's requests, when it's on (Settings ▸ Diagnostics).
     @State private var transcriptV2 = TranscriptHandle()
     @State private var jumpState = TranscriptPillState()
 
-    init(threadId: String, hidesTabBar: Bool = true, botChrome: BotChrome? = nil, session: RoomSession? = nil) {
+    init(threadId: String, hidesTabBar: Bool = true, session: RoomSession? = nil) {
         self.hidesTabBar = hidesTabBar
-        self.botChrome = botChrome
         roomSession = session
         _talk = StateObject(wrappedValue: session?.talk ?? HoldToTalk(threadId: threadId))
         _model = StateObject(wrappedValue: session?.model ?? ThreadModel(threadId: threadId))
@@ -134,31 +131,11 @@ struct ThreadView: View {
         withTalk
         .focusedSceneValue(\.thread, actions)
         .sensoryFeedback(.success, trigger: model.confirmations)
-        .task(id: botChrome?.chain) {
-            // The chain ends at this thread; until `bot_chain` answers, the thread alone.
-            if let chain = botChrome?.chain, chain.last == model.threadId { model.chainBefore = Array(chain.dropLast()) }
-        }
-        .modifier(BotThreadHooks(chrome: botChrome, threadId: model.threadId, environmentId: model.thread?.environmentId,
-                                    sends: sends, running: model.thread?.isRunning == true, interactions: model.interactions.count))
+        .sensoryFeedback(.impact(weight: .medium), trigger: sends)
         .sensoryFeedback(.warning, trigger: model.interactions.count, condition: Self.grew)
         .sensoryFeedback(.error, trigger: model.error) { (_: String?, new: String?) in new != nil }
         .sensoryFeedback(.selection, trigger: attachments.count, condition: Self.grew)
         .userActivity(Spotlight.threadActivityType, isActive: model.thread != nil, describeActivity)
-        .onChange(of: composerFocused, initial: true) { _, _ in reportClassicWriting() }
-        .onAppear {
-            reportClassicWriting()
-            if botChrome != nil { ClassicBotActivity.shared.setReading(ClassicBotActivity.shared.reading(threadId: model.threadId)) }
-        }
-        .onDisappear {
-            guard botChrome != nil else { return }
-            ClassicBotActivity.shared.setWriting(false)
-            ClassicBotActivity.shared.setReading(false)
-        }
-    }
-
-    private func reportClassicWriting() {
-        guard botChrome != nil else { return }
-        ClassicBotActivity.shared.setWriting(composerFocused || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
     /// For the haptics on a count: it went up.
@@ -253,7 +230,6 @@ struct ThreadView: View {
     /// The screen and its sheets.
     private var withSheets: some View {
         withConversation
-        .navigationBarBackButtonHidden(duoLayout.twoPages && app.tab == .inbox && hidesTabBar)
         .sheet(isPresented: $showingWeb) {
             if let thread = model.thread {
                 NavigationStack {
@@ -413,16 +389,6 @@ struct ThreadView: View {
                 Task { await bot.load(client: client) }
             }
             await model.load()
-            #if DEBUG
-            if botChrome != nil, let text = BotDemo.served?.send {
-                // As a person would: into the composer with the keyboard up, then Send.
-                composerFocused = true
-                draft = text
-                try? await Task.sleep(for: .seconds(2))
-                ChatPerf.sent(text)
-                send()
-            }
-            #endif
         }
         // Open where the reader left off. Waits a beat for the rows to be laid out.
         .task(id: model.unreadFrom) {
@@ -441,110 +407,7 @@ struct ThreadView: View {
 
     /// The timeline, find bar, composer, and toolbar; `body` adds sheets and tasks.
     private var screen: some View {
-        TranscriptV2Switch { legacyScreen } next: { transcriptV2Screen }
-    }
-
-    private var legacyScreen: some View {
-        Group {
-            // Built once the first page is in, so it opens at the bottom of real
-            // content rather than growing from empty.
-            if model.loaded {
-                timeline.id(timelineKey)
-                    .modifier(RegularScrollingSurface(readableWidth: Self.readableWidth))
-            } else {
-                // Nothing cached yet: the shape of a chat, not a blank screen.
-                ChatSkeleton(bot: botChrome != nil)
-            }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if finding {
-                FindBar(query: $findQuery, index: $findIndex, count: findMatches.count, loading: model.loadingAll) {
-                    finding = false
-                    findQuery = ""
-                }
-                // Its buttons stay clear of the Duo's clock and icons.
-                .padding(.trailing, duoLayout.statusColumn)
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .animation(.snappy, value: finding)
-        // The server's page goes in over the cached rows by id, so the chat
-        // stays put. Only when it doesn't join up with them (more came in
-        // since than one page holds) does it replace them: start again at the
-        // bottom then, unless the reader has scrolled up into the cached rows.
-        .onChange(of: model.replacedCache) { _, _ in
-            if atBottom || end.pastEnd > Self.pastEndSlack { timelineKey += 1 }
-        }
-        // Beside two pages, centred on the page above the composer, in the
-        // transcript's bottom inset. No scrim: rows stay readable right up to
-        // the button's and composer's own backgrounds. A phone keeps it
-        // floating in the corner.
-        .overlay(alignment: .bottomTrailing) { if !duoLayout.twoPages { jumpButton } }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if duoLayout.twoPages && !atBottom {
-                jumpButton
-                    .frame(maxWidth: .infinity)
-                    .transition(.opacity)
-            }
-        }
-        .animation(.snappy, value: atBottom)
-        .safeAreaInset(edge: .bottom) { Isolated { composer } }
-        // Beside two pages the transcript, jump button and composer all run
-        // under the status column, so they share the page's width and centre;
-        // the header still keeps its actions inside the safe area. On the
-        // Duo's inner screen, in our two pages or beside another app, they
-        // also run under its 34-point home indicator inset: the composer sits
-        // 8 points above the edge, as a phone's sits above its indicator.
-        .ignoresSafeArea(.container, edges: duoLayout.chatIgnoredEdges)
-        .environment(\.threadId, model.threadId)
-        .environment(\.openURL, OpenURLAction { url in
-            // Agents link Studio items by their BB web path, which reads like a file path.
-            if let path = FilePathLink.path(from: url) ?? (url.host() == client.baseURL.host() ? url.path() : nil),
-                let route = Route(href: path)
-            {
-                open(route)
-                return .handled
-            }
-            if let path = FilePathLink.path(from: url) {
-                openingFile = OpenFile(path: path)
-                return .handled
-            }
-            if AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first {
-                if let botChrome { botChrome.openThread(id) } else { open(.thread(id: id)) }
-                return .handled
-            }
-            return followLink(url)
-        })
-        .modifier(BotChromeToolbar(chrome: botChrome, status: botStatus, shortStatus: botShortStatus, working: model.thread?.isRunning == true))
-        .navigationTitle(botChrome != nil ? "" : model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(duoLayout.twoPages || (sizeClass == .compact && hidesTabBar) ? .hidden : .automatic, for: .tabBar)
-        .toolbar(duoLayout.twoPages ? .hidden : .automatic, for: .navigationBar)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if duoLayout.twoPages && botChrome == nil {
-                DuoHeader {
-                    if conversation != nil {
-                        conversationTitle
-                    } else if let worker {
-                        WorkerTitle(info: worker)
-                    } else {
-                        Text(model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
-                            .font(.headline).lineLimit(1).accessibilityIdentifier("duoThreadTitle")
-                    }
-                } actions: { threadActions }
-            }
-        }
-        .toolbar {
-            if botChrome == nil && !duoLayout.twoPages {
-                ToolbarItemGroup(placement: .topBarTrailing) { threadActions }
-            }
-            if conversation != nil && !duoLayout.twoPages {
-                ToolbarItem(placement: .principal) { conversationTitle }
-            }
-            if conversation == nil && !duoLayout.twoPages, let worker {
-                ToolbarItem(placement: .principal) { WorkerTitle(info: worker) }
-            }
-        }
+        transcriptV2Screen
     }
 
     @ViewBuilder private var threadActions: some View {
@@ -661,379 +524,6 @@ struct ThreadView: View {
         Button { UIPasteboard.general.string = model.threadId } label: { Label("Copy Thread ID", systemImage: "number") }
     }
 
-    /// The Bot's status line, for its header.
-    private var botStatus: String {
-        BotStatus.line(state: botChrome?.bot.state, running: model.thread?.isRunning == true, thinking: model.shelf.thinking,
-                       attention: botChrome?.attention?.reason, lead: botChrome?.bot.lead)
-    }
-
-    /// "1 question", "Approval", "2 things": the Bot's attention, short, for a tight header.
-    private var botShortStatus: String? {
-        guard let attention = botChrome?.attention, botStatus == attention.reason else { return nil }
-        return BotStatus.short(reason: attention.reason, count: attention.count)
-    }
-
-    private var timeline: some View {
-        timelinePaging
-        .onChange(of: finding) { _, finding in
-            if finding { Task { await model.loadAll() } }
-        }
-        .onChange(of: findQuery) { _, _ in findIndex = 0 }
-        // Earlier pages going in above would carry the match off screen.
-        .onChange(of: model.rows.first?.id) { _, _ in
-            if finding, let currentMatch { read(currentMatch, anchor: .center) }
-        }
-        .onChange(of: currentMatch) { _, id in
-            if let id { withAnimation(.snappy) { read(id, anchor: .center) } }
-        }
-        .onChange(of: model.interactions.first?.id) { _, id in
-            if id != nil { scrollToBottom() }
-        }
-        .onChange(of: model.confirmations) { _, _ in scrollToBottom() }
-        .onChange(of: outbox.messages.count) { old, new in
-            if new > old { scrollToBottom() }
-        }
-    }
-
-    /// Scrolling by hand, rows going in at the end, and older pages at the top.
-    private var timelinePaging: some View {
-        timelineGeometry
-        .onScrollPhaseChange { _, phase in
-            #if DEBUG
-            RenderCount.bump("write.scrollPhase")
-            #endif
-            scrollPhase = phase
-            end.animationOver = false
-            if phase == .animating { watchAnimation() }
-            if phase == .tracking || phase == .interacting {
-                resizeRestore?.cancel()
-                resizeAnchor.cancel()
-                end.readerScrolling = true
-            }
-            // The reader decides: wherever their scroll comes to rest, the
-            // chat follows its end only if that's near the end. The app's own
-            // animated scrolls don't decide it: one cut short by a newer
-            // request rests wherever it was, short of a reply still growing,
-            // and the chat stopped following with no one having scrolled.
-            if phase == .idle, end.readerScrolling {
-                end.following = end.geometry.nearEnd
-                end.readerScrolling = false
-            }
-            keepAtEnd()
-        }
-        // The first page lands at the bottom through `defaultScrollAnchor`;
-        // scrolling by hand while lazy rows are still measuring can overshoot.
-        .onChange(of: model.shownRows.last?.id) { old, _ in
-            if old != nil, atBottom || model.shownRows.last?.isUser == true { scrollToBottom() }
-        }
-        // The Bot's typing row goes in under the message just sent.
-        .onChange(of: showsWorking) { _, shows in
-            if shows, atBottom { scrollToBottom() }
-        }
-        // Older pages load when the reader reaches the top.
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y + geometry.contentInsets.top < 40
-        } action: { _, isAtTop in
-            #if DEBUG
-            RenderCount.bump("write.atTop")
-            #endif
-            atTop = isAtTop
-        }
-        // Keeps loading while the reader stays at the top and a page is too
-        // short to move them off it; backs off after failures, and stops when
-        // a page brings nothing new.
-        .task(id: atTop) {
-            var failures = 0
-            while atTop, botChrome != nil ? model.canLoadOlder : model.hasOlder, !Task.isCancelled {
-                guard let delay = await loadOlder().retryDelay(failures: &failures) else { break }
-                try? await Task.sleep(for: delay)
-            }
-        }
-    }
-
-    // `timeline` in parts, so each type-checks quickly. The same modifiers, in order.
-
-    /// The rows, and the Debug QA commands.
-    private var timelineScroll: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
-                if botChrome != nil ? model.canLoadOlder : model.hasOlder {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                }
-                if let botChrome {
-                    if !model.canLoadOlder { BotHero(bot: botChrome.bot, status: botStatus, working: model.thread?.isRunning == true) }
-                    BotChatTimeline(
-                        bot: botChrome.bot, rows: model.chainRows, threadId: model.threadId, projectId: model.thread?.projectId,
-                        running: model.thread?.isRunning == true, thinking: model.shelf.thinking, started: botChrome.started, compactions: botChrome.compactions,
-                        react: { send(text: $0) }, quote: { quote($0) }, select: { selecting = SelectionText(text: $0) },
-                        edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread,
-                        sideThreads: botChrome.sideThreads, replyInThread: botChrome.replyInThread, threadRows: model.rowIds, cached: model.showsCache, measure: { resizeAnchor.measure($0, row: $1) }, unmeasure: { resizeAnchor.forget($0) })
-                }
-                let items = botChrome != nil ? [] : model.shownItems
-                let unread = unreadItem(in: items)
-                let editable = worker == nil ? lastUserRowId : nil
-                // Once, not per row: it searches every row while Find is open.
-                let match = currentMatch
-                ForEach(items) { item in
-                    // One view per item, so scrolling to the item lands on the divider.
-                    timelineItem(item, unread: unread, editable: editable, match: match)
-                    .onGeometryChange(for: TranscriptResizeAnchor.Row.self) { proxy in
-                        let isMessage: Bool
-                        if case .message = item { isMessage = true } else { isMessage = false }
-                        return TranscriptResizeAnchor.Row(width: proxy.bounds(of: .scrollView)?.width ?? 0,
-                            frame: proxy.frame(in: .global), isMessage: isMessage)
-                    } action: { row in
-                        resizeAnchor.measure(item.id, row: row)
-                    }
-                    .onDisappear { resizeAnchor.forget(item.id) }
-                }
-                ForEach(outbox.messages(for: model.threadId)) { message in
-                    PendingBubble(message: message)
-                }
-                ForEach(botChrome == nil ? shownInteractions : []) { interaction in
-                    InteractionCard(
-                        interaction: interaction,
-                        resolve: { await model.resolve(interaction, $0) },
-                        cancel: { await model.cancel(interaction) },
-                        openWeb: { showingWeb = true })
-                    .id(interaction.id)
-                }
-                if showsWorking {
-                    if let botChrome {
-                        BotTypingRow(bot: botChrome.bot, thinking: model.shelf.thinking)
-                            .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottomLeading)))
-                    } else {
-                        WorkingIndicator(thinking: model.shelf.thinking)
-                    }
-                }
-                // Where "scroll to the bottom" goes. A lazy stack scrolled to its
-                // bottom edge while rows go in and the composer or keyboard moves
-                // can land where it draws nothing: after a send, a blank chat
-                // until the reply. Scrolling to a view lays that view out.
-                Color.clear.frame(height: 1).id(Self.bottomId)
-            }
-            #if DEBUG
-            // The transcript's content edges, which bubbles reach; the composer matches them.
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { DuoDemo.surfaces["transcript-" + model.threadId] = $0 }
-            .onDisappear { DuoDemo.surfaces["transcript-" + model.threadId] = nil }
-            #endif
-            .padding(.horizontal, Self.margin(bot: botChrome != nil))
-            .padding(.vertical, 8)
-            .animation(botChrome != nil ? .smooth(duration: 0.3) : nil, value: showsWorking)
-            .scrollTargetLayout()
-            .frame(maxWidth: Self.readableWidth)
-            .frame(maxWidth: .infinity)
-            // A tap on the transcript puts the keyboard away; rows keep their taps.
-            .background(alignment: .topLeading) {
-                TranscriptTapDismissesKeyboard(active: composerFocused).frame(width: 1, height: 1)
-            }
-            .background {
-                if let roomChat {
-                    Color.clear.contentShape(.rect).onTapGesture { roomChat.layDown() }
-                        .accessibilityHidden(true)
-                }
-            }
-        }
-        #if DEBUG
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("duo-qa-inspect"))) { _ in
-            guard BotDemo.variant == "duo", app.tab == .bot, botChrome != nil else { return }
-            let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first { $0.isKeyWindow }
-            window?.accessibilityValue = "\(ObjectIdentifier(model))|loads=\(model.qaLoadCount)|keeper=\(ObjectIdentifier(resizeAnchor))#\(resizeAnchor.debugState)"
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("qa-draft"))) { event in
-            // `n` lines in the composer, which grows with them; 0 empties it, and quick replies come back.
-            let lines = event.object as? Int ?? 0
-            draft = (0..<lines).map { "Draft line \($0 + 1)" }.joined(separator: "\n")
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("qa-attach"))) { _ in
-            // A photo in the composer, as if picked from the library.
-            let image = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64)).image { context in
-                UIColor.systemTeal.setFill()
-                context.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
-            }
-            if let attachment = PendingAttachment.image(image) { attachments.append(attachment) }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("duo-qa-scroll"))) { event in
-            guard BotDemo.variant != nil else { return }
-            resizeRestore?.cancel()
-            resizeAnchor.cancel()
-            if event.object as? String == "mid" {
-                if botChrome != nil {
-                    let entries = BotChatEntry.memo.entries(model.chainRows, started: botChrome?.started ?? [], compactions: [])
-                    if let entry = entries.first(where: { $0.id == "a150" }) ?? entries.dropFirst(entries.count / 2).first { read(entry.id, anchor: .top) }
-                } else {
-                    let items = TimelineItem.group(model.shownRows)
-                    if let item = items.dropFirst(items.count / 4).first { read(item.id, anchor: .top) }
-                }
-            } else { scrollToBottom(animated: false) }
-        }
-        #endif
-    }
-
-    /// Where the rows are, and the one owner of the end.
-    private var timelineGeometry: some View {
-        timelineScroll
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { resizeAnchor.frame = $0 }
-        .onScrollTargetVisibilityChange(idType: String.self, threshold: 0.01) { ids in
-            resizeAnchor.visible(ids)
-            end.markerVisible = ids.contains(Self.bottomId)
-            ScrollLog.visible(ids)
-        }
-        .onScrollGeometryChange(for: ScrollGeometry.self) { $0 } action: { _, geometry in ScrollLog.geometry(geometry) }
-        .coordinateSpace(name: "threadTranscript")
-        .modifier(TranscriptScrollPosition(scroller: scroller))
-        .onScrollGeometryChange(for: TranscriptResizeAnchor.Viewport.self) { geometry in
-            TranscriptResizeAnchor.Viewport(size: geometry.containerSize, offset: geometry.contentOffset.y,
-                inset: geometry.contentInsets.top, bottomGap: geometry.contentSize.height - geometry.unobscuredBottom,
-                contentHeight: geometry.contentSize.height, bottomInset: geometry.contentInsets.bottom)
-        } action: { _, viewport in
-            if let anchor = resizeAnchor.update(viewport) { restoreAfterWidthChange(anchor) }
-        }
-        // The Bot's header floats on glass: earlier messages blur away under it
-        // rather than being cut off at a hard edge.
-        .scrollEdgeEffectStyle(botChrome != nil ? .soft : nil, for: .top)
-        .defaultScrollAnchor(.bottom)
-        .scrollDismissesKeyboard(.interactively)
-        // The one owner of the timeline's end: rows growing or shrinking,
-        // the keyboard, composer or quick replies changing the bottom inset
-        // all come through here as geometry, and `keepAtEnd` answers them.
-        .onScrollGeometryChange(for: EndGeometry.self) { geometry in
-            EndGeometry(
-                distance: TranscriptResizeAnchor.overshoot(contentHeight: geometry.contentSize.height,
-                    viewportHeight: geometry.containerSize.height, visibleBottom: geometry.unobscuredBottom),
-                lastPoint: TranscriptResizeAnchor.lastPoint(contentHeight: geometry.contentSize.height,
-                    viewportHeight: geometry.containerSize.height),
-                point: geometry.contentOffset.y + geometry.contentInsets.top,
-                nearEnd: geometry.unobscuredBottom >= geometry.contentSize.height - 120,
-                bottomInset: geometry.contentInsets.bottom)
-        } action: { _, next in
-            // The keyboard, composer or quick replies changing the bottom
-            // inset while the reader was at the end: keep the end in view.
-            if next.bottomInset != end.geometry.bottomInset, end.geometry.nearEnd, !end.readerScrolling {
-                end.following = true
-            }
-            if next.point != end.geometry.point { end.moved = .now }
-            end.geometry = next
-            // The jump button's state comes from here too. A separate
-            // observer of the same test stopped reporting once rows settled
-            // their heights after a jump to the end: the chat sat at its end
-            // with the button still up (DuoSplitComposerUITests).
-            if atBottom != next.nearEnd {
-                #if DEBUG
-                RenderCount.bump("write.atBottom")
-                #endif
-                atBottom = next.nearEnd
-            }
-            #if DEBUG
-            RenderCount.bump("geometry.end")
-            #endif
-            keepAtEnd()
-        }
-    }
-
-    /// One item of `timeline`, built apart so the timeline type-checks quickly.
-    @ViewBuilder private func timelineItem(_ item: TimelineItem, unread: String?, editable: String?, match: String?) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if item.id == unread { UnreadDivider() }
-            Group {
-                switch item {
-                case .message(let row):
-                    MessageBubble(
-                        row: row,
-                        projectId: model.thread?.projectId,
-                        react: { draftReply($0) },
-                        reactionItems: reactionSettings.items,
-                        quote: { quote($0) },
-                        select: { selecting = SelectionText(text: $0) },
-                        edit: row.id == editable ? startEditing : nil,
-                        saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
-                        thread: sideThreads[row.id], replier: conversation?.look,
-                        replyInThread: conversation != nil && ConversationReplies.canThread(row) ? { replyInThread(row) } : nil,
-                        fork: conversation != nil && ConversationReplies.canFork(row) ? { forkConversation(row) } : nil,
-                        openSideThread: conversation != nil ? { showThread($0) } : nil)
-                case .activity(let rows):
-                    ActivityGroup(rows: rows)
-                }
-            }
-            .background {
-                if item.id == match {
-                    RoundedRectangle(cornerRadius: 12).fill(.yellow.opacity(0.22)).padding(-6)
-                }
-            }
-        }
-    }
-
-    /// The only new scroll requests: after a container-width change. First
-    /// materialize the saved row in the lazy stack, then restore its pixel
-    /// offset as the new widths settle. An interaction cancels this work.
-    private func restoreAfterWidthChange(_ anchor: TranscriptResizeAnchor.Anchor) {
-        #if DEBUG
-        RenderCount.bump("restore")
-        #endif
-        ScrollLog.request("restoreAfterWidthChange \(ScrollLog.describe(anchor))")
-        resizeRestore?.cancel()
-        let token = resizeAnchor.generation
-        resizeRestore = Task { @MainActor in
-            // A restore's last jump can itself land past the end, while the
-            // check is held off; check once it's done.
-            defer {
-                resizeAnchor.finish(token)
-                ScrollLog.request("restore released")
-                keepAtEnd()
-                // Once more after the layout the release lets through: the
-                // geometry seen here can predate the restore's last jump.
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(150))
-                    keepAtEnd()
-                }
-            }
-            try? await Task.sleep(for: .milliseconds(120))
-            guard !Task.isCancelled else { return }
-            switch anchor {
-            case .bottom:
-                // A single lazy-stack jump can precede a cascade of new row
-                // heights. Keep the marker pinned while that layout settles.
-                for _ in 0..<24 {
-                    guard !Task.isCancelled else { return }
-                    scrollToBottom(animated: false)
-                    try? await Task.sleep(for: .milliseconds(100))
-                }
-            case .message(let id, let offset):
-                read(id, anchor: .top)
-                var restored = false
-                for _ in 0..<12 {
-                    try? await Task.sleep(for: .milliseconds(100))
-                    guard !Task.isCancelled else { return }
-                    if let alignment = resizeAnchor.alignment(for: id, offset: offset) {
-                        // Keep an id anchor after the restore. A raw point loses
-                        // its message as estimated heights above it settle.
-                        read(id, anchor: UnitPoint(x: 0, y: alignment))
-                        restored = true
-                    } else if let y = resizeAnchor.correction(for: id, offset: offset) {
-                        ScrollLog.request("restore scrollTo(y: \(y))")
-                        end.following = false
-                        scroller.scrollTo(y: y)
-                        restored = true
-                    } else { restored = false }
-                }
-                // Unmeasured/stale lazy geometry cannot provide a safe point.
-                // Materializing the bottom marker is the deterministic fallback.
-                if !restored { scrollToBottom(animated: false) }
-            }
-            try? await Task.sleep(for: .milliseconds(120))
-            guard !Task.isCancelled else { return }
-            // Past the end is `keepAtEnd`'s, once this finishes.
-            if let viewport = resizeAnchor.viewport {
-                let point = viewport.offset + viewport.inset
-                if !point.isFinite || point < -Self.pastEndSlack || !resizeAnchor.hasVisibleRows {
-                    scrollToBottom(animated: false)
-                }
-            }
-        }
-    }
-
     @ViewBuilder private var jumpButton: some View {
         if !atBottom {
             Button { scrollToBottom() } label: {
@@ -1063,9 +553,6 @@ struct ThreadView: View {
     /// under it unless there's a thought to show.
     private var showsWorking: Bool {
         guard model.thread?.isRunning == true, model.interactions.isEmpty else { return false }
-        // The Bot types while it thinks, and while it works between replies.
-        if botChrome != nil, let last = model.rows.last, last.isConversation, !last.isUser, !(last.text ?? "").isEmpty { return false }
-        if botChrome != nil { return true }
         if model.shelf.thinking?.isEmpty == false { return true }
         guard let last = model.rows.last, last.kind == "work" else { return true }
         return !["inProgress", "running", "pending"].contains(last.status ?? "")
@@ -1074,7 +561,7 @@ struct ThreadView: View {
     /// The page goes in above the reader, so bring back what was the first
     /// item. By id rather than offset: rows above are only estimated heights.
     private func loadOlder() async -> OlderPage {
-        let first = botChrome.map { BotChatEntry.memo.entries(model.chainRows, started: $0.started, compactions: $0.compactions).first?.id } ?? TimelineItem.group(model.rows).first?.id
+        let first = TimelineItem.group(model.rows).first?.id
         guard let first else { return .nothing }
         let result = await model.loadOlder()
         ScrollLog.request("loadOlder \(result) keep \(ScrollLog.id(first))")
@@ -1286,7 +773,6 @@ struct ThreadView: View {
 
     private func saveDraftLocally() {
         Drafts.save(model.threadId, text: draft, mentions: mentions, serverURL: model.serverURL)
-        reportClassicWriting()
     }
 
     /// Puts unsent text back in the composer, and in storage in case the thread closed meanwhile.
@@ -1450,7 +936,7 @@ struct ThreadView: View {
         }
         .modifier(TalkDraft(talk: talk, draft: $draftText.value, typed: $talkTyped))
         .onChange(of: draft) { _, _ in draftText.saveSoon(saveDraftLocally) }
-        .padding(.horizontal, duoLayout.twoPages ? Self.margin(bot: false) : 12)
+        .padding(.horizontal, duoLayout.twoPages ? Self.margin : 12)
         .padding(.vertical, 8)
         .frame(maxWidth: Self.readableWidth)
         .frame(maxWidth: .infinity)
@@ -1463,11 +949,11 @@ struct ThreadView: View {
 
     private var placeholder: String {
         if shell?.kind == .reply, shell?.threadId == model.threadId { return "Reply…" }
-        return botChrome.map { "Message \($0.bot.name)" } ?? "Message"
+        return "Message"
     }
 
     private func open(_ route: Route) {
-        if let shell { shell.push(route) } else { app.path.append(route) }
+        if let shell { shell.push(route) } else { app.push(route) }
     }
 
     private func followLink(_ url: URL) -> OpenURLAction.Result {
@@ -1477,8 +963,6 @@ struct ThreadView: View {
             return .systemAction
         case .entity(let ref) where (ref.kind == .file || ref.kind == .diff) && ref.id != nil:
             openingFile = OpenFile(path: ref.id ?? "")
-        case .entity(let ref) where ref.kind == .conversation && botChrome != nil:
-            botChrome?.openThread(ref.id ?? "")
         default:
             app.openLink(target, threadId: model.threadId) { open($0) }
         }
@@ -1586,7 +1070,7 @@ struct ThreadView: View {
 
 
     /// Hands the thread off to another provider's model, then follows the new
-    /// thread: the Bot tab reloads its bot; elsewhere it replaces this thread.
+    /// thread: a conversation opens the new one; elsewhere it replaces this thread.
     private func handOff(providerId: String, providerName: String, modelId: String, modelName: String, reasoning: String?) {
         handoffStatus = (ModelHandoffPlan.progressLabel(providerName: providerName), true)
         let threadId = model.threadId
@@ -1598,17 +1082,11 @@ struct ThreadView: View {
                     return
                 }
                 handoffStatus = nil
-                if let botChrome {
-                    botChrome.followThread(next)
-                } else if conversation != nil, let shell {
+                if conversation != nil, let shell {
                     shell.openConversation(next)
                     shell.refresh()
-                } else if shell != nil {
-                    open(.thread(id: next))
-                } else if let index = app.path.lastIndex(of: .thread(id: threadId)) {
-                    app.path[index] = .thread(id: next)
                 } else {
-                    app.path.append(.thread(id: next))
+                    open(.thread(id: next))
                 }
             } catch {
                 handoffStatus = nil
@@ -1625,20 +1103,7 @@ struct ThreadView: View {
         }
     }
 
-    private var liveStep: String? {
-        model.shelf.background.first.map { $0.workflowName ?? $0.description ?? "Background work" }
-    }
-
-    private func unlistedWorkers(_ line: WorkersLine) -> WorkersLine? {
-        var line = line
-        if InFlightBar.shows(model.threadId) {
-            let listed = InFlightBar.listedWorkers(model.threadId)
-            line.workers.removeAll { listed.contains($0.threadId) }
-        }
-        return line.isEmpty ? nil : line
-    }
-
-    private var stackLine: Bool { conversation != nil || botChrome != nil }
+    private var stackLine: Bool { conversation != nil }
 
     private var strands: StrandsModel { StrandsModel.shared }
 
@@ -1672,16 +1137,6 @@ struct ThreadView: View {
 
     private var threadComposer: some View {
         VStack(spacing: 8) {
-            if let botChrome {
-                BotNeedsYouCard(interactions: model.interactions,
-                                resolve: { await model.resolve($0, $1) }, cancel: { await model.cancel($0) },
-                                openWeb: { showingWeb = true })
-                let replies = BotQuickReplies.items(in: model.shownRows)
-                if model.interactions.isEmpty, model.thread?.isRunning != true, !replies.isEmpty, draft.isEmpty, !composerFocused {
-                    BotQuickReplies(items: replies, tint: BotPalette.color(botChrome.bot.color)) { send(text: $0) }
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
             if conversation != nil {
                 RouterNoticeBanner(threadId: model.threadId, openThread: openRouterThread)
                     .padding(.trailing, stackClear)
@@ -1697,27 +1152,15 @@ struct ThreadView: View {
                 }
                 .padding(.trailing, stackClear)
             }
-            if stackLine {
-                if strands.replacesInFlight() {
-                    if roomChat?.strandsBeside != true {
-                        StrandsBox(threadId: model.threadId, typing: composerFocused, openThread: openStrandThread)
-                            .padding(.trailing, stackClear)
-                    }
-                } else {
-                    InFlightBar(threadId: model.threadId, typing: composerFocused, liveStep: liveStep,
-                                workers: conversation?.workers.workers.count ?? 0)
-                        .padding(.trailing, stackClear)
-                }
+            if stackLine, roomChat?.strandsBeside != true {
+                StrandsBox(threadId: model.threadId, typing: composerFocused, openThread: openStrandThread)
+                    .padding(.trailing, stackClear)
             }
             if let conversation {
                 WorkerApprovalCards(approvals: approvals, openWorker: { conversation.push(.thread(id: $0)) }, decide: decideApproval)
             }
-            if !composerFocused, let conversation, !(stackLine && strands.replacesInFlight()), let workers = unlistedWorkers(conversation.workers) {
-                WorkersLineView(line: workers) { conversation.push(.thread(id: $0)) }
-                    .padding(.trailing, stackClear)
-            }
             if !(composerFocused && stackLine) {
-                ThreadShelf(model: model, showsBackground: !(stackLine && !strands.replacesInFlight() && InFlightBar.shows(model.threadId)))
+                ThreadShelf(model: model, showsBackground: true)
                     .padding(.trailing, stackClear)
             }
             if let error = outbox.storageError {
@@ -1817,34 +1260,10 @@ struct ThreadView: View {
                         .accessibilityLabel("Model & permissions")
                 }
             } send: {
-                if let botChrome, model.thread?.isRunning == true, !canSend, !dictation.blocksSend {
-                    // Nothing typed while the Bot works: stop it.
-                    Button { Task { await model.stop() } } label: {
-                        Group {
-                            if model.stopping {
-                                ProgressView().tint(Color(uiColor: .systemBackground))
-                            } else {
-                                Image(systemName: "stop.fill").font(.footnote.weight(.bold))
-                            }
-                        }
-                        .foregroundStyle(Color(uiColor: .systemBackground))
-                        .frame(width: 32, height: 32)
-                        .background(Color.primary.opacity(0.85), in: .circle)
-                        .frame(width: ComposerRow.button, height: ComposerRow.button).contentShape(.rect)
-                    }
-                    .disabled(model.stopping)
-                    .accessibilityLabel("Stop \(botChrome.bot.name)")
-                } else {
                 Button(action: send) {
                     Group {
                         if model.sending {
                             ProgressView()
-                        } else if let botChrome {
-                            Image(systemName: model.thread?.isRunning == true ? "text.append" : "arrow.up")
-                                .font(.body.weight(.bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 32, height: 32)
-                                .background(canSend ? BotPalette.color(botChrome.bot.color) : Color.secondary.opacity(0.35), in: .circle)
                         } else {
                             Image(systemName: model.thread?.isRunning == true ? "text.append" : "arrow.up.circle.fill")
                                 .font(model.thread?.isRunning == true ? .body.weight(.semibold) : .title)
@@ -1869,7 +1288,6 @@ struct ThreadView: View {
                     }
                 }
                 .accessibilityLabel(editing ? "Save edit" : model.thread?.isRunning == true ? "Queue message" : "Send")
-                }
             }
             .modifier(BotComposerGlass(active: true))
             .accessibilityElement(children: .contain)
@@ -1888,16 +1306,10 @@ struct ThreadView: View {
         }
         // Floats over the transcript, as in the Bot chat: no bar behind it.
         // Beside two pages it has the transcript's margins.
-        .padding(.horizontal, duoLayout.twoPages ? Self.margin(bot: botChrome != nil) : 12)
+        .padding(.horizontal, duoLayout.twoPages ? Self.margin : 12)
         .padding(.vertical, 8)
         .frame(maxWidth: Self.readableWidth)
         .frame(maxWidth: .infinity)
-        // Nudge them on a loop card drafts here, in the Bot's chat.
-        .onChange(of: app.botDraft, initial: true) { _, text in
-            guard botChrome != nil, let text else { return }
-            draftReply(text)
-            app.botDraft = nil
-        }
         // A `bbstudio://reply/<id>` link lands here.
         .onChange(of: app.replyThreadId, initial: true) { _, id in
             guard id == model.threadId else { return }
@@ -1912,19 +1324,16 @@ struct ThreadView: View {
         .onChange(of: StrandsModel.shared.flash[model.threadId]) { _, seq in
             if let seq { showReply(seq) }
         }
-        .task(id: conversation != nil || botChrome != nil ? model.threadId : "") {
-            guard conversation != nil || botChrome != nil else { return }
-            // Strands take In flight's place; a Studio without them keeps In flight.
+        .task(id: conversation != nil ? model.threadId : "") {
+            guard conversation != nil else { return }
             await StrandsModel.shared.poll(model.threadId)
-            guard !Task.isCancelled, !StrandsModel.shared.replacesInFlight() else { return }
-            await InFlightBar.poll(model.threadId)
         }
     }
 
     /// Lines past this get hard to follow on an iPad or a wide window.
     private static let readableWidth: CGFloat = 760
     /// The transcript's side margins: the Bot chat's bubbles sit closer to the edges.
-    private static func margin(bot: Bool) -> CGFloat { bot ? 12 : 16 }
+    private static let margin: CGFloat = 16
 }
 
 /// The composer's text, observed only by the views that read it.
@@ -2158,7 +1567,7 @@ struct ChatSkeleton: View {
     }
 }
 
-// MARK: - The new chat transcript (Settings ▸ Diagnostics ▸ New chat transcript)
+// MARK: - The chat transcript (UIKit, `iOS/Transcript`)
 
 /// The same thread on the UIKit transcript: the rows, composer, header and
 /// find bar go into one `TranscriptContainer`, which owns scrolling, the
@@ -2171,13 +1580,12 @@ extension ThreadView {
                                         findQuery: findQuery, currentMatch: currentMatch))
             .environment(\.threadId, model.threadId)
             .environment(\.openURL, transcriptV2OpenURL)
-            .modifier(BotChromeToolbar(chrome: botChrome, status: botStatus, shortStatus: botShortStatus, working: model.thread?.isRunning == true))
-            .navigationTitle(botChrome != nil ? "" : model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
+            .navigationTitle(model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(duoLayout.twoPages || (sizeClass == .compact && hidesTabBar) ? .hidden : .automatic, for: .tabBar)
             .toolbar(duoLayout.twoPages || compactHeader ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
-                if botChrome == nil && !duoLayout.twoPages {
+                if !duoLayout.twoPages {
                     ToolbarItemGroup(placement: .topBarTrailing) { threadActions }
                 }
                 if conversation != nil && !duoLayout.twoPages {
@@ -2187,7 +1595,7 @@ extension ThreadView {
                     ToolbarItem(placement: .principal) { WorkerTitle(info: worker) }
                 }
             }
-            .overlay { if compactHeader && botChrome == nil && !lying { FoldedColumn { compactActions } } }
+            .overlay { if compactHeader && !lying { FoldedColumn { compactActions } } }
             .onAppear { roomSession?.transcript = transcriptV2 }
     }
 
@@ -2195,40 +1603,37 @@ extension ThreadView {
     fileprivate var compactHeader: Bool { (FoldedChrome.columnHeader || duoPage) && !duoLayout.twoPages }
 
     @ViewBuilder fileprivate var compactActions: some View {
-        // The Bot's chat has its buttons from the Bot tab (`BotTab`). A
-        // thread: back out of whichever stack it's on, and its own actions.
-        if botChrome == nil {
-            if let showList = roomChat?.showList {
-                Button(action: showList) { Label("Conversations", systemImage: "list.bullet") }
-                    .accessibilityIdentifier("roomList")
-            } else if let roomChat {
-                Button { roomChat.layDown() } label: { Label("Back to the room", systemImage: "chevron.down") }
-                    .accessibilityIdentifier("roomLayDown")
-            } else {
-                FoldedBackButton()
+        // Back out of whichever stack it's on, and the thread's own actions.
+        if let showList = roomChat?.showList {
+            Button(action: showList) { Label("Conversations", systemImage: "list.bullet") }
+                .accessibilityIdentifier("roomList")
+        } else if let roomChat {
+            Button { roomChat.layDown() } label: { Label("Back to the room", systemImage: "chevron.down") }
+                .accessibilityIdentifier("roomLayDown")
+        } else {
+            FoldedBackButton()
+        }
+        threadActions
+        // The ↓ joins the rail's round buttons, so it never narrows the composer. With the
+        // keyboard up the rail has no room under ⋯; sending jumps to the end anyway.
+        if jumpState.shown && !composerFocused {
+            Button { transcriptV2.jumpToLatest() } label: {
+                Label(jumpState.note.map { "Jump to latest, \($0)" } ?? (jumpState.unseen > 0 ? "Jump to latest, new messages" : "Jump to latest"),
+                      systemImage: jumpState.note != nil ? "questionmark.bubble" : "arrow.down")
             }
-            threadActions
-            // The ↓ joins the rail's round buttons, so it never narrows the composer. With the
-            // keyboard up the rail has no room under ⋯; sending jumps to the end anyway.
-            if jumpState.shown && !composerFocused {
-                Button { transcriptV2.jumpToLatest() } label: {
-                    Label(jumpState.note.map { "Jump to latest, \($0)" } ?? (jumpState.unseen > 0 ? "Jump to latest, new messages" : "Jump to latest"),
-                          systemImage: jumpState.note != nil ? "questionmark.bubble" : "arrow.down")
+            .overlay(alignment: .topTrailing) {
+                if jumpState.unseen > 0, jumpState.note == nil {
+                    Circle().fill(look.accent).frame(width: 9, height: 9).offset(x: -6, y: 6).allowsHitTesting(false)
                 }
-                .overlay(alignment: .topTrailing) {
-                    if jumpState.unseen > 0, jumpState.note == nil {
-                        Circle().fill(look.accent).frame(width: 9, height: 9).offset(x: -6, y: 6).allowsHitTesting(false)
-                    }
-                }
-                .tint(jumpState.note != nil ? .orange : nil)
-                .transition(.opacity.combined(with: .scale(scale: 0.8)))
-                .accessibilityIdentifier("jumpToLatest")
             }
+            .tint(jumpState.note != nil ? .orange : nil)
+            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+            .accessibilityIdentifier("jumpToLatest")
         }
     }
 
     /// The folded Duo's rail is drawn: the ↓ is one of its buttons, not beside the composer.
-    fileprivate var jumpInRail: Bool { compactHeader && botChrome == nil && !lying }
+    fileprivate var jumpInRail: Bool { compactHeader && !lying }
 
     private var transcriptV2Body: some View {
         TranscriptContainer(
@@ -2236,10 +1641,7 @@ extension ThreadView {
             row: { [actions = transcriptV2Actions] row in ThreadTranscriptRowView(row: row, actions: actions) },
             composer: { Isolated { composer }.opacity(lying ? 0 : 1).allowsHitTesting(!lying).accessibilityHidden(lying) },
             top: transcriptV2HasTop ? { transcriptV2Top } : nil,
-            pill: { state, jump in
-                if botChrome != nil { ClassicBotActivity.shared.setReading(state.shown, threadId: model.threadId) }
-                return transcriptV2Pill(state, jump: jump)
-            },
+            pill: { state, jump in transcriptV2Pill(state, jump: jump) },
             onNearTop: { transcriptV2LoadOlder() },
             onEmptyTap: roomChat?.layDown,
             onPage: lying || composerFocused ? nil : roomChat?.page,
@@ -2263,7 +1665,7 @@ extension ThreadView {
         .ignoresSafeArea(.container)
         .overlay {
             // Nothing cached yet: the shape of a chat, not a blank screen.
-            if !model.loaded { ChatSkeleton(bot: botChrome != nil).allowsHitTesting(false) }
+            if !model.loaded { ChatSkeleton().allowsHitTesting(false) }
         }
         // Beside two pages the header owns the status-bar strip: the
         // transcript's scroll view mustn't take its taps as scroll-to-top.
@@ -2288,7 +1690,7 @@ extension ThreadView {
                 return .handled
             }
             if AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first {
-                if let botChrome { botChrome.openThread(id) } else { open(.thread(id: id)) }
+                open(.thread(id: id))
                 return .handled
             }
             return followLink(url)
@@ -2334,7 +1736,7 @@ extension ThreadView {
                     // The first row: the top, where older pages load.
                     if event.object as? String == "top", let first = ids.first { return view.transcriptV2.scrollTo(first, position: .top) }
                     guard event.object as? String == "mid" else { return view.transcriptV2.jumpToLatest(animated: false) }
-                    let target = ids.first { $0 == "a150" } ?? ids.dropFirst(view.botChrome != nil ? ids.count / 2 : ids.count / 4).first
+                    let target = ids.first { $0 == "a150" } ?? ids.dropFirst(ids.count / 4).first
                     if let target { view.transcriptV2.scrollTo(target, position: .top) }
                 }
                 #endif
@@ -2344,18 +1746,13 @@ extension ThreadView {
     fileprivate var transcriptV2Rows: [ThreadTranscriptRow] {
         guard model.loaded else { return [] }
         let pending = outbox.messages(for: model.threadId)
-        if let botChrome {
-            return ThreadTranscriptRow.bot(botChrome, rows: model.chainRows, status: botStatus, working: model.thread?.isRunning == true,
-                canLoadOlder: model.canLoadOlder, editableId: lastUserRowId, threadRows: model.rowIds, pending: pending,
-                typing: showsWorking, thinking: model.shelf.thinking)
-        }
         let items = inRoom ? RoomText.clean(model.shownItems) : model.shownItems
         let rows = ThreadTranscriptRow.thread(items: items, hasOlder: model.hasOlder, unread: unreadItem(in: items), match: currentMatch,
             editableId: worker == nil ? lastUserRowId : nil, pending: pending, interactions: shownInteractions,
             working: showsWorking, thinking: model.shelf.thinking, sideThreads: conversation != nil ? sideThreads : [:])
         let shown = inRoom ? RoomText.rows(rows) : rows
         // Strands in a Bot conversation: dividers where the strand changes, or only one strand.
-        guard conversation != nil, strands.replacesInFlight() else { return shown }
+        guard conversation != nil else { return shown }
         return ThreadTranscriptRow.strands(shown, tags: strands.tags[model.threadId], only: strands.only[model.threadId],
                                            flash: strands.flash[model.threadId])
     }
@@ -2374,11 +1771,11 @@ extension ThreadView {
         let threadId = model.threadId
         return ThreadTranscriptActions(
             onlyStrand: inConversation ? { strandId in withAnimation(.snappy) { StrandsModel.shared.only[threadId] = strandId } } : nil,
-            bot: botChrome?.bot, projectId: model.thread?.projectId, reactionItems: reactionSettings.items, cached: model.showsCache,
+            projectId: model.thread?.projectId, reactionItems: reactionSettings.items, cached: model.showsCache,
             draftReply: { draftReply($0) }, sendReply: { send(text: $0) }, quote: { quote($0) },
             select: { selecting = SelectionText(text: $0) }, edit: startEditing,
             saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
-            openThread: { id in if let botChrome { botChrome.openThread(id) } else { shell?.push(.thread(id: id)) } }, replyInThread: { botChrome?.replyInThread($0) },
+            openThread: { id in shell?.push(.thread(id: id)) }, replyInThread: { _ in },
             messageThread: inConversation ? { replyInThread($0) } : nil,
             forkConversation: inConversation ? { forkConversation($0) } : nil,
             openSideThread: inConversation ? { showThread($0) } : nil,
@@ -2404,7 +1801,7 @@ extension ThreadView {
         chrome.restingBackdrop = .systemBackground
         chrome.stackBand = look.showsScene ? UIColor(look.canvas) : .systemBackground
         chrome.composerIgnoresTrailingSafeArea = duoLayout.twoPages
-        chrome.rows.margin = Self.margin(bot: botChrome != nil)
+        chrome.rows.margin = Self.margin
         chrome.rows.spacing = 10
         chrome.rows.readableWidth = Self.readableWidth
         if duoLayout.twoPages {
@@ -2413,24 +1810,21 @@ extension ThreadView {
         }
         chrome.pill = .inline
         chrome.nearEnd = 120
-        chrome.softTopEdge = botChrome != nil
         return chrome
     }
 
-    fileprivate var transcriptV2HasTop: Bool { finding || (duoLayout.twoPages && botChrome == nil) || compactHeader }
+    fileprivate var transcriptV2HasTop: Bool { finding || duoLayout.twoPages || compactHeader }
 
     /// The Duo's header beside two pages, and the find bar under it.
     fileprivate var transcriptV2Top: some View {
         VStack(spacing: 0) {
             if compactHeader {
-                FoldedChatTitle(avatar: botChrome.map { AnyView(BotAvatar($0.bot.look, size: 16, working: model.thread?.isRunning == true)) },
-                                 title: botChrome?.bot.name ?? model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread",
-                                 status: botChrome != nil ? botStatus : nil)
+                FoldedChatTitle(avatar: nil, title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread", status: nil)
                     .background(.bar)
                     .opacity(lying ? 0 : 1)
                     .accessibilityHidden(lying)
             }
-            if duoLayout.twoPages && botChrome == nil {
+            if duoLayout.twoPages {
                 DuoHeader {
                     if conversation != nil {
                         conversationTitle
@@ -2500,7 +1894,7 @@ extension ThreadView {
     /// Older pages while the top is near: the container keeps the reader's
     /// row in place as they go in above, and asks again while still near.
     fileprivate func transcriptV2LoadOlder() {
-        guard botChrome != nil ? model.canLoadOlder : model.hasOlder else { return }
+        guard model.hasOlder else { return }
         Task {
             var failures = 0
             while !Task.isCancelled {
