@@ -34,6 +34,7 @@ import {
 import { CLEAR_BATCH, clearPayload, keptWorkers, noteNotified, noteWorkers, partition, settled, type Notified, type NotifiedWorkers, type ThreadReadState } from "./clear.js";
 import { DeskHold, holdable } from "./desk.js";
 import { appendJournal, JOURNAL_KEY, journalEntry, journalSummary, type JournalEntry, type JournalOutcome } from "./journal.js";
+import { redactSecrets } from "./redact.js";
 import { isQuietCompletion, isUserFacingReply, triggerOf, turnPushAllowed, type TurnTrigger } from "./notifications.js";
 import { collapseIdFor, PushWindows, summaryBody, windowKey } from "./push-window.js";
 import { StudioApprovals } from "./studio-approvals.js";
@@ -513,7 +514,8 @@ export default async function plugin(bb: BbPluginApi) {
       const category = outcome === "sent" && message.to.startsWith(APNS_TOKEN_PREFIX) ? notificationCategory(message.data ?? {}) : undefined;
       return journalEntry(message, outcome, now, { ...(category ? { category } : {}), ...(options.later && outcome === "sent" ? { later: options.later } : {}) });
     }));
-    const errors = tickets.flatMap((ticket) => (ticket.status === "error" ? [ticket.message ?? "unknown"] : []));
+    // Expo names the device token in some errors; none is stored, logged or printed.
+    const errors = tickets.flatMap((ticket) => (ticket.status === "error" ? [redactSecrets(ticket.message ?? "unknown")] : []));
     for (const error of new Set(errors)) bb.log.warn(`push delivery failed: ${error}`);
     await bb.storage.kv.set(LAST_DELIVERY_KEY, {
       at: new Date().toISOString(),
@@ -750,7 +752,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (!devices.length) return { ok: false, sent: 0, message: "No phone has received a push yet. Open the BB Studio app and allow notifications." };
       const tickets = await deliver(devices.map((to) => ({ to, title: "BB Studio", body: "Test push from Studio Mobile. Pushes work.", sound: "default", data: {} })));
       const sent = tickets.filter((ticket) => ticket.status === "ok").length;
-      const failed = tickets.flatMap((ticket) => (ticket.status === "error" ? [ticket.message ?? "unknown"] : []));
+      const failed = tickets.flatMap((ticket) => (ticket.status === "error" ? [redactSecrets(ticket.message ?? "unknown")] : []));
       return sent
         ? { ok: true, sent, message: `Sent to ${sent} phone${sent === 1 ? "" : "s"}.` }
         : { ok: false, sent: 0, message: `Apple didn't take it: ${[...new Set(failed)].join("; ") || "unknown error"}` };
@@ -869,17 +871,18 @@ export default async function plugin(bb: BbPluginApi) {
         lastDelivery: last ?? null,
         deskHold: deskStatus(),
       };
-      if (argv.includes("--json")) return { exitCode: 0, stdout: JSON.stringify(status) };
+      // Errors stored before redaction are redacted here.
+      if (argv.includes("--json")) return { exitCode: 0, stdout: redactSecrets(JSON.stringify(status)) };
       return {
         exitCode: 0,
-        stdout: [
+        stdout: redactSecrets([
           `APNs: ${status.apnsReady ? `ready (${status.environment})` : `not ready: ${status.apnsProblem}`}`,
           `Relay: ${status.relayPath}`,
           last
             ? `Last delivery ${last.at}: ${last.apns} APNs, ${last.expo} Expo${last.categories?.length ? ` (categories: ${last.categories.join(", ")})` : ""}${last.errors.length ? `; errors: ${last.errors.join("; ")}` : ""}`
             : "No deliveries yet.",
           `Hold while at the desk: ${status.deskHold.enabled ? "on" : "off"}; at the desk: ${status.deskHold.atDesk === null ? "unknown" : status.deskHold.atDesk ? "yes" : "no"}; held: ${status.deskHold.held}`,
-        ].join("\n"),
+        ].join("\n")),
       };
     },
   }));

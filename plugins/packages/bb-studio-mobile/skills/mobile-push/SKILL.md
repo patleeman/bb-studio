@@ -64,7 +64,7 @@ directly. Threads are tracked for three days.
 
 ## Commands
 
-- `bb mobile status [--json]` — whether APNs is configured, and the last delivery result.
+- `bb mobile status [--json]` — whether APNs is configured, and the last delivery result. Device tokens in error text show as `[redacted …abcd]`.
 - RPC `push_status` and `push_test` — the same status, and a test push to every remembered phone.
 - `bb mobile live-activities [--json]` — the Live Activity tokens phones registered, by device, Bot and kind (`push-to-start` or `update`), without the tokens.
 - `bb mobile deliveries [--hours N] [--json]` — what the relay did with each push (sent, quiet, muted, held at the desk, folded into a window, failed), per hour and by kind, then the last 20. No titles, bodies or tokens.
@@ -96,12 +96,20 @@ unreadable path is kept as a fallback until a key is pasted.
 
 ## Wiring
 
-Point push-notifications at the relay (the token is the per-plugin token
-from `bb plugin token mobile`; never print it into chat or logs):
+Point push-notifications at the relay on BB Studio's own server. In a
+Studio shell `BB_SERVER_URL` names it; BB Studio listens on 38986. Stock
+bb's server is a different one, and pushes sent there are lost. The
+token is the per-plugin token from `bbs plugin token mobile`; never print it
+into chat or logs:
 
 ```sh
-bb plugin config push-notifications set expoPushUrl \
-  "http://127.0.0.1:38886/api/v1/plugins/mobile/http/push?token=$(bb plugin token mobile)"
+bbs plugin config push-notifications set expoPushUrl \
+  "${BB_SERVER_URL:-http://127.0.0.1:38986}/api/v1/plugins/mobile/http/push?token=$(bbs plugin token mobile)"
 ```
+
+`bbs plugin config push-notifications` and `bbs push-notifications status`
+show the relay URL with its token as `[redacted …abcd]`. Writing that shown
+value back keeps the stored URL; to change it, set the whole URL again as
+above.
 
 Never read or print the APNs key.

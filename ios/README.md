@@ -701,9 +701,10 @@ notifications, including through the notification extension.
 3. **Route BB pushes through the relay**. This changes the push-notifications
    plugin, and non-APNs tokens still reach Expo:
    ```sh
-   bb plugin config push-notifications set expoPushUrl \
-     "http://127.0.0.1:38886/api/v1/plugins/mobile/http/push?token=$(bb plugin token mobile)"
+   bbs plugin config push-notifications set expoPushUrl \
+     "${BB_SERVER_URL:-http://127.0.0.1:38986}/api/v1/plugins/mobile/http/push?token=$(bbs plugin token mobile)"
    ```
+   BB Studio's server is on 38986; stock bb's server is a different one.
    The app registers itself (`apns:<token>`) on its first launch after you
    grant notification permission.
 4. **TestFlight** (optional):
