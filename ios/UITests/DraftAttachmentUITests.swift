@@ -22,10 +22,8 @@ final class DraftAttachmentUITests: ServerIsolatedUITestCase {
 
         // Leave for another conversation and come back.
         func leaveAndReopen() {
-            app.openRoomPlace("conversations")
-            app.buttons["roomConversation-thr_demo_interview"].tap()
-            app.openRoomPlace("conversations")
-            app.buttons["roomConversation-thr_botdemo01"].tap()
+            app.pickConversation("thr_demo_interview")
+            app.pickConversation("thr_botdemo01")
         }
         leaveAndReopen()
         XCTAssertTrue(composer.waitForExistence(timeout: 10))

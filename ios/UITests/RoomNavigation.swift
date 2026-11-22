@@ -32,6 +32,16 @@ extension XCUIApplication {
         row.tap()
     }
 
+    /// A conversation from the one list, which closes over it.
+    func pickConversation(_ id: String, file: StaticString = #filePath, line: UInt = #line) {
+        openRoomPlace("conversations", file: file, line: line)
+        let row = buttons["roomConversation-\(id)"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "\(id) in the list", file: file, line: line)
+        row.tap()
+        XCTAssertTrue(descendants(matching: .any)["RoomSheet-conversations"].firstMatch.waitForNonExistence(timeout: 10),
+                      "the list closes", file: file, line: line)
+    }
+
     /// Back from a pushed screen: the rail's Back on the folded Duo, the
     /// navigation bar's elsewhere. Waits for either to show.
     func goBack(timeout: TimeInterval = 20, file: StaticString = #filePath, line: UInt = #line) {
