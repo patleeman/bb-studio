@@ -4527,8 +4527,8 @@ strands. Quiet `[PASS]` replies and the backfill's history aren't tagged.
   `slots.experimental_timelineFilter`) the strands box above the composer is
   gone; an older BB keeps the box and has no zoom. **Tree**, one level
   further out, draws the strands as branches on the same time axis: the
-  trunk on the left, each strand branching from its parent (or the trunk)
-  where it starts and ending in a dot when done, with nodes only for your
+  trunk on the left, each strand branching where it starts (from its
+  parent once sorting records one in strands.tags' parentId, else the trunk) and ending in a dot when done, with nodes only for your
   messages (◆), asks (amber ring), results (□) and the open ask (filled
   amber). Clicking a node zooms in to that message. **Esc Esc** opens
   keyboard mode on the tree: a search field at its top (typing fades the

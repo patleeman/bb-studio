@@ -42133,11 +42133,13 @@ public enum Studio {
     public var id: String?
     public var title: String?
     public var done: Bool?
+    public var parentId: String?
 
-    public init(id: String? = nil, title: String? = nil, done: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, done: Bool? = nil, parentId: String? = nil) {
       self.id = id
       self.title = title
       self.done = done
+      self.parentId = parentId
     }
   }
 

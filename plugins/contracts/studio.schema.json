@@ -57302,12 +57302,20 @@
                 "done": {
                   "default": false,
                   "type": "boolean"
+                },
+                "parentId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
                 "id",
                 "title",
-                "done"
+                "done",
+                "parentId"
               ],
               "additionalProperties": false
             }

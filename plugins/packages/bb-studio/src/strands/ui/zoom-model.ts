@@ -44,7 +44,11 @@ export const WHOLE = "Whole conversation";
 type Turn = Tags["tags"][number];
 type Reply = NonNullable<Tags["replies"]>[number];
 
-const clip = (text: string, max = 90) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
+/** Cuts to `max` characters (code points, so an emoji is never split), with "…". */
+export function clip(text: string, max = 90): string {
+  const chars = Array.from(text);
+  return chars.length > max ? `${chars.slice(0, max - 1).join("").trimEnd()}…` : text;
+}
 
 /** The conversation's stretches of one strand, oldest first, with "N hours later" between long pauses. */
 export function zoomLines(tags: Tags | null | undefined): ZoomRow[] {
@@ -169,7 +173,9 @@ export interface TreeNode {
   /** Its turn's first message. */
   turnSeq: number;
   kind: TreeNodeKind;
+  /** The line drawn (clipped), and the whole first line, which the search reads. */
   label: string;
+  text: string;
   at: number | null;
   strandId: string | null;
   column: number;
@@ -196,7 +202,10 @@ export interface ZoomTree {
   nodes: TreeNode[];
   gaps: { y: number; hours: number }[];
   height: number;
+  /** Columns in use at once (the trunk is 0): a done strand's column is reused by a later one. */
   columns: number;
+  /** Each strand's name, for the search. */
+  names: ReadonlyMap<string, string>;
 }
 
 /** Vertical space for a turn with a node, and for one without. */
@@ -210,13 +219,27 @@ const stripRelay = (text: string) => text.replace(/^\[bb [^\]\n]*\]\s*/u, "").tr
 /** The conversation as a tree on one vertical time axis: the trunk, a lane per strand branching from its parent, and its nodes. */
 export function zoomTree(tags: Tags | null | undefined): ZoomTree {
   const turns = (tags?.tags ?? []) as readonly Turn[];
-  const empty: ZoomTree = { lanes: [], nodes: [], gaps: [], height: TREE_TOP + TREE_BOTTOM, columns: 1 };
+  const empty: ZoomTree = { lanes: [], nodes: [], gaps: [], height: TREE_TOP + TREE_BOTTOM, columns: 1, names: new Map() };
   if (!turns.length) return empty;
   const replies = new Map<string, Reply>();
   for (const reply of tags?.replies ?? []) replies.set(reply.turnId, reply);
-  const strands = new Map((tags?.strands ?? []).map((strand) => [strand.id, strand as Tags["strands"][number] & { parentId?: string | null }]));
+  const strands = new Map((tags?.strands ?? []).map((strand) => [strand.id, strand]));
+  // A column per strand while it runs; once a done strand has ended, a later strand takes its column.
+  const firstAt = new Map<string, number>();
+  const lastAt = new Map<string, number>();
+  turns.forEach((turn, index) => {
+    if (!turn.strandId) return;
+    if (!firstAt.has(turn.strandId)) firstAt.set(turn.strandId, index);
+    lastAt.set(turn.strandId, index);
+  });
   const columns = new Map<string, number>();
-  for (const turn of turns) if (turn.strandId && !columns.has(turn.strandId)) columns.set(turn.strandId, columns.size + 1);
+  const busyUntil: number[] = [Number.POSITIVE_INFINITY];
+  for (const [strandId, start] of firstAt) {
+    let column = busyUntil.findIndex((until, at) => at > 0 && until < start);
+    if (column < 0) { column = busyUntil.length; busyUntil.push(0); }
+    busyUntil[column] = strands.get(strandId)?.done ? lastAt.get(strandId)! : Number.POSITIVE_INFINITY;
+    columns.set(strandId, column);
+  }
   const open = turns.find((turn) => { const reply = replies.get(turn.turnId); return reply?.tag === "needs-you" && !reply.resolved; });
   const currentStrand = open ? open.strandId : turns.at(-1)!.strandId;
 
@@ -239,7 +262,8 @@ export function zoomTree(tags: Tags | null | undefined): ZoomTree {
     ys.set(turn.turnId, y);
     if (!node) return;
     const strandId = turn.strandId;
-    const name = strandId && !named.has(strandId) ? strands.get(strandId)?.title ?? null : null;
+    const title = strandId && !named.has(strandId) ? strands.get(strandId)?.title ?? null : null;
+    const name = title === null ? null : clip(title, 32);
     if (strandId) named.add(strandId);
     nodes.push({ ...node, at: turn.at ?? null, strandId, column: strandId ? columns.get(strandId)! : 0, y, name });
   });
@@ -260,18 +284,15 @@ export function zoomTree(tags: Tags | null | undefined): ZoomTree {
       done,
     };
   });
-  return { lanes, nodes, gaps, height, columns: columns.size + 1 };
+  const names = new Map([...columns.keys()].map((strandId) => [strandId, strands.get(strandId)?.title ?? "Strand"]));
+  return { lanes, nodes, gaps, height, columns: busyUntil.length, names };
 }
 
-function nodeOf(turn: Turn, reply: Reply | undefined): Pick<TreeNode, "seq" | "turnSeq" | "kind" | "label"> | null {
-  if (reply?.tag === "needs-you") {
-    return { seq: reply.seq, turnSeq: turn.seq, kind: reply.resolved ? "ask" : "open", label: clip(reply.ask ?? reply.line ?? "Asked you", 60) };
-  }
-  if (turn.kind === "user") return { seq: turn.seq, turnSeq: turn.seq, kind: "dec", label: clip(turn.line ?? "Your message", 60) };
-  if (turn.kind === "report") {
-    const text = reply?.line ?? stripRelay(turn.line ?? "");
-    return { seq: reply?.seq ?? turn.seq, turnSeq: turn.seq, kind: "res", label: clip(text || "A result", 60) };
-  }
+function nodeOf(turn: Turn, reply: Reply | undefined): Pick<TreeNode, "seq" | "turnSeq" | "kind" | "label" | "text"> | null {
+  const node = (seq: number, kind: TreeNodeKind, text: string) => ({ seq, turnSeq: turn.seq, kind, label: clip(text, 60), text });
+  if (reply?.tag === "needs-you") return node(reply.seq, reply.resolved ? "ask" : "open", reply.ask ?? reply.line ?? "Asked you");
+  if (turn.kind === "user") return node(turn.seq, "dec", turn.line ?? "Your message");
+  if (turn.kind === "report") return node(reply?.seq ?? turn.seq, "res", reply?.line ?? (stripRelay(turn.line ?? "") || "A result"));
   return null;
 }
 
@@ -283,12 +304,25 @@ export function nodeAt(tree: ZoomTree, seq: number | null): TreeNode | null {
   return found ?? tree.nodes[0]!;
 }
 
-/** Whether a node matches the keyboard search (its line or its strand's name). */
+/** Whether a node matches the keyboard search (its whole first line or its strand's name). */
 export function nodeMatches(node: TreeNode, tree: ZoomTree, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
-  const strand = tree.lanes.find((lane) => lane.strandId === node.strandId)?.name ?? "";
-  return node.label.toLowerCase().includes(needle) || strand.toLowerCase().includes(needle);
+  const strand = node.strandId ? tree.names.get(node.strandId) ?? "" : "";
+  return node.text.toLowerCase().includes(needle) || strand.toLowerCase().includes(needle);
+}
+
+/** The nodes (seqs) and strands the search matches, once per query; null when nothing is typed. */
+export function treeMatches(tree: ZoomTree, query: string): { seqs: ReadonlySet<number>; strands: ReadonlySet<string> } | null {
+  if (!query.trim()) return null;
+  const seqs = new Set<number>();
+  const strands = new Set<string>();
+  for (const node of tree.nodes) {
+    if (!nodeMatches(node, tree, query)) continue;
+    seqs.add(node.seq);
+    if (node.strandId) strands.add(node.strandId);
+  }
+  return { seqs, strands };
 }
 
 /** Keyboard mode: the node a key moves to from `from` (↑↓ through the matches, ←→ to the nearest node on the neighbouring lane). */
