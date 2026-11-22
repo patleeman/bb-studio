@@ -2,6 +2,7 @@
 // store (store.ts), the one-time migration (migrate.ts), the RPCs the
 // settings sections and the iOS app use (contract.ts), and the push status
 // Studio shows for the Mobile plugin.
+import { redactedValues, withoutRedactedEcho } from "./redacted";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { errorMessage } from "../kit/format";
@@ -60,7 +61,7 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
     return { keys: Object.entries(STUDIO_KEY_SETTINGS).map(([key, setting]) => ({ key, label: setting.label, description: setting.description, set: set[key] === true })) };
   };
   const answer = () => ({
-    values: { ...store.current() },
+    values: redactedValues({ ...store.current() }),
     changed: Object.keys(store.explicit()),
     timeZone: loopTimeZone(process.env, store.current().todosTimeZone),
     defaultTimeZone: loopTimeZone(process.env),
@@ -76,7 +77,7 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
   bb.rpc.register(settingsContract, {
     "settings.get": async () => answer(),
     "settings.set": async ({ values }) => {
-      await store.set(values);
+      await store.set(withoutRedactedEcho(values, store.current() as Record<string, unknown>));
       return answer();
     },
     "settings.keys.get": () => apiKeys(),
