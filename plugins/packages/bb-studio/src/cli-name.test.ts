@@ -9,10 +9,22 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import ts from "typescript";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import plugin from "../server";
 import { STUDIO_CLI_ALIAS_MARKER, studioCliName, studioCliRegistration, withStudioCli } from "./cli-name";
 import { installCommand, marketplaceCommand } from "./setup";
+
+// studioCliName() reads BB_CLI, also while modules load (setup.ts builds its
+// commands then). An agent shell's BB_CLI can point at a CLI with no Studio
+// `bbs` beside it, which makes the text say `bb`. These tests expect BB
+// Studio's own CLI, so the shell's BB_* variables are set aside before any
+// import runs and put back afterwards.
+const ambientBb = vi.hoisted(() => {
+  const saved: Record<string, string | undefined> = {};
+  for (const name of Object.keys(process.env)) if (name.startsWith("BB_")) { saved[name] = process.env[name]; delete process.env[name]; }
+  return saved;
+});
+afterAll(() => { Object.assign(process.env, ambientBb); });
 
 const root = join(__dirname, "..");
 const plugins = join(root, "..", "..");

@@ -1,8 +1,20 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import type { HealthSummary, Problem } from "./health-contract";
 import { buildSetup, classify, formatSetup, oneLine, RETIRED, SetupService, type SetupPluginEntry, type SetupSdk } from "./setup";
 import { ADDONS, MARKETPLACE_NAME } from "./setup-addons";
+
+// studioCliName() reads BB_CLI, also while modules load (setup.ts builds its
+// commands then). An agent shell's BB_CLI can point at a CLI with no Studio
+// `bbs` beside it, which makes the text say `bb`. These tests expect BB
+// Studio's own CLI, so the shell's BB_* variables are set aside before any
+// import runs and put back afterwards.
+const ambientBb = vi.hoisted(() => {
+  const saved: Record<string, string | undefined> = {};
+  for (const name of Object.keys(process.env)) if (name.startsWith("BB_")) { saved[name] = process.env[name]; delete process.env[name]; }
+  return saved;
+});
+afterAll(() => { Object.assign(process.env, ambientBb); });
 
 const plugin = (id: string, extra: Partial<SetupPluginEntry> = {}): SetupPluginEntry => ({ id, name: id, enabled: true, status: "running", version: "1.0.0", ...extra });
 const problem = (pluginId: string, status: Problem["status"], title = "Add a key"): Problem => ({
