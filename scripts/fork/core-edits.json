@@ -167,9 +167,9 @@
       "budget": 2
     },
     "apps/server/src/server.ts": {
-      "seam": "import-sync, approvals, skills-registry-policy, thread-successor, text-completion",
-      "intent": "Registers the fork's import routes (/api/v1/fork/import/* and /api/v1/fork/bring-over/*, given the plugin service so a plugin from bb can be added) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain. One fork import and registerForkTextCompletion(deps) right after it, so plugins' experimental_completeText can run bb's title task (services/ai/plugin-text-completion.fork.ts).",
-      "budget": 10
+      "seam": "import-sync, approvals, skills-registry-policy, thread-successor, text-completion, list-quiet",
+      "intent": "Registers the fork's import routes (/api/v1/fork/import/* and /api/v1/fork/bring-over/*, given the plugin service so a plugin from bb can be added) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain. One fork import and registerForkTextCompletion(deps) right after it, so plugins' experimental_completeText can run bb's title task (services/ai/plugin-text-completion.fork.ts). One fork import and the /ws route's onOpen calls markListQuiet(socket, context.req.url) before onClientSocketOpen, so a client that opened /ws?listEvents=status is quiet (ws/list-quiet.fork.ts).",
+      "budget": 16
     },
     "apps/server/src/services/plugins/plugin-service.ts": {
       "seam": "quiet-turns, plugin-events, bundled-studio, secret-redaction",
@@ -367,9 +367,9 @@
       "budget": 4
     },
     "apps/server/src/ws/hub.ts": {
-      "seam": "plugin-events",
-      "intent": "notifyThread, where events-appended is announced to plugins, also calls announceThreadFilesChanged (fork-plugin-events.ts), which emits experimental_thread.fileChanged for new completed file-change items.",
-      "budget": 2
+      "seam": "plugin-events, list-quiet",
+      "intent": "notifyThread, where events-appended is announced to plugins, also calls announceThreadFilesChanged (fork-plugin-events.ts), which emits experimental_thread.fileChanged for new completed file-change items. One import and one condition in notifyThreadListOnlySockets: a socket isListQuiet (list-quiet.fork.ts) marked gets no thread-list events-appended for threads it does not subscribe to.",
+      "budget": 5
     },
     "plugins/git/ui/diff/DiffTab.tsx": {
       "seam": "diff-to-editor",
