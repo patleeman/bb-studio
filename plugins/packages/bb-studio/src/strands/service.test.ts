@@ -212,7 +212,7 @@ describe("strands.list", () => {
     const { tags, strands } = x.svc.tags(x.thread.id);
     expect(tags).toMatchObject([{ turnId: a.turnId, seq: a.seq, strandId: strands[0]!.id, kind: "user", line: "Look at the router" }, { turnId: b.turnId, seq: b.seq, strandId: null, kind: "user", line: "thanks" }]);
     expect(typeof tags[0]!.at).toBe("number");
-    expect(strands[0]).toEqual({ id: strands[0]!.id, title: strands[0]!.title, done: false });
+    expect(strands[0]).toEqual({ id: strands[0]!.id, title: strands[0]!.title, done: false, parentId: null });
   });
 });
 

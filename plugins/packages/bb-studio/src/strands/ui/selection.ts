@@ -140,10 +140,10 @@ export function registerTimelineFilter(slots: object, zoomView?: ZoomViewCompone
   return true;
 }
 
-// ---- semantic zoom: 0 messages (BB's timeline), 1 strands ----
+// ---- semantic zoom: 0 messages (BB's timeline), 1 strands, 2 the tree ----
 
-/** The furthest out a conversation zooms (1: strands; the tree comes later). */
-export const ZOOM_MAX = 1;
+/** The furthest out a conversation zooms (2: the tree). */
+export const ZOOM_MAX = 2;
 const zoomLevels = new Map<string, number>();
 let hostZooms = false;
 
@@ -184,7 +184,27 @@ export function setZoom(threadId: string, level: number): void {
   const next = Math.max(0, Math.min(ZOOM_MAX, Math.round(level)));
   if (zoomOf(threadId) === next) return;
   if (next === 0) zoomLevels.delete(threadId); else zoomLevels.set(threadId, next);
+  // Keyboard mode lives on the tree only.
+  if (next < ZOOM_MAX) keyboardModes.delete(threadId);
   notify();
+}
+
+/** Keyboard mode (Esc Esc): the tree with a search, ↑↓ ←→ and Enter. */
+const keyboardModes = new Set<string>();
+
+export function keyboardModeOf(threadId: string): boolean {
+  return keyboardModes.has(threadId);
+}
+
+/** Turns keyboard mode on (at the tree) or off (staying where it is). */
+export function setKeyboardMode(threadId: string, on: boolean): void {
+  if (keyboardModes.has(threadId) === on) return;
+  if (on) { keyboardModes.add(threadId); zoomLevels.set(threadId, ZOOM_MAX); } else keyboardModes.delete(threadId);
+  notify();
+}
+
+export function useKeyboardMode(threadId: string): boolean {
+  return useSyncExternalStore(subscribeSelection, () => keyboardModes.has(threadId), () => false);
 }
 
 export function useZoom(threadId: string): number {
@@ -195,7 +215,7 @@ export function useZoom(threadId: string): number {
 export const timelineFiltersInHost = () => hostFilters;
 
 /** Test hook: a fresh app (no host filter, nothing picked). */
-export function resetSelectionForTests(): void { hostFilters = false; hostZooms = false; zoomLevels.clear(); zoomable.clear(); selected.clear(); filters.clear(); marks.clear(); foldTags.clear(); openFolds.clear(); foldCache.clear(); }
+export function resetSelectionForTests(): void { hostFilters = false; hostZooms = false; zoomLevels.clear(); zoomable.clear(); keyboardModes.clear(); selected.clear(); filters.clear(); marks.clear(); foldTags.clear(); openFolds.clear(); foldCache.clear(); }
 
 // ---- runs of status replies, folded in BB's timeline ----
 

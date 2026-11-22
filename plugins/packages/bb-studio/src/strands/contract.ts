@@ -138,7 +138,7 @@ export const rpcContract = defineRpcContract({
       /** Sorted turns, oldest first: each turn's first message (its seq) and its strand, null for none. */
       tags: z.array(z.object({ turnId: z.string(), seq: z.number(), strandId: z.string().nullable(), /** "user": the user wrote it; "report": another thread's or a runner's message. */ kind: z.enum(["user", "report"]).default("user"), /** When it was sent (ms), and its first line. */ at: z.number().nullable().default(null), line: z.string().nullable().default(null) })),
       /** The conversation's strands; `done`: an agent said it is done. */
-      strands: z.array(z.object({ id: z.string(), title: z.string(), done: z.boolean().default(false) })),
+      strands: z.array(z.object({ id: z.string(), title: z.string(), done: z.boolean().default(false), /** The strand it branched from, when sorting knows one. */ parentId: z.string().nullable().default(null) })),
       /** Tagged replies, oldest first: each turn's reply needs-you or status, its ask line, and whether the user is past it. */
       replies: z.array(replyTagView).default([]),
     }),

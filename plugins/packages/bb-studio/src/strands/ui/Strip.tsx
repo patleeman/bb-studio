@@ -92,6 +92,8 @@ export function useStrandFilter(threadId: string, own?: { readonly current: HTML
       const target = event.target as HTMLElement | null;
       const typing = !!target && (target.isContentEditable || /^(?:INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) && target !== own?.current;
       if (typing) return;
+      // Handled: Esc Esc (keyboard mode) doesn't count this one.
+      event.preventDefault();
       select(threadId, null);
     };
     document.addEventListener("keydown", onKey);
