@@ -9,5 +9,9 @@ device_id="${BB_TEST_SIMULATOR_ID:?Set BB_TEST_SIMULATOR_ID to your private empt
 for domain in nyc.plee.bbgo group.nyc.plee.bbgo; do
   xcrun simctl spawn "$device_id" defaults write "$domain" serverURL https://unit-tests.invalid
 done
+# The three transcript replay tests take about 12 minutes of the run's 13:
+# they run in scripts/test-transcript.sh, and here only with REPLAY=1.
+skip_replay="-skip-testing:BBStudioTests/TranscriptReplayTests"
+if [ "${REPLAY:-0}" = 1 ]; then skip_replay=""; fi
 xcodebuild test -scheme BBStudio -destination "id=$device_id" \
-  -derivedDataPath build/system/DerivedData -only-testing:BBStudioTests "$@"
+  -derivedDataPath build/system/DerivedData -only-testing:BBStudioTests $skip_replay "$@"
