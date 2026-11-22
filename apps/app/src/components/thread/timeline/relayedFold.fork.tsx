@@ -27,11 +27,13 @@ import {
 } from "@/lib/fork-timeline-filter";
 import {
   foldTurnRuns,
-  linkedRowId,
   TurnRunMarkerLine,
   type TurnRunMarker,
 } from "./turnRunFold.fork.js";
-import { useSearchMessageLocation } from "./useScrollToSearchedMessage.js";
+import {
+  collectSearchedMessageAncestorRowIds,
+  useSearchMessageLocation,
+} from "./useScrollToSearchedMessage.js";
 import {
   noticeFoldOf,
   noticeOf,
@@ -99,6 +101,7 @@ export class FoldedRows extends Set<string> {
 }
 
 const NO_FOLDS = new FoldedRows();
+const NO_TARGET: ReadonlySet<string> = new Set();
 
 export const RelayedFoldContext = createContext<FoldedRows>(NO_FOLDS);
 export const RelayedRowFoldedContext = createContext(false);
@@ -230,6 +233,7 @@ export function foldRelayedRows(
   streamingAssistantMessageId: string | null,
   classifiers: ReplyClassifiers = getPluginSlotSnapshot().replyClassifiers,
   active: boolean = streamingAssistantMessageId !== null,
+  targetRowIds: ReadonlySet<string> = NO_TARGET,
 ): RelayedFold {
   const relayed = (row: ThreadTimelineViewRow | undefined): boolean =>
     row !== undefined &&
@@ -303,6 +307,11 @@ export function foldRelayedRows(
       after?.kind === "conversation" && after.role === "assistant"
         ? Math.max(...group)
         : -1;
+    // A group holding the message a link points at stays as it is, so the jump lands on it.
+    if (targetRowIds.size > 0 && rows.slice(index, end + 1).some((row) => targetRowIds.has(row.id))) {
+      index = end;
+      continue;
+    }
     for (let at = index; at <= end; at += 1) {
       const row = rows[at]!;
       if (at === answered) continue;
@@ -337,15 +346,23 @@ export function useRelayedFold(
   const runFolds = useTimelineFoldsOf(threadId);
   // A message link or search result into a folded run keeps that run open.
   const { target } = useSearchMessageLocation();
-  const targetSeq = target?.seq ?? null;
-  const targetMatch = target?.match ?? null;
+  // Only a link into this list's own thread (a delegation's nested list is another thread).
+  const forThisThread =
+    target !== null && (target.threadId === null || target.threadId === threadId);
+  const targetSeq = forThisThread ? target.seq : null;
+  const targetMatch = forThisThread ? target.match : null;
   const fold = useMemo(() => {
     if (unfold) return { rows, folded: NO_FOLDS, opened: NO_OPENED };
+    const targetRowIds =
+      targetSeq === null || targetMatch === null
+        ? NO_TARGET
+        : collectSearchedMessageAncestorRowIds(rows, targetSeq, targetMatch);
     const relayed = foldRelayedRows(
       rows,
       scopeActive ? findStreamingAssistantMessageId(rows) : null,
       slots.replyClassifiers,
       scopeActive,
+      targetRowIds,
     );
     // A plugin's folded runs (status replies), over what the relayed fold left.
     const runs = foldTurnRuns(relayed.rows, runFolds, {
@@ -355,10 +372,7 @@ export function useRelayedFold(
         row.kind === "conversation" &&
         row.role === "assistant" &&
         isQuietReply(row.text, slots.replyClassifiers),
-      targetRowId:
-        targetSeq === null || targetMatch === null
-          ? null
-          : linkedRowId(rows, { seq: targetSeq, match: targetMatch }),
+      targetRowIds,
     });
     if (runs.markers.size === 0) return { ...relayed, opened: runs.opened };
     return {
