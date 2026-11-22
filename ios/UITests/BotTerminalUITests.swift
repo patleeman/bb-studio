@@ -8,7 +8,7 @@ final class BotTerminalUITests: ServerIsolatedUITestCase {
         let app = XCUIApplication()
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-openURL", "bbstudio://bot"]
         app.launchOffline()
-        let options = app.navigationBars.buttons["More"].firstMatch
+        let options = app.conversationMore
         XCTAssertTrue(options.waitForExistence(timeout: 20))
         XCTAssertTrue(app.descendants(matching: .any)["composerMic"].firstMatch.waitForExistence(timeout: 20), "the chat loaded")
         options.tap()

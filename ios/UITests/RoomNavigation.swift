@@ -32,14 +32,47 @@ extension XCUIApplication {
         row.tap()
     }
 
-    /// Back from a pushed screen: the rail's Back on the folded Duo, the navigation bar's elsewhere.
-    func goBack() {
+    /// Back from a pushed screen: the rail's Back on the folded Duo, the
+    /// navigation bar's elsewhere. Waits for either to show.
+    func goBack(timeout: TimeInterval = 20, file: StaticString = #filePath, line: UInt = #line) {
+        // The folded Duo's conversation rail, or a pushed screen's own side
+        // column there (its BackButton sits outside a navigation bar).
         let folded = buttons["folded-back"]
+        let back = buttons["BackButton"].firstMatch
+        let bar = navigationBars.firstMatch
+        let shown = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            (folded.exists && folded.isHittable) || (back.exists && back.isHittable) || bar.buttons.firstMatch.exists
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: timeout), .completed, "a Back button", file: file, line: line)
         if folded.exists, folded.isHittable { return folded.tap() }
-        let back = navigationBars.buttons["BackButton"]
-        if back.exists { return back.tap() }
-        navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
+        if back.exists, back.isHittable { return back.tap() }
+        bar.buttons.element(boundBy: 0).tap()
     }
+
+    /// The conversation's ⋯: in the header, or in the folded Duo's side column.
+    var conversationMore: XCUIElement { buttons["conversationMore"].firstMatch }
+
+    /// The conversation's name: the header's title button, or the folded
+    /// Duo's title (the side column's Bot mark opens the list there).
+    var conversationTitle: XCUIElement {
+        let folded = staticTexts["foldedChatTitle"]
+        return folded.exists ? folded : buttons["conversationTitleList"]
+    }
+
+    /// Which conversation shows: the page dots ("Conversation 2 of 4") on
+    /// the phone, the conversation's title on the folded Duo, which has none.
+    var shownConversation: XCUIElement {
+        isFoldedDuo ? staticTexts["foldedChatTitle"] : descendants(matching: .any)["conversationPageDots"].firstMatch
+    }
+
+    /// A reply thread or fork: Done on its sheet, Back where it's pushed.
+    func closeReplyThread() {
+        let done = buttons["replyThreadDone"]
+        if done.waitForExistence(timeout: 3) { done.tap() } else { goBack() }
+    }
+
+    /// True on the folded Duo, whose header is a title over the messages and a side column.
+    var isFoldedDuo: Bool { staticTexts["foldedChatTitle"].exists }
 
     func closeRoomSheet() {
         let top = coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.075))

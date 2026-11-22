@@ -13,11 +13,7 @@ final class BotSpacesUITests: ServerIsolatedUITestCase {
 
     private var list: XCUIElement { app.collectionViews["BotSpaceList"] }
 
-    private func back() {
-        let bar = app.navigationBars.firstMatch
-        XCTAssertTrue(bar.waitForExistence(timeout: 20))
-        bar.buttons.element(boundBy: 0).tap()
-    }
+    private func back() { app.goBack() }
 
     func testLaunchOpensMainAndBackShowsTheList() {
         launch()
@@ -67,7 +63,7 @@ final class BotSpacesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["Studio"].exists)
         app.buttons["Studio"].tap()
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10), "Studio opens over the list")
-        app.navigationBars["Studio"].swipeDown(velocity: .fast)
+        app.closeRoomSheet()
         XCTAssertTrue(app.navigationBars["Studio"].waitForNonExistence(timeout: 10))
         XCTAssertTrue(list.waitForExistence(timeout: 10))
         app.buttons["BotSpaceSettings"].tap()

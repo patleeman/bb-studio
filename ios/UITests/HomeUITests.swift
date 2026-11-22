@@ -21,6 +21,8 @@ final class HomeUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation is the first thing")
         XCTAssertFalse(app.buttons["roomInput"].exists, "no presence screen")
         XCTAssertTrue(app.buttons["strands-toggle"].waitForExistence(timeout: 20), "its strands box")
+        XCTAssertTrue(app.shownConversation.waitForExistence(timeout: 10))
+        let first = app.shownConversation.label
         let list = app.buttons["roomList"]
         XCTAssertTrue(list.exists, "the Bot's mark in the header")
         shot("1-home")
@@ -37,27 +39,32 @@ final class HomeUITests: ServerIsolatedUITestCase {
         XCTAssertFalse(app.buttons["roomPlace-tasks"].exists, "no Tasks")
         shot("3-list-places")
         app.buttons["roomPlace-memory"].tap()
-        XCTAssertTrue(app.navigationBars.buttons.firstMatch.waitForExistence(timeout: 10), "Memory opens in the list")
-        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.buttons["memoryAdd"].waitForExistence(timeout: 10), "Memory opens in the list")
+        app.goBack()
 
         app.swipeDown()
         let launchPrep = app.buttons["roomConversation-thr_demo_interview"]
         XCTAssertTrue(launchPrep.waitForExistence(timeout: 10))
         launchPrep.tap()
         XCTAssertTrue(any("RoomSheet-conversations").waitForNonExistence(timeout: 10), "the list closes")
-        let dots = any("conversationPageDots")
-        XCTAssertTrue(dots.waitForExistence(timeout: 10))
-        XCTAssertFalse(dots.label.hasPrefix("Conversation 1 of"), "another conversation shows: \(dots.label)")
+        let shown = app.shownConversation
+        XCTAssertTrue(shown.waitForExistence(timeout: 10))
+        let picked = shown.label
+        XCTAssertNotEqual(picked, first, "another conversation shows")
         shot("4-picked")
 
         app.terminate()
         launch(["-qaRoomRemember"])
-        XCTAssertTrue(any("conversationPageDots").waitForExistence(timeout: 30))
-        XCTAssertEqual(any("conversationPageDots").label, dots.label, "it opens on the last conversation opened")
+        XCTAssertTrue(app.waitForRoom())
+        XCTAssertTrue(app.shownConversation.waitForExistence(timeout: 30))
+        XCTAssertEqual(app.shownConversation.label, picked, "it opens on the last conversation opened")
     }
 
-    func testTheTitleOpensTheListToo() {
+    func testTheTitleOpensTheListToo() throws {
         launch()
+        XCTAssertTrue(app.waitForRoom())
+        // The folded Duo's title is plain text; its side column's Bot mark opens the list.
+        try XCTSkipIf(app.isFoldedDuo, "the folded Duo has no title button")
         let title = app.buttons["conversationTitleList"]
         XCTAssertTrue(title.waitForExistence(timeout: 30))
         title.tap()

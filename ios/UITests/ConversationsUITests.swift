@@ -15,17 +15,14 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 
-    private func back() {
-        let bar = app.navigationBars.firstMatch
-        XCTAssertTrue(bar.waitForExistence(timeout: 20))
-        bar.buttons.element(boundBy: 0).tap()
-    }
-
     func testReplyInThreadOpensASheetAndLeavesAReplyRow() {
         launch()
-        let chip = app.buttons["conversationModelChip"]
-        XCTAssertTrue(chip.waitForExistence(timeout: 10), "the model chip is in the header")
-        XCTAssertTrue(chip.label.contains("Opus 5.5"), chip.label)
+        // The folded Duo's header is its title; the model is in its ⋯.
+        if !app.isFoldedDuo {
+            let chip = app.buttons["conversationModelChip"]
+            XCTAssertTrue(chip.waitForExistence(timeout: 10), "the model chip is in the header")
+            XCTAssertTrue(chip.label.contains("Opus 5.5"), chip.label)
+        }
         XCTAssertFalse(app.buttons["conversationWorkers"].exists, "workers are in the strands box, not a line of their own")
         XCTAssertFalse(app.buttons["Model & permissions"].exists, "the model picker left the input bar")
         XCTAssertFalse(app.buttons["composerExpandToPage"].exists, "no open-as-page control")
@@ -50,14 +47,15 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         reply.tap()
         let field = app.textViews["Reply…"]
         XCTAssertTrue(field.waitForExistence(timeout: 15), "the thread opens as a sheet")
-        XCTAssertTrue(app.buttons["replyThreadDone"].exists)
+        XCTAssertTrue(app.buttons["replyThreadDone"].exists || app.buttons["BackButton"].exists || app.buttons["folded-back"].exists,
+                      "it closes with Done, or Back where it's pushed")
         shot("reply-sheet")
         field.tap()
         field.typeText("Hold it until Friday")
         app.buttons["Send"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Main stays clear'")).firstMatch.waitForExistence(timeout: 15))
         shot("reply-sheet-answered")
-        app.buttons["replyThreadDone"].tap()
+        app.closeReplyThread()
         let replies = app.buttons["replies-m5"]
         XCTAssertTrue(replies.waitForExistence(timeout: 15), "the reply row shows under the message")
         XCTAssertTrue(replies.label.contains("2 replies"), replies.label)
@@ -67,7 +65,7 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         existing.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'release workflow fix'")).firstMatch.waitForExistence(timeout: 15),
                       "the replies row reopens its thread")
-        app.buttons["replyThreadDone"].tap()
+        app.closeReplyThread()
     }
 
     func testForkOpensBesideItsConversationWithNoRow() {
@@ -84,14 +82,14 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         XCTAssertFalse(app.buttons["Side Chat"].exists, "side chat is gone from conversations")
         fork.tap()
         XCTAssertTrue(app.staticTexts["Main · fork"].waitForExistence(timeout: 15), "the fork opens in a sheet over its conversation")
-        app.buttons["replyThreadDone"].tap()
+        app.closeReplyThread()
         // Review M9: the fork stays reachable from its message.
         let forked = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'forked-'")).firstMatch
         XCTAssertTrue(forked.waitForExistence(timeout: 15), "the message shows its Forked here line")
         XCTAssertTrue(forked.label.contains("Forked here · 1 conversation"), forked.label)
         forked.tap()
         XCTAssertTrue(app.staticTexts["Main · fork"].waitForExistence(timeout: 15), "the line reopens the fork")
-        app.buttons["replyThreadDone"].tap()
+        app.closeReplyThread()
         app.openRoomPlace("conversations")
         XCTAssertTrue(app.buttons["roomNewConversation"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["roomConversation-thr_demo_fork1"].exists, "a fork has no row of its own")
@@ -99,7 +97,7 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
 
     func testMainHasNoFinish() {
         launch("list")
-        app.navigationBars.buttons["More"].tap()
+        app.conversationMore.tap()
         XCTAssertTrue(app.buttons["menuModel"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["menuArchive"].exists)
         XCTAssertFalse(app.buttons["menuDelete"].exists)
@@ -117,7 +115,6 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         field.typeText("Plan the Lisbon dinner")
         app.buttons["newConversationStart"].tap()
         XCTAssertTrue(app.staticTexts["Plan the Lisbon dinner"].waitForExistence(timeout: 15), "the new conversation opens")
-        back()
         app.openRoomPlace("conversations")
         XCTAssertTrue(app.buttons["roomConversation-thr_demo_new1"].waitForExistence(timeout: 15))
     }

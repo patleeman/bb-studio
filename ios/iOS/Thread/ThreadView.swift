@@ -476,6 +476,7 @@ struct ThreadView: View {
             Image(systemName: "ellipsis").modifier(DuoHeaderMenuLabel())
         }
         .accessibilityLabel("More")
+        .accessibilityIdentifier("conversationMore")
     }
 
     @ViewBuilder private var contextItems: some View {

@@ -15,11 +15,7 @@ final class WorkersUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 
-    private func back() {
-        let bar = app.navigationBars.firstMatch
-        XCTAssertTrue(bar.waitForExistence(timeout: 20))
-        bar.buttons.element(boundBy: 0).tap()
-    }
+    private func back() { app.goBack() }
 
     private var askField: XCUIElement { app.textViews["Ask the Bot about this worker…"] }
 
