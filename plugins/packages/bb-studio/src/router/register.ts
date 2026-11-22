@@ -23,7 +23,7 @@ function message(error: unknown): string {
 }
 
 /** Fills each target's label with its model's name from the provider's catalog. */
-async function labelled(bb: BbPluginApi, policy: Policy): Promise<Policy> {
+export async function labelled(bb: BbPluginApi, policy: Policy): Promise<Policy> {
   const catalogs = new Map<string, Promise<ReadonlyMap<string, string>>>();
   const names = (providerId: string) => {
     let names = catalogs.get(providerId);
@@ -35,7 +35,12 @@ async function labelled(bb: BbPluginApi, policy: Policy): Promise<Policy> {
     }
     return names;
   };
-  const label = async (target: Target): Promise<Target> => target.label ? target : { ...target, label: (await names(target.providerId)).get(target.model) ?? undefined };
+  // No name (an agent that isn't installed has no catalog): no label key at all, since an RPC result can't carry undefined.
+  const label = async (target: Target): Promise<Target> => {
+    if (target.label) return target;
+    const name = (await names(target.providerId)).get(target.model);
+    return name ? { ...target, label: name } : target;
+  };
   return {
     ...policy,
     rules: await Promise.all(policy.rules.map(async (rule) => ({ ...rule, chain: await Promise.all(rule.chain.map(label)) }))),

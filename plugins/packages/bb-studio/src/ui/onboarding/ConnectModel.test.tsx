@@ -9,7 +9,7 @@ vi.mock("../../kit/ui/hooks/use-pointer-coarse.js", () => ({ usePointerCoarse: (
 vi.mock("../live", () => ({ useCall: () => async () => ({ sessionId: "s", state: "waiting", targetId: "provider:codex", name: "Codex", flow: "device", url: null, code: null, acceptsCode: false, expiresAt: null, pollMs: 1000, message: null }), useLive: () => ({ data: null, refresh: () => {} }) }));
 
 const { ConnectModelView } = await import("./ConnectModel");
-const { anyReady, canSignIn, sortCards } = await import("./providers");
+const { anyReady, canSignIn, cardsFrom, sortCards } = await import("./providers");
 
 installTestPluginRuntime();
 
@@ -38,4 +38,14 @@ it("counts only a ready provider as connected", () => {
   expect(anyReady(null)).toBe(false);
   expect(canSignIn(card("codex", "Codex", "expired"))).toBe(true);
   expect(canSignIn(card("codex", "Codex", "unauthenticated", null))).toBe(false);
+});
+
+it("counts a ready agent with no sign-in (an ACP agent on a local model), and leaves out ones that are neither", () => {
+  const cards = cardsFrom([
+    { providerId: "codex", displayName: "Codex", status: "unauthenticated", loginCommand: "codex login" },
+    { providerId: "acp-ollama", displayName: "Ollama", status: "ready", loginCommand: null },
+    { providerId: "acp-cursor", displayName: "Cursor", status: "not_installed", loginCommand: null },
+  ]);
+  expect(cards.map((card) => card.providerId)).toEqual(["codex", "acp-ollama"]);
+  expect(anyReady(cards)).toBe(true);
 });

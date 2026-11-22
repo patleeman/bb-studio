@@ -32,6 +32,19 @@ function moved<T>(list: readonly T[], from: number, to: number): T[] {
 }
 
 /** What Settings says beside a chain's model: why Auto skips it, or (readiness unknown) that it comes after the ready ones. */
+/**
+ * A chain entry after the picker reports a value, or null when nothing changed.
+ * The picker reports what it shows when it opens (a null reasoning level shows
+ * as "medium"), which must not rewrite the saved entry. The same model keeps
+ * its label.
+ */
+export function pickerChange(target: Target, next: { providerId: string; model: string; reasoningLevel: string }): Target | null {
+  const sameModel = next.providerId === target.providerId && next.model === target.model;
+  if (sameModel && next.reasoningLevel === (target.reasoningLevel ?? "medium")) return null;
+  const reasoningLevel = toReasoningLevelOrNull(next.reasoningLevel);
+  return { providerId: next.providerId, model: next.model, reasoningLevel, ...(sameModel && target.label ? { label: target.label } : {}) };
+}
+
 type Problems = ReadonlyMap<string, { problem: string | null; note?: string }>;
 const problemKey = (target: Pick<Target, "providerId" | "model">) => `${target.providerId}\0${target.model}`;
 
@@ -56,7 +69,8 @@ function Chain({ chain, disabled, onChange, starter, problems }: { chain: readon
               onChange={(next) => {
                 if (next.providerId === AUTO_ID) return setError("A chain names real models, not Auto.");
                 setError(null);
-                onChange(chain.map((each, at) => at === index ? { providerId: next.providerId, model: next.model, reasoningLevel: toReasoningLevelOrNull(next.reasoningLevel) } : each));
+                const update = pickerChange(target, next);
+                if (update) onChange(chain.map((each, at) => at === index ? update : each));
               }}
             />
             <Button type="button" size="sm" variant="ghost" disabled={disabled || index === 0} aria-label="Move up" onClick={() => onChange(moved(chain, index, index - 1))}>↑</Button>

@@ -27,6 +27,18 @@ export function sortCards(cards: readonly ProviderCard[]): ProviderCard[] {
   return [...cards].sort((a, b) => rank(a) - rank(b) || a.displayName.localeCompare(b.displayName));
 }
 
+/**
+ * The providers to show: those you can sign in to, and any that is ready
+ * without a sign-in (an ACP agent on a local model, OpenCode with its own
+ * keys). Without the second kind, a BB whose only ready agents are ACP agents
+ * would read as having no model at all, and hide the picker (and Auto).
+ */
+export function cardsFrom(providers: readonly { providerId: string; displayName: string; status: string; accountEmail?: string | null; loginCommand?: string | null }[]): ProviderCard[] {
+  return sortCards(providers
+    .filter((each) => !!each.loginCommand || isReady(each))
+    .map((each) => ({ providerId: each.providerId, displayName: each.displayName, status: each.status, accountEmail: each.accountEmail ?? null, loginCommand: each.loginCommand ?? null })));
+}
+
 export function useProviderCards(enabled = true): ProviderCard[] | null {
   const sdk = useSdk() as unknown as {
     system: {
@@ -42,7 +54,7 @@ export function useProviderCards(enabled = true): ProviderCard[] | null {
       try {
         const { primaryHostId } = await sdk.system.config();
         const { providers } = await sdk.system.providerStates(primaryHostId ? { hostId: primaryHostId } : undefined);
-        if (live) setCards(sortCards(providers.filter((each) => !!each.loginCommand).map((each) => ({ providerId: each.providerId, displayName: each.displayName, status: each.status, accountEmail: each.accountEmail ?? null, loginCommand: each.loginCommand ?? null }))));
+        if (live) setCards(cardsFrom(providers));
       } catch {
         if (live) setCards((current) => current ?? []);
       }

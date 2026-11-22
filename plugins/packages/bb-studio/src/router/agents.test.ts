@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { leanFor } from "../context-lean";
 import type { Policy, Target } from "./contract";
 import type { RouterDecisions } from "./decide";
-import { errorEventText } from "./register";
+import { errorEventText, labelled } from "./register";
 import { handoffRequest, ModelRouter, POLICY_KEY, UNREACHABLE_MS, type FailedTurnEvent, type RouterDeps, type RouterThread } from "./router";
 import { agentResetAt, firstAvailable, formatReset, readAgentError, readFailure, UNSURE_PASSED, UNSURE_PICKED, usageProblem, type UsageSnapshot } from "./select";
 
@@ -318,4 +318,17 @@ describe("Hand off to and from Pi and ACP agents", () => {
     expect(await router.onTurnFailed(failed({ category: "rate-limit", providerCode: "rate_limit", httpStatusCode: 429 }))).toMatchObject({ target: null });
     await expect(router.handoff("thr_1")).rejects.toThrow("no router notice with a model");
   });
+});
+
+const unlabelled = ({ label: _label, ...target }: Target): Target => target;
+
+it("saves a chain naming an agent that isn't installed: no catalog, so no label (an RPC result can't carry undefined)", async () => {
+  const bb = { sdk: { providers: { models: async ({ providerId }: { providerId: string }) => {
+    if (providerId === "acp-antigravity") throw new Error("not installed");
+    return { models: [{ model: glm.model, displayName: "GLM-5.3" }], selectedOnlyModels: [] };
+  } } } } as never;
+  const saved = await labelled(bb, { ...policy, rules: [{ id: "coding", text: "Pure coding", chain: [unlabelled(gemini), unlabelled(glm)] }], defaultChain: [] });
+  expect(saved.rules[0]!.chain[0]).not.toHaveProperty("label");
+  expect(saved.rules[0]!.chain[1]).toMatchObject({ label: "GLM-5.3" });
+  expect(JSON.parse(JSON.stringify(saved))).toEqual(saved);
 });
