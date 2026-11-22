@@ -1,0 +1,97 @@
+// Parts of a long tool result, the way pages_read reads a page: a default
+// budget, the "Next:" call right after the header (so no cut can take it),
+// and a cursor that names an item, so an item is never lost or shown twice at
+// a boundary. A cursor whose item is gone says so instead of starting over.
+import { ALIASES, MERGES } from "./merged-tools";
+
+/** Default characters for one part of a list or a body. */
+export const PART_CHARS = 6_000;
+
+export interface ItemPage<T> {
+  items: T[];
+  /** The last item shown, to pass as `after` for the next part; null when this is the last part. */
+  next: string | null;
+  /** 1-based positions shown, and the total. */
+  from: number;
+  to: number;
+  total: number;
+  /** `after` named no item in the list. */
+  missing?: true;
+}
+
+/**
+ * The items after `after` (an item's id) that fit in `budget` characters as rendered, and at most `max`;
+ * always at least one.
+ */
+export function pageItems<T>(items: readonly T[], idOf: (item: T) => string, size: (item: T) => number, options: { after?: string | null; budget?: number; max?: number }): ItemPage<T> {
+  const budget = options.budget ?? PART_CHARS;
+  const max = options.max ?? Number.POSITIVE_INFINITY;
+  let start = 0;
+  if (options.after) {
+    const at = items.findIndex((item) => idOf(item) === options.after);
+    if (at < 0) return { items: [], next: null, from: 0, to: 0, total: items.length, missing: true };
+    start = at + 1;
+  }
+  const out: T[] = [];
+  let used = 0;
+  for (let index = start; index < items.length && out.length < max; index++) {
+    const cost = size(items[index]!) + 1;
+    if (out.length && used + cost > budget) break;
+    out.push(items[index]!);
+    used += cost;
+  }
+  const end = start + out.length;
+  return { items: out, next: end < items.length && out.length ? idOf(out.at(-1)!) : null, from: out.length ? start + 1 : start, to: end, total: items.length };
+}
+
+/** A tool call as an agent writes it, under the name the session sees: memory { op: "search", query: "x" }. */
+export function callText(tool: string, args: Record<string, unknown>): string {
+  const alias = ALIASES.get(tool);
+  const merge = alias ? MERGES.find((each) => each.name === alias.merged) : undefined;
+  const fields = { ...(alias && merge ? { [merge.field]: alias.op } : {}), ...args };
+  const shown = Object.entries(fields).filter(([, value]) => value !== undefined).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join(", ");
+  return `${alias?.merged ?? tool} { ${shown} }`;
+}
+
+/** The line right after a part's header: where this part sits, and the call for the next one. */
+export function nextLine(page: { from: number; to: number; total: number; next: string | null }, call: (after: string) => string, noun = "items"): string | null {
+  if (page.next === null) return null;
+  return `(Showing ${page.from}–${page.to} of ${page.total} ${noun}. Next: ${call(page.next)}.)`;
+}
+
+/** What a stale cursor says. */
+export function staleCursor(after: string, again: string): string {
+  return `${after} is no longer in this list (it was removed or changed); call ${again} without after to start again.`;
+}
+
+/** One part of a long text body, by character offset, cut at a line end where one is near. */
+export function pageText(text: string, offset: number, budget = PART_CHARS): { text: string; next: number | null; missing?: true } {
+  if (offset < 0 || offset > text.length) return { text: "", next: null, missing: true };
+  if (text.length - offset <= budget) return { text: text.slice(offset), next: null };
+  const hard = offset + budget;
+  const line = text.lastIndexOf("\n", hard);
+  const end = line > offset + budget / 2 ? line + 1 : hard;
+  return { text: text.slice(offset, end), next: end };
+}
+
+/** A text's first line, at most `max` characters. */
+export function clipLine(text: string, max = 120): string {
+  const line = text.split("\n").find((each) => each.trim())?.trim() ?? "";
+  return line.length > max ? `${line.slice(0, max - 1)}…` : line;
+}
+
+/**
+ * One part of a list made of sections ("Conversations:", "Workers:"): rows in order, each section's heading
+ * shown again in any part that has rows of it. Returns the lines, or null for a stale cursor.
+ */
+export function pageSections(rows: readonly { id: string; section: string; line: string }[], options: { after?: string | null; budget?: number; max?: number }): { lines: string[]; page: ItemPage<{ id: string; section: string; line: string }> } | null {
+  const page = pageItems(rows, (row) => row.id, (row) => row.line.length, options);
+  if (page.missing) return null;
+  const lines: string[] = [];
+  let section: string | null = null;
+  for (const row of page.items) {
+    if (row.section !== section) { section = row.section; if (section) lines.push(section); }
+    lines.push(row.line);
+  }
+  return { lines, page };
+}

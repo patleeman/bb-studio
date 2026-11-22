@@ -3726,6 +3726,34 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `chief_of_staff_set` and `chief_of_staff_set_run` remain as deprecated
   aliases for one release.
 
+## Long results in parts
+
+Tools whose results can be long return them in parts (`src/paging.ts`): a
+default budget (about 6,000 characters for a list, 8,000 for a skill's text,
+12,000 for a transcript, an app's source or text and a page, whole screens up
+to 30,000 for a design), the header first and right after it a line such as
+`(Showing 1–10 of 34 records. Next: memory { op: "search", query: "x", after: "mem_…" }.)`
+with the exact call for the next part under the name the session sees. A list
+part's cursor is the last item's id (`after`), so an item is never shown twice
+or skipped at a boundary; a text's is a character offset, cut at a line end.
+A cursor whose item is gone, or an offset past the end, gets a reply that
+says so instead of starting over. Lists show one short line per item (the
+schedule, areas, skills, conversations) and the full item through its own
+call: `schedule { op: "list", id }`, `area { op: "get" }`, `bot_skill { op: "view" }`.
+
+| Tool | Part | Cursor |
+|---|---|---|
+| `memory` search | 10 records, 6,000 characters | `after` record id |
+| `schedule` list | short lines, 6,000 characters (`id` for one in full) | `after` item id |
+| `bot_skill` list / view | 6,000 characters of lines / 8,000 of the skill | `after` name / `offset` |
+| `bot_info` conversations, activity | 6,000 characters, sections repeated | `after` thread or line id |
+| `area` list | one JSON line per area, 6,000 characters (`area` get for one: its 10 newest runs) | `after` area id |
+| `talk` list, search / read | 30 recordings, 6,000 characters / 12,000 of the transcript | `after` recording id / `offset` |
+| `apps` list / read | 100 apps, 6,000 characters / 12,000 of a mini's source or an artifact's text | `after` app id / `offset` |
+| `minis_data` find | 25 records, 6,000 characters | `query.offset` |
+| `pages_read` without page / with page / a design | 6,000 characters of the tree / 12,000 of the page / whole screens to 30,000 | `after` page id / `from` block / `screenIds` left |
+| `code_comments` | whole threads, 6,000 characters | `after` thread id |
+
 ## Tool scope and lean context
 
 Each session loads only the Studio tools its thread kind uses (`src/tool-scope.ts`,

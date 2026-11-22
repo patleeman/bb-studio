@@ -343,7 +343,8 @@ export class MiniStore {
       else if (FIELD.test(field)) order = `json_extract(data, '${jsonPath(field)}') ${desc ? "DESC" : "ASC"}, created_at`;
       else throw new Error(`Can't order by "${query.order}".`);
     }
-    const rows = this.db.prepare(`SELECT id, rev, data, created_by, created_at, updated_at FROM mini_records WHERE ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`)
+    // id breaks ties, so parts read by offset never repeat or skip a record.
+    const rows = this.db.prepare(`SELECT id, rev, data, created_by, created_at, updated_at FROM mini_records WHERE ${sql} ORDER BY ${order}, id LIMIT ? OFFSET ?`)
       .all(...params, query.limit ?? 100, query.offset ?? 0) as Parameters<typeof toRecord>[0][];
     return rows.map(toRecord);
   }

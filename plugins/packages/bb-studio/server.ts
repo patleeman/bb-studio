@@ -40,6 +40,7 @@ import { sessionTitlePrefix } from "./src/decisions/server/classifier";
 import { ON_DEMAND_EXTRAS, scopeEntries, scopeTools, trioInstructions, type Scope, type ScopeKind } from "./src/tool-scope";
 import { registerScopedTools, ScopeMemory } from "./src/tool-scope-tools";
 import { slim, slimmedIfSmaller } from "./src/slim-schema";
+import { callText, clipLine, nextLine, pageItems, pageSections, pageText, staleCursor } from "./src/paging";
 import { ABSORB_FIELDS, INTERNAL_RENAMES, MERGES, mergedParameters, mergedTools, presentScope } from "./src/merged-tools";
 import { LeanStore, leanFor } from "./src/context-lean";
 import { contextLeanContract } from "./src/context-lean-contract";
@@ -2182,7 +2183,6 @@ export default async function plugin(bb: BbPluginApi) {
   const describeBot = ({ bot, run }: Awaited<ReturnType<typeof bots.get>>) => bot
     ? `${bot.avatar} ${bot.name} is ${bot.state}. Thread: ${bot.threadId ? `/threads/${bot.threadId}` : "none"}. Check-ins: ${run?.enabled ? `${run.cadence}${run.cadence === "custom" ? ` (${run.cron})` : ` at ${run.time}`}` : "off"}.`
     : "The user has no Bot yet. They can make one in Studio → Bot.";
-  const listThreads = (label: string, threads: { id: string; title: string; status: string }[]) => threads.length ? [`${label}:`, ...threads.map((thread) => `- [${thread.title}](/threads/${thread.id}) (${thread.status})`)] : [];
   // These act on the Bot the thread works for: its own thread (or handoff
   // chain), one of its runners, or a thread it started; elsewhere the primary.
   // A conversation of a Bot (src/bot-threads.ts) is that Bot's own thread, whichever conversation it is.
@@ -2322,17 +2322,23 @@ export default async function plugin(bb: BbPluginApi) {
   });
   // bot_conversations replaced bot_threads_list (src/bot-threads-server.ts): side threads are conversations.
   bb.agents.registerTool({
-    name: "bot_activity", description: "What the user's Bot is doing: what waits on the user in its chat, threads in progress (and which wait on an answer), scheduled check-ins and automations, and recently completed threads it started.", parameters: z.object({}),
-    execute: async (_input, ctx) => {
+    name: "bot_activity", description: "What the user's Bot is doing: what waits on the user in its chat, threads in progress (and which wait on an answer), scheduled check-ins and automations, and recently completed threads it started.", parameters: z.object({ after: z.string().min(1).max(200).optional().describe("The line id the last part's Next names") }),
+    execute: async ({ after }: { after?: string }, ctx) => {
       const activity = await bots.activity(await selfBot(ctx.threadId));
-      const lines = [
-        ...(activity.attention ? [`Waiting on the user in your chat: ${/^\d+$/.test(activity.attention.reason) ? `${activity.attention.count} (questions, todos and unread replies)` : activity.attention.reason}`] : []),
-        ...listThreads("Waiting on an answer (yours to handle, or bring to the user)", activity.inProgress.filter((each) => each.waitingFor)),
-        ...listThreads("In progress", activity.inProgress.filter((each) => !each.waitingFor)),
-        ...(activity.scheduled.length ? ["Scheduled:", ...activity.scheduled.map((each) => `- ${each.name}${each.enabled ? "" : " (off)"}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toISOString()}` : ""}`)] : []),
-        ...listThreads("Completed", activity.completed),
+      // In parts (src/paging.ts), each section's heading again in a part that continues it.
+      const threadRows = (section: string, threads: { id: string; title: string; status: string }[]) => threads.map((thread) => ({ id: thread.id, section: `${section}:`, line: `- [${thread.title}](/threads/${thread.id}) (${thread.status})` }));
+      const rows = [
+        ...(activity.attention ? [{ id: "attention", section: "", line: `Waiting on the user in your chat: ${/^\d+$/.test(activity.attention.reason) ? `${activity.attention.count} (questions, todos and unread replies)` : activity.attention.reason}` }] : []),
+        ...threadRows("Waiting on an answer (yours to handle, or bring to the user)", activity.inProgress.filter((each) => each.waitingFor)),
+        ...threadRows("In progress", activity.inProgress.filter((each) => !each.waitingFor)),
+        ...activity.scheduled.map((each, index) => ({ id: `scheduled-${index}-${each.name}`, section: "Scheduled:", line: `- ${each.name}${each.enabled ? "" : " (off)"}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toISOString()}` : ""}` })),
+        ...threadRows("Completed", activity.completed),
       ];
-      return lines.length ? lines.join("\n") : "Nothing to show yet.";
+      if (!rows.length) return "Nothing to show yet.";
+      const part = pageSections(rows, { after });
+      if (!part) return staleCursor(`${after}`, "bot_info activity");
+      const next = nextLine(part.page, (last) => callText("bot_activity", { after: last }), "lines");
+      return [...(next ? [next] : []), ...part.lines].join("\n");
     },
   });
 
@@ -2369,27 +2375,39 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "bot_skill_list",
     description: "List or search your own skills (non-archived). Without query, lists all; with query, searches names, descriptions and full text (load one with bot_skill (op: view) before following it).",
-    parameters: z.object({ query: z.string().trim().min(1).max(200).optional(), limit: z.number().int().min(1).max(20).optional() }),
-    execute: ({ query, limit }, ctx) => {
+    parameters: z.object({ query: z.string().trim().min(1).max(200).optional(), limit: z.number().int().min(1).max(20).optional(), after: z.string().min(1).max(64).optional().describe("The skill name the last part's Next names") }),
+    execute: ({ query, limit, after }, ctx) => {
       const botId = ownBot(ctx.threadId);
       if (query) {
         const hits = bots.searchSkills(query, limit ?? 5, botId);
         if (!hits.length) return `No skill of yours matches "${query}".`;
-        return hits.map((hit, index) => `${index + 1}. ${hit.name}: ${hit.description} (matched ${hit.fields.join(", ")})${hit.snippet ? `\n   ${hit.snippet}` : ""}`).join("\n");
+        return hits.map((hit, index) => `${index + 1}. ${hit.name}: ${clipLine(hit.description, 200)} (matched ${hit.fields.join(", ")})${hit.snippet ? `\n   ${clipLine(hit.snippet, 200)}` : ""}`).join("\n");
       }
       const list = bots.skills(botId).filter((skill) => skill.state !== "archived");
-      return list.map((skill) => `- ${skill.name}${skill.pinned ? " (pinned)" : ""}${skill.state === "stale" ? " (stale)" : ""}: ${skill.description}`).join("\n") || "No skills yet.";
+      if (!list.length) return "No skills yet.";
+      // In parts (src/paging.ts), descriptions on one short line.
+      const rows = list.map((skill) => ({ id: skill.name, line: `- ${skill.name}${skill.pinned ? " (pinned)" : ""}${skill.state === "stale" ? " (stale)" : ""}: ${clipLine(skill.description, 200)}` }));
+      const part = pageItems(rows, (each) => each.id, (each) => each.line.length, { after });
+      if (part.missing) return staleCursor(`Skill ${after}`, "bot_skill list");
+      const next = nextLine(part, (last) => callText("bot_skill_list", { after: last }), "skills");
+      return [`${list.length} skill${list.length === 1 ? "" : "s"}.`, ...(next ? [next] : []), ...part.items.map((each) => each.line)].join("\n");
     },
   });
+  /** A skill body's part (bot_skill view): measured bodies run a median 4,800 characters, p90 13,600. */
+  const SKILL_PART_CHARS = 8_000;
   bb.agents.registerTool({
-    name: "bot_skill_view", description: "Load one of your own skills in full. Do it before you follow a skill: your instructions list only names and descriptions.", parameters: z.object({ name: z.string().min(1).max(64) }),
-    execute: ({ name }, ctx) => {
+    name: "bot_skill_view", description: "Load one of your own skills in full, in parts of about 8,000 characters (the next part with offset, as the reply says). Do it before you follow a skill: your instructions list only names and descriptions.",
+    parameters: z.object({ name: z.string().min(1).max(64), offset: z.number().int().min(0).optional().describe("Where the next part starts, as the last part's Next says") }),
+    execute: ({ name, offset }, ctx) => {
       const botId = ownBot(ctx.threadId);
       const skill = bots.skill(name, botId);
       if (!skill || skill.state === "archived") return `No skill "${name}". Yours: ${bots.skills(botId).filter((each) => each.state !== "archived").map((each) => each.name).join(", ") || "none"}.`;
       // A review reading skills isn't the Bot using them.
-      if (!learning.review(ctx.threadId)) bots.touchSkill(name, botId);
-      return `# ${skill.name}\n${skill.description}\n\n${skill.body}`;
+      if (!learning.review(ctx.threadId) && !offset) bots.touchSkill(name, botId);
+      const part = pageText(skill.body, offset ?? 0, SKILL_PART_CHARS);
+      if (part.missing) return `The skill ${skill.name} is ${skill.body.length.toLocaleString("en-US")} characters now; ${offset} is past its end. Read it again without offset.`;
+      const next = part.next === null ? null : `(Characters ${(offset ?? 0).toLocaleString("en-US")}–${part.next.toLocaleString("en-US")} of ${skill.body.length.toLocaleString("en-US")}. Next: ${callText("bot_skill_view", { name: skill.name, offset: part.next })}.)`;
+      return [`# ${skill.name}`, skill.description, ...(next ? [next] : []), "", part.text].join("\n");
     },
   });
   bb.agents.registerTool({
@@ -2521,8 +2539,22 @@ export default async function plugin(bb: BbPluginApi) {
     ...(input.machine !== undefined ? { machine: input.machine } : {}),
     ...(input.confirm !== undefined ? { confirm: input.confirm } : {}),
   });
-  runnerTool("automation_list", "List what you have scheduled: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome. The user sees them under Scheduled on the Strands page; call them scheduled items, never automations.", z.object({}),
-    async (_input: unknown, botId) => (await automations.list(botId)).map(describeAutomation).join("\n") || "Nothing scheduled yet.");
+  runnerTool("automation_list", "List what you have scheduled: check-ins, reminders, watchers and runners, one short line each with schedule, state and next run; give id for one item in full (instruction or script, last outcome). The user sees them under Scheduled on the Strands page; call them scheduled items, never automations.",
+    z.object({ id: z.string().min(1).max(200).optional().describe("One item in full"), after: z.string().min(1).max(200).optional().describe("The item id the last part's Next names") }),
+    async ({ id, after }: { id?: string; after?: string }, botId) => {
+      const items = await automations.list(botId);
+      if (id) {
+        const one = items.find((each) => each.id === id || each.name === id);
+        return one ? describeAutomation(one) : `No scheduled item ${id}. List them with ${callText("automation_list", {})}.`;
+      }
+      if (!items.length) return "Nothing scheduled yet.";
+      // One short line each (src/paging.ts); the full item with id.
+      const rows = items.map((each) => ({ id: each.id, line: `- ${each.name} (${each.kind}, ${each.id}, ${each.state}): ${each.scheduleText}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toLocaleString()}` : ""}${each.lastOutcome ? ` · last: ${clipLine(each.lastOutcome, 100)}` : ""}` }));
+      const part = pageItems(rows, (each) => each.id, (each) => each.line.length, { after });
+      if (part.missing) return staleCursor(`Scheduled item ${after}`, "schedule list");
+      const next = nextLine(part, (last) => callText("automation_list", { after: last }), "scheduled items");
+      return [`${items.length} scheduled item${items.length === 1 ? "" : "s"}. Full details: ${callText("automation_list", { id: "<id>" })}.`, ...(next ? [next] : []), ...part.items.map((each) => each.line)].join("\n");
+    });
   runnerTool("automation_create", "Create a scheduled item (checkin, reminder, watcher, or runner). Watchers run a script and wake only on stdout (trailing JSON line supports each/key/severity/clear). A runner may answer with preflight warnings: review them and retry with confirm: true. Call them scheduled items to the user.",
     z.object({ kind: z.enum(["checkin", "reminder", "watcher", "runner"]), name: z.string().trim().min(1).max(60), ...automationFields, schedule: toolSchedule }),
     async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => {
@@ -2550,7 +2582,7 @@ export default async function plugin(bb: BbPluginApi) {
     parameters: z.object({ query: z.string().trim().min(1).max(200) }),
     execute: async ({ query }, ctx) => {
       const hits = await bots.historySearch(query, 10, ownBot(ctx.threadId));
-      return hits.length ? hits.map((hit) => `- [${hit.title}](/threads/${hit.threadId}): ${hit.text.replace(/\s+/g, " ")}`).join("\n") : "No matches in your threads.";
+      return hits.length ? hits.map((hit) => `- [${hit.title}](/threads/${hit.threadId}): ${clipLine(hit.text.replace(/\s+/g, " "), 240)}`).join("\n") : "No matches in your threads.";
     },
   });
 

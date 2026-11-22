@@ -18,6 +18,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
+import { callText } from "../paging";
 import { rpcContract } from "./contract";
 import { printCsp, printPage } from "./server/print";
 import { applyTextEdit } from "./server/text-edit";
@@ -347,6 +348,8 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
 
   /** A design read without screenIds inlines the newest round's HTML up to this many characters. */
   const DEFAULT_HTML_CHARS = 12_000;
+  /** A design read's part with screens named: whole screens up to this many characters. */
+  const SCREENS_PART = 30_000;
   bb.agents.registerTool({
     name: "design_read",
     description: "Read a design: its rounds, each option's id, caption and frame size, and the HTML of the screens you name (or of the newest round when you name none and it is small). Call it before editing so you see the latest version.",
@@ -372,11 +375,31 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
           `The newest round's HTML (${wanted.join(", ")}) is ${htmlSize.toLocaleString("en-US")} characters. Read the screens you need with screenIds.`,
         ].join("\n\n");
       }
-      const payload = JSON.stringify({ design: { ...view, name: displayName(view), link: designHref(view.id) }, html }, null, 2);
-      if (payload.length <= MAX_READ_CHARS) return payload;
+      const design = { ...view, name: displayName(view), link: designHref(view.id) };
+      const payload = JSON.stringify({ design, html }, null, 2);
+      if (payload.length <= SCREENS_PART) return payload;
+      // In parts (src/paging.ts): whole screens in the order asked, the rest named in the Next call right after the header.
+      const head = JSON.stringify({ design }, null, 2);
+      const room = Math.max(SCREENS_PART - head.length, 4_000);
+      const shown: Record<string, string> = {};
+      let used = 0;
+      const found = wanted.filter((id) => id in html);
+      let cut: string | null = null;
+      for (const id of found) {
+        const size = html[id]!.length;
+        if (Object.keys(shown).length && used + size > room) break;
+        if (size > MAX_READ_CHARS - head.length - 1_000) { shown[id] = html[id]!.slice(0, MAX_READ_CHARS - head.length - 1_000); cut = id; used += shown[id]!.length; break; }
+        shown[id] = html[id]!;
+        used += size;
+      }
+      const rest = found.filter((id) => !(id in shown));
+      const missing = wanted.filter((id) => !(id in html));
       return [
-        JSON.stringify({ design: { ...view, name: displayName(view), link: designHref(view.id) } }, null, 2),
-        `The HTML of ${wanted.join(", ")} is ${payload.length} characters, too large to inline. Read fewer screens at a time with screenIds.`,
+        head,
+        ...(rest.length ? [`(Screens ${Object.keys(shown).join(", ")} of ${found.join(", ")}. Next: ${callText("pages_read", { page: designId, screenIds: rest })}.)`] : []),
+        ...(cut ? [`(Screen ${cut} is ${html[cut]!.length.toLocaleString("en-US")} characters, more than one reply holds: it is cut after the first ${shown[cut]!.length.toLocaleString("en-US")}.)`] : []),
+        ...(missing.length ? [`(No screen ${missing.join(", ")} in this design.)`] : []),
+        JSON.stringify({ html: shown }, null, 2),
       ].join("\n\n");
     },
   });
