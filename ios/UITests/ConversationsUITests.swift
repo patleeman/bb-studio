@@ -94,7 +94,6 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         forked.tap()
         XCTAssertTrue(app.staticTexts["Main · fork"].waitForExistence(timeout: 15), "the line reopens the fork")
         app.buttons["replyThreadDone"].tap()
-        app.buttons["roomLayDown"].tap()
         app.openRoomPlace("conversations")
         XCTAssertTrue(app.buttons["roomNewConversation"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["roomConversation-thr_demo_fork1"].exists, "a fork has no row of its own")
@@ -110,7 +109,6 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
 
     func testNewConversation() {
         launch("list")
-        app.buttons["roomLayDown"].tap()
         app.openRoomPlace("conversations")
         let plus = app.buttons["roomNewConversation"]
         XCTAssertTrue(plus.waitForExistence(timeout: 10))

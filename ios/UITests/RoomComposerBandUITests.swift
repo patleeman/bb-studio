@@ -13,11 +13,11 @@ final class RoomComposerBandUITests: ServerIsolatedUITestCase {
     private func launch() {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo", "-qaRoomTheme", "forest"]
         app.launchOffline()
-        if !app.buttons["roomMic"].waitForExistence(timeout: 30) {
+        if !app.waitForRoom(timeout: 30) {
             app.terminate()
             app.launchOffline()
         }
-        XCTAssertTrue(app.buttons["roomMic"].waitForExistence(timeout: 60), "the app opens on the room")
+        XCTAssertTrue(app.waitForRoom(timeout: 60), "the app opens on the room")
     }
 
     private func command(_ path: String, wait: TimeInterval = 2) {
@@ -123,7 +123,7 @@ final class RoomComposerBandUITests: ServerIsolatedUITestCase {
 
     func testTheComposerGrowsWithItsTextAndTheBandStaysCompact() {
         launch()
-        app.buttons["roomInput"].tap()
+        app.textViews["Message"].tap()
         XCTAssertTrue(field.waitForExistence(timeout: 10), "the chat stands up")
         XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "the keyboard is up")
         let tip = app.buttons["Continue"]

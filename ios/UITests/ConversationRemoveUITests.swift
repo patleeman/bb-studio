@@ -36,10 +36,12 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
     }
 
     private func backInTheRoom(_ what: String) {
-        let title = app.staticTexts["roomTitle"]
-        let shown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND isHittable == true"), object: title)
+        let composer = app.textViews["Message"]
+        let shown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND isHittable == true"), object: composer)
         XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 15), .completed, what)
     }
+
+    private var dots: XCUIElement { app.descendants(matching: .any)["conversationPageDots"].firstMatch }
 
     private func openMore() {
         let more = app.buttons["More"].firstMatch
@@ -156,35 +158,24 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
 
     func testArchivingTheShownConversationMovesTheRoomToItsNeighbour() {
         launch()
-        let stage = app.buttons["RoomStage"]
-        let title = app.staticTexts["roomTitle"]
-        stage.swipeLeft()
-        XCTAssertTrue(title.waitForLabel(prefix: "Launch prep"), "on Launch prep")
-        stage.swipeUp()
+        openConversations()
+        row("thr_demo_interview").tap()
+        XCTAssertTrue(dots.waitForExistence(timeout: 10))
+        XCTAssertEqual(dots.label, "Conversation 2 of 4", "on Launch prep")
         openMore()
         app.buttons["menuArchive"].tap()
         backInTheRoom("the archived conversation closes")
-        XCTAssertTrue(title.waitForLabel(prefix: "Juniper"), "the room moves to the page before it: \(title.label)")
-        XCTAssertEqual(stage.value as? String, "Conversation 1 of 3", "and its dots")
-        stage.swipeLeft()
-        XCTAssertTrue(title.waitForLabel(prefix: "Tree truncation"), "swipes still work: \(title.label)")
+        let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == 'Conversation 1 of 3'"), object: dots)
+        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 15), .completed, "the room moves to the page before it: \(dots.label)")
         shot("7-archived-shown")
-        stage.swipeLeft()
-        XCTAssertTrue(title.waitForLabel(prefix: "Train a model"), "on the last page: \(title.label)")
 
         openConversations()
         row("thr_demo_speech").swipeLeft()
         app.buttons["roomConversationArchive-thr_demo_speech"].tap()
         XCTAssertTrue(row("thr_demo_speech").waitForNonExistence(timeout: 10))
-        app.closeRoomSheet()
-        if app.buttons["roomMenuClose"].waitForExistence(timeout: 3) { app.buttons["roomMenuClose"].tap() }
-        XCTAssertTrue(title.waitForLabel(prefix: "Tree truncation"), "archived from Conversations, the room leaves it too: \(title.label)")
-        app.buttons["roomInput"].tap()
-        XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10))
-        app.buttons["roomLayDown"].tap()
-        app.openRoomPlace("conversations")
         row("thr_botdemo01").tap()
-        XCTAssertTrue(title.waitForLabel(prefix: "Juniper") || app.buttons["roomLayDown"].exists, "Main opens")
+        backInTheRoom("Main opens")
+        XCTAssertEqual(dots.label, "Conversation 1 of 2", "archived from the list, the room leaves it too")
     }
 
     func testTheArchiveDeletesAndArchivesItsRows() {

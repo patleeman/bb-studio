@@ -496,9 +496,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     }
 
     private func standUpTheRoom() {
-        if inRoom { XCTAssertTrue(app.buttons["RoomStage"].waitForExistence(timeout: 30), "the room shows on the folded Duo") }
-        guard app.buttons["RoomStage"].waitForExistence(timeout: 10) else { return }
-        XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10), "the room's chat stands up")
+        if inRoom { XCTAssertTrue(app.waitForRoom(timeout: 30), "the conversation shows on the folded Duo") }
     }
 
     /// The split's right page on the simulator's screen (it's only as wide as the outer one).

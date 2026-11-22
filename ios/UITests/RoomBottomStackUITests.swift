@@ -9,11 +9,11 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
     private func launch() {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo", "-qaRoomTheme", theme]
         app.launchOffline()
-        if !app.buttons["roomMic"].waitForExistence(timeout: 30) {
+        if !app.waitForRoom(timeout: 30) {
             app.terminate()
             app.launchOffline()
         }
-        XCTAssertTrue(app.buttons["roomMic"].waitForExistence(timeout: 60), "the app opens on the room")
+        XCTAssertTrue(app.waitForRoom(timeout: 60), "the app opens on the room")
     }
 
     private func command(_ path: String, wait: TimeInterval = 2) {
@@ -117,7 +117,7 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
             capture("unfolded-presence")
             command("outer", wait: 4)
         }
-        app.buttons["roomInput"].tap()
+        app.textViews["Message"].tap()
         XCTAssertTrue(field.waitForExistence(timeout: 10), "the chat stands up")
         XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "the keyboard is up")
         let tip = app.buttons["Continue"]
@@ -211,7 +211,7 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
 
     func testTheBottomStackIsOneOpaqueBandWithTheJumpInItsOwnLane() throws {
         launch()
-        app.buttons["roomInput"].tap()
+        app.textViews["Message"].tap()
         XCTAssertTrue(field.waitForExistence(timeout: 10), "the chat stands up")
         let tip = app.buttons["Continue"]
         if tip.waitForExistence(timeout: 2) { tip.tap() }

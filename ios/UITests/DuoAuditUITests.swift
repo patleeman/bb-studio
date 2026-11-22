@@ -13,11 +13,11 @@ final class DuoAuditUITests: ServerIsolatedUITestCase {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo",
                                 "-qaRoomTheme", environment["ROOM_THEME"] ?? "forest"] + extra
         app.launchOffline()
-        if !app.buttons["roomMic"].waitForExistence(timeout: 30) && !app.buttons["roomLayDown"].exists {
+        if !app.waitForRoom(timeout: 30) && !app.buttons["roomLayDown"].exists {
             app.terminate()
             app.launchOffline()
         }
-        _ = app.buttons["roomMic"].waitForExistence(timeout: 30)
+        _ = app.waitForRoom(timeout: 30)
         sleep(2)
     }
 
@@ -60,7 +60,7 @@ final class DuoAuditUITests: ServerIsolatedUITestCase {
     func testMenu() { launch(["-qaRoomMode", "menu"]); postures("room-menu") }
     func testTalk() {
         launch()
-        app.buttons["roomInput"].tap()
+        app.textViews["Message"].tap()
         _ = app.keyboards.firstMatch.waitForExistence(timeout: 10)
         sleep(1)
         postures("room-talk")
@@ -228,7 +228,7 @@ final class DuoAuditUITests: ServerIsolatedUITestCase {
         shot("fold-menu-6-folded-again")
         NSLog("AUDIT menu after fold: close=\(app.buttons["roomMenuClose"].exists) button=\(app.buttons["roomMenuButton"].exists)")
         if app.buttons["roomMenuClose"].exists { app.buttons["roomMenuClose"].tap() }
-        app.buttons["roomInput"].tap()
+        app.textViews["Message"].tap()
         sleep(2)
         command("landscape")
         shot("fold-talk-2-landscape")

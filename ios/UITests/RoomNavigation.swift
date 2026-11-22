@@ -8,8 +8,18 @@ extension XCUIApplication {
     }
 
     /// A place from the one conversation list (the header's Bot mark).
+    /// "conversations" is the list itself.
     func openRoomPlace(_ place: String, file: StaticString = #filePath, line: UInt = #line) {
         let row = buttons["roomPlace-\(place)"]
+        let list = descendants(matching: .any)["RoomSheet-conversations"].firstMatch
+        if place == "conversations" {
+            if !list.exists {
+                XCTAssertTrue(buttons["roomList"].waitForExistence(timeout: 15), "the header's Bot mark", file: file, line: line)
+                buttons["roomList"].tap()
+            }
+            XCTAssertTrue(list.waitForExistence(timeout: 10), "the conversation list", file: file, line: line)
+            return
+        }
         if !row.exists {
             let list = buttons["roomList"]
             XCTAssertTrue(list.waitForExistence(timeout: 15), "the header's Bot mark", file: file, line: line)

@@ -35,7 +35,6 @@ final class WorkersUITests: ServerIsolatedUITestCase {
 
     func testOpenFromTheListAndAsk() {
         launch()
-        app.buttons["roomLayDown"].tap()
         app.openRoomPlace("conversations")
         // The failed worker sits under the conversation that started it, behind that row's toggle.
         let nest = app.buttons["roomNestToggle-thr_demo_interview"]
@@ -89,7 +88,6 @@ final class WorkersUITests: ServerIsolatedUITestCase {
 
     func testWaitingOnAnApprovalShowsItsStatusOnly() {
         launch()
-        app.buttons["roomLayDown"].tap()
         app.openRoomPlace("conversations")
         let waiting = app.buttons["roomWorker-thr_demo_w1"]
         XCTAssertTrue(waiting.waitForExistence(timeout: 15))
