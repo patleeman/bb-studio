@@ -3,6 +3,7 @@ import {
   emitPluginThreadRead,
 } from "../services/plugins/plugin-thread-events.js";
 import { announceThreadFilesChanged } from "../services/plugins/fork-plugin-events.js";
+import { isListQuiet } from "./list-quiet.fork.js";
 import { Buffer } from "node:buffer";
 import {
   realtimeSubscriptionTargetKey as subscriptionKey,
@@ -1425,7 +1426,7 @@ export class NotificationHub implements DbNotifier {
     }
     const detailKey = subscriptionKey({ kind: "thread-detail", threadId });
     for (const socket of listSockets) {
-      if (this.clientKeysBySocket.get(socket)?.has(detailKey)) {
+      if (this.clientKeysBySocket.get(socket)?.has(detailKey) || isListQuiet(socket)) {
         continue;
       }
       socket.send(payload, COMPRESSED_SEND);
