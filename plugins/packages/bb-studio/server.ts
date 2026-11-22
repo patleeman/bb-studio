@@ -348,7 +348,9 @@ export default async function plugin(bb: BbPluginApi) {
   let runnerDispatch: (context: { thread: { id: string } }) => Promise<{ action: "reject"; message: string } | null> = async () => null;
   const decisions = await registerDecisions(bb, settings, (context) => runnerDispatch(context));
   // The model router (src/router): Auto in the pickers, rules picked by Jev, the usage-limit notice.
-  await registerRouter(bb, { systemOne: decisions.ask.systemOne });
+  // Auto reports whether its pick runs lean (Settings › Agent context); the lean settings load further down.
+  const leanRef: { store: LeanStore | null } = { store: null };
+  await registerRouter(bb, { systemOne: decisions.ask.systemOne }, { lean: (providerId, model) => leanFor(leanRef.store?.current ?? {}, providerId, model) });
   let settingValues: Record<string, unknown> = await settings.get();
   appCards = settingValues.appCards === true;
   const explore = registerExploreBuiltin(bb, db, settingValues);
@@ -472,6 +474,7 @@ export default async function plugin(bb: BbPluginApi) {
   // `defer` flag) or through studio_tool_* (other providers, and lean mode), which
   // then also reach Tool Gateway's MCP tools.
   const leanModes = new LeanStore(bb.storage.kv as never);
+  leanRef.store = leanModes;
   await leanModes.load().catch((error) => bb.log.warn(`Lean context settings unreadable; using Auto: ${errorText(error)}`));
   const scopes = new ScopeMemory();
   const deferSupported = (bb as { experimental_hooks?: { experimental_features?: { deferredAgentTools?: unknown } } }).experimental_hooks?.experimental_features?.deferredAgentTools === true;

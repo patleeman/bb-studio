@@ -42302,10 +42302,11 @@ public enum Studio {
     public var reason: String?
     public var target: RouterNoticeGetOutputTarget?
     public var targetName: String?
+    public var permissionMode: String?
     public var text: String?
     public var createdAt: Double?
 
-    public init(threadId: String? = nil, requestId: String? = nil, kind: RouterNoticeGetOutputKind? = nil, failedProviderId: String? = nil, failedProviderName: String? = nil, reason: String? = nil, target: RouterNoticeGetOutputTarget? = nil, targetName: String? = nil, text: String? = nil, createdAt: Double? = nil) {
+    public init(threadId: String? = nil, requestId: String? = nil, kind: RouterNoticeGetOutputKind? = nil, failedProviderId: String? = nil, failedProviderName: String? = nil, reason: String? = nil, target: RouterNoticeGetOutputTarget? = nil, targetName: String? = nil, permissionMode: String? = nil, text: String? = nil, createdAt: Double? = nil) {
       self.threadId = threadId
       self.requestId = requestId
       self.kind = kind
@@ -42314,6 +42315,7 @@ public enum Studio {
       self.reason = reason
       self.target = target
       self.targetName = targetName
+      self.permissionMode = permissionMode
       self.text = text
       self.createdAt = createdAt
     }
