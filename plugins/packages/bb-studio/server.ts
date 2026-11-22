@@ -2322,7 +2322,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   // bot_conversations replaced bot_threads_list (src/bot-threads-server.ts): side threads are conversations.
   bb.agents.registerTool({
-    name: "bot_activity", description: "What the user's Bot is doing: what waits on the user in its chat, threads in progress (and which wait on an answer), scheduled check-ins and automations, and recently completed threads it started.", parameters: z.object({ after: z.string().min(1).max(200).optional().describe("The line id the last part's Next names") }),
+    name: "bot_activity", description: "What the user's Bot is doing: what waits on the user in its chat, threads in progress (and which wait on an answer), scheduled check-ins and automations, and recently completed threads it started.", parameters: z.object({ after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
     execute: async ({ after }: { after?: string }, ctx) => {
       const activity = await bots.activity(await selfBot(ctx.threadId));
       // In parts (src/paging.ts), each section's heading again in a part that continues it.
@@ -2375,7 +2375,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "bot_skill_list",
     description: "List or search your own skills (non-archived). Without query, lists all; with query, searches names, descriptions and full text (load one with bot_skill (op: view) before following it).",
-    parameters: z.object({ query: z.string().trim().min(1).max(200).optional(), limit: z.number().int().min(1).max(20).optional(), after: z.string().min(1).max(64).optional().describe("The skill name the last part's Next names") }),
+    parameters: z.object({ query: z.string().trim().min(1).max(200).optional(), limit: z.number().int().min(1).max(20).optional(), after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
     execute: ({ query, limit, after }, ctx) => {
       const botId = ownBot(ctx.threadId);
       if (query) {
@@ -2542,7 +2542,7 @@ export default async function plugin(bb: BbPluginApi) {
     ...(input.confirm !== undefined ? { confirm: input.confirm } : {}),
   });
   runnerTool("automation_list", "List what you have scheduled: check-ins, reminders, watchers and runners, one short line each with schedule, state and next run; give id for one item in full (instruction or script, last outcome). The user sees them under Scheduled on the Strands page; call them scheduled items, never automations.",
-    z.object({ id: z.string().min(1).max(200).optional().describe("One item in full"), after: z.string().min(1).max(200).optional().describe("The item id the last part's Next names") }),
+    z.object({ id: z.string().min(1).max(200).optional().describe("One item in full"), after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
     async ({ id, after }: { id?: string; after?: string }, botId) => {
       const items = await automations.list(botId);
       if (id) {

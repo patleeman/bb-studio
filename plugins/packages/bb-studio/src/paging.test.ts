@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { callText, clipLine, counted, decodeKey, encodeKey, nextLine, pageByKey, pageItems, pageSections, pageText, safeEnd, staleCursor } from "./paging";
+import { callText, clipLine, counted, decodeKey, encodeKey, nextLine, pageByKey, pageItems, pageSections, pageText, safeEnd, safeStart, staleCursor } from "./paging";
 
 const items = Array.from({ length: 57 }, (_, index) => ({ id: `it_${index}`, text: `item ${index} ${"x".repeat(index % 7 * 40)}` }));
 const walk = (budget: number, max?: number) => {
@@ -125,8 +125,26 @@ describe("parts by keyset while the list changes", () => {
     expect(clipLine("🙂".repeat(10), 4)).toBe("🙂…");
   });
 
+  it("moves on with a budget smaller than one emoji, taking the whole emoji", () => {
+    expect(pageText("a😀b", 1, 1)).toEqual({ text: "😀", next: 3 });
+    const text = "😀".repeat(20);
+    let offset = 0;
+    let joined = "";
+    for (let guard = 0; guard < 100; guard++) {
+      const part = pageText(text, offset, 1);
+      joined += part.text;
+      if (part.next === null) break;
+      expect(part.next).toBeGreaterThan(offset);
+      offset = part.next;
+    }
+    expect(joined).toBe(text);
+    expect(safeStart("ab😀", 3)).toBe(2);
+  });
+
   it("says at least when a count hit its cap", () => {
     expect(counted(500, 500)).toBe("At least 500");
     expect(counted(42, 500)).toBe("42");
+    // A filter after a capped fetch: the count is still a floor.
+    expect(counted(480, 500, 500)).toBe("At least 480");
   });
 });

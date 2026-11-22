@@ -22,7 +22,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { StudioSettingValues } from "../settings/schema";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { callText, counted, nextLine, pageByKey, pageText, staleCursor } from "../paging";
+import { callText, counted, nextLine, pageByKey, pageText, safeEnd, safeStart, staleCursor } from "../paging";
 import { rpcContract } from "./shared/contract";
 import { PANEL_PATH, PLUGIN_ID, RECORDING_CHANGED, formatLength, recordingHref } from "./shared/format";
 import { AudioFiles, extensionFor, pluginDataDirectory } from "./server/audio-files";
@@ -505,21 +505,22 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
   bb.agents.registerTool({
     name: "talk_list",
     description: "List recent Talk recordings and dictations. Search titles and transcripts with `query`.",
-    parameters: z.object({ query: z.string().max(200).optional(), limit: z.number().int().min(1).max(100).optional().describe("At most this many in a part (default 30)"), after: z.string().min(1).max(100).optional().describe("The recording id the last part's Next names") }),
+    parameters: z.object({ query: z.string().max(200).optional(), limit: z.number().int().min(1).max(100).optional().describe("At most this many in a part (default 30)"), after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
     execute({ query, limit, after }) {
       // In parts by keyset on creation (src/paging.ts): a recording retitled or cleaned between parts doesn't move.
-      const listed = store.list({ query, limit: LIST_CAP });
+      const listed = store.list({ query, limit: LIST_CAP, order: "created" });
       if (!listed.length) return "No recordings match.";
-      const part = pageByKey(listed, (r) => [r.createdAt, r.id], (r) => r.title.length + 80, { after, max: limit ?? 30, descending: [true, true] });
+      const line = (r: (typeof listed)[number]) => `- ${r.title} (${r.id}), ${r.kind}, ${r.status}, ${r.wordCount} words: ${recordingHref(r.id)}`;
+      const part = pageByKey(listed, (r) => [r.createdAt, r.id], (r) => line(r).length, { after, max: limit ?? 30, descending: [true, true] });
       if (part.missing) return staleCursor("That cursor", callText("talk_list", { ...(query ? { query } : {}) }));
       const next = nextLine(part, (last) => callText("talk_list", { ...(query ? { query } : {}), ...(limit ? { limit } : {}), after: last }), "recordings");
-      return [`${counted(listed.length, LIST_CAP)} recording${listed.length === 1 ? "" : "s"}, newest first.`, ...(next ? [next] : []), ...part.items.map((r) => `- ${r.title} (${r.id}), ${r.kind}, ${r.status}, ${r.wordCount} words: ${recordingHref(r.id)}`)].join("\n");
+      return [`${counted(listed.length, LIST_CAP)} recording${listed.length === 1 ? "" : "s"}, newest first.`, ...(next ? [next] : []), ...part.items.map(line)].join("\n");
     },
   });
   bb.agents.registerTool({
     name: "talk_read",
     description: "Read a Talk recording's saved cleaned transcript when available, otherwise its original, plus an optional summary. Set version to original to read the raw text. For long transcripts, use offset and limit.",
-    parameters: z.object({ id: z.string().min(1).max(100), version: z.enum(["original", "cleaned"]).optional(), offset: z.number().int().nonnegative().optional(), limit: z.number().int().min(1).max(20_000).optional() }),
+    parameters: z.object({ id: z.string().min(1).max(100), version: z.enum(["original", "cleaned"]).optional(), offset: z.number().int().nonnegative().optional(), limit: z.number().int().min(200).max(20_000).optional() }),
     execute({ id, version, offset = 0, limit = READ_CHARS }) {
       const recording = store.recording(id);
       if (!recording) return { content: [{ type: "text", text: `Recording ${id} not found.` }], isError: true };
@@ -541,19 +542,26 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
   bb.agents.registerTool({
     name: "talk_search",
     description: "Search Talk recording titles and transcripts. Returns matching recordings with a short transcript excerpt.",
-    parameters: z.object({ query: z.string().trim().min(1).max(200), after: z.string().min(1).max(100).optional().describe("The recording id the last part's Next names") }),
+    parameters: z.object({ query: z.string().trim().min(1).max(200), after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
     execute({ query, after }) {
       // In parts by keyset on creation; an excerpt (a transcript read) only for the part's recordings.
-      const listed = store.list({ query, limit: SEARCH_CAP });
+      const listed = store.list({ query, limit: SEARCH_CAP, order: "created" });
       if (!listed.length) return "No recordings match.";
-      const part = pageByKey(listed, (r) => [r.createdAt, r.id], () => 260, { after, max: 30, descending: [true, true] });
-      if (part.missing) return staleCursor("That cursor", callText("talk_search", { query }));
-      const lines = part.items.map((r) => {
+      // Each line is rendered once, when the part measures it: at most the part's recordings and one more.
+      const rendered = new Map<string, string>();
+      const line = (r: (typeof listed)[number]) => {
+        const known = rendered.get(r.id);
+        if (known !== undefined) return known;
         const transcript = store.transcript(r.id);
         const at = transcript.toLowerCase().indexOf(query.toLowerCase());
-        const excerpt = at < 0 ? r.preview : transcript.slice(Math.max(0, at - 80), at + query.length + 120);
-        return `- ${r.title} (${r.id}): ${excerpt.replace(/\s+/g, " ")}`;
-      });
+        const excerpt = at < 0 ? r.preview : transcript.slice(safeStart(transcript, Math.max(0, at - 80)), safeEnd(transcript, at + query.length + 120));
+        const text = `- ${r.title} (${r.id}): ${excerpt.replace(/\s+/g, " ")}`;
+        rendered.set(r.id, text);
+        return text;
+      };
+      const part = pageByKey(listed, (r) => [r.createdAt, r.id], (r) => line(r).length, { after, max: 30, descending: [true, true] });
+      if (part.missing) return staleCursor("That cursor", callText("talk_search", { query }));
+      const lines = part.items.map(line);
       const next = nextLine(part, (last) => callText("talk_search", { query, after: last }), "recordings");
       return [`${counted(listed.length, SEARCH_CAP)} recording${listed.length === 1 ? "" : "s"} match, newest first.`, ...(next ? [next] : []), ...lines].join("\n");
     },

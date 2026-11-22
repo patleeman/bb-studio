@@ -285,4 +285,41 @@ describe("parts while the data changes", () => {
     for (const reply of replies) expect(reply.length).toBeLessThanOrEqual(120_000);
     for (const reply of replies) expect(reply).not.toMatch(/\\ud83d"/);
   });
+
+  it("follows cursors for skills and areas with the longest names, non-ASCII ones too", async () => {
+    // A 64-character skill name and an 80-character CJK area name make the longest keyset cursors.
+    const skills = Array.from({ length: 30 }, (_, index) => `long-${String(index).padStart(2, "0")}-${"x".repeat(56)}`);
+    expect(skills[0]!.length).toBe(64);
+    for (const name of skills) await run("bot_skill", { op: "edit", change: "write", name, description: `Use when ${"something specific happens ".repeat(10)}`, body: "Do it." });
+    const skillReplies = await walk(await run("bot_skill", { op: "list" }));
+    const shownSkills = all(skillReplies, /^- (long-\d+-x+)/gm);
+    expect(shownSkills.sort()).toEqual(skills);
+    expect(skillReplies.slice(0, -1).some((reply) => (nextCall(reply)!.args.after as string).length > 64)).toBe(true);
+    const areas = Array.from({ length: 40 }, (_, index) => `${String(index).padStart(2, "0")}${"区域名称".repeat(19)}和`);
+    expect(areas[0]!.length).toBe(79);
+    for (const area of areas) expect(await run("area", { op: "update", area: `${area}é`, covers: "Things", status: "ok", now: `Fine. ${"Nothing new. ".repeat(20)}` })).not.toMatch(/^Error/);
+    const areaReplies = await walk(await run("area", { op: "list" }));
+    const shownAreas = all(areaReplies, /"name":"(\d\d区域[^"]+)"/g);
+    expect(shownAreas.sort()).toEqual(areas.map((area) => `${area}é`));
+    expect(areaReplies.slice(0, -1).some((reply) => (nextCall(reply)!.args.after as string).length > 200)).toBe(true);
+  });
+
+  it("caps talk lists by creation, the order its parts go in, and keeps each part near its budget", async () => {
+    // 460 more recordings, made before the others, with long titles: 521 in all, over the 500 cap.
+    const now = Date.now();
+    const recording = db!.prepare("INSERT INTO recordings (id, title, title_source, kind, status, created_at, updated_at, heartbeat_at) VALUES (?, ?, 'user', 'dictation', 'done', ?, ?, ?)");
+    for (let index = 0; index < 460; index++) recording.run(`rec_old_${String(index).padStart(3, "0")}`, `Old recording ${index} ${"with a long title ".repeat(12)}`, now - 10_000_000 - index * 1000, now - 10_000_000 - index * 1000, now);
+    // The oldest is edited now: last changed, but still the oldest made, so it stays past the cap.
+    db!.prepare("UPDATE recordings SET updated_at = ? WHERE id = 'rec_old_459'").run(now + 60_000);
+    const first = await run("talk", { op: "list" });
+    expect(first.split("\n")[0]).toBe("At least 500 recordings, newest first.");
+    const replies = await walk(first, 100);
+    const ids = all(replies, /\((rec_[a-z0-9_]+)\)/g);
+    expect(ids.length).toBe(500);
+    expect(new Set(ids).size).toBe(500);
+    expect(ids).toContain("rec_000");
+    expect(ids).not.toContain("rec_old_459");
+    for (const reply of replies) expect(reply.length).toBeLessThanOrEqual(6_000 + 200);
+    db!.prepare("DELETE FROM recordings WHERE id LIKE 'rec_old_%'").run();
+  });
 });

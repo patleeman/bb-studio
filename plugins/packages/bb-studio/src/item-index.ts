@@ -57,6 +57,8 @@ export interface IndexListOptions {
   includeArchived?: boolean;
   includeTemplates?: boolean;
   limit?: number;
+  /** "updated" (the default): last changed first. "created": last made first, id breaking ties. */
+  order?: "updated" | "created";
 }
 
 export class ItemIndex {
@@ -70,7 +72,7 @@ export class ItemIndex {
     return row ? read(row) : null;
   }
 
-  /** Items newest-updated first. */
+  /** Items newest-updated first, or newest-created with `order: "created"`. */
   list(options: IndexListOptions = {}): IndexedItem[] {
     const where: string[] = [KNOWN_TYPES];
     const args: (string | number)[] = [];
@@ -82,7 +84,7 @@ export class ItemIndex {
     }
     if (!options.includeArchived) where.push("archived_at IS NULL");
     if (!options.includeTemplates) where.push("template = 0");
-    const rows = this.db.prepare(`SELECT ${COLUMNS} FROM items WHERE ${where.join(" AND ")} ORDER BY updated_at DESC, id LIMIT ?`).all(...args, options.limit ?? 500) as Row[];
+    const rows = this.db.prepare(`SELECT ${COLUMNS} FROM items WHERE ${where.join(" AND ")} ORDER BY ${options.order === "created" ? "created_at DESC, id DESC" : "updated_at DESC, id"} LIMIT ?`).all(...args, options.limit ?? 500) as Row[];
     return rows.map(read);
   }
 

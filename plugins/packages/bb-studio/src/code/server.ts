@@ -651,7 +651,7 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
   bb.agents.registerTool({
     name: "code_comments",
     description: "The user's open code review comments sent to you from VS Code (Studio Code): each thread's id, file and lines, and what was said.",
-    parameters: z.object({ after: z.string().min(1).max(200).optional().describe("The comment thread id the last part's Next names") }),
+    parameters: z.object({ after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
     execute: async ({ after }: { after?: string }, ctx) => {
       const path = await threadPath(ctx.threadId);
       const open = comments.openFor(ctx.threadId).filter((thread) => {

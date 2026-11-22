@@ -244,7 +244,8 @@ export class PageStore {
     tx(ids);
   }
 
-  search(query: string, projectId: string | null | undefined, limit = 20): PageMeta[] {
+  /** Pages whose title or text holds `query`: last changed first, or with `order: "created"` last made (id breaks ties). */
+  search(query: string, projectId: string | null | undefined, limit = 20, order: "updated" | "created" = "updated"): PageMeta[] {
     const like = `%${query.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
     const scope = projectId === undefined ? "" : projectId === null ? "AND project_id IS NULL" : "AND (project_id IS NULL OR project_id = ?)";
     const args: unknown[] = [like, like];
@@ -252,7 +253,7 @@ export class PageStore {
     args.push(limit);
     return this.db
       .prepare(
-        `SELECT ${META_COLUMNS} FROM pages WHERE archived_at IS NULL AND (title LIKE ? ESCAPE '\\' OR markdown LIKE ? ESCAPE '\\') ${scope} ORDER BY updated_at DESC LIMIT ?`,
+        `SELECT ${META_COLUMNS} FROM pages WHERE archived_at IS NULL AND (title LIKE ? ESCAPE '\\' OR markdown LIKE ? ESCAPE '\\') ${scope} ORDER BY ${order === "created" ? "created_at DESC, id DESC" : "updated_at DESC"} LIMIT ?`,
       )
       .all(...args) as PageMeta[];
   }

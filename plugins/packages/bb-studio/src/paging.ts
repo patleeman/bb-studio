@@ -1,7 +1,12 @@
 // Parts of a long tool result, the way pages_read reads a page: a default
-// budget, the "Next:" call right after the header (so no cut can take it),
-// and a cursor that names an item, so an item is never lost or shown twice at
-// a boundary. A cursor whose item is gone says so instead of starting over.
+// budget, and the "Next:" call right after the header (so no cut can take it).
+// The cursor in that call is opaque to the agent. It is one of three kinds:
+// - a keyset cursor (pageByKey): a position in an order that doesn't change
+//   while an item lives, so items that change, arrive or go between parts never
+//   make another one repeat or go missing;
+// - an item id (pageItems, pageSections): a cursor whose item is gone says so,
+//   with the exact call that starts again, instead of starting over;
+// - a character or row offset (pageText, memory search by relevance).
 import { ALIASES, MERGES } from "./merged-tools";
 
 /** Default characters for one part of a list or a body. */
@@ -71,6 +76,13 @@ export function safeEnd(text: string, end: number): number {
   return code >= 0xd800 && code <= 0xdbff ? end - 1 : end;
 }
 
+/** A start at `start` that never begins inside a surrogate pair: it takes the whole emoji. */
+export function safeStart(text: string, start: number): number {
+  if (start <= 0 || start >= text.length) return start;
+  const code = text.charCodeAt(start);
+  return code >= 0xdc00 && code <= 0xdfff ? start - 1 : start;
+}
+
 /** A keyset cursor: a list's sort key and id, as one opaque string. */
 export function encodeKey(key: readonly (string | number)[]): string {
   return Buffer.from(JSON.stringify(key)).toString("base64url");
@@ -119,7 +131,9 @@ export function pageByKey<T>(items: readonly T[], keyOf: (item: T) => (string | 
 export function pageText(text: string, offset: number, budget = PART_CHARS): { text: string; next: number | null; missing?: true } {
   if (offset < 0 || offset > text.length) return { text: "", next: null, missing: true };
   if (text.length - offset <= budget) return { text: text.slice(offset), next: null };
-  const hard = safeEnd(text, offset + budget);
+  let hard = safeEnd(text, offset + budget);
+  // A budget too small for the character at `offset` (half an emoji) takes the whole character, so a part always moves on.
+  if (hard <= offset) hard = Math.min(text.length, offset + 2);
   const line = text.lastIndexOf("\n", hard);
   const end = line > offset + budget / 2 ? line + 1 : hard;
   return { text: text.slice(offset, end), next: end };
@@ -147,7 +161,7 @@ export function pageSections(rows: readonly { id: string; section: string; line:
   return { lines, page };
 }
 
-/** A count that may have hit a fetch cap: "at least 500" when it did. */
-export function counted(count: number, cap: number): string {
-  return count >= cap ? `At least ${count}` : String(count);
+/** A count that may have hit a fetch cap: "At least N" when the fetch (`fetched` rows, before any filter) did. */
+export function counted(count: number, cap: number, fetched = count): string {
+  return fetched >= cap ? `At least ${count}` : String(count);
 }

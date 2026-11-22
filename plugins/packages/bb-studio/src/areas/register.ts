@@ -27,7 +27,7 @@ export function registerAreas(bb: BbPluginApi, areas: Areas, guard: <T>(work: ()
   const time = (at: number | null) => (at ? new Date(at).toISOString().slice(0, 16).replace("T", " ") : null);
   bb.agents.registerTool({
     name: "area_list", description: LIST,
-    parameters: z.object({ after: z.string().min(1).max(200).optional().describe("The area id the last part's Next names") }),
+    parameters: z.object({ after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
     execute: async ({ after }: { after?: string }) => {
       try {
         const list = guard(() => areas.list());

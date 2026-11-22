@@ -139,19 +139,20 @@ export function appTools(deps: AppToolDeps): AgentTool[] {
     {
       name: "apps_list",
       description: 'List Studio apps: interactive ("mini") and saved ("artifact"). Pass type or query to filter.',
-      parameters: z.object({ type: typeParam.optional(), query: z.string().max(200).optional().describe("Words a title must contain"), after: z.string().min(1).max(200).optional().describe("The app id the last part's Next names") }),
+      parameters: z.object({ type: typeParam.optional(), query: z.string().max(200).optional().describe("Words a title must contain"), after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
       execute: (async ({ type, query, after }: { type?: (typeof APP_TYPES)[number]; query?: string; after?: string }, ctx: ToolContext) => {
         const needle = query?.trim().toLowerCase();
         if (type && !needle && !after) return deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].list, {}, ctx, "apps_list") : offMessage(type);
-        const items = deps.index.list({ family: "app", ...(type ? { type } : {}), limit: 500 })
-          .filter((item) => deps.typeOn(item.type) && (!needle || item.title.toLowerCase().includes(needle)));
+        // The cap and the parts both go by creation, so the capped set is the newest made and an edit can't move an app in or out of it.
+        const fetched = deps.index.list({ family: "app", ...(type ? { type } : {}), limit: 500, order: "created" });
+        const items = fetched.filter((item) => deps.typeOn(item.type) && (!needle || item.title.toLowerCase().includes(needle)));
         if (!items.length) return needle ? `No apps match "${query}".` : "No apps yet. Make one with apps (op: create).";
         // In parts (src/paging.ts): the next part starts after the last app shown.
         // By keyset on creation: an app changed between parts doesn't move.
         const part = pageByKey(items, (item) => [item.createdAt, item.id], (item) => line(item).length, { after, max: 100, descending: [true, true] });
         if (part.missing) return staleCursor("That cursor", callText("apps_list", { ...(type ? { type } : {}), ...(query ? { query } : {}) }));
         const next = nextLine(part, (last) => callText("apps_list", { ...(type ? { type } : {}), ...(query ? { query } : {}), after: last }), "apps");
-        return [`${counted(items.length, 500)} app${items.length === 1 ? "" : "s"}, newest first.`, ...(next ? [next] : []), ...part.items.map(line)].join("\n");
+        return [`${counted(items.length, 500, fetched.length)} app${items.length === 1 ? "" : "s"}, newest first.`, ...(next ? [next] : []), ...part.items.map(line)].join("\n");
       }) as never,
     },
     {

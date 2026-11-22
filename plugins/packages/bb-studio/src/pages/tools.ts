@@ -108,7 +108,7 @@ export function registerTools(
   bb.agents.registerTool({
     name: "pages_list",
     description: "List BB Pages (collaborative documents) in this project and global pages, as a tree. Optionally search titles and content.",
-    parameters: z.object({ query: z.string().max(200).optional(), after: z.string().min(1).max(100).optional().describe("The page id the last part's Next names") }),
+    parameters: z.object({ query: z.string().max(200).optional(), after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
     execute({ query, after }, ctx) {
       // In parts (src/paging.ts): the next part starts after the last page shown.
       const parted = (rows: { id: string; line: string }[], heading: string) => {
@@ -119,7 +119,7 @@ export function registerTools(
       };
       if (query?.trim()) {
         // Search hits by keyset on creation: a page edited between parts doesn't move.
-        const hits = store.search(query, ctx.projectId, SEARCH_CAP);
+        const hits = store.search(query, ctx.projectId, SEARCH_CAP, "created");
         if (!hits.length) return `No pages match "${query}".`;
         const part = pageByKey(hits, (page) => [page.created_at, page.id], (page) => pageLine(page).length, { after, descending: [true, true] });
         if (part.missing) return staleCursor("That cursor", callText("pages_list", { query }));

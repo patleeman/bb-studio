@@ -649,7 +649,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     ].join("\n");
   };
   const conversationsTool = (name: string, description: string) => bb.agents.registerTool({
-    name, description, parameters: z.object({ after: z.string().min(1).max(200).optional().describe("The thread id the last part's Next names") }),
+    name, description, parameters: z.object({ after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
     execute: async ({ after }: { after?: string }, ctx) => {
       const botId = (ctx.threadId ? store.get(ctx.threadId)?.botId : null) ?? await deps.actingBot(ctx.threadId) ?? deps.bots()[0]?.id;
       return botId ? describe(botId, after) : "The user has no Bot yet.";

@@ -731,7 +731,7 @@ export function registerMinis(
       data: z.record(z.string(), z.unknown()).optional(),
       fields: z.record(z.string(), z.unknown()).optional(),
       rev: z.number().int().optional(),
-      after: z.string().min(1).max(200).optional().describe("find: the cursor the last part's Next names"),
+      after: z.string().min(1).max(512).optional().describe("find: the cursor the last part's Next names"),
     }),
     execute(input) {
       try {
