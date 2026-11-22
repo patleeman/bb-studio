@@ -369,6 +369,22 @@ describe("slots.experimental_timelineFilter", () => {
     expect(collected.timelineFilters).toEqual([{ id: "strands", get, subscribe }]);
   });
 
+  it("keeps a filter's folds and expandFold, and refuses them when they aren't functions", () => {
+    const get = () => null;
+    const subscribe = () => () => {};
+    const folds = () => [];
+    const expandFold = () => {};
+    const collected = collect((app) => {
+      app.slots.experimental_timelineFilter({ id: "strands", get, subscribe, folds, expandFold });
+    });
+    expect(collected.timelineFilters).toEqual([{ id: "strands", get, subscribe, folds, expandFold }]);
+    expect(() =>
+      collect((app) => {
+        app.slots.experimental_timelineFilter({ id: "a", get, subscribe, folds: [] } as never);
+      }),
+    ).toThrow(/folds must be a function/u);
+  });
+
   it("refuses a filter without get or subscribe, and a second one with the same id", () => {
     const get = () => null;
     const subscribe = () => () => {};
