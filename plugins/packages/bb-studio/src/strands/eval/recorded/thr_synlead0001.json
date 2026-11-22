@@ -1,0 +1,407 @@
+{
+ "jev": {
+  "498246640283160403c4e27b": {
+   "strand": {
+    "type": "choice",
+    "choice": "new",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "e8a188fead5e1fbe598b9615": {
+   "strand": {
+    "type": "choice",
+    "choice": "new",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  },
+  "ef050bd7f13d8457f4b155b7": {
+   "reply": {
+    "type": "choice",
+    "choice": "needs-you",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "p2",
+    "confidence": 1
+   }
+  },
+  "16cf32f7a6486b4fcce9eca6": {
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  },
+  "d568f9c036e35b9997ed4ece": {
+   "strand": {
+    "type": "choice",
+    "choice": "new",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "bb6b9878aad50854f4152978": {
+   "strand": {
+    "type": "choice",
+    "choice": "s1",
+    "confidence": 0.98
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  },
+  "a9c74cc17719edf906b2dba8": {
+   "strand": {
+    "type": "choice",
+    "choice": "s1",
+    "confidence": 1
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "9005386ad165988ba9fe70ae": {
+   "reply": {
+    "type": "choice",
+    "choice": "needs-you",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "p3",
+    "confidence": 1
+   }
+  },
+  "d809849614fb3d8e898f4fb5": {
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  },
+  "7ff752a6751b8f8f7e24d860": {
+   "strand": {
+    "type": "choice",
+    "choice": "new",
+    "confidence": 1
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "433159ce74cf50592b0df9f0": {
+   "strand": {
+    "type": "choice",
+    "choice": "whole",
+    "confidence": 1
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "needs-you",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "p6",
+    "confidence": 1
+   }
+  },
+  "45a11f4f16bcc56340f35e6b": {
+   "strand": {
+    "type": "choice",
+    "choice": "whole",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  },
+  "ec19420ef8eae76555566108": {
+   "strand": {
+    "type": "choice",
+    "choice": "new",
+    "confidence": 0.98
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "5928724052723f4f82f46474": {
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  },
+  "33a4847ccb809a2fc672860e": {
+   "strand": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "2999eb7533935168a1f937e3": {
+   "strand": {
+    "type": "choice",
+    "choice": "new",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.98
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  },
+  "3daa69571feeb8a442d49c65": {
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "4605cd88718895ebee9895d8": {
+   "strand": {
+    "type": "choice",
+    "choice": "s4",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "91a555cb348939723a3f3466": {
+   "strand": {
+    "type": "choice",
+    "choice": "s1",
+    "confidence": 0.98
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "bb7700439351dbd384f33fe3": {
+   "strand": {
+    "type": "choice",
+    "choice": "s1",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  },
+  "153dcbfccd9fb6426a02a986": {
+   "reply": {
+    "type": "choice",
+    "choice": "needs-you",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "p3",
+    "confidence": 1
+   }
+  },
+  "bdf246c5f945ceaec0f4f0b6": {
+   "strand": {
+    "type": "choice",
+    "choice": "s1",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   },
+   "clear_a1": {
+    "type": "choice",
+    "choice": "answers",
+    "confidence": 0.98
+   }
+  },
+  "89dae8c9be75a97df629f1e6": {
+   "strand": {
+    "type": "choice",
+    "choice": "s5",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "19b8f23f8f844f8ab75c7d73": {
+   "strand": {
+    "type": "choice",
+    "choice": "whole",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "needs-you",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "p3",
+    "confidence": 0.99
+   }
+  },
+  "fc9b9d1dc39c276062539253": {
+   "strand": {
+    "type": "choice",
+    "choice": "s1",
+    "confidence": 1
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "needs-you",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  }
+ },
+ "model": {
+  "a7ac9ee40dcb1fdb3982509f": "{\"n1\":{\"title\":\"Android note sync\",\"summary\":\"Investigating why offline edits disappear after reconnecting; cause not yet determined.\"}}",
+  "5619732493eeaaec2845a7de": "{\"n1\":{\"title\":\"Onboarding flow\",\"summary\":\"Reducing the five-screen path before users can start writing.\"}}",
+  "fcd5f95bfb6ee3c66a19b18d": "{\"n1\":{\"title\":\"App startup time\",\"summary\":\"Investigating slow startup on an older phone; no timing data yet.\"}}",
+  "e87d399a707d1a7ec521bd89": "{\"n1\":{\"title\":\"Billing provider migration\",\"summary\":\"Moving billing off the old payment provider before it shuts down in June.\"}}",
+  "d8604461409fd075fa7f304e": "{\"n1\":{\"title\":\"Release 2.4\",\"summary\":\"Build is signed; store review is pending.\"}}",
+  "9e558e460917d0dd24410dd5": "{\"n1\":{\"title\":\"Docs site search\",\"summary\":\"Investigating why searching for “export” returns no results.\"}}"
+ }
+}

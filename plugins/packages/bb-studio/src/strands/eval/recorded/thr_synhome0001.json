@@ -1,0 +1,297 @@
+{
+ "jev": {
+  "4413fd18cb497f772bde8fff": {
+   "strand": {
+    "type": "choice",
+    "choice": "new",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  },
+  "d0fbaac7b106e6a4e41d6b3e": {
+   "strand": {
+    "type": "choice",
+    "choice": "new",
+    "confidence": 1
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.97
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  },
+  "8b88af8ce546a17db9120d48": {
+   "strand": {
+    "type": "choice",
+    "choice": "new",
+    "confidence": 1
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "7ed974035cb7db8dc290fcf1": {
+   "reply": {
+    "type": "choice",
+    "choice": "needs-you",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "p2",
+    "confidence": 1
+   }
+  },
+  "feb4df8e2589f69feb430c97": {
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "c3898dd8206a0ad2e93cd7b6": {
+   "strand": {
+    "type": "choice",
+    "choice": "new",
+    "confidence": 1
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "c76d00eff94564b5918ad270": {
+   "strand": {
+    "type": "choice",
+    "choice": "new",
+    "confidence": 1
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "2080fce756cc81cc0a20a4e2": {
+   "strand": {
+    "type": "choice",
+    "choice": "s5",
+    "confidence": 1
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "da9852d31ba73022bb5d5e32": {
+   "strand": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "f504e51270cad0a7574352e0": {
+   "strand": {
+    "type": "choice",
+    "choice": "whole",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "needs-you",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "p6",
+    "confidence": 1
+   }
+  },
+  "350ad07f42757099f46923d1": {
+   "strand": {
+    "type": "choice",
+    "choice": "s2",
+    "confidence": 0.98
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  },
+  "52f5625529383bb19135cb62": {
+   "strand": {
+    "type": "choice",
+    "choice": "s1",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  },
+  "b107795518b7acb7e045d436": {
+   "strand": {
+    "type": "choice",
+    "choice": "s1",
+    "confidence": 1
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "a970219159204ce0d0ced488": {
+   "strand": {
+    "type": "choice",
+    "choice": "s5",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "2176f74daa6a80f5a46d48e6": {
+   "reply": {
+    "type": "choice",
+    "choice": "needs-you",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "p2",
+    "confidence": 1
+   }
+  },
+  "f9513baf3961e244cfde1ec6": {
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 1
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "3a712301b6c8d7a37686cc56": {
+   "strand": {
+    "type": "choice",
+    "choice": "s4",
+    "confidence": 0.98
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 1
+   }
+  },
+  "0d6decb5b72d4f321ba96f13": {
+   "strand": {
+    "type": "choice",
+    "choice": "whole",
+    "confidence": 0.99
+   },
+   "reply": {
+    "type": "choice",
+    "choice": "status",
+    "confidence": 0.99
+   },
+   "askSentence": {
+    "type": "choice",
+    "choice": "none",
+    "confidence": 0.99
+   }
+  }
+ },
+ "model": {
+  "a882c1d314453fa6a7e47ff0": "{\"n1\":{\"title\":\"Morning digest\",\"summary\":\"Rain this afternoon and recycling pickup tomorrow.\"}}",
+  "267552b634c068e500f47393": "{\"n1\":{\"title\":\"Bike brake pads\",\"summary\":\"Choosing whether to fix or replace the squeaking rear brake pads.\"}}",
+  "b21a1d71365da33e0b03d4dd": "{\"n1\":{\"title\":\"Tomato bed location\",\"summary\":\"Deciding whether to move the tomato bed to the sunnier south fence.\"}}",
+  "086b12328b886b63bc94965e": "{\"n1\":{\"title\":\"Weekly groceries\",\"summary\":\"Planning mostly vegetarian groceries with one fish night.\"}}",
+  "c981fab90c0a5cc963c545dd": "{\"n1\":{\"title\":\"Niece’s birthday party\",\"summary\":\"Planning a birthday party for a niece in two weeks.\"}}"
+ }
+}
