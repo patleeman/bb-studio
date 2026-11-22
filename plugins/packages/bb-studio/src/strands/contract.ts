@@ -91,6 +91,8 @@ export const replyTagView = z.object({
   ask: z.string().nullable(),
   /** Answered, marked done, its strand marked done, or a week old. */
   resolved: z.boolean(),
+  /** The reply's first sentence: what a folded run of status replies shows as its last. */
+  line: z.string().nullable().default(null),
 });
 export type ReplyTagView = z.infer<typeof replyTagView>;
 
@@ -134,7 +136,7 @@ export const rpcContract = defineRpcContract({
     input: z.object({ threadId }).strict(),
     output: z.object({
       /** Sorted turns, oldest first: each turn's first message (its seq) and its strand, null for none. */
-      tags: z.array(z.object({ turnId: z.string(), seq: z.number(), strandId: z.string().nullable() })),
+      tags: z.array(z.object({ turnId: z.string(), seq: z.number(), strandId: z.string().nullable(), /** "user": the user wrote it; "report": another thread's or a runner's message. */ kind: z.enum(["user", "report"]).default("user") })),
       strands: z.array(z.object({ id: z.string(), title: z.string() })),
       /** Tagged replies, oldest first: each turn's reply needs-you or status, its ask line, and whether the user is past it. */
       replies: z.array(replyTagView).default([]),

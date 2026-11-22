@@ -71,16 +71,16 @@ const itemOf = (row: ItemRow): StrandItem => ({
 });
 
 /** A reply: its item, its tag (null while untagged), ask sentence, who tagged it (null: not yet), and whether the user is past it. */
-export interface ReplyRow { seq: number; turnId: string | null; at: number; strandId: string | null; tag: ReplyTag | null; ask: string | null; by: ReplyBy | null; resolved: boolean }
-type ReplyDbRow = { seq: number; turn_id: string | null; at: number; strand_id: string | null; reply_tag: string | null; reply_ask: string | null; reply_by: string | null; resolved: number };
+export interface ReplyRow { seq: number; turnId: string | null; at: number; strandId: string | null; tag: ReplyTag | null; ask: string | null; by: ReplyBy | null; resolved: boolean; /** The reply's first sentence (a folded run of status replies says it). */ line: string | null }
+type ReplyDbRow = { seq: number; turn_id: string | null; at: number; strand_id: string | null; reply_tag: string | null; reply_ask: string | null; reply_by: string | null; resolved: number; line: string | null };
 
 /** A reply's columns and whether it's resolved: answered (Jev), marked done, or open when its strand was marked done (a stored fact: reopening the strand doesn't bring it back). */
-const REPLY_COLUMNS = `r.seq, r.turn_id, r.at, r.strand_id, r.reply_tag, r.reply_ask, r.reply_by,
+const REPLY_COLUMNS = `r.seq, r.turn_id, r.at, r.strand_id, r.reply_tag, r.reply_ask, r.reply_by, r.line,
   (r.reply_resolved_at IS NOT NULL) AS resolved`;
 const replyOf = (row: ReplyDbRow): ReplyRow => ({
   seq: row.seq, turnId: row.turn_id, at: row.at, strandId: row.strand_id,
   tag: row.reply_tag === "needs-you" || row.reply_tag === "status" ? row.reply_tag : null,
-  ask: row.reply_ask, by: row.reply_by === "jev" || row.reply_by === "none" ? row.reply_by : null, resolved: !!row.resolved,
+  ask: row.reply_ask, by: row.reply_by === "jev" || row.reply_by === "none" ? row.reply_by : null, resolved: !!row.resolved, line: row.line,
 });
 
 /** The last user line kept with an item, for the prompt's "last user line". */
@@ -327,9 +327,9 @@ export class StrandStore {
   // ---- replies that need the user (src/strands/reply.ts) ----
 
   /** Tags a turn's reply item (it must exist): needs-you or status with its ask sentence; null: Jev couldn't, it stays untagged ("none"). */
-  tagReply(threadId: string, seq: number, verdict: { tag: ReplyTag; ask: string | null } | null): void {
-    this.db.prepare("UPDATE strand_items SET reply_tag = ?, reply_ask = ?, reply_by = ? WHERE thread_id = ? AND kind = 'reply' AND seq = ? AND ref = ''")
-      .run(verdict?.tag ?? null, verdict?.ask?.slice(0, LINE_MAX) ?? null, verdict ? "jev" : "none", threadId, seq);
+  tagReply(threadId: string, seq: number, verdict: { tag: ReplyTag; ask: string | null } | null, line: string | null = null): void {
+    this.db.prepare("UPDATE strand_items SET reply_tag = ?, reply_ask = ?, reply_by = ?, line = COALESCE(?, line) WHERE thread_id = ? AND kind = 'reply' AND seq = ? AND ref = ''")
+      .run(verdict?.tag ?? null, verdict?.ask?.slice(0, LINE_MAX) ?? null, verdict ? "jev" : "none", line?.slice(0, LINE_MAX) ?? null, threadId, seq);
   }
 
   /** A reply once tagged (or marked untagged), else null. */

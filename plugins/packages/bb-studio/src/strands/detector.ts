@@ -21,7 +21,7 @@ import {
 } from "./sort";
 import type { ItemBy, Strand, StrandStore } from "./store";
 import { scrubber, type Scrub } from "./scrub";
-import { clearQuestions, readClears, readReplyAnswers, REPLY_OPEN_MS, replyQuestions, taggable, type ReplyVerdict } from "./reply";
+import { clearQuestions, firstLineOf, readClears, readReplyAnswers, REPLY_OPEN_MS, replyQuestions, taggable, type ReplyVerdict } from "./reply";
 import { sortable, turnsOf, UNFINISHED_MAX_MS, type EventRow, type Turn } from "./turns";
 
 export const STRANDS_CALLER = "strands";
@@ -269,7 +269,7 @@ export class StrandDetector {
     const text = turn.finalReply;
     if (turn.replySeq === null || !taggable(text) || this.store.reply(threadId, turn.replySeq)) return false;
     const verdict = asked ? readReplyAnswers(asked.answers, asked.candidates) : await this.askReply(threadId, text);
-    this.store.tagReply(threadId, turn.replySeq, verdict ?? null);
+    this.store.tagReply(threadId, turn.replySeq, verdict ?? null, firstLineOf(text));
     return true;
   }
 

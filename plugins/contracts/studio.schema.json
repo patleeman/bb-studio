@@ -57253,12 +57253,21 @@
                     "string",
                     "null"
                   ]
+                },
+                "kind": {
+                  "default": "user",
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "report"
+                  ]
                 }
               },
               "required": [
                 "turnId",
                 "seq",
-                "strandId"
+                "strandId",
+                "kind"
               ],
               "additionalProperties": false
             }
@@ -57309,6 +57318,13 @@
                 },
                 "resolved": {
                   "type": "boolean"
+                },
+                "line": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -57316,7 +57332,8 @@
                 "seq",
                 "tag",
                 "ask",
-                "resolved"
+                "resolved",
+                "line"
               ],
               "additionalProperties": false
             }

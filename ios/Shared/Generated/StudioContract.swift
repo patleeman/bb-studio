@@ -42087,15 +42087,41 @@ public enum Studio {
     }
   }
 
+  public enum StrandsTagsOutputTagsItemKind: Sendable, Hashable, Codable {
+    case user
+    case report
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "report": self = .report
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .report: try container.encode("report")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct StrandsTagsOutputTagsItem: Sendable, Hashable, Codable {
     public var turnId: String?
     public var seq: Double?
     public var strandId: String?
+    public var kind: StrandsTagsOutputTagsItemKind?
 
-    public init(turnId: String? = nil, seq: Double? = nil, strandId: String? = nil) {
+    public init(turnId: String? = nil, seq: Double? = nil, strandId: String? = nil, kind: StrandsTagsOutputTagsItemKind? = nil) {
       self.turnId = turnId
       self.seq = seq
       self.strandId = strandId
+      self.kind = kind
     }
   }
 
@@ -42139,13 +42165,15 @@ public enum Studio {
     public var tag: StrandsTagsOutputRepliesItemTag?
     public var ask: String?
     public var resolved: Bool?
+    public var line: String?
 
-    public init(turnId: String? = nil, seq: Double? = nil, tag: StrandsTagsOutputRepliesItemTag? = nil, ask: String? = nil, resolved: Bool? = nil) {
+    public init(turnId: String? = nil, seq: Double? = nil, tag: StrandsTagsOutputRepliesItemTag? = nil, ask: String? = nil, resolved: Bool? = nil, line: String? = nil) {
       self.turnId = turnId
       self.seq = seq
       self.tag = tag
       self.ask = ask
       self.resolved = resolved
+      self.line = line
     }
   }
 

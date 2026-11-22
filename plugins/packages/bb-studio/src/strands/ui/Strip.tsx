@@ -26,7 +26,7 @@ import type { StrandAsk, StrandView } from "../contract";
 import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, replyAskOf, rowWorkersOf, seqsOf, stepSeq, strayCountsOf, stripShown } from "./model";
 import { hostContextSegments, useHidePromptStack } from "./prompt-stack";
 import { flashReply } from "./ask-mark";
-import { select, selectionOf, setStrandTurns, useSelection } from "./selection";
+import { openFoldOf, select, selectionOf, setStrandTurns, useSelection } from "./selection";
 
 export const STRANDS_TAB = "strands";
 export const STRANDS_POLL_MS = 30_000;
@@ -37,6 +37,8 @@ export function useJump(threadId: string): (seq: number) => boolean {
   const pathname = usePathname();
   return useCallback((seq: number) => {
     const path = messageLinkPath(pathname, threadId, seq);
+    // A message in a folded run of status replies: open the run first, so the jump lands on it.
+    openFoldOf(threadId, seq);
     return !!path && !!toAppPathOf(navigate)?.(path, { replace: true });
   }, [navigate, pathname, threadId]);
 }
@@ -98,6 +100,7 @@ function useOpenMessage() {
   const navigate = useBbNavigate();
   const pathname = usePathname();
   return useCallback((threadId: string, seq: number) => {
+    openFoldOf(threadId, seq);
     const here = messageLinkPath(pathname, threadId, seq);
     if (!toAppPathOf(navigate)?.(here ?? `/threads/${encodeURIComponent(threadId)}#msg=${seq}`, here ? { replace: true } : undefined)) navigate.toThread(threadId);
   }, [navigate, pathname]);

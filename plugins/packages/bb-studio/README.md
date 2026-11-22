@@ -4452,6 +4452,14 @@ strands. Quiet `[PASS]` replies and the backfill's history aren't tagged.
   (the reply's last paragraph when Jev named no sentence). **Done** shows
   beside the sentence on hover or keyboard focus. Status replies look as
   they always did.
+- Runs of status replies fold: 3 or more consecutive replies Jev tagged
+  status, with no message you typed between them, become one line in the
+  timeline ("6 updates · last: <its newest reply's first sentence>") that
+  opens in place. A reply that needs you, or one with no tag, ends a run;
+  the conversation's newest reply never folds. With a strand picked, nothing
+  folds, and a jump to a folded reply opens its run first. This needs a BB
+  whose timeline folds runs (the fork's `folds` on
+  `slots.experimental_timelineFilter`); an older BB folds nothing.
 - It counts as an ask on its strand ("N need you" in the box, the overview,
   the sidebar), with **Jump to reply** and **Done**; picking the strand opens
   the reply. Jump to reply lands on the marked sentence and flashes it.

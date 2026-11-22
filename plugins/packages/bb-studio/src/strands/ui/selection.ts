@@ -7,6 +7,7 @@
 // back to its first message. On a BB without it, the tags dim the other
 // strands' messages instead.
 import { useSyncExternalStore } from "react";
+import { foldOfSeq, statusRunFolds, type StatusRunFold, type Tags } from "./model";
 
 export interface Selection {
   strandId: string;
@@ -113,14 +114,18 @@ export function useSelection(threadId: string): Selection | null {
 }
 
 interface TimelineFilterSlots {
-  experimental_timelineFilter?: (registration: { id: string; get(threadId: string): TimelineFilter | null; subscribe(listener: () => void): () => void }) => void;
+  experimental_timelineFilter?: (registration: {
+    id: string; get(threadId: string): TimelineFilter | null; subscribe(listener: () => void): () => void;
+    folds?(threadId: string): readonly StatusRunFold[] | null; expandFold?(threadId: string, id: string): void;
+  }) => void;
 }
 
 /** Hands the filter to BB's timeline (`slots.experimental_timelineFilter`). False on a BB without it, where the tags dim instead. */
 export function registerTimelineFilter(slots: object): boolean {
   const target = slots as TimelineFilterSlots;
   if (typeof target.experimental_timelineFilter !== "function") return false;
-  target.experimental_timelineFilter({ id: "strands", get: timelineFilterOf, subscribe: subscribeSelection });
+  // A BB whose timeline folds runs (the fork's seam) asks foldsOf; an older one ignores it and folds nothing.
+  target.experimental_timelineFilter({ id: "strands", get: timelineFilterOf, subscribe: subscribeSelection, folds: foldsOf, expandFold: openFold });
   hostFilters = true;
   return true;
 }
@@ -129,7 +134,48 @@ export function registerTimelineFilter(slots: object): boolean {
 export const timelineFiltersInHost = () => hostFilters;
 
 /** Test hook: a fresh app (no host filter, nothing picked). */
-export function resetSelectionForTests(): void { hostFilters = false; selected.clear(); filters.clear(); marks.clear(); }
+export function resetSelectionForTests(): void { hostFilters = false; selected.clear(); filters.clear(); marks.clear(); foldTags.clear(); openFolds.clear(); foldCache.clear(); }
+
+// ---- runs of status replies, folded in BB's timeline ----
+
+const foldTags = new Map<string, Tags>();
+const openFolds = new Map<string, Set<string>>();
+const foldCache = new Map<string, { tags: Tags; open: number; folds: readonly StatusRunFold[] }>();
+let openVersion = 0;
+
+/** A conversation's tags, as its messages' tags read them: the folds follow. */
+export function setFoldTags(threadId: string, tags: Tags | null | undefined): void {
+  if (!tags || foldTags.get(threadId) === tags) return;
+  foldTags.set(threadId, tags);
+  notify();
+}
+
+/** The runs BB folds in a conversation's timeline: the same array while nothing changed. */
+export function foldsOf(threadId: string): readonly StatusRunFold[] | null {
+  const tags = foldTags.get(threadId);
+  if (!tags) return null;
+  const cached = foldCache.get(threadId);
+  if (cached && cached.tags === tags && cached.open === openVersion) return cached.folds;
+  const folds = statusRunFolds(tags, openFolds.get(threadId));
+  foldCache.set(threadId, { tags, open: openVersion, folds });
+  return folds;
+}
+
+/** The user opened a fold: it stays open. */
+export function openFold(threadId: string, id: string): void {
+  const open = openFolds.get(threadId) ?? new Set<string>();
+  if (open.has(id)) return;
+  open.add(id);
+  openFolds.set(threadId, open);
+  openVersion++;
+  notify();
+}
+
+/** Opens the fold that holds message `seq`, before a jump to it. */
+export function openFoldOf(threadId: string, seq: number): void {
+  const fold = foldOfSeq(foldTags.get(threadId), foldsOf(threadId) ?? [], seq);
+  if (fold) openFold(threadId, fold.id);
+}
 
 /** The rule that dims the other strands' messages (where BB can't hide them), once per document. */
 export function ensureDimStyle(doc: Document = document): void {

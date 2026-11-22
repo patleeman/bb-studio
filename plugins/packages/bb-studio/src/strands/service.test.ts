@@ -210,7 +210,7 @@ describe("strands.list", () => {
     const b = x.thread.turn("thanks", "Sure.");
     await x.svc.idle(x.thread.id);
     const { tags, strands } = x.svc.tags(x.thread.id);
-    expect(tags).toEqual([{ turnId: a.turnId, seq: a.seq, strandId: strands[0]!.id }, { turnId: b.turnId, seq: b.seq, strandId: null }]);
+    expect(tags).toEqual([{ turnId: a.turnId, seq: a.seq, strandId: strands[0]!.id, kind: "user" }, { turnId: b.turnId, seq: b.seq, strandId: null, kind: "user" }]);
   });
 });
 
