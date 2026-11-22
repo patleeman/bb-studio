@@ -1620,6 +1620,14 @@ The compact page header at 390 pixels, with **Item actions** open.
   `/` for headings, lists, checklists, toggles, quotes, code, tables, images,
   video, audio, files, and the custom blocks below. Blocks can be dragged,
   nested, and turned into other types. Markdown shortcuts work as you type.
+- **Zoom into images.** Double-click an image, or use the expand button at
+  its top-right, to open it over the page, fitted to the window. A single
+  click still selects it, to resize it or edit its caption. Pinch,
+  Ctrl- or Cmd-scroll, the + and - keys, or a double-click zoom in, up to 8×
+  the fitted size or 4× the image's own pixels, whichever is more. Drag or
+  scroll to pan. 0 or another double-click fits it again. The left and right
+  arrows step through the page's other images. Esc or a click outside the
+  image closes it.
 - **Live collaboration.** Every page is a Yjs document synced over a
   WebSocket. Agents edit the same document from the server, so their
   changes stream into your editor, with cursors, while you keep typing.

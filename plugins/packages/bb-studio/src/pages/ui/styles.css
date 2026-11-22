@@ -227,3 +227,120 @@
   content: "Chat";
   color: var(--muted-foreground);
 }
+
+/* An image's expand button (blocks.tsx): top-right on the image, shown on hover. */
+.pages-editor .pages-image-expand {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: #fff;
+  background: rgb(0 0 0 / 0.55);
+  opacity: 0;
+  transition: opacity 120ms;
+  cursor: zoom-in;
+}
+.pages-editor .bn-visual-media-wrapper:hover .pages-image-expand,
+.pages-editor .pages-image-expand:focus-visible {
+  opacity: 1;
+}
+.pages-editor .pages-image-expand:hover {
+  background: rgb(0 0 0 / 0.75);
+}
+
+/* The image lightbox (image-lightbox.tsx), portalled to the body over all of
+   BB. Plain CSS: the build doesn't generate every utility for a portal. */
+.pages-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  overflow: hidden;
+  background: rgb(8 9 12 / 0.92);
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+.pages-lightbox-image {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: none;
+  max-height: none;
+  will-change: transform;
+  image-rendering: auto;
+}
+.pages-lightbox-bar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  pointer-events: none;
+  color: rgb(255 255 255 / 0.88);
+  font-size: 12px;
+  line-height: 16px;
+}
+.pages-lightbox-chip {
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.55);
+  padding: 4px 8px;
+}
+.pages-lightbox-chip:empty {
+  display: none;
+}
+.pages-lightbox-caption {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pages-lightbox-zoom {
+  font-variant-numeric: tabular-nums;
+}
+.pages-lightbox-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pages-lightbox-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  color: rgb(255 255 255 / 0.88);
+  background: rgb(0 0 0 / 0.55);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.pages-lightbox-button:hover {
+  background: rgb(0 0 0 / 0.8);
+  color: #fff;
+}
+.pages-lightbox-button:focus-visible {
+  outline: 2px solid rgb(255 255 255 / 0.7);
+  outline-offset: 2px;
+}
+.pages-lightbox-step {
+  position: absolute;
+  top: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  transform: translateY(-50%);
+}
+.pages-lightbox-step[data-side="left"] { left: 12px; }
+.pages-lightbox-step[data-side="right"] { right: 12px; }
+.pages-lightbox-step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
