@@ -195,6 +195,29 @@ describe("the zoomed-out view BB draws in the timeline's place", () => {
     release();
   });
 
+  it("takes a cold open's first rows as the baseline, not as a send", () => {
+    zoomingHost();
+    setZoom("thr_main", 1);
+    render(<ZoomView threadId="thr_main" level={1} anchorSeq={null} latestUserSeq={null} />);
+    render(<ZoomView threadId="thr_main" level={1} anchorSeq={null} latestUserSeq={70} />);
+    expect(zoomOf("thr_main")).toBe(1);
+    render(<ZoomView threadId="thr_main" level={1} anchorSeq={null} latestUserSeq={120} />);
+    expect(zoomOf("thr_main")).toBe(0);
+  });
+
+  it("goes back to the messages when the list crashes", () => {
+    zoomingHost();
+    setZoom("thr_main", 1);
+    state.tags = { ...DAY, replies: 5 as never };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<ZoomView threadId="thr_main" level={1} anchorSeq={null} latestUserSeq={null} />);
+    expect(container.querySelector("[data-zoom-view]")).toBeNull();
+    expect(zoomOf("thr_main")).toBe(0);
+    warn.mockRestore();
+    error.mockRestore();
+  });
+
   it("goes back to the messages when the user sends", () => {
     zoomingHost();
     setZoom("thr_main", 1);

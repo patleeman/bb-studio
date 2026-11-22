@@ -7,7 +7,7 @@
 // key moment, and sending a message goes back to the messages. Where BB zooms,
 // the header also carries what the strands box did: the strand filter, the
 // Strands tab and "N need you". The tree (level 2) comes later.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
+import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
 import { cn } from "../../kit/ui/utils";
 import { useLive } from "../../ui/live";
 import { flashReply } from "./ask-mark";
@@ -94,8 +94,23 @@ function Glyph({ glyph, current }: { glyph: ZoomGlyph; current: boolean }) {
   );
 }
 
-/** BB's `zoom.View`: what a zoomed-out conversation shows in the timeline's place. */
-export function ZoomView({ threadId, anchorSeq, latestUserSeq = null }: { threadId: string; level: number; anchorSeq: number | null; latestUserSeq?: number | null }) {
+/** BB's `zoom.View`: what a zoomed-out conversation shows in the timeline's place. A crash goes back to the messages. */
+export function ZoomView(props: { threadId: string; level: number; anchorSeq: number | null; latestUserSeq?: number | null }) {
+  return <ZoomCrashGuard threadId={props.threadId}><ZoomList {...props} /></ZoomCrashGuard>;
+}
+
+/** A list that throws sets the conversation back to level 0, so the switch and BB agree on Messages. */
+class ZoomCrashGuard extends Component<{ threadId: string; children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+  static getDerivedStateFromError(): { failed: boolean } { return { failed: true }; }
+  override componentDidCatch(error: unknown): void {
+    console.warn("[studio] the strands view failed; back to the messages", error);
+    setZoom(this.props.threadId, 0);
+  }
+  override render(): ReactNode { return this.state.failed ? null : this.props.children; }
+}
+
+function ZoomList({ threadId, anchorSeq, latestUserSeq = null }: { threadId: string; level: number; anchorSeq: number | null; latestUserSeq?: number | null }) {
   const tags = useLive("strands.tags", { threadId }, { pollMs: TAGS_POLL_MS });
   const rows = useMemo(() => zoomLines(tags.data), [tags.data]);
   const zoomTo = useZoomTo(threadId);
@@ -118,11 +133,12 @@ export function ZoomView({ threadId, anchorSeq, latestUserSeq = null }: { thread
     middles.set(threadId, own);
     return () => { if (middles.get(threadId) === own) middles.delete(threadId); };
   }, [threadId]);
-  // The user sent a message: back to the messages, where it shows.
+  // The user sent a message: back to the messages, where it shows. The first value seen (rows
+  // arriving on a cold open) is the baseline, not a send.
   const sentFrom = useRef(latestUserSeq);
   useEffect(() => {
-    if (latestUserSeq !== null && latestUserSeq !== sentFrom.current) setZoom(threadId, 0);
-    sentFrom.current = latestUserSeq;
+    if (latestUserSeq !== null && sentFrom.current !== null && latestUserSeq !== sentFrom.current) setZoom(threadId, 0);
+    if (latestUserSeq !== null) sentFrom.current = latestUserSeq;
   }, [latestUserSeq, threadId]);
   const open = (line: ZoomLine) => {
     if (line.mark === "open") flashReply(threadId, line.go);
@@ -171,7 +187,8 @@ export function ZoomSwitch({ threadId }: { threadId: string }) {
   const openTab = useOpenStrandsTab();
   const enabled = !!list.data?.enabled && zoomInHost();
   const zoomBy = useCallback((delta: number) => zoomTo(zoomOf(threadId) + delta), [threadId, zoomTo]);
-  useEffect(() => {
+  // Before paint: coming back to a zoomed-out conversation draws the list at once, not the timeline first.
+  useLayoutEffect(() => {
     if (!enabled) return;
     const own: ZoomActions = { zoomBy };
     actions.set(threadId, own);

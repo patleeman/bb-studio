@@ -396,6 +396,7 @@ export default definePluginApp((app) => {
   // Semantic zoom (the fork's zoom seam): a zoomed-out conversation shows its strands in the timeline's place.
   registerTimelineFilter(app.slots, ZoomView);
   // ⌃⌘− / ⌃⌘=: Control keeps the key "-" and "="; Option would make them "–" and "≠", which BB's matcher can't map back.
+  // macOS-only by design: elsewhere mod+control is plain Ctrl+− / Ctrl+=, which BB's View menu uses for page zoom.
   app.commands.register({ id: "zoom-out", title: "Studio: Zoom out (Messages → Strands)", defaultShortcut: { key: "-", mod: true, control: true }, isAvailable: (context) => canZoom(context.threadId), run: (context) => { zoomThreadBy(context.threadId, 1); } });
   app.commands.register({ id: "zoom-in", title: "Studio: Zoom in (Strands → Messages)", defaultShortcut: { key: "=", mod: true, control: true }, isAvailable: (context) => canZoom(context.threadId), run: (context) => { zoomThreadBy(context.threadId, -1); } });
   // BB's thread context row (parent, changed files, pull request) in a strands conversation's Info tab; hidden above its composer (prompt-stack.ts).
