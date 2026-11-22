@@ -66,7 +66,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(text("Bring the laptop.").waitForExistence(timeout: 10), "the new record replaces it")
         XCTAssertTrue(text("replaces “Interview with Sam is Friday 10:00.”").exists)
 
-        app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
+        app.goBack()
         app.buttons["memoryAdd"].tap()
         let topic = app.textFields["memoryTopicField"]
         XCTAssertTrue(topic.waitForExistence(timeout: 10))
@@ -140,9 +140,11 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         shot("archive-finished")
         app.buttons["archiveReopen"].tap()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 15), "the reopened conversation")
-        app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
+        app.goBack()
         app.openRoomPlace("conversations")
-        XCTAssertTrue(app.buttons["roomConversation-thr_demo_lisbon"].waitForExistence(timeout: 15), "back in Conversations")
+        let reopened = app.buttons["roomConversation-thr_demo_lisbon"]
+        for _ in 0..<3 where !reopened.waitForExistence(timeout: 3) { app.swipeUp() }
+        XCTAssertTrue(reopened.waitForExistence(timeout: 15), "back in Conversations")
     }
 
     func testSlowMemoryAndLibraryLoadThroughTheBotFlip() {

@@ -54,8 +54,9 @@ extension XCUIApplication {
             (folded.exists && folded.isHittable) || (back.exists && back.isHittable) || bar.buttons.firstMatch.exists
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: timeout), .completed, "a Back button", file: file, line: line)
-        if folded.exists, folded.isHittable { return folded.tap() }
+        // A pushed screen's own Back first: the conversation's can still show beside it.
         if back.exists, back.isHittable { return back.tap() }
+        if folded.exists, folded.isHittable { return folded.tap() }
         bar.buttons.element(boundBy: 0).tap()
     }
 

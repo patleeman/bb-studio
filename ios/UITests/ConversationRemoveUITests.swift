@@ -43,7 +43,10 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 15), .completed, what)
     }
 
-    private var dots: XCUIElement { app.descendants(matching: .any)["conversationPageDots"].firstMatch }
+    /// The page dots, or the folded Duo's title (it has no dots).
+    private var dots: XCUIElement { app.shownConversation }
+    /// What `dots` says: the page on the phone, the conversation's name on the folded Duo.
+    private func shown(_ page: String, _ name: String) -> String { app.isFoldedDuo ? name : page }
 
     private func openMore() {
         let more = app.buttons["More"].firstMatch
@@ -163,11 +166,11 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         openConversations()
         row("thr_demo_interview").tap()
         XCTAssertTrue(dots.waitForExistence(timeout: 10))
-        XCTAssertEqual(dots.label, "Conversation 2 of 4", "on Launch prep")
+        XCTAssertEqual(dots.label, shown("Conversation 2 of 4", "Launch prep"), "on Launch prep")
         openMore()
         app.buttons["menuArchive"].tap()
         backInTheRoom("the archived conversation closes")
-        let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == 'Conversation 1 of 3'"), object: dots)
+        let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", shown("Conversation 1 of 3", "Juniper")), object: dots)
         XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 15), .completed, "the room moves to the page before it: \(dots.label)")
         shot("7-archived-shown")
 
@@ -177,7 +180,7 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(row("thr_demo_speech").waitForNonExistence(timeout: 10))
         row("thr_botdemo01").tap()
         backInTheRoom("Main opens")
-        XCTAssertEqual(dots.label, "Conversation 1 of 2", "archived from the list, the room leaves it too")
+        XCTAssertEqual(dots.label, shown("Conversation 1 of 2", "Juniper"), "archived from the list, the room leaves it too")
     }
 
     func testTheArchiveDeletesAndArchivesItsRows() {
