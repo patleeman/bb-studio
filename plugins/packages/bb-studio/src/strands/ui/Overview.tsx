@@ -10,18 +10,17 @@ import { toAppPathOf } from "../../kit/app/host-sdk";
 import { cn, Icon, Tooltip } from "../../kit/ui/index";
 import { useLive } from "../../ui/live";
 import type { OverviewConversation, StrandAsk, StrandView } from "../contract";
-import { openFoldOf, select } from "./selection";
+import { select } from "./selection";
 import { flashReply } from "./ask-mark";
 import { AskButtonsFor, StateMark } from "./Strip";
 
 export { isStrandsPath, strandsPath } from "./overview-route";
 
-/** Opens a conversation at a strand's newest message, with the strand selected. */
+/** Opens a conversation at a strand's newest message, with the strand selected (the filter shows its runs unfolded). */
 function useOpenStrand() {
   const navigate = useBbNavigate();
   return (threadId: string, strand: Pick<StrandView, "id" | "latestSeq"> | null) => {
     if (strand) select(threadId, { strandId: strand.id, seq: strand.latestSeq });
-    if (strand?.latestSeq != null) openFoldOf(threadId, strand.latestSeq);
     const path = strand?.latestSeq != null ? `/threads/${encodeURIComponent(threadId)}#msg=${strand.latestSeq}` : null;
     if (!path || !toAppPathOf(navigate)?.(path)) navigate.toThread(threadId);
   };

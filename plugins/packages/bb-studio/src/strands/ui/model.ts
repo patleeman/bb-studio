@@ -17,9 +17,10 @@ export interface StatusRunFold { id: string; turnIds: string[]; label: string }
  * turn the user started may open a run: its message stays, its reply folds).
  * A reply that needs the user, or one with no tag, ends a run; runs shorter
  * than RUN_MIN stay open; the newest turn never folds, so the newest reply
- * always shows. `open`: the folds the user opened.
+ * always shows. `openTurns`: the turns of the runs the user opened; a run
+ * holding any of them stays open, even when a late tag moves where it starts.
  */
-export function statusRunFolds(tags: Tags | null | undefined, open: ReadonlySet<string> = new Set()): StatusRunFold[] {
+export function statusRunFolds(tags: Tags | null | undefined, openTurns: ReadonlySet<string> = new Set()): StatusRunFold[] {
   if (!tags?.replies?.length) return [];
   const replies = new Map(tags.replies.map((reply) => [reply.turnId, reply]));
   const runs: { turnId: string; line: string | null }[][] = [];
@@ -37,7 +38,7 @@ export function statusRunFolds(tags: Tags | null | undefined, open: ReadonlySet<
       const last = each.at(-1)!.line;
       return { id: `run:${each[0]!.turnId}`, turnIds: each.map((turn) => turn.turnId), label: `${each.length} updates${last ? ` · last: ${last}` : ""}` };
     })
-    .filter((fold) => !open.has(fold.id));
+    .filter((fold) => !fold.turnIds.some((turnId) => openTurns.has(turnId)));
 }
 
 /** The fold that holds message `seq` (a message's or a reply's seq: the turn it falls in), or null. */

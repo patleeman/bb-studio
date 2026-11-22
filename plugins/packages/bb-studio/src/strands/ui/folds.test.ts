@@ -32,7 +32,7 @@ describe("runs of status replies to fold", () => {
     expect(statusRunFolds(day)).toEqual([]);
     const longer = tags([status("a"), status("b"), status("c"), status("d"), status("e")]);
     expect(statusRunFolds(longer).map((fold) => fold.turnIds)).toEqual([["a", "b", "c", "d"]]);
-    expect(statusRunFolds(longer, new Set(["run:a"]))).toEqual([]);
+    expect(statusRunFolds(longer, new Set(["b"]))).toEqual([]);
     expect(statusRunFolds({ ...longer, replies: longer.replies!.map((reply) => ({ ...reply, line: null })) })[0]!.label).toBe("4 updates");
   });
 
@@ -65,6 +65,17 @@ describe("the folds BB's timeline reads", () => {
     expect(heard).toHaveBeenCalledTimes(2);
     expect(foldsOf("thr_main")).toEqual([]);
     off();
+  });
+
+  it("keeps an opened run open when a late tag moves where it starts", () => {
+    const untagged: Turn = { key: "x", kind: "report", tag: null };
+    setFoldTags("thr_main", tags([untagged, status("a"), status("b"), status("c"), status("d"), status("e")]));
+    expect(foldsOf("thr_main")!.map((fold) => fold.id)).toEqual(["run:a"]);
+    openFold("thr_main", "run:a");
+    expect(foldsOf("thr_main")).toEqual([]);
+    setFoldTags("thr_main", tags([status("x"), status("a"), status("b"), status("c"), status("d"), status("e")]));
+    expect(foldsOf("thr_main")).toEqual([]);
+    openFold("thr_main", "run:nowhere");
   });
 
   it("opens the fold that holds a jump's target, and only that one", () => {

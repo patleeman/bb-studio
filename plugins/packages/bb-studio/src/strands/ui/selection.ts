@@ -139,6 +139,7 @@ export function resetSelectionForTests(): void { hostFilters = false; selected.c
 // ---- runs of status replies, folded in BB's timeline ----
 
 const foldTags = new Map<string, Tags>();
+/** The turns of the runs the user opened, per conversation. */
 const openFolds = new Map<string, Set<string>>();
 const foldCache = new Map<string, { tags: Tags; open: number; folds: readonly StatusRunFold[] }>();
 let openVersion = 0;
@@ -161,20 +162,26 @@ export function foldsOf(threadId: string): readonly StatusRunFold[] | null {
   return folds;
 }
 
-/** The user opened a fold: it stays open. */
+/** The user opened a fold: it stays open (by its turns, so a late tag that moves the run's start keeps it open). */
 export function openFold(threadId: string, id: string): void {
-  const open = openFolds.get(threadId) ?? new Set<string>();
-  if (open.has(id)) return;
-  open.add(id);
-  openFolds.set(threadId, open);
-  openVersion++;
-  notify();
+  const fold = foldsOf(threadId)?.find((each) => each.id === id);
+  if (fold) openTurns(threadId, fold.turnIds);
 }
 
 /** Opens the fold that holds message `seq`, before a jump to it. */
 export function openFoldOf(threadId: string, seq: number): void {
   const fold = foldOfSeq(foldTags.get(threadId), foldsOf(threadId) ?? [], seq);
-  if (fold) openFold(threadId, fold.id);
+  if (fold) openTurns(threadId, fold.turnIds);
+}
+
+function openTurns(threadId: string, turnIds: readonly string[]): void {
+  const open = openFolds.get(threadId) ?? new Set<string>();
+  const before = open.size;
+  for (const turnId of turnIds) open.add(turnId);
+  if (open.size === before) return;
+  openFolds.set(threadId, open);
+  openVersion++;
+  notify();
 }
 
 /** The rule that dims the other strands' messages (where BB can't hide them), once per document. */
