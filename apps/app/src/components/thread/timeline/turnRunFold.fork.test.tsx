@@ -22,7 +22,8 @@ import {
 import { timelineFoldsOf } from "@/lib/fork-timeline-filter";
 import { TimelineFilterExpandContext } from "@/lib/fork-timeline-filter";
 import { ThreadTimelineRows } from "./ThreadTimelineRows";
-import { foldTurnRuns, linkedRowId } from "./turnRunFold.fork";
+import { foldTurnRuns } from "./turnRunFold.fork";
+import { collectSearchedMessageAncestorRowIds } from "./useScrollToSearchedMessage";
 
 afterEach(() => {
   cleanup();
@@ -215,13 +216,25 @@ describe("foldTurnRuns", () => {
   it("leaves open the fold that holds the linked row, and says so", () => {
     const rows = buildTimelineViewRows(day());
     const target = rows.find((row) => row.id === "c_reply")!;
-    const id = linkedRowId(rows, { seq: target.sourceSeqStart, match: "message" });
-    expect(id).toBe("c_reply");
-    const fold = foldTurnRuns(rows, [FOLD], { targetRowId: id });
+    const ids = collectSearchedMessageAncestorRowIds(rows, target.sourceSeqStart, "message");
+    expect([...ids]).toEqual(["c_reply"]);
+    const fold = foldTurnRuns(rows, [FOLD], { targetRowIds: ids });
     expect(fold.rows).toBe(rows);
     expect(fold.opened).toEqual(["run_a"]);
-    expect(linkedRowId(rows, { seq: target.sourceSeqStart - 2, match: "sequence" })).toBe("c_command");
-    expect(linkedRowId(rows, null)).toBeNull();
+    expect(foldTurnRuns(rows, [FOLD], { targetRowIds: new Set(["e_reply"]) }).opened).toEqual([]);
+  });
+
+  it("asks the plugin for the line when it folds fewer turns than the run has", () => {
+    const rows = buildTimelineViewRows(day());
+    const labelFor = vi.fn((turns: readonly string[]) => `${turns.length} updates · last: ${turns.at(-1)}`);
+    const short = foldTurnRuns(rows, [{ ...FOLD, turnIds: ["turn_b", "turn_c", "turn_e"], labelFor }]);
+    expect(labelFor).toHaveBeenCalledWith(["turn_b", "turn_c"]);
+    expect(short.markers.get("b_message")?.label).toBe("2 updates · last: turn_c");
+    labelFor.mockClear();
+    expect(foldTurnRuns(rows, [{ ...FOLD, labelFor }]).markers.get("a_reply")?.label).toBe(FOLD.label);
+    expect(labelFor).not.toHaveBeenCalled();
+    const broken = foldTurnRuns(rows, [{ ...FOLD, turnIds: ["turn_b", "turn_c", "turn_e"], labelFor: () => { throw new Error("no"); } }]);
+    expect(broken.markers.get("b_message")?.label).toBe(FOLD.label);
   });
 });
 
@@ -295,6 +308,19 @@ describe("a plugin's folded runs in the timeline", () => {
     expect(container.querySelector("[data-turn-run-fold]")).toBeNull();
     expect(container.querySelector('[data-timeline-row-id="c_reply"]')).not.toBeNull();
     expect(store.expandFold).toHaveBeenCalledWith("thr_main", "run_a");
+  });
+
+  it("leaves the runs alone for a link into another thread", () => {
+    const store = foldingStore([FOLD]);
+    setPluginSlotRegistrations(
+      "studio",
+      makePluginRegistrationSet({ timelineFilters: [store.registration] }),
+    );
+    const rows = day();
+    const target = rows.find((row) => row.id === "c_reply")!;
+    const { container } = renderRows(rows, false, `/threads/thr_other#msg=${target.sourceSeqStart}`);
+    expect(container.querySelector('[data-turn-run-fold="run_a"]')).not.toBeNull();
+    expect(store.expandFold).not.toHaveBeenCalled();
   });
 
   it("folds nothing while a timeline filter opens everything", () => {
