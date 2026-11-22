@@ -20,6 +20,7 @@ import { createChangeBus, defineItemMention, displayPath, resolveSource, serveBy
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import { callText, pageText } from "../paging";
 import { rpcContract, type artifactSchema, type candidateSchema } from "./contract";
 import { artifactBackupHandlers } from "./server/backup";
 import { contentHeaders, rangeResponse, utf8Prefix, withQuoteScript } from "./server/content";
@@ -66,7 +67,8 @@ export const ARTIFACTS_USAGE = [
 
 /** The viewer shows at most this much text; Download has the rest. */
 const MAX_VIEW_TEXT = 2 * 1024 * 1024;
-const MAX_TOOL_TEXT = 100_000;
+/** artifacts_read's part of a text, in characters. */
+const TEXT_PART = 12_000;
 
 type ArtifactDto = z.infer<typeof artifactSchema>;
 type Candidate = z.infer<typeof candidateSchema>;
@@ -475,8 +477,8 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database, servic
   bb.agents.registerTool({
     name: "artifacts_read",
     description: "Read a Studio artifact: its details and, for text types (Markdown, HTML, code, text), its contents. For images and other files, use `bb studio artifacts export <id>` to copy it into the workspace.",
-    parameters: z.object({ artifactId: z.string().min(1).max(100) }),
-    execute({ artifactId }) {
+    parameters: z.object({ artifactId: z.string().min(1).max(100), offset: z.number().int().min(0).optional() }),
+    execute({ artifactId, offset }) {
       const artifact = store.get(artifactId);
       if (!artifact) return { content: [{ type: "text", text: `Artifact ${artifactId} not found.` }], isError: true };
       const text = artifactText(store, artifact);
@@ -485,8 +487,11 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database, servic
         return `${head}\n\nToo large to read here (text over ${formatBytes(TEXT_SCAN_BYTES)}). Print it with: bb studio artifacts show ${artifact.id}, or copy it into the workspace with: bb studio artifacts export ${artifact.id}`;
       }
       if (text === null) return `${head}\n\nNot text. Copy it into the workspace with: bb studio artifacts export ${artifact.id}`;
-      const shown = text.length > MAX_TOOL_TEXT ? `${text.slice(0, MAX_TOOL_TEXT)}\n…(truncated; full text: bb studio artifacts show ${artifact.id})` : text;
-      return `${head}\n\n${artifact.description ? `Description: ${artifact.description}\n\n` : ""}${shown}`;
+      // In parts (src/paging.ts): the Next call right after the details.
+      const part = pageText(text, offset ?? 0, TEXT_PART);
+      if (part.missing) return `${head}\n\nThe text is ${text.length.toLocaleString("en-US")} characters; offset ${offset} is past its end. Start again: ${callText("apps_read", { id: artifact.id })}.`;
+      const next = part.next === null ? null : `(Characters ${(offset ?? 0).toLocaleString("en-US")}–${part.next.toLocaleString("en-US")} of ${text.length.toLocaleString("en-US")}. Next: ${callText("apps_read", { id: artifact.id, offset: part.next })}.)`;
+      return `${head}${next ? `\n${next}` : ""}\n\n${artifact.description && !offset ? `Description: ${artifact.description}\n\n` : ""}${part.text}`;
     },
   });
 

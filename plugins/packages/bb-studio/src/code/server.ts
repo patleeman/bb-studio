@@ -12,6 +12,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import { createChangeBus, mustGet } from "../kit/server/index";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { callText, nextLine, pageByKey, staleCursor } from "../paging";
 import { studioSchemas } from "../kit/contract";
 import { listenForFileChanges, type ThreadFileChange } from "../kit/host-events";
 import { fileChangeActivities, type Activity } from "./server/activity";
@@ -650,14 +651,22 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
   bb.agents.registerTool({
     name: "code_comments",
     description: "The user's open code review comments sent to you from VS Code (Studio Code): each thread's id, file and lines, and what was said.",
-    parameters: z.object({}),
-    execute: async (_input, ctx) => {
+    parameters: z.object({ after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
+    execute: async ({ after }: { after?: string }, ctx) => {
       const path = await threadPath(ctx.threadId);
       const open = comments.openFor(ctx.threadId).filter((thread) => {
         const workspace = store.get(thread.workspaceId);
         return workspace && usable(workspace, ctx.threadId, path);
       });
-      return open.map((thread) => describeThread(thread, showIn(thread.workspaceId))).join("\n\n") || "No open review comments.";
+      if (!open.length) return "No open review comments.";
+      // In parts (src/paging.ts): whole comment threads; the next part starts after the last one shown.
+      const blocks = open.map((thread) => ({ id: thread.id, text: describeThread(thread, showIn(thread.workspaceId)) }));
+      // By keyset on (first comment's time, id): threads resolved after part 1 drop out without breaking the cursor.
+      const started = new Map(open.map((thread) => [thread.id, [thread.comments[0]?.createdAt ?? 0, thread.id] as (string | number)[]]));
+      const page = pageByKey(blocks, (block) => started.get(block.id)!, (block) => block.text.length + 1, { after });
+      if (page.missing) return staleCursor("That cursor", callText("code_comments", {}));
+      const next = nextLine(page, (last) => callText("code_comments", { after: last }), "comment threads");
+      return [...(next ? [next] : []), page.items.map((block) => block.text).join("\n\n")].join("\n");
     },
   });
   bb.agents.registerTool({

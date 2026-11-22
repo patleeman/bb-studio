@@ -110,7 +110,7 @@ export function presentScope(scope: { loaded: readonly string[]; onDemand: reado
 
 /** For an absorb (pages_read, code_comments): the fields each op adds, to leave out of a shown schema without that op. */
 export const ABSORB_FIELDS: Readonly<Record<string, Record<string, readonly string[]>>> = {
-  pages_read: { list: ["query", "type"], comments: ["comments"] },
+  pages_read: { list: ["query", "type", "after"], comments: ["comments"] },
   code_comments: { reply: ["op", "id", "body", "resolve"] },
 };
 
@@ -218,11 +218,11 @@ export function mergedTools(deps: MergedToolDeps) {
         comments: z.object(commentShape).optional().describe("Read or change this page's comments (pages_comments' fields)"),
       }),
       execute: async (input: Record<string, unknown>, ctx: unknown) => {
-        const { page, comments, query, type, ...read } = input;
+        const { page, comments, query, type, after, ...read } = input;
         if (page === undefined && comments !== undefined) return "pages_read with comments needs page.";
         if (page === undefined) {
           if (!(await deps.allowed(ctx, "pages_list"))) return `pages_read without page (the list) isn't available in this thread.`;
-          return await deps.book.run("pages_list", { query, type }, ctx, "pages_read");
+          return await deps.book.run("pages_list", { query, type, after }, ctx, "pages_read");
         }
         if (comments !== undefined) {
           if (!(await deps.allowed(ctx, "pages_comments"))) return `pages_read with comments isn't available in this thread.`;
@@ -241,7 +241,7 @@ export function mergedTools(deps: MergedToolDeps) {
     tools.push({
       name: "code_comments",
       description: `${firstSentence(commentsList.description)} (op list, the default), or reply to one (op reply: id, body, resolve). Replaces code_comment_reply.`,
-      parameters: z.object({ op: z.enum(["list", "reply"]).optional(), ...Object.fromEntries(Object.entries(replyShape).map(([key, value]) => [key, value.optional()])) }),
+      parameters: z.object({ op: z.enum(["list", "reply"]).optional(), ...Object.fromEntries(Object.entries(replyShape).map(([key, value]) => [key, value.optional()])), ...((commentsList.parameters as unknown as { shape: Record<string, z.ZodType> }).shape ?? {}) }),
       execute: async (input: Record<string, unknown>, ctx: unknown) => {
         const { op = "list", ...rest } = input;
         if (op === "reply") {
@@ -249,7 +249,7 @@ export function mergedTools(deps: MergedToolDeps) {
           return await deps.book.run("code_comment_reply", rest, ctx, "code_comments reply");
         }
         if (!(await deps.allowed(ctx, "code_comments"))) return `code_comments op "list" isn't available in this thread.`;
-        return await deps.book.run(INTERNAL_RENAMES.code_comments!, {}, ctx, "code_comments");
+        return await deps.book.run(INTERNAL_RENAMES.code_comments!, rest.after !== undefined ? { after: rest.after } : {}, ctx, "code_comments");
       },
     } as never);
   }

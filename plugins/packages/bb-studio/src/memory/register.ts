@@ -3,6 +3,7 @@
 // (MemoryService.caller); a new record's source defaults to that thread.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { callText, PART_CHARS } from "../paging";
 import { memoryRpcContract, memorySourceInput, type MemoryRecordView } from "./contract";
 import type { MemoryService } from "./service";
 
@@ -24,7 +25,8 @@ export function toolRecord(record: MemoryRecordView) {
 export const memorySearchParams = z.object({
   query: z.string().max(500).describe("Words to find in records' topic and text; empty lists the newest"),
   topic: z.string().trim().min(1).max(60).optional().describe("Only this topic"),
-  limit: z.number().int().min(1).max(50).optional().describe("At most this many records (default 10)"),
+  limit: z.number().int().min(1).max(50).optional().describe("At most this many records in a part (default 10)"),
+  offset: z.number().int().min(0).max(10_000).optional().describe("Where the next part starts, as the last part's Next says"),
 });
 export const memoryAddParams = z.object({
   topic: z.string().trim().min(1).max(60).describe("A short topic, reused across records (\"Launch\", \"homelab\", \"Preferences\")"),
@@ -71,10 +73,26 @@ export function registerMemory(bb: Pick<BbPluginApi, "rpc" | "agents">, memory: 
     name: "memory_search",
     description: "Search your memory records (facts, decisions and notes shared by all your conversations) by words, optionally in one topic. Current records come first; replaced ones are marked replaced. Search before you rely on what you remember.",
     parameters: memorySearchParams,
-    execute: async ({ query, topic, limit }, ctx) => {
+    execute: async ({ query, topic, limit, offset = 0 }, ctx) => {
       const { botId } = await memory.caller(ctx.threadId);
-      const result = await memory.list({ botId, query, ...(topic ? { topic } : {}), limit: limit ?? 10, sort: query.trim() ? "relevance" : "newest" });
-      return JSON.stringify({ total: result.total, records: result.records.map(toolRecord), ...(result.total ? {} : { note: "No records match. Try other words, or no topic." }) });
+      // In parts by position (src/paging.ts): relevance has no key that stays put, so Next names an offset.
+      // Only the part's records are turned into views (their source threads are looked up).
+      const sort = query.trim() ? "relevance" as const : "newest" as const;
+      const result = memory.store.list({ botId, query: query.trim() || undefined, ...(topic ? { topic } : {}), sort, includeReplaced: true, includeArchived: false, limit: offset + (limit ?? 10) });
+      if (!result.total) return "No records match. Try other words, or no topic.";
+      if (offset >= result.total) return `There are ${result.total} matching records; offset ${offset} is past the end. Start again: ${callText("memory_search", { query, ...(topic ? { topic } : {}) })}.`;
+      const views = await memory.views(result.records.slice(offset));
+      const lines: string[] = [];
+      let used = 0;
+      for (const view of views) {
+        const line = JSON.stringify(toolRecord(view));
+        if (lines.length && used + line.length > PART_CHARS) break;
+        lines.push(line);
+        used += line.length + 1;
+      }
+      const end = offset + lines.length;
+      const next = end < result.total ? `(Records ${offset + 1}–${end} of ${result.total}, most relevant first. Next: ${callText("memory_search", { query, ...(topic ? { topic } : {}), ...(limit ? { limit } : {}), offset: end })}. After you add or change records, search again from the start.)` : null;
+      return [`${result.total} record${result.total === 1 ? "" : "s"} match${result.total === 1 ? "es" : ""}.`, ...(next ? [next] : []), ...lines].join("\n");
     },
   });
   bb.agents.registerTool({

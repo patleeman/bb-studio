@@ -13,6 +13,7 @@ import type { Presence } from "./presence/schema";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import { callText, clipLine, nextLine, pageSections, staleCursor } from "./paging";
 import type { ThreadSeeds } from "./thread-seeds";
 import { BotThreads, botOwnThread, forkUndecided, botActivity, botNeedsYou, conversationsPage, conversationTitle, conversationWorkers, latestLine, needsYouOf, olderView, repoTag, staleRaises, threadsView, workerStatus, type BotThreadRecord, type Signals, type ThreadFacts } from "./bot-threads";
 import { ConversationText, plainLine, queryWords, snippetOf, summaryBody, summaryPreview } from "./conversation-text";
@@ -624,23 +625,34 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
   };
 
   // The tools: a Bot's own view of its conversations and workers, and its way to raise something with the user.
-  const describe = async (botId: string) => {
+  const describe = async (botId: string, after?: string) => {
     const shown = await view(botId);
-    const lines = [
-      "Conversations (you and the user; Main gets reports and alerts):",
-      ...shown.conversations.map((each) => `- ${each.title} (/threads/${each.threadId})${each.isMain ? " [Main]" : ""}${each.forkedFrom ? `, forked from ${each.forkedFrom.title}` : ""}${each.running ? ", working" : ""}${each.needsYou ? `, needs the user: ${each.needsYou.reason}` : ""}${each.latest ? `. Latest: ${each.latest}` : ""}`),
-      "Workers (agents you started; each reports to the conversation that started it):",
-      ...(shown.workers.length ? shown.workers.map((each) => `- ${each.title} (/threads/${each.threadId}): ${each.status}${each.ownerTitle ? `, from ${each.ownerTitle}` : ""}${each.tag ? `, in ${each.tag}${each.branch ? ` (${each.branch})` : ""}` : ""}`) : ["- none"]),
-      ...(shown.olderConversations ? [`(${shown.olderConversations} older conversations not listed: not active in 14 days)`] : []),
-      ...(shown.hiddenWorkers ? [`(${shown.hiddenWorkers} older finished or failed workers not listed)`] : []),
+    // In parts (src/paging.ts): the next part starts after the last thread shown.
+    const conversations = "Conversations (you and the user; Main gets reports and alerts):";
+    const workersHead = "Workers (agents you started; each reports to the conversation that started it):";
+    const rows = [
+      ...shown.conversations.map((each) => ({ id: each.threadId, section: conversations, line: `- ${each.title} (/threads/${each.threadId})${each.isMain ? " [Main]" : ""}${each.forkedFrom ? `, forked from ${each.forkedFrom.title}` : ""}${each.running ? ", working" : ""}${each.needsYou ? `, needs the user: ${each.needsYou.reason}` : ""}${each.latest ? `. Latest: ${clipLine(each.latest, 160)}` : ""}` })),
+      ...shown.workers.map((each) => ({ id: each.threadId, section: workersHead, line: `- ${each.title} (/threads/${each.threadId}): ${each.status}${each.ownerTitle ? `, from ${each.ownerTitle}` : ""}${each.tag ? `, in ${each.tag}${each.branch ? ` (${each.branch})` : ""}` : ""}` })),
     ];
-    return lines.join("\n");
+    const part = pageSections(rows, { after });
+    if (!part) return staleCursor(`Thread ${after}`, callText("bot_conversations", {}));
+    const next = nextLine(part.page, (last) => callText("bot_conversations", { after: last }), "threads");
+    const last = part.page.next === null;
+    return [
+      ...(next ? [next] : []),
+      // The headings the old list always had: Conversations even when there are none, Workers "- none" at the end.
+      ...(!after && !shown.conversations.length ? [conversations, "- none"] : []),
+      ...part.lines,
+      ...(last && !shown.workers.length ? [workersHead, "- none"] : []),
+      ...(part.page.next === null && shown.olderConversations ? [`(${shown.olderConversations} older conversations not listed: not active in 14 days)`] : []),
+      ...(part.page.next === null && shown.hiddenWorkers ? [`(${shown.hiddenWorkers} older finished or failed workers not listed)`] : []),
+    ].join("\n");
   };
   const conversationsTool = (name: string, description: string) => bb.agents.registerTool({
-    name, description, parameters: z.object({}),
-    execute: async (_input, ctx) => {
+    name, description, parameters: z.object({ after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
+    execute: async ({ after }: { after?: string }, ctx) => {
       const botId = (ctx.threadId ? store.get(ctx.threadId)?.botId : null) ?? await deps.actingBot(ctx.threadId) ?? deps.bots()[0]?.id;
-      return botId ? describe(botId) : "The user has no Bot yet.";
+      return botId ? describe(botId, after) : "The user has no Bot yet.";
     },
   });
   conversationsTool("bot_conversations", "List your conversations with the user (Main first) and your workers (status, owner conversation, repo/branch).");

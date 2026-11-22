@@ -9,6 +9,7 @@
 //   artifacts.
 // A handler's errors name the family tool the agent called, not the handler.
 import { z } from "zod";
+import { callText, counted, nextLine, pageByKey, staleCursor } from "./paging";
 import type { IndexedItem, IndexListOptions } from "./item-index";
 import { familyHref, itemType, typeOfId, type ItemType } from "./item-model";
 
@@ -138,25 +139,31 @@ export function appTools(deps: AppToolDeps): AgentTool[] {
     {
       name: "apps_list",
       description: 'List Studio apps: interactive ("mini") and saved ("artifact"). Pass type or query to filter.',
-      parameters: z.object({ type: typeParam.optional(), query: z.string().max(200).optional().describe("Words a title must contain") }),
-      execute: (async ({ type, query }: { type?: (typeof APP_TYPES)[number]; query?: string }, ctx: ToolContext) => {
+      parameters: z.object({ type: typeParam.optional(), query: z.string().max(200).optional().describe("Words a title must contain"), after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
+      execute: (async ({ type, query, after }: { type?: (typeof APP_TYPES)[number]; query?: string; after?: string }, ctx: ToolContext) => {
         const needle = query?.trim().toLowerCase();
-        if (type && !needle) return deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].list, {}, ctx, "apps_list") : offMessage(type);
-        const items = deps.index.list({ family: "app", ...(type ? { type } : {}), limit: 500 })
-          .filter((item) => deps.typeOn(item.type) && (!needle || item.title.toLowerCase().includes(needle)));
+        if (type && !needle && !after) return deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].list, {}, ctx, "apps_list") : offMessage(type);
+        // The cap and the parts both go by creation, so the capped set is the newest made and an edit can't move an app in or out of it.
+        const fetched = deps.index.list({ family: "app", ...(type ? { type } : {}), limit: 500, order: "created" });
+        const items = fetched.filter((item) => deps.typeOn(item.type) && (!needle || item.title.toLowerCase().includes(needle)));
         if (!items.length) return needle ? `No apps match "${query}".` : "No apps yet. Make one with apps (op: create).";
-        return [...items.slice(0, 100).map(line), ...(items.length > 100 ? [`…and ${items.length - 100} more. Pass type or query to narrow it.`] : [])].join("\n");
+        // In parts (src/paging.ts): the next part starts after the last app shown.
+        // By keyset on creation: an app changed between parts doesn't move.
+        const part = pageByKey(items, (item) => [item.createdAt, item.id], (item) => line(item).length, { after, max: 100, descending: [true, true] });
+        if (part.missing) return staleCursor("That cursor", callText("apps_list", { ...(type ? { type } : {}), ...(query ? { query } : {}) }));
+        const next = nextLine(part, (last) => callText("apps_list", { ...(type ? { type } : {}), ...(query ? { query } : {}), after: last }), "apps");
+        return [`${counted(items.length, 500, fetched.length)} app${items.length === 1 ? "" : "s"}, newest first.`, ...(next ? [next] : []), ...part.items.map(line)].join("\n");
       }) as never,
     },
     {
       name: "apps_read",
-      description: "Read a Studio app by id (mini_… source/state/collections or art_… details/text).",
-      parameters: z.object({ id: z.string().min(1).max(200).describe("App id (mini_… or art_…)") }),
-      execute: (async ({ id }: { id: string }, ctx: ToolContext) => {
+      description: "Read a Studio app by id (mini_… source/state/collections or art_… details/text); a long source or text comes in parts (the next part with offset, as the reply says).",
+      parameters: z.object({ id: z.string().min(1).max(200).describe("App id (mini_… or art_…)"), offset: z.number().int().min(0).optional().describe("Where the next part starts, as the last part's Next says") }),
+      execute: (async ({ id, offset }: { id: string; offset?: number }, ctx: ToolContext) => {
         // The index knows every app; an id it doesn't have yet is read from its prefix.
         const type = deps.index.get(id.trim())?.type ?? typeOfId(id.trim())?.type;
         if (type !== "mini" && type !== "artifact") return fail(`No app with id ${id}. apps (op: list) shows the ids.`);
-        return deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].read, { [TYPE_TOOLS[type].idParam]: id.trim() }, ctx, "apps_read") : offMessage(type);
+        return deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].read, { [TYPE_TOOLS[type].idParam]: id.trim(), ...(offset !== undefined ? { offset } : {}) }, ctx, "apps_read") : offMessage(type);
       }) as never,
     },
     {

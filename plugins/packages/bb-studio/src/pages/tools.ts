@@ -1,6 +1,7 @@
 import { untitled } from "../kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { callText, counted, nextLine, pageByKey, pageItems, staleCursor } from "../paging";
 import { createThread, listThreads, reply, setResolved, type ThreadView } from "./comments";
 import { readMarkdown, type EditOp } from "./doc";
 import { shortId } from "./markdown";
@@ -12,6 +13,7 @@ import { opNeeds } from "../op-errors";
 
 const MAX_READ_CHARS = 60_000;
 /** pages_read's default part of a long page (characters); `limit` asks for more, up to MAX_READ_CHARS. */
+const SEARCH_CAP = 200;
 export const READ_PART_CHARS = 12_000;
 
 /**
@@ -106,11 +108,23 @@ export function registerTools(
   bb.agents.registerTool({
     name: "pages_list",
     description: "List BB Pages (collaborative documents) in this project and global pages, as a tree. Optionally search titles and content.",
-    parameters: z.object({ query: z.string().max(200).optional() }),
-    execute({ query }, ctx) {
+    parameters: z.object({ query: z.string().max(200).optional(), after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
+    execute({ query, after }, ctx) {
+      // In parts (src/paging.ts): the next part starts after the last page shown.
+      const parted = (rows: { id: string; line: string }[], heading: string) => {
+        const part = pageItems(rows, (row) => row.id, (row) => row.line.length, { after });
+        if (part.missing) return staleCursor(`Page ${after}`, callText("pages_list", { ...(query?.trim() ? { query } : {}) }));
+        const next = nextLine(part, (last) => callText("pages_list", { ...(query?.trim() ? { query } : {}), after: last }), "pages");
+        return [heading, ...(next ? [next] : []), ...part.items.map((row) => row.line)].join("\n");
+      };
       if (query?.trim()) {
-        const hits = store.search(query, ctx.projectId);
-        return hits.length ? hits.map((page) => pageLine(page)).join("\n") : `No pages match "${query}".`;
+        // Search hits by keyset on creation: a page edited between parts doesn't move.
+        const hits = store.search(query, ctx.projectId, SEARCH_CAP, "created");
+        if (!hits.length) return `No pages match "${query}".`;
+        const part = pageByKey(hits, (page) => [page.created_at, page.id], (page) => pageLine(page).length, { after, descending: [true, true] });
+        if (part.missing) return staleCursor("That cursor", callText("pages_list", { query }));
+        const next = nextLine(part, (last) => callText("pages_list", { query, after: last }), "pages");
+        return [`${counted(hits.length, SEARCH_CAP)} page${hits.length === 1 ? "" : "s"} match, newest first.`, ...(next ? [next] : []), ...part.items.map((page) => pageLine(page))].join("\n");
       }
       const pages = store.list({ projectId: ctx.projectId });
       if (!pages.length) return "No pages yet. Create one with pages_create.";
@@ -119,15 +133,15 @@ export function registerTools(
         const parent = page.parent_id && pages.some((p) => p.id === page.parent_id) ? page.parent_id : null;
         children.set(parent, [...(children.get(parent) ?? []), page]);
       }
-      const lines: string[] = [];
+      const lines: { id: string; line: string }[] = [];
       const walk = (parent: string | null, depth: number) => {
         for (const page of children.get(parent) ?? []) {
-          lines.push(pageLine(page, depth));
+          lines.push({ id: page.id, line: pageLine(page, depth) });
           walk(page.id, depth + 1);
         }
       };
       walk(null, 0);
-      return lines.join("\n");
+      return parted(lines, `${lines.length} page${lines.length === 1 ? "" : "s"}.`);
     },
   });
 
@@ -150,7 +164,7 @@ export function registerTools(
       // The header and the Next line stay inside MAX_READ_CHARS whatever limit asks for.
       const budget = Math.min(limit ?? READ_PART_CHARS, MAX_READ_CHARS - header.join("\n").length - 600);
       const part = readPart(markdown, from, budget);
-      if (part.missing) return `Block ${from} is no longer on page ${meta.id}; read it again without from.`;
+      if (part.missing) return `Block ${from} is no longer on page ${meta.id}. Start again: ${callText("pages_read", { page: meta.id })}.`;
       const threads = listThreads(live.doc);
       const last = part.next === null;
       const notes = [

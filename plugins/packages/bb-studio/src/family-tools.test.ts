@@ -121,7 +121,7 @@ describe("apps_*", () => {
   it("lists every app from the index, with its type, id and family link", async () => {
     const { call, handlers } = setup();
     const listed = await call("apps_list", {}) as string;
-    expect(listed.split("\n")).toHaveLength(2);
+    expect(listed.split("\n")).toEqual(["2 apps, newest first.", expect.any(String), expect.any(String)]);
     expect(listed).toContain(`Tracker — App (id ${MINI})`);
     expect(listed).toContain(`link /plugins/studio/studio/apps/${ARTIFACT}`);
     expect(await call("apps_list", { query: "track" })).toContain(MINI);

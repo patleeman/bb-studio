@@ -331,9 +331,19 @@ export class MiniStore {
     return this.db.prepare("DELETE FROM mini_records WHERE mini_id = ? AND collection = ? AND id = ?").run(miniId, collection, id).changes > 0;
   }
 
-  /** Records matching `where`, in `order`. Filters and order work on any field; indexed ones are fast. */
-  find(miniId: string, collection: string, query: Find): MiniRecord[] {
+  /**
+   * Records matching `where`, in `order`. Filters and order work on any field; indexed ones are fast.
+   * `after` (a record's creation time and id) reads by keyset in creation order, newest first, ignoring
+   * `order` and `offset`: records that change between parts never repeat or go missing.
+   */
+  find(miniId: string, collection: string, query: Find, after?: { createdAt: number; id: string } | null): MiniRecord[] {
     const { sql, params } = this.where(miniId, collection, query.where);
+    if (after !== undefined) {
+      const keyset = after ? " AND (created_at < ? OR (created_at = ? AND id < ?))" : "";
+      const rows = this.db.prepare(`SELECT id, rev, data, created_by, created_at, updated_at FROM mini_records WHERE ${sql}${keyset} ORDER BY created_at DESC, id DESC LIMIT ?`)
+        .all(...params, ...(after ? [after.createdAt, after.createdAt, after.id] : []), query.limit ?? 100) as Parameters<typeof toRecord>[0][];
+      return rows.map(toRecord);
+    }
     let order = "updated_at DESC";
     if (query.order) {
       const desc = query.order.startsWith("-");
@@ -343,7 +353,8 @@ export class MiniStore {
       else if (FIELD.test(field)) order = `json_extract(data, '${jsonPath(field)}') ${desc ? "DESC" : "ASC"}, created_at`;
       else throw new Error(`Can't order by "${query.order}".`);
     }
-    const rows = this.db.prepare(`SELECT id, rev, data, created_by, created_at, updated_at FROM mini_records WHERE ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`)
+    // id breaks ties, so the order is the same on every read.
+    const rows = this.db.prepare(`SELECT id, rev, data, created_by, created_at, updated_at FROM mini_records WHERE ${sql} ORDER BY ${order}, id LIMIT ? OFFSET ?`)
       .all(...params, query.limit ?? 100, query.offset ?? 0) as Parameters<typeof toRecord>[0][];
     return rows.map(toRecord);
   }

@@ -406,8 +406,17 @@ Your instructions carry one-line pointers to these; the full rules are here.
 BB Pages are collaborative documents the user edits live. Read a page with
 `pages_read` before changing it; it returns Markdown with a `<!-- ^id -->`
 marker on the line before each block, naming the block below it. A long page
-comes in parts of about 12,000 characters, each ending with the call for the
-next part (`from` a block id); ask for more at once with `limit`.
+comes in parts of about 12,000 characters, with the call for the next part
+(`from` a block id) right after the header; ask for more at once with `limit`.
+
+Other long results come in parts too: memory search, the schedule, skill
+lists and skill text, areas, conversations and activity, recordings, apps and
+their records, a design's screens, the page list and code comments. A part's
+second line says where it sits and gives the exact call for the next part
+(`after` an item's id, or an `offset`): make that call to read on. A list
+shows one short line per item; read one item in full with its own call (the
+reply names it). If a cursor's item is gone, the reply says so: start again
+without it.
 
 Edit with `pages_edit` using small, targeted operations that reference those
 block ids, so you don't overwrite the user's concurrent typing. Use

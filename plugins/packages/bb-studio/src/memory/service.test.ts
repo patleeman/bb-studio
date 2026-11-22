@@ -12,6 +12,12 @@ async function withTools() {
   return { ...x, tool, rpc };
 }
 const json = (text: string) => JSON.parse(text.slice(text.indexOf("{")));
+/** memory search's reply: a header ("N records match."), maybe a Next line, then one JSON record per line. */
+const search = (text: string) => {
+  const lines = text.split("\n");
+  const total = Number(/^(\d+) record/.exec(lines[0]!)?.[1] ?? 0);
+  return { total, header: lines[0]!, records: lines.filter((line) => line.startsWith("{")).map((line) => JSON.parse(line)) };
+};
 
 it("memory (op: add) saves under the calling thread's Bot, with the thread as its source", async () => {
   const x = await withTools();
@@ -73,7 +79,7 @@ it("memory (op: update) makes a replacing record, memory (op: search) marks the 
   const first = json(await x.tool("memory_add", { topic: "Launch", text: "High-level design gets 20 minutes." }, "thr_main"));
   const reply = await x.tool("memory_update", { id: first.id, text: "High-level design gets 15 minutes." }, "thr_side");
   expect(reply).toMatch(new RegExp(`replaces ${first.id}, kept as history`));
-  const found = json(await x.tool("memory_search", { query: "high-level design" }, "thr_worker"));
+  const found = search(await x.tool("memory_search", { query: "high-level design" }, "thr_worker"));
   expect(found.total).toBe(2);
   expect(found.records.map((record: { text: string; replaced: boolean; source: { title: string } }) => [record.text, record.replaced, record.source.title])).toEqual([
     ["High-level design gets 15 minutes.", false, "Launch prep"],
@@ -82,7 +88,7 @@ it("memory (op: update) makes a replacing record, memory (op: search) marks the 
   expect(found.records[0]).toMatchObject({ replaces: first.id, date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
   await expect(x.tool("memory_update", { id: first.id, text: "Again" }, "thr_main")).rejects.toThrow(/already replaced/);
   await expect(x.tool("memory_update", { id: found.records[0].id, text: "Scout's take" }, "thr_scout")).rejects.toThrow(/No memory record/);
-  expect(json(await x.tool("memory_search", { query: "nothing like it" }, "thr_main"))).toMatchObject({ total: 0, note: expect.stringMatching(/No records match/) });
+  expect(await x.tool("memory_search", { query: "nothing like it" }, "thr_main")).toMatch(/^No records match/);
 });
 
 it("the RPC lists, adds, edits and archives records as the user, newest first and replaced ones last", async () => {

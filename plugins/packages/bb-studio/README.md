@@ -3734,6 +3734,45 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `chief_of_staff_set` and `chief_of_staff_set_run` remain as deprecated
   aliases for one release.
 
+## Long results in parts
+
+Tools whose results can be long return them in parts (`src/paging.ts`): a
+default budget (about 6,000 characters for a list, 8,000 for a skill's text,
+12,000 for a transcript, an app's source or text and a page, whole screens up
+to 30,000 for a design), the header first and right after it a line such as
+`(Showing 1–30 of 120 recordings. Next: talk { op: "list", after: "WzE3…" }.)`
+with the exact call for the next part under the name the session sees. Most
+lists page by keyset: the cursor (`after`, an opaque string) is the last shown
+item's place in an order that doesn't change while the item lives (creation
+time and id; areas by problems first, name and id; skills pinned first, then
+name), so items that change, arrive or go between parts never make another
+item repeat or go missing. Memory search orders by relevance, which shifts as
+records change, so it pages by `offset` and says to search again after
+changing records; `minis_data` find with an `order` pages by `offset` the
+same way (without `order`, newest created first, by keyset, which keeps a
+migration that patches each part's records whole). A text's cursor is a
+character offset, cut at a line end and never inside a surrogate pair. A
+cursor that can't be read, or an offset past the end, gets a reply with the
+exact call that starts again. A list with a fetch cap (talk, pages search,
+apps) takes the newest created up to the cap, the same order its parts go in,
+so an edit can't move an item into or out of the list; a count that hit the
+cap reads "At least N". Lists show one short line per item (the schedule, areas, skills,
+conversations) and the full item through its own call:
+`schedule { op: "list", id }`, `area { op: "get" }`, `bot_skill { op: "view" }`.
+
+| Tool | Part | Cursor |
+|---|---|---|
+| `memory` search | 10 records, 6,000 characters, most relevant first | `offset` |
+| `schedule` list | short lines, 6,000 characters (`id` for one in full) | `after` item id |
+| `bot_skill` list / view | 6,000 characters of lines / 8,000 of the skill | `after` keyset / `offset` |
+| `bot_info` conversations, activity | 6,000 characters, sections repeated | `after` thread or line id |
+| `area` list | one JSON line per area, 6,000 characters (`area` get for one: its 10 newest runs) | `after` keyset |
+| `talk` list, search / read | 30 recordings, newest first (an excerpt only for those shown) / 12,000 of the transcript | `after` keyset / `offset` |
+| `apps` list / read | 100 apps, newest first, 6,000 characters / 12,000 of a mini's source or an artifact's text | `after` keyset / `offset` |
+| `minis_data` find | 25 records, 6,000 characters | `after` keyset (no order) / `query.offset` (with order) |
+| `pages_read` without page / with `query` / with page / a design | 6,000 characters of the tree / of the hits, newest first / 12,000 of the page / whole screens to 30,000 | `after` page id / `after` keyset / `from` block / `screenIds` left |
+| `code_comments` | whole threads, 6,000 characters | `after` keyset (resolved threads drop out) |
+
 ## Tool scope and lean context
 
 Each session loads only the Studio tools its thread kind uses (`src/tool-scope.ts`,
