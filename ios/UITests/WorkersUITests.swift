@@ -59,13 +59,12 @@ final class WorkersUITests: ServerIsolatedUITestCase {
         shot("asked")
     }
 
-    func testOpenFromTheWorkersLineAndAskGoesBack() {
+    /// From the conversation list (the "N workers from here" line went with In flight).
+    func testOpenFromTheListAndAskGoesBack() {
         launch()
-        let line = app.buttons["conversationWorkers"]
-        XCTAssertTrue(line.waitForExistence(timeout: 15))
-        line.tap()
-        let running = app.buttons["Theme stills renderer"]
-        XCTAssertTrue(running.waitForExistence(timeout: 5))
+        app.openRoomPlace("conversations")
+        let running = app.buttons["roomWorker-thr_demo_w2"]
+        XCTAssertTrue(running.waitForExistence(timeout: 15))
         running.tap()
         expectWorker("Theme stills renderer", status: "running")
         XCTAssertTrue(app.buttons["workerOwner"].label.contains("Main"))
@@ -75,10 +74,7 @@ final class WorkersUITests: ServerIsolatedUITestCase {
         askField.tap()
         askField.typeText("How far along is it?")
         app.buttons["workerAskSend"].tap()
-        let typingLine = app.buttons["in-flight-toggle"]
-        XCTAssertTrue(app.buttons["conversationWorkers"].waitForExistence(timeout: 15) || typingLine.label.contains("worker"),
-                      "back on Main, its workers in the chip or, while typing, in the one line")
-        XCTAssertTrue(app.textViews["Message"].exists)
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 15), "back on Main")
         XCTAssertFalse(askField.exists)
     }
 

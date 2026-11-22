@@ -7,7 +7,8 @@ final class TypingBurstUITests: ServerIsolatedUITestCase {
 
     private func launch(_ arguments: [String]) {
         app = XCUIApplication()
-        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBurstDemo", "-openURL", "bbstudio://thread/thr_burstdemo1"] + arguments
+        // Studio's Bots answer (the demo's), so the thread opens over the room rather than "Can't reach Studio".
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBurstDemo", "-qaSpacesDemo", "list", "-openURL", "bbstudio://thread/thr_burstdemo1"] + arguments
         app.launchOffline()
     }
 

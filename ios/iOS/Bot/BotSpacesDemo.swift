@@ -813,6 +813,8 @@ enum BotSpacesDemo {
                 return lock.withLock {
                     switch kind {
                     case "conversation", "worker":
+                        // The burst demo's busy thread is served by its own fixture.
+                        if BurstDemo.enabled, id == BurstDemo.threadId { return ok(["found": true, "title": "Busy thread", "spec": NSNull()]) }
                         let title = threads[id]?.title ?? conversations.values.flatMap { $0 }.first { $0.id == id }?.title
                         return ok(["found": title != nil, "title": title ?? NSNull(), "spec": NSNull()])
                     case "record":
