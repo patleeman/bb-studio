@@ -131,6 +131,9 @@ const FORK_API_SYMBOLS: Readonly<Record<string, readonly string[]>> = {
     "ExperimentalTimelineFilterRegistration",
     "ExperimentalTimelineFilter",
     "ExperimentalTimelineFold",
+    "ExperimentalTimelineZoom",
+    "ExperimentalTimelineZoomViewProps",
+    "ExperimentalTimelineFilterHost",
   ],
   "app-overlay": [
     "PluginAppSlots.experimental_appBackdrop",

@@ -280,10 +280,36 @@ of the run's first message that isn't a quiet reply. It never hides another
 turn's rows, or what the relayed fold keeps (errors, alerts, warnings, rows
 still running); a message the user typed ends the run there. A fold holding
 the message a link or search points at (`#msg=`, search state) stays open,
-and `expandFold` is called for it, so a jump never lands on a hidden row. The
+and `expandFold` is called for it, so a jump never lands on a hidden row (the
+target's rows come from the core's own `collectSearchedMessageAncestorRowIds`,
+only for a link into the list's own thread; a relayed group holding the target
+stays unfolded too). When bb folds fewer turns than a fold lists, the line is
+the fold's optional `labelFor(turnIds folded)`, else its `label`. The
 first registration that returns folds wins; folds that throw or are malformed
 count as none and are logged once (each returned array is checked once). No core file changed: the
 fold runs inside the relayed fold's existing hook and row wrapper.
+
+**Semantic zoom.** A registration may also give `zoom: { level(threadId),
+View }`. While `level` returns more than 0, `withTimelineFilter`
+(`timelineFilter.fork.tsx`) draws only the error rows of the turns since the
+user's last message (a turn failing while zoomed out still says so): `View`
+leads the timeline surface (mounted as the plugin's slot), and the surface's
+own status stays under it (host disconnected, load error, working or
+thinking, Stop requested, catch-up). `View` gets `{ threadId, level, anchorSeq, latestUserSeq }`:
+`anchorSeq` is the message that was at the middle of the scroll viewport when
+the thread left level 0 (read through a ref on the wrapper when the level
+changes, before the redraw); `latestUserSeq` is the newest message the user
+typed, so a plugin can go back to the messages when the user sends. A `View`
+that crashes gives the thread its timeline back until the next zoom-out;
+a `level` that throws counts as 0 and is logged once. Zooming back in is the
+plugin's: level 0 and the message's `#msg=` link, which scrolls there and
+opens any fold holding it. The first registration with `zoom` wins.
+`experimental_timelineFilter` answers `{ folds: true, zoom: true }`
+(`ExperimentalTimelineFilterHost`), so a plugin can tell this bb from one that
+takes the registration and drops `zoom` (that one answers nothing). No core
+file changed. Plugin commands that zoom should avoid Option with punctuation:
+on a Mac it turns "-" into "–", which bb's shortcut matcher can't map back
+(`fork-zoom-shortcuts.test.ts` pins ⌃⌘− / ⌃⌘=).
 
 **Why not upstream's own API.** No add-in point can hide timeline rows or
 open collapsed ones; the timeline windows only the rows it has and pages

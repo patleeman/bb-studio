@@ -31,13 +31,14 @@ export interface TurnRunFoldOptions {
   kept?: (row: ThreadTimelineViewRow) => boolean;
   /** A reply drawn as the quiet-turn mark: never the fold's line. */
   isQuiet?: (row: ThreadTimelineViewRow) => boolean;
-  /** The row a link points at: its fold stays open. */
-  targetRowId?: string | null;
+  /** The rows a link points at (its path, from the top-level row down): a fold holding one stays open. */
+  targetRowIds?: ReadonlySet<string>;
 }
 
 const NO_MARKERS: ReadonlyMap<string, TurnRunMarker> = new Map();
 const NO_OPENED: readonly string[] = [];
 const never = () => false;
+const NO_TARGET: ReadonlySet<string> = new Set();
 
 /** A message the user typed: it never folds. */
 function typedByUser(row: ThreadTimelineViewRow): boolean {
@@ -55,7 +56,7 @@ export function foldTurnRuns(
     isRelayed = never,
     kept = never,
     isQuiet = never,
-    targetRowId = null,
+    targetRowIds = NO_TARGET,
   }: TurnRunFoldOptions = {},
 ): TurnRunFold {
   if (folds.length === 0) return { rows, markers: NO_MARKERS, opened: NO_OPENED };
@@ -104,7 +105,7 @@ export function foldTurnRuns(
   const opened: string[] = [];
   folds.forEach((fold, index) => {
     const members = folding[index]!;
-    if (targetRowId !== null && members.some((row) => row.id === targetRowId)) {
+    if (targetRowIds.size > 0 && members.some((row) => targetRowIds.has(row.id))) {
       opened.push(fold.id);
       return;
     }
@@ -114,7 +115,7 @@ export function foldTurnRuns(
     markers.set(marker.id, {
       foldId: fold.id,
       threadId: marker.threadId,
-      label: fold.label,
+      label: labelOf(fold, members),
     });
     for (const row of members) if (row !== marker) hidden.add(row.id);
   });
@@ -122,44 +123,23 @@ export function foldTurnRuns(
   return { rows: rows.filter((row) => !hidden.has(row.id)), markers, opened: opened.length ? opened : NO_OPENED };
 }
 
-interface SeqRow {
-  id: string;
-  messageSeq?: number;
-  sourceSeqStart?: number;
-  sourceSeqEnd?: number;
-  childRows?: readonly SeqRow[] | null;
-  children?: readonly SeqRow[] | null;
-}
-
-function holdsMessage(row: SeqRow, seq: number): boolean {
-  if (row.messageSeq === seq) return true;
-  const nested = row.childRows ?? row.children ?? null;
-  return nested !== null && nested.some((child) => holdsMessage(child, seq));
-}
-
-/**
- * The top-level row a message link or search result points at, found as the
- * timeline's scroll-to-message finds it: the row holding message `seq`, or
- * (for a sequence match) the row whose span holds `seq`.
- */
-export function linkedRowId(
-  rows: readonly ThreadTimelineViewRow[],
-  target: { seq: number; match: "message" | "sequence" } | null,
-): string | null {
-  if (target === null) return null;
-  const seqRows = rows as readonly SeqRow[];
-  const message = seqRows.find((row) => holdsMessage(row, target.seq));
-  if (message !== undefined) return message.id;
-  if (target.match === "message") return null;
-  return (
-    seqRows.find(
-      (row) =>
-        row.sourceSeqStart !== undefined &&
-        row.sourceSeqEnd !== undefined &&
-        row.sourceSeqStart <= target.seq &&
-        target.seq <= row.sourceSeqEnd,
-    )?.id ?? null
-  );
+/** The fold's line: the plugin's label, or its `labelFor` the turns actually folded when the host folded fewer. */
+function labelOf(
+  fold: ExperimentalTimelineFold,
+  members: readonly ThreadTimelineViewRow[],
+): string {
+  if (typeof fold.labelFor !== "function") return fold.label;
+  const turns: string[] = [];
+  for (const row of members) {
+    if (row.turnId !== null && !turns.includes(row.turnId)) turns.push(row.turnId);
+  }
+  if (turns.length >= new Set(fold.turnIds).size) return fold.label;
+  try {
+    const label = fold.labelFor(turns);
+    return typeof label === "string" && label.length > 0 ? label : fold.label;
+  } catch {
+    return fold.label;
+  }
 }
 
 /** The one line in a folded run's place; opening it unfolds the run. */
