@@ -9,6 +9,7 @@ import { registerForkImportRoutes } from "./services/fork-import/index.js";
 import { registerSkillsRegistryGate } from "./services/skills/registry-policy.fork.js";
 import { registerForkThreadSuccessors } from "./services/threads/thread-successor.fork.js";
 import { registerForkTextCompletion } from "./services/ai/plugin-text-completion.fork.js";
+import { markListQuiet } from "./ws/list-quiet.fork.js";
 import { registerPluginUpdateJobRoutes } from "./routes/plugin-update-jobs.js";
 import {
   recheckEnvironmentProvisioning,
@@ -990,7 +991,10 @@ export function createApp(
     upgradeWebSocket((context) => {
       assertBrowserWebSocketAllowed(context);
       return {
-        onOpen: (_event, socket) => onClientSocketOpen(deps.hub, socket),
+        onOpen: (_event, socket) => {
+          markListQuiet(socket, context.req.url);
+          onClientSocketOpen(deps.hub, socket);
+        },
         onMessage: (event, socket) =>
           onClientSocketMessage(deps.hub, socket, event.data),
         onClose: (_event, socket) => onClientSocketClose(deps.hub, socket),
