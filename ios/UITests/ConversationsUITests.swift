@@ -26,9 +26,7 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         let chip = app.buttons["conversationModelChip"]
         XCTAssertTrue(chip.waitForExistence(timeout: 10), "the model chip is in the header")
         XCTAssertTrue(chip.label.contains("Opus 5.5"), chip.label)
-        let workers = app.buttons["conversationWorkers"]
-        XCTAssertTrue(workers.waitForExistence(timeout: 10))
-        XCTAssertTrue(workers.label.contains("2 workers from here"), workers.label)
+        XCTAssertFalse(app.buttons["conversationWorkers"].exists, "workers are in the strands box, not a line of their own")
         XCTAssertFalse(app.buttons["Model & permissions"].exists, "the model picker left the input bar")
         XCTAssertFalse(app.buttons["composerExpandToPage"].exists, "no open-as-page control")
         XCTAssertTrue(app.buttons["Send"].exists == false, "dictation is the action while it's empty")

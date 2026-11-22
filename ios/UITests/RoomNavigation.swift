@@ -32,6 +32,15 @@ extension XCUIApplication {
         row.tap()
     }
 
+    /// Back from a pushed screen: the rail's Back on the folded Duo, the navigation bar's elsewhere.
+    func goBack() {
+        let folded = buttons["folded-back"]
+        if folded.exists, folded.isHittable { return folded.tap() }
+        let back = navigationBars.buttons["BackButton"]
+        if back.exists { return back.tap() }
+        navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
+    }
+
     func closeRoomSheet() {
         let top = coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.075))
         top.press(forDuration: 0.05, thenDragTo: coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))

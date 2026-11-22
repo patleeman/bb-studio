@@ -1819,7 +1819,18 @@ extension ThreadView {
     fileprivate var transcriptV2Top: some View {
         VStack(spacing: 0) {
             if compactHeader {
-                FoldedChatTitle(avatar: nil, title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread", status: nil)
+                Group {
+                    if let worker {
+                        // A worker: its name and state, as the navigation bar's WorkerTitle says them.
+                        FoldedChatTitle(avatar: nil, title: worker.displayTitle, status: worker.headerLabel(now: .now))
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("\(worker.displayTitle), \(worker.stateLabel)")
+                            .accessibilityValue(worker.status.rawValue)
+                            .accessibilityIdentifier("workerTitle")
+                    } else {
+                        FoldedChatTitle(avatar: nil, title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread", status: nil)
+                    }
+                }
                     .background(.bar)
                     .opacity(lying ? 0 : 1)
                     .accessibilityHidden(lying)

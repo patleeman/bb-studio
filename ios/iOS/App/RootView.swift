@@ -24,7 +24,6 @@ struct RootView: View {
             case .room:
                 BotSpacesRoot(store: spaces)
                     .transformEnvironment(\.horizontalSizeClass) { if layout.twoPages { $0 = .regular } }
-                    .modifier(RootSheets(active: model.tab == .bot))
             case .loading:
                 SpacesLoadingView(serverURL: spaces.serverURL)
                     .transition(.opacity)
@@ -35,6 +34,8 @@ struct RootView: View {
             }
         }
         .modifier(RootNotice())
+        // Capture, dictation, Write and the rest work while Studio loads, too.
+        .modifier(RootSheets(active: model.tab == .bot))
         .sheet(item: secondary) { tab in
             Group {
                 switch tab {

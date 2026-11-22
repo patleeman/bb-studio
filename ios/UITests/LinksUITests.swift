@@ -35,7 +35,7 @@ final class LinksUITests: ServerIsolatedUITestCase {
         launch("bbstudio://record/mem_3")
         XCTAssertTrue(any("memoryRecordText").waitForExistence(timeout: 30), "the record")
         XCTAssertTrue(any("memoryRecordText").label.contains("Friday 10:00"))
-        app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
+        app.goBack()
         XCTAssertTrue(app.waitForRoom(timeout: 15), "Back goes to the room")
     }
 

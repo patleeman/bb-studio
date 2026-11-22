@@ -241,13 +241,17 @@ final class AppModel: ObservableObject {
                 openThread(id)
                 replyThreadId = id
             }
+        case "page": if let id { openPage(id) }
+        case "automations": open(.automations)
         case "usage": open(.usage)
         case "archived": open(.archived)
         case "drawing", "drawings": openStudio(kind: "drawing", id.map { .drawing(id: $0) })
         case "pages": openStudio(kind: "page")
-        case "recordings": openStudio(kind: "recording", id.map { .recording(id: $0) })
-        case "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
-        case "designs": openStudio(kind: "design", id.map { .design(id: $0) })
+        case "recording", "recordings": openStudio(kind: "recording", id.map { .recording(id: $0) })
+        case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
+        case "design", "designs": openStudio(kind: "design", id.map { .design(id: $0) })
+        case "dashboard", "dashboards": flash("Dashboards open in BB on your Mac.")
+        case "bot": openBot(id)
         case "mini", "minis": openStudio(kind: "mini", id.map { .mini(id: $0) })
         case "visual-chat":
             // The list under the chat, so Back goes to it.

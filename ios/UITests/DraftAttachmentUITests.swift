@@ -20,19 +20,21 @@ final class DraftAttachmentUITests: ServerIsolatedUITestCase {
         }
         XCTAssertTrue(attachment.exists, "The photo never reached the composer")
 
-        app.buttons["Bots"].firstMatch.tap()
-        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Juniper'")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "The Bots list has no Juniper row")
-        row.tap()
+        // Leave for another conversation and come back.
+        func leaveAndReopen() {
+            app.openRoomPlace("conversations")
+            app.buttons["roomConversation-thr_demo_interview"].tap()
+            app.openRoomPlace("conversations")
+            app.buttons["roomConversation-thr_botdemo01"].tap()
+        }
+        leaveAndReopen()
         XCTAssertTrue(composer.waitForExistence(timeout: 10))
         XCTAssertTrue(attachment.waitForExistence(timeout: 5), "The photo was lost on reopening the chat")
 
         // Removed from the composer, it stays removed.
         attachment.tap()
         XCTAssertTrue(attachment.waitForNonExistence(timeout: 5))
-        app.buttons["Bots"].firstMatch.tap()
-        XCTAssertTrue(row.waitForExistence(timeout: 10))
-        row.tap()
+        leaveAndReopen()
         XCTAssertTrue(composer.waitForExistence(timeout: 10))
         XCTAssertFalse(attachment.waitForExistence(timeout: 3), "A removed photo came back")
     }
