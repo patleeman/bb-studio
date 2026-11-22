@@ -92,6 +92,21 @@ final class LinksTests: XCTestCase {
         XCTAssertNil(target("bbstudio://capture"))
     }
 
+    @MainActor func testStudioAndBotLinksOpenTheirItemNotTheList() {
+        func to(_ text: String) -> Destination? {
+            let url = URL(string: text)!
+            return AppModel.destination(url, id: url.pathComponents.dropFirst().first)
+        }
+        XCTAssertEqual(to("bbstudio://design/dsn_1"), .studio(kind: "design", .design(id: "dsn_1")))
+        XCTAssertEqual(to("bbstudio://page/pg_1"), .studio(kind: nil, .page(id: "pg_1")))
+        XCTAssertEqual(to("bbstudio://artifact/art_1"), .studio(kind: "artifact", .artifact(id: "art_1")))
+        XCTAssertEqual(to("bbstudio://recording/rec_1"), .studio(kind: "recording", .recording(id: "rec_1")))
+        XCTAssertEqual(to("bbstudio://bot/bot_2"), .bot("bot_2"))
+        XCTAssertEqual(to("bbstudio://automations"), .route(.automations))
+        XCTAssertEqual(to("bbstudio://new"), .compose(""), "New is a Bot conversation")
+        XCTAssertEqual(to("bbstudio://nonsense"), .list)
+    }
+
     func testDestinations() {
         XCTAssertEqual(Links.destination(LinkRef(kind: .worker, id: "t")), .thread("t", worker: true))
         XCTAssertEqual(Links.destination(LinkRef(kind: .archive, id: "bot_1")), .botPage(.archive, botId: "bot_1"))
