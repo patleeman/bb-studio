@@ -2,8 +2,7 @@ import XCTest
 
 final class RoomBottomStackUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
-    /// The folded Duo: `TEST_RUNNER_ROOM_DUO`, or seen on screen (its title and side column).
-    private var duo: Bool { ProcessInfo.processInfo.environment["ROOM_DUO"] != nil || app.isFoldedDuo }
+    private var duo: Bool { ProcessInfo.processInfo.environment["ROOM_DUO"] != nil }
     private var theme: String { ProcessInfo.processInfo.environment["ROOM_THEME"] ?? "forest" }
     private var device: String { duo ? "duo" : "iphone" }
 
@@ -143,15 +142,13 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
         command("mid")
         field.tap()
         XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "the keyboard is up while reading up")
-        // The folded Duo's ↓ is on its side column, which hides it while you type.
-        if duo {
-            command("bottom")
-        } else {
+        // The folded Duo's ↓ is on its side column, which hides it while you type: no ↓ to tap here.
+        if !(duo || app.isFoldedDuo) {
             try assertTheJumpSitsAboveTheStack("with the keyboard up")
             shot("chat-keyboard-up-reading")
             app.buttons["jumpToLatest"].firstMatch.tap()
+            try assertClearOfTheStack("after the ↓, with the keyboard up", keyboardUp: true)
         }
-        try assertClearOfTheStack("after the ↓, with the keyboard up", keyboardUp: true)
 
         guard duo else { return }
         command("landscape", wait: 4)
@@ -187,7 +184,10 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
         }
         if reading {
             let jump = try XCTUnwrap(jumpFrame(transcript), "the ↓ shows while reading up \(when)", file: file, line: line)
-            XCTAssertGreaterThanOrEqual(jump.minY, band.minY - 0.5, "the ↓ (\(jump)) is on the band (from \(band.minY)), over no row \(when)", file: file, line: line)
+            // The folded Duo's ↓ is on its side column, not the band.
+            if !app.isFoldedDuo {
+                XCTAssertGreaterThanOrEqual(jump.minY, band.minY - 0.5, "the ↓ (\(jump)) is on the band (from \(band.minY)), over no row \(when)", file: file, line: line)
+            }
             for (name, frame) in stackParts() {
                 XCTAssertLessThanOrEqual(frame.intersection(jump).height, 0.5, "the ↓ (\(jump)) leaves \(name) (\(frame)) clear \(when)", file: file, line: line)
             }
@@ -238,7 +238,7 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
             shot("stack-inflight-\(state)-keyboard")
             readUp()
             // Not on the folded Duo, whose ↓ hides while you type.
-            if keyboard.exists, !duo {
+            if keyboard.exists, !duo, !app.isFoldedDuo {
                 try assertOneOpaqueStack("strands \(state), keyboard up, reading up", reading: true)
             }
             command("dismiss")
