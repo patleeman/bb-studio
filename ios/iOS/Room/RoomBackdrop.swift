@@ -110,10 +110,6 @@ struct RoomFrost: View {
             LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: Self.seam(layout.windowSize.width) - 0.02),
                                    .init(color: .black, location: Self.seam(layout.windowSize.width) + 0.02), .init(color: .black, location: 1)],
                            startPoint: .leading, endPoint: .trailing)
-        case .stacked?:
-            LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: Self.seam(layout.windowSize.height) - 0.02),
-                                   .init(color: .black, location: Self.seam(layout.windowSize.height) + 0.02), .init(color: .black, location: 1)],
-                           startPoint: .top, endPoint: .bottom)
         }
     }
 
@@ -156,8 +152,6 @@ enum RoomSceneLight {
         switch pages {
         case .sideBySide?:
             return CGRect(x: safeLeading, y: 0, width: window.width / 2 - DuoPages.hinge / 2 - safeLeading, height: window.height)
-        case .stacked?:
-            return CGRect(x: safeLeading, y: 0, width: window.width - railWidth - safeLeading, height: window.height / 2 - DuoPages.hinge / 2)
         case nil:
             return CGRect(x: safeLeading, y: 0, width: window.width - railWidth - safeLeading, height: window.height)
         }

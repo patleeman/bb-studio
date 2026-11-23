@@ -261,7 +261,6 @@ struct RoomView: View {
                                         startingConversation = true
                                     })
                 }
-                .padding(.trailing, pages == .stacked ? max(0, FoldedChrome.column - proxy.safeAreaInsets.trailing) : 0)
                 .padding(.top, proxy.safeAreaInsets.top)
                 .padding(.bottom, 8)
                 .ignoresSafeArea(.container, edges: [.top, .bottom])
@@ -311,7 +310,7 @@ struct RoomView: View {
     private func duoScrim(_ pages: DuoPages) -> some View {
         LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: 0.36),
                                .init(color: .black.opacity(0.5), location: 0.5), .init(color: .black.opacity(0.58), location: 1)],
-                       startPoint: pages == .stacked ? .top : .leading, endPoint: pages == .stacked ? .bottom : .trailing)
+                       startPoint: .leading, endPoint: .trailing)
             .ignoresSafeArea()
             .allowsHitTesting(false)
             .accessibilityHidden(true)

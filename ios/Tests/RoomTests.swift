@@ -11,10 +11,6 @@ final class RoomTests: XCTestCase {
         let unfolded = try XCTUnwrap(RoomSceneLight.spot(window: CGSize(width: 951, height: 669), safeTop: 0, safeTrailing: 0, pages: .sideBySide, rail: true))
         XCTAssertLessThan(unfolded.x, 951 / 2 - DuoPages.hinge / 2, "unfolded: on the presence's page, left of the hinge")
         XCTAssertEqual(unfolded.y, RoomSceneLight.corner)
-        let portrait = try XCTUnwrap(RoomSceneLight.spot(window: CGSize(width: 669, height: 951), safeTop: 0, safeTrailing: 0, pages: .stacked, rail: true))
-        let page = RoomSceneLight.page(window: CGSize(width: 669, height: 951), safeLeading: 0, safeTrailing: 0, pages: .stacked, rail: true)
-        XCTAssertTrue(page.width >= 560 && page.width > page.height * 1.25, "portrait's top page is wide")
-        XCTAssertLessThan(portrait.x, page.minX + 22 + (page.width - 72) / 2, "portrait: in the presence's column, not over the rows")
         XCTAssertEqual(SceneLight.scale, 0.6, accuracy: 0.001, "smaller than desktop's")
         XCTAssertNil(RoomSceneLight.spot(window: .zero, safeTop: 0, safeTrailing: 0, pages: nil, rail: false))
     }
@@ -111,7 +107,7 @@ final class RoomTests: XCTestCase {
 
     func testTheDuoUnfoldedHasTwoPagesAndOnlyThere() {
         XCTAssertEqual(DuoPages(window: CGSize(width: 951, height: 669), phone: true), .sideBySide)
-        XCTAssertEqual(DuoPages(window: CGSize(width: 669, height: 951), phone: true), .stacked)
+        XCTAssertNil(DuoPages(window: CGSize(width: 669, height: 951), phone: true), "upright, the hinge across: one column, as on a phone")
         XCTAssertNil(DuoPages(window: CGSize(width: 466, height: 678), phone: true), "folded")
         XCTAssertNil(DuoPages(window: CGSize(width: 678, height: 466), phone: true), "folded, landscape")
         XCTAssertNil(DuoPages(window: CGSize(width: 468, height: 669), phone: true), "beside another app")

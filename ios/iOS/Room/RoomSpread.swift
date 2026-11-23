@@ -1,19 +1,16 @@
 import SwiftUI
 
+/// The unfolded Duo on its side: two pages, the hinge between them. Upright
+/// (the hinge across, one screen above the other) it is one tall phone: the
+/// phone's single column, never a page split by the hinge.
 enum DuoPages: Equatable {
-    case sideBySide, stacked
+    case sideBySide
 
     static let hinge: CGFloat = 32
 
     init?(window size: CGSize, phone: Bool) {
-        guard phone else { return nil }
-        if size.width >= 900, size.height >= 600, size.width > size.height {
-            self = .sideBySide
-        } else if size.height >= 900, size.width >= 600 {
-            self = .stacked
-        } else {
-            return nil
-        }
+        guard phone, size.width >= 900, size.height >= 600, size.width > size.height else { return nil }
+        self = .sideBySide
     }
 }
 
@@ -25,16 +22,15 @@ struct RoomCanvas<First: View, Second: View>: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let stack = pages == .stacked ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
             let size = firstPage(proxy)
-            stack {
+            HStack(spacing: 0) {
                 first
-                    .frame(width: pages == .sideBySide ? size : nil, height: pages == .stacked ? size : nil)
+                    .frame(width: size)
                     .environment(\.duoLayout, DuoLayout(size: pageSize(size), innerScreen: layout.innerScreen))
                     .environment(\.horizontalSizeClass, .compact)
                     .environment(\.duoPage, true)
                 Color.clear
-                    .frame(width: pages == .sideBySide ? DuoPages.hinge : nil, height: pages == .stacked ? DuoPages.hinge : nil)
+                    .frame(width: DuoPages.hinge)
                     .accessibilityHidden(true)
                 second
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -45,17 +41,11 @@ struct RoomCanvas<First: View, Second: View>: View {
     }
 
     private func firstPage(_ proxy: GeometryProxy) -> CGFloat {
-        switch pages {
-        case .sideBySide: max(0, layout.windowSize.width / 2 - DuoPages.hinge / 2 - proxy.safeAreaInsets.leading)
-        case .stacked: max(0, layout.windowSize.height / 2 - DuoPages.hinge / 2 - proxy.safeAreaInsets.top)
-        }
+        max(0, layout.windowSize.width / 2 - DuoPages.hinge / 2 - proxy.safeAreaInsets.leading)
     }
 
     private func pageSize(_ first: CGFloat) -> CGSize {
-        switch pages {
-        case .sideBySide: CGSize(width: first, height: layout.windowSize.height)
-        case .stacked: CGSize(width: layout.windowSize.width, height: first)
-        }
+        CGSize(width: first, height: layout.windowSize.height)
     }
 }
 

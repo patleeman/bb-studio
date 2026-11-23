@@ -155,6 +155,17 @@ public struct Strand: Decodable, Hashable, Sendable, Identifiable {
 
 /// What the box shows, from a list: desktop's `strands/ui/model.ts`.
 public enum StrandsBoxModel {
+    /// A strand's summary line, or nil when it says nothing: an empty line, or
+    /// the sorter's "Continuation of the main conversation; no details
+    /// provided." and the like.
+    public static func summary(_ line: String?) -> String? {
+        guard let line = line?.trimmingCharacters(in: .whitespacesAndNewlines), !line.isEmpty else { return nil }
+        let plain = line.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".;: "))
+        if plain.contains("no details provided") || plain.contains("no details given") { return nil }
+        if ["continuation of the main conversation", "continuation of the conversation", "continuation of main"].contains(plain) { return nil }
+        return line
+    }
+
     /// A needs-you strand's reply ask, when that's what it waits on first: picking the strand jumps to the reply.
     public static func replyAsk(_ strand: Strand) -> Strand.Ask? {
         guard strand.state == .needsYou, let ask = strand.asks.first, ask.kind == .reply, ask.seq != nil else { return nil }

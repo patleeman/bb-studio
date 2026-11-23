@@ -145,4 +145,14 @@ final class StrandTimelineTests: XCTestCase {
         XCTAssertEqual(only.marks[3], [.gap(count: 1)])
         XCTAssertNil(only.marks[0])
     }
+
+    func testASummaryThatSaysNothingIsLeftOut() {
+        XCTAssertNil(StrandsBoxModel.summary("Continuation of the main conversation; no details provided."))
+        XCTAssertNil(StrandsBoxModel.summary("Continuation of the main conversation."))
+        XCTAssertNil(StrandsBoxModel.summary("  "))
+        XCTAssertNil(StrandsBoxModel.summary(nil))
+        XCTAssertEqual(StrandsBoxModel.summary("Picks a look for the six screens"), "Picks a look for the six screens")
+        XCTAssertEqual(StrandsBoxModel.summary("Continuation of the email app work: the inbox and History"),
+                       "Continuation of the email app work: the inbox and History", "a continuation that says what")
+    }
 }

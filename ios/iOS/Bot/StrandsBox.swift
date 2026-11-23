@@ -222,7 +222,7 @@ struct StrandsBox: View {
                     StrandMark(state: strand.state).frame(width: 12)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(strand.title).font(.subheadline.weight(.semibold)).lineLimit(2)
-                        if let line = strand.summary ?? strand.detail, !line.isEmpty {
+                        if let line = StrandsBoxModel.summary(strand.summary) ?? StrandsBoxModel.summary(strand.detail) {
                             Text(line).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
                         }
                     }
@@ -239,7 +239,45 @@ struct StrandsBox: View {
         .padding(.vertical, 8)
     }
 
+    /// What tapping an ask's row does: a reply in this conversation comes into
+    /// view and flashes; one elsewhere opens there. Approvals have their own buttons.
+    private func askAction(_ ask: Strand.Ask) -> (() -> Void)? {
+        switch ask.kind {
+        case .approval, .gateway: return nil
+        case .reply:
+            if let seq = ask.seq, ask.threadId == threadId {
+                return {
+                    if !panel { withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { open = false } }
+                    model.flashReply(seq, in: threadId)
+                }
+            }
+            return ask.threadId != threadId ? { openThread(ask.threadId) } : nil
+        case .question, .other:
+            return ask.threadId != threadId ? { openThread(ask.threadId) } : nil
+        }
+    }
+
     @ViewBuilder private func askView(_ ask: Strand.Ask) -> some View {
+        if let action = askAction(ask) {
+            // The row is the button: one per ask, not a Show under each.
+            Button(action: action) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(ask.label.isEmpty ? "A reply needs you" : ask.label).font(.footnote).multilineTextAlignment(.leading)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                }
+                .frame(minHeight: 32)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(ask.threadId == threadId ? "Shows the reply" : "Opens its conversation")
+            .accessibilityIdentifier(ask.kind == .reply && ask.threadId == threadId ? "strand-reply-\(Int(ask.seq ?? 0))" : "strand-ask-\(ask.id)")
+        } else {
+            decisionAsk(ask)
+        }
+    }
+
+    @ViewBuilder private func decisionAsk(_ ask: Strand.Ask) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if !ask.label.isEmpty { Text(ask.label).font(.footnote) }
             if ask.kind == .approval, !ask.details.isEmpty {
@@ -262,23 +300,8 @@ struct StrandsBox: View {
                 }
             case .gateway:
                 Text("Approve on the desktop").font(.caption).foregroundStyle(.secondary)
-            case .reply:
-                if let seq = ask.seq, ask.threadId == threadId {
-                    Button("Show") {
-                        if !panel { withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { open = false } }
-                        model.flashReply(seq, in: threadId)
-                    }
-                    .font(.footnote).buttonStyle(.bordered)
-                    .accessibilityIdentifier("strand-reply-\(Int(seq))")
-                } else if ask.threadId != threadId {
-                    Button("Open") { openThread(ask.threadId) }
-                        .font(.footnote).buttonStyle(.bordered)
-                }
-            case .question, .other:
-                if ask.threadId != threadId {
-                    Button("Open") { openThread(ask.threadId) }
-                        .font(.footnote).buttonStyle(.bordered)
-                }
+            case .reply, .question, .other:
+                EmptyView()
             }
         }
     }
