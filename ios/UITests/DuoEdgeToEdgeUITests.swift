@@ -60,9 +60,13 @@ final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
         XCTAssertEqual(page.y, 0, accuracy: 1, "The messages run under the header")
         XCTAssertEqual(page.maxY, layout.height, accuracy: 1, "The messages run to the bottom edge")
         XCTAssertEqual(page.x, layout.width / 2 + 16, accuracy: 1, "The right page starts past the crease")
-        XCTAssertEqual(page.maxX, layout.width - column, accuracy: 1, "The right page stops at the status column")
+        // At the status column: on a phone the room pads for it; on a Duo the
+        // device's safe area holds it, and the page runs to the edge under it.
+        XCTAssertTrue(abs(page.maxX - (layout.width - column)) <= 1 || abs(page.maxX - layout.width) <= 1,
+                      "The right page stops at the status column or the edge: \(page.maxX)")
         // The left page's list too, from the screen's left edge.
-        let context = try XCTUnwrap(layout.scrolls.first { $0.x < layout.width / 2 && $0.height >= layout.height - 1 }, "the left page's list")
+        // Within the left half (the scene behind both pages has a full-window scroll view too).
+        let context = try XCTUnwrap(layout.scrolls.first { $0.x >= -1 && $0.maxX <= layout.width / 2 && $0.height >= layout.height - 1 }, "the left page's list")
         XCTAssertEqual(context.x, 0, accuracy: 1)
         XCTAssertEqual(context.maxY, layout.height, accuracy: 1, "The left page runs to the bottom edge")
         XCTAssertLessThanOrEqual(context.maxX, layout.width / 2 - 16 + 1, "The left page stops before the crease")
@@ -91,7 +95,7 @@ final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
 
     /// The right page's message list: the tall scroll view past the crease.
     private func transcript(_ layout: Geometry) throws -> Scroll {
-        try XCTUnwrap(layout.scrolls.first { $0.x > layout.width / 2 && $0.height >= layout.height - 1 }, "the right page's messages")
+        try XCTUnwrap(layout.scrolls.first { $0.x > layout.width / 2 && $0.height >= layout.height - 1 && $0.maxY <= layout.height + 1 }, "the right page's messages")
     }
 
     private func command(_ path: String) { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/" + path)!) }
