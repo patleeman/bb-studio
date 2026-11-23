@@ -173,9 +173,16 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         // the status column; the transcript keeps clear of it, so its rows
         // never pass under the Duo's clock, battery and Now Playing.
         var layout = try geometry()
-        // Only the thread on screen keeps its probe.
-        // The right page's: the room can keep the last conversation's probe off the page.
-        let transcripts = layout.surfaces.filter { $0.key.hasPrefix("transcript-") && $0.value.x >= pageMinX - 1 && $0.value.x < layout.width }
+        // The right page's, wholly on it: the room can keep the last
+        // conversation's probe beside the page until its slide settles.
+        func onPage(_ layout: Geometry) -> [String: Rect] {
+            layout.surfaces.filter { $0.key.hasPrefix("transcript-") && $0.value.x >= pageMinX - 1 && $0.value.maxX <= layout.width + 1 }
+        }
+        for _ in 0..<5 where onPage(layout).isEmpty {
+            Thread.sleep(forTimeInterval: 1)
+            layout = try geometry()
+        }
+        let transcripts = onPage(layout)
         XCTAssertEqual(transcripts.count, 1, "\(name): one transcript on the page")
         let transcript = try XCTUnwrap(transcripts.first?.value, "\(name): transcript content probe")
         print("SPLIT COMPOSER \(name) composer=\(composer.frame) transcript=\(transcript) safeRight=\(layout.safeRight) safeBottom=\(layout.safeBottom)")
