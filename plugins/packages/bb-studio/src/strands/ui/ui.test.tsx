@@ -88,7 +88,12 @@ const state = vi.hoisted(() => ({
   overview: null as unknown,
   toast: vi.fn((_message: string, _options?: { action?: { label: string; onClick(): void } }) => undefined),
 }));
+const { submittedComposer, submitted } = vi.hoisted(() => {
+  const submitted = new Set<() => void>();
+  return { submitted, submittedComposer: { scope: { kind: "thread", threadId: "thr_main" }, onSubmitted: (listener: () => void) => { submitted.add(listener); return () => { submitted.delete(listener); }; } } };
+});
 vi.mock("@get-bb/plugin-sdk/app", () => ({
+  useComposer: () => submittedComposer,
   useBbNavigate: () => ({ toThread: state.toThread, experimental_toAppPath: state.toAppPath }),
   experimental_useAppPanel: () => ({ openTab: state.openTab }),
   experimental_InfoSection: ({ label, children }: { label: string; children?: React.ReactNode }) => <section aria-label={label}>{children}</section>,
@@ -129,6 +134,19 @@ const render = (node: React.ReactNode) => act(() => root.render(node));
 const box2 = () => container.querySelector('[data-testid="strands-strip"]');
 const click = (element: Element | null | undefined) => act(() => { (element as HTMLElement).click(); });
 const text = (element: Element | null | undefined) => element?.textContent ?? "";
+
+describe("sending a message", () => {
+  it("clears the strand filter and zoom, so the new message is drawn at once", async () => {
+    const { setZoom, zoomOf, selectionOf } = await import("./selection");
+    render(<StrandsBoxBanner />);
+    act(() => { select("thr_main", { strandId: "s1", seq: 3, turnIds: ["turn_1"] }); setZoom("thr_main", 1); });
+    expect(timelineFilterOf("thr_main")).not.toBeNull();
+    act(() => { for (const listener of submitted) listener(); });
+    expect(selectionOf("thr_main")).toBeNull();
+    expect(timelineFilterOf("thr_main")).toBeNull();
+    expect(zoomOf("thr_main")).toBe(0);
+  });
+});
 
 describe("the strands box above a conversation's composer", () => {
   const box = () => container.querySelector('[data-testid="strands-strip"]');

@@ -161,7 +161,12 @@ const state = vi.hoisted(() => ({
   toThread: vi.fn(),
   openTab: vi.fn(() => true),
 }));
+const { submittedComposer } = vi.hoisted(() => {
+  const submitted = new Set<() => void>();
+  return { submitted, submittedComposer: { scope: { kind: "thread", threadId: "thr_main" }, onSubmitted: (listener: () => void) => { submitted.add(listener); return () => { submitted.delete(listener); }; } } };
+});
 vi.mock("@get-bb/plugin-sdk/app", () => ({
+  useComposer: () => submittedComposer,
   useBbNavigate: () => ({ toThread: state.toThread, experimental_toAppPath: state.toAppPath }),
   experimental_useAppPanel: () => ({ openTab: vi.fn() }),
 }));

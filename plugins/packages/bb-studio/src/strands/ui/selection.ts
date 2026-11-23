@@ -189,6 +189,24 @@ export function setZoom(threadId: string, level: number): void {
   notify();
 }
 
+/**
+ * The owner sent a message in this conversation: show its messages, unfiltered
+ * and zoomed in, so the new message is drawn at once. A strand filter shows
+ * only turns strands already tagged, and the new turn is tagged later. The
+ * scroll position from before filtering is dropped: BB scrolls to the new message.
+ */
+export function showSent(threadId: string): void {
+  const filtered = selected.has(threadId);
+  const zoomed = zoomLevels.has(threadId) || keyboardModes.has(threadId);
+  if (!filtered && !zoomed) return;
+  marks.delete(threadId);
+  selected.delete(threadId);
+  filters.delete(threadId);
+  zoomLevels.delete(threadId);
+  keyboardModes.delete(threadId);
+  notify();
+}
+
 /** Keyboard mode (Esc Esc): the tree with a search, ↑↓ ←→ and Enter. */
 const keyboardModes = new Set<string>();
 

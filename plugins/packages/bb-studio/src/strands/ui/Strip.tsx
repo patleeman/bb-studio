@@ -11,7 +11,7 @@
 // finished, failed) show on its row, and workers no strand holds are counted
 // in the line and listed under "In no strand". Nothing open, no box. The
 // workbench Strands tab is the full view.
-import { experimental_useAppPanel, useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { experimental_useAppPanel, useBbNavigate, useComposer } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { toAppPathOf } from "../../kit/app/host-sdk";
@@ -26,7 +26,7 @@ import type { StrandAsk, StrandView } from "../contract";
 import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, replyAskOf, rowWorkersOf, seqsOf, stepSeq, strayCountsOf, stripShown } from "./model";
 import { hostContextSegments, useHidePromptStack } from "./prompt-stack";
 import { flashReply } from "./ask-mark";
-import { openFoldOf, select, selectionOf, setStrandTurns, useSelection, zoomInHost } from "./selection";
+import { openFoldOf, select, selectionOf, setStrandTurns, showSent, useSelection, zoomInHost } from "./selection";
 
 export const STRANDS_TAB = "strands";
 export const STRANDS_POLL_MS = 30_000;
@@ -119,6 +119,9 @@ export function useOpenStrandsTab() {
 /** In flight's place: the strands box, in BB's card above the composer; nothing where strands don't run or nothing is open. */
 export function StrandsBoxBanner() {
   const threadId = useComposerThread();
+  const composer = useComposer();
+  // A message sent here (queued ones too) is drawn at once, not after strands tags its turn.
+  useEffect(() => (threadId ? composer.onSubmitted(() => showSent(threadId)) : undefined), [composer, threadId]);
   return threadId ? <StrandsBoxFor threadId={threadId} /> : null;
 }
 
