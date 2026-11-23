@@ -466,15 +466,16 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         let afterBurst = record("\(name): a burst while reading")
         moved(from: reading, to: afterBurst, "\(name): a burst while reading")
         if !pill.label.contains("new") { failures.append("\(name): the pill doesn't count new rows (\(pill.label))") }
+        let watched = anchor()
         composerField.tap()
         expectKeyboard(true, "\(name): keyboard up while reading")
-        let keyboardUp = record("\(name): keyboard up while reading")
-        moved(from: afterBurst, to: keyboardUp, "\(name): keyboard up while reading")
+        record("\(name): keyboard up while reading")
+        anchorMoved(watched, "\(name): keyboard up while reading")
         shot("\(name)-reading-keyboard-up")
         command("dismiss")
         expectKeyboard(false, "\(name): keyboard down while reading")
-        let keyboardDown = record("\(name): keyboard down while reading")
-        moved(from: keyboardUp, to: keyboardDown, "\(name): keyboard down while reading")
+        record("\(name): keyboard down while reading")
+        anchorMoved(watched, "\(name): keyboard down while reading")
 
         // The pill: back to the end, following again.
         pill.tap()
@@ -611,6 +612,33 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         guard let bandStart = column.firstIndex(where: { $0 <= 4 }),
               let bandEnd = column[bandStart...].firstIndex(where: { $0 >= 12 }) else { return nil }
         return CGFloat(bandEnd - bandStart) / scale
+    }
+
+    /// A message's text in the upper half of the screen and where it sits:
+    /// what the reader sees. The content offset alone can't say: a row above
+    /// that changes height (one measures in, or the keyboard changes a safe
+    /// area) moves the offset and the content together, and nothing on
+    /// screen moves (HeaderTapUITests, B16).
+    private func anchor() -> (label: String, y: CGFloat)? {
+        let screen = app.frame
+        for text in app.staticTexts.allElementsBoundByIndex.prefix(80) where text.exists {
+            let frame = text.frame
+            let label = text.label
+            guard label.count > 12, frame.minY > screen.minY + 140, frame.maxY < screen.midY,
+                  app.staticTexts.matching(NSPredicate(format: "label == %@", label)).count == 1 else { continue }
+            return (label, frame.minY)
+        }
+        return nil
+    }
+
+    /// Fails `step` when the anchor's text moved on screen (or left it).
+    private func anchorMoved(_ anchor: (label: String, y: CGFloat)?, _ step: String) {
+        guard let anchor else { return failures.append("\(step): no message in view to watch") }
+        let text = app.staticTexts.matching(NSPredicate(format: "label == %@", anchor.label)).firstMatch
+        guard text.exists else { return failures.append("\(step): \"\(anchor.label.prefix(30))\" left the screen") }
+        let delta = text.frame.minY - anchor.y
+        steps.append(String(format: "%@: the text on screen moved %.1f", step, delta))
+        if abs(delta) > 2 { failures.append(String(format: "%@: the rows moved %.1f pt on screen", step, delta)) }
     }
 
     private func moved(from before: Scroll?, to after: Scroll?, _ step: String) {
