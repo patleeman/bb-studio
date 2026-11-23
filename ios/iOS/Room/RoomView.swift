@@ -71,6 +71,9 @@ struct RoomView: View {
     @State private var startingConversation = false
     @State private var composeText = ""
     @State private var settingsOpen = false
+    /// Asked to show a conversation (a link, a pick, a Bot switch that opens
+    /// one): the room's opening (Main, or the last one) doesn't replace it.
+    @State private var focused = false
     @Environment(\.look) private var look
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.scenePhase) private var phase
@@ -450,6 +453,7 @@ struct RoomView: View {
     }
 
     private func focus(on id: String, keyboard: Bool = false) {
+        focused = true
         settingsOpen = false
         if router.place != nil { router.closePlace() }
         guard order.contains(id) else {
@@ -500,7 +504,9 @@ struct RoomView: View {
     }
 
     private func applyQAMode() {
-        if let id = RoomQA.value("-qaRoomConversation"), order.contains(id) {
+        if focused {
+            // Already showing what it was asked for.
+        } else if let id = RoomQA.value("-qaRoomConversation"), order.contains(id) {
             slide = .trailing
             pager.show(id)
         } else {
