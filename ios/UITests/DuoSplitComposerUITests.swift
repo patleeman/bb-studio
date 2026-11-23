@@ -174,8 +174,9 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         // never pass under the Duo's clock, battery and Now Playing.
         var layout = try geometry()
         // Only the thread on screen keeps its probe.
-        let transcripts = layout.surfaces.filter { $0.key.hasPrefix("transcript-") }
-        XCTAssertEqual(transcripts.count, 1, "\(name): one transcript on screen")
+        // The right page's: the room can keep the last conversation's probe off the page.
+        let transcripts = layout.surfaces.filter { $0.key.hasPrefix("transcript-") && $0.value.x >= pageMinX - 1 && $0.value.x < layout.width }
+        XCTAssertEqual(transcripts.count, 1, "\(name): one transcript on the page")
         let transcript = try XCTUnwrap(transcripts.first?.value, "\(name): transcript content probe")
         print("SPLIT COMPOSER \(name) composer=\(composer.frame) transcript=\(transcript) safeRight=\(layout.safeRight) safeBottom=\(layout.safeBottom)")
         XCTAssertEqual(composer.frame.maxX, transcript.maxX + layout.safeRight, accuracy: 4,

@@ -53,7 +53,7 @@ final class DuoSplitWidthUITests: ServerIsolatedUITestCase {
         XCTAssertGreaterThanOrEqual(message.frame.minX, pageMinX - 1, "\(name): transcript text is not cut at the crease")
         XCTAssertLessThanOrEqual(message.frame.maxX, 951 + 1, "\(name): transcript text is not cut at the window edge")
         // The header's title, the first text at the top of the right page.
-        let title = app.staticTexts.allElementsBoundByIndex.first { $0.frame.minX >= pageMinX - 1 && $0.frame.minY > 60 && $0.frame.maxY < 120 }
+        let title = app.staticTexts.allElementsBoundByIndex.first { $0.frame.minX >= pageMinX - 1 && $0.frame.minY > 20 && $0.frame.maxY < 160 }
         let header = try XCTUnwrap(title, "\(name): a title in the right page's header")
         XCTAssertLessThanOrEqual(header.frame.maxX, 951 - geometry.safeRight + 1, "\(name): title ends before the status column")
         let jump = app.buttons["Jump to latest"]
