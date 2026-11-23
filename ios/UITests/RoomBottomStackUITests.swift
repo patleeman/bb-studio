@@ -2,7 +2,8 @@ import XCTest
 
 final class RoomBottomStackUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
-    private var duo: Bool { ProcessInfo.processInfo.environment["ROOM_DUO"] != nil }
+    /// The folded Duo: `TEST_RUNNER_ROOM_DUO`, or seen on screen (its title and side column).
+    private var duo: Bool { ProcessInfo.processInfo.environment["ROOM_DUO"] != nil || app.isFoldedDuo }
     private var theme: String { ProcessInfo.processInfo.environment["ROOM_THEME"] ?? "forest" }
     private var device: String { duo ? "duo" : "iphone" }
 
@@ -142,9 +143,14 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
         command("mid")
         field.tap()
         XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "the keyboard is up while reading up")
-        try assertTheJumpSitsAboveTheStack("with the keyboard up")
-        shot("chat-keyboard-up-reading")
-        app.buttons["jumpToLatest"].firstMatch.tap()
+        // The folded Duo's ↓ is on its side column, which hides it while you type.
+        if duo {
+            command("bottom")
+        } else {
+            try assertTheJumpSitsAboveTheStack("with the keyboard up")
+            shot("chat-keyboard-up-reading")
+            app.buttons["jumpToLatest"].firstMatch.tap()
+        }
         try assertClearOfTheStack("after the ↓, with the keyboard up", keyboardUp: true)
 
         guard duo else { return }
@@ -231,7 +237,8 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
             try assertOneOpaqueStack("strands \(state), keyboard up, at the end", reading: false)
             shot("stack-inflight-\(state)-keyboard")
             readUp()
-            if keyboard.exists {
+            // Not on the folded Duo, whose ↓ hides while you type.
+            if keyboard.exists, !duo {
                 try assertOneOpaqueStack("strands \(state), keyboard up, reading up", reading: true)
             }
             command("dismiss")

@@ -14,10 +14,19 @@ final class TypingBurstUITests: ServerIsolatedUITestCase {
 
     private var composer: XCUIElement { app.textViews["Message"] }
 
+    /// The thread's title: in its navigation bar, or the folded Duo's title over the messages.
+    private func threadOpens() -> Bool {
+        let folded = app.staticTexts.matching(NSPredicate(format: "identifier == 'foldedChatTitle' AND label BEGINSWITH 'Busy thread'")).firstMatch
+        let opened = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in self.app.navigationBars["Busy thread"].exists || folded.exists }, object: nil)
+        return XCTWaiter.wait(for: [opened], timeout: 30) == .completed
+    }
+
     private func focusComposer() {
-        XCTAssertTrue(app.navigationBars["Busy thread"].waitForExistence(timeout: 30), "the thread opens")
+        XCTAssertTrue(threadOpens(), "the thread opens")
         command("focus?thr_burstdemo1")
         XCTAssertTrue(composer.waitForExistence(timeout: 10), "the composer takes the keyboard")
+        // Typing before the keyboard is up can put the first key after the rest.
+        _ = app.keyboards.firstMatch.waitForExistence(timeout: 10)
     }
 
     func testTypingDoesNotRedrawTheThread() {
@@ -34,7 +43,7 @@ final class TypingBurstUITests: ServerIsolatedUITestCase {
 
     func testTypingDuringABurst() {
         launch([])
-        XCTAssertTrue(app.navigationBars["Busy thread"].waitForExistence(timeout: 30), "the thread opens")
+        XCTAssertTrue(threadOpens(), "the thread opens")
         Thread.sleep(forTimeInterval: 40)
         var result = counts(reset: false)
         let deadline = Date().addingTimeInterval(80)

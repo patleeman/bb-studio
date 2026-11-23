@@ -2,7 +2,8 @@ import XCTest
 
 final class RoomComposerBandUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
-    private var duo: Bool { ProcessInfo.processInfo.environment["ROOM_DUO"] != nil }
+    /// The folded Duo: `TEST_RUNNER_ROOM_DUO`, or seen on screen (its title and side column).
+    private var duo: Bool { ProcessInfo.processInfo.environment["ROOM_DUO"] != nil || app.isFoldedDuo }
     private var device: String { duo ? "duo" : "iphone" }
     private var failures: [String] = []
     private var steps: [String] = []
