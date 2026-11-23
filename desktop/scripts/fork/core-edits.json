@@ -158,8 +158,8 @@
     },
     "apps/app/src/views/thread-detail/ThreadDetailHeader.tsx": {
       "seam": "thread-header",
-      "intent": "The header asks useForkThreadHeader (components/fork/ForkThreadHeader.tsx) for the thread's decoration: the title text shown when not editing is its title (plugins' slots.experimental_threadHeader may replace it), and its after node is drawn right after the title div, before the actions menu. useSidebarRename, the pane drag label and the rename save keep the real threadTitle.",
-      "budget": 5
+      "intent": "The header asks useForkThreadHeader (components/fork/ForkThreadHeader.tsx) for the thread's decoration: the title text shown when not editing is its title (plugins' slots.experimental_threadHeader may replace it), and its after node is drawn right after the title div, before the actions menu; its end node is the first child of the header's workflow actions (the right end). useSidebarRename, the pane drag label and the rename save keep the real threadTitle.",
+      "budget": 6
     },
     "apps/cli/src/commands/server.ts": {
       "seam": "import-sync",
