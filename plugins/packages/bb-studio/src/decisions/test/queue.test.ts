@@ -610,3 +610,119 @@ test("held follow-ups are sent once the agent's run ends, oldest first", async (
   await queue.releaseFinished();
   assert.deepEqual(calls.steered, ["q_a", "q_b"], "sent once");
 });
+
+test("on a background-only turn, a new message waits for older held follow-ups: A then B", async () => {
+  let idle = false;
+  const verdicts = new Map<string, Verdict>([["q_a", followup]]);
+  const { queue, calls } = harness(followup, {
+    mainRunIdle: async () => idle,
+    classify: async (r) => verdicts.get(r.id) ?? steer,
+  });
+  queue.queued(row({ id: "q_a", createdAt: 1 }));
+  await settle();
+  assert.deepEqual(calls.steered, [], "A is held as a follow-up");
+  idle = true;
+  queue.queued(row({ id: "q_b", createdAt: 2, content: [{ type: "text", text: "and this", mentions: [] }] }));
+  await settle();
+  assert.deepEqual(calls.steered, ["q_a", "q_b"]);
+  await queue.releaseFinished();
+  assert.deepEqual(calls.steered, ["q_a", "q_b"], "nothing is sent twice");
+});
+
+test("a Jev answer that arrives after the budget is dropped: one steer, one record", async () => {
+  const late = new Promise<Verdict>((resolve) => setTimeout(() => resolve(steer), 40));
+  const { queue, calls } = harness(late, { decideBudgetMs: 20 });
+  queue.queued(row());
+  await sleepMs(70);
+  await settle();
+  assert.deepEqual(calls.steered, ["q_1"]);
+  assert.equal(calls.records.length, 1);
+  assert.equal((calls.records[0] as { verdict: Verdict }).verdict.source, "default");
+});
+
+test("a turn still running (a tool, a pending approval) asks Jev and holds a follow-up", async () => {
+  const { queue, calls } = harness(followup, { mainRunIdle: async () => false });
+  queue.queued(row());
+  await settle();
+  assert.equal(calls.classified, 1);
+  assert.deepEqual(calls.steered, []);
+});
+
+test("a release that fails partway keeps the order and retries the rest once", async () => {
+  let idle = false;
+  let failB = true;
+  const steered: string[] = [];
+  const warnings: string[] = [];
+  const { queue } = harness(followup, {
+    mainRunIdle: async () => idle,
+    steer: async (r) => {
+      if (r.id === "q_b" && failB) {
+        failB = false;
+        throw new Error("bridge busy");
+      }
+      steered.push(r.id);
+    },
+    warn: (message) => warnings.push(message),
+  });
+  queue.queued(row({ id: "q_a", createdAt: 1 }));
+  queue.queued(row({ id: "q_b", createdAt: 2 }));
+  queue.queued(row({ id: "q_c", createdAt: 3 }));
+  await settle();
+  idle = true;
+  await queue.releaseFinished();
+  assert.deepEqual(steered, ["q_a"], "B failed, so C waits behind it");
+  const b = queue.entries.get("q_b");
+  assert.equal(b?.state === "decided" ? b.verdict.action : null, "followup");
+  await queue.releaseFinished();
+  assert.deepEqual(steered, ["q_a", "q_b", "q_c"]);
+  assert.equal(warnings.length, 1);
+});
+
+test("a release error never puts back a row that was sent or cancelled meanwhile, and warns once", async () => {
+  const warnings: string[] = [];
+  let queueRef: SmartQueue | null = null;
+  const { queue } = harness(followup, {
+    mainRunIdle: async () => idleNow,
+    steer: async (r) => {
+      queueRef!.gone({ id: r.id });
+      throw new Error("bridge busy");
+    },
+    warn: (message) => warnings.push(message),
+  });
+  let idleNow = false;
+  queueRef = queue;
+  queue.queued(row());
+  await settle();
+  idleNow = true;
+  await queue.releaseFinished();
+  assert.equal(queue.entries.has("q_1"), false);
+  await queue.releaseFinished();
+  assert.equal(warnings.filter((w) => w.includes("could not release")).length, 1);
+});
+
+test("a re-send that never comes back held does not make a later steer a follow-up", async () => {
+  let at = 0;
+  const { queue, calls } = harness(new Promise<Verdict>(() => {}), {
+    decideBudgetMs: 20,
+    now: () => at,
+    route: async () => {},
+  });
+  queue.queued(row({ id: "q_core", waitingOn: { kind: "thread-busy" } }));
+  await settle();
+  at += 10_000; // The copy was never held.
+  queue.queued(row({ id: "q_steer" }));
+  await sleepMs(40);
+  await settle();
+  assert.deepEqual(calls.steered, ["q_steer"]);
+});
+
+test("the decision budget starts when the hook held the message", async () => {
+  let at = 1_000;
+  const { queue, calls } = harness(new Promise<Verdict>(() => {}), { decideBudgetMs: 1_500, now: () => at });
+  await queue.dispatch(context({ input: { blocks: [], text: "Actually use SQLite" } } as never));
+  at += 1_490; // message.queued arrived late.
+  queue.queued(row());
+  await sleepMs(40);
+  await settle();
+  assert.deepEqual(calls.steered, ["q_1"], "only ~10 ms of budget was left");
+});

@@ -282,14 +282,7 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     );
   }
 
-  /** The newest turn event says the agent's main run is idle: the turn is open only for background work. */
-  async function mainRunIdle(threadId: string): Promise<boolean> {
-    const [latest] = (await bb.sdk.threads.events.list({ threadId, order: "desc", limit: "1", types: ["turn/started", "turn/completed", "turn/mainRun/updated"] } as never)) as {
-      type?: string;
-      data?: { state?: string };
-    }[];
-    return latest?.type === "turn/mainRun/updated" && latest.data?.state === "idle";
-  }
+  const mainRunIdle = (threadId: string) => readMainRunIdle(bb.sdk, threadId);
 
   const queue = new SmartQueue({
     pluginId: bb.pluginId,
@@ -567,4 +560,26 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
   };
   bb.rpc.register({ "decisions.cli": rpcContract["decisions.cli"] }, { "decisions.cli": ({ argv }) => cli(argv) });
   return { cli, ask: { systemOne: askJevFor, model: askModelFor } };
+}
+
+/** Whether a thread's turn is open only for background work; false when its events can't be read. */
+export async function readMainRunIdle(sdk: Pick<BbPluginApi["sdk"], "threads">, threadId: string): Promise<boolean> {
+  try {
+    const rows = await sdk.threads.events.list({ threadId, order: "desc", limit: "20", types: ["turn/started", "turn/completed", "turn/mainRun/updated"] } as never);
+    return mainRunIdleFrom(rows as TurnEventRow[]);
+  } catch {
+    return false;
+  }
+}
+
+type TurnEventRow = { type?: string; data?: { state?: string; parentToolCallId?: unknown } | null; scope?: { parentToolCallId?: unknown } | null };
+
+/**
+ * Whether the newest root turn event (newest first in `rows`) says the agent's
+ * main run is idle: the turn is open only for background work. Child turns
+ * (those with a parentToolCallId) are skipped, as core reads the root turn only.
+ */
+export function mainRunIdleFrom(rows: readonly TurnEventRow[]): boolean {
+  const latest = rows.find((row) => row.data?.parentToolCallId == null && row.scope?.parentToolCallId == null);
+  return latest?.type === "turn/mainRun/updated" && latest.data?.state === "idle";
 }

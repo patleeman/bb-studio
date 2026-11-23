@@ -79,6 +79,10 @@ export const maxDecideMs = 90_000;
  * slow or failing classifier never keeps the owner's message off the thread.
  */
 export const decideBudgetMs = 1_500;
+/** A core row re-sent for Smart Queue to hold comes back within this, or it was never held. */
+export const reroutedTtlMs = 5_000;
+/** A release that keeps failing warns at most this often per row. */
+export const releaseWarnEveryMs = 60_000;
 export const decidingReason = "Smart Queue is deciding whether to steer or follow up.";
 export const batchingReason = "Smart Queue is grouping related follow-ups into one turn.";
 /** How many follow-ups one batching decision weighs. */
@@ -144,8 +148,18 @@ export class SmartQueue {
   readonly entries = new Map<string, Entry>();
   /** Core-queued rows being sent back through the dispatch hook. */
   readonly routed = new Set<string>();
-  /** Re-sent core rows not held yet (thread and text): the owner queued them, so their fallback is follow-up. */
-  private readonly rerouted = new Map<string, number>();
+  /**
+   * Re-sent core rows not held yet (thread and text → when each was re-sent):
+   * the owner queued them, so their fallback is follow-up. A re-send that is
+   * never held (the thread went free first) ages out after {@link reroutedTtlMs}.
+   */
+  private readonly rerouted = new Map<string, number[]>();
+  /** When the hook held a new message (thread and text), so its decision budget starts there, not at `message.queued`. */
+  private readonly heldAt = new Map<string, number>();
+  /** Per thread, held follow-ups being released, one release at a time. */
+  private readonly releasing = new Map<string, Promise<void>>();
+  /** When a failing release last warned, per row. */
+  private readonly releaseWarnedAt = new Map<string, number>();
   /** Routes one row at a time, so the held rows keep the order the owner queued them in. */
   private routing = Promise.resolve();
   /** Threads whose follow-ups are being grouped, so the drain waits for the plan. */
@@ -182,7 +196,10 @@ export class SmartQueue {
         context.senderThreadId === null &&
         context.experimental_submission === null;
       if (!human || (context.attempt !== "join-turn" && !busy)) return proceed;
-      return { action: "wait", reason: decidingReason, sendAt: this.now() + holdMs };
+      const now = this.now();
+      for (const [key, at] of this.heldAt) if (now - at >= reroutedTtlMs) this.heldAt.delete(key);
+      this.heldAt.set(`${context.thread.id}\0${context.input?.text ?? ""}`, now);
+      return { action: "wait", reason: decidingReason, sendAt: now + holdMs };
     }
     const threadId = context.thread.id;
     if (!busy) {
@@ -265,12 +282,10 @@ export class SmartQueue {
     const applied = new Promise<void>((resolve) => (finish = resolve));
     const text = rowText(row);
     const key = `${row.threadId}\0${text}`;
-    const queuedByOwner = (this.rerouted.get(key) ?? 0) > 0;
-    if (queuedByOwner) {
-      const left = this.rerouted.get(key)! - 1;
-      if (left > 0) this.rerouted.set(key, left);
-      else this.rerouted.delete(key);
-    }
+    const queuedByOwner = this.takeRerouted(key);
+    const heldAt = this.heldAt.get(key);
+    this.heldAt.delete(key);
+    const startedAt = heldAt !== undefined && this.now() - heldAt < reroutedTtlMs ? heldAt : this.now();
     this.entries.set(row.id, {
       state: "pending",
       threadId: row.threadId,
@@ -280,7 +295,7 @@ export class SmartQueue {
       applied,
       finish,
       fallback: queuedByOwner ? "followup" : "steer",
-      startedAt: this.now(),
+      startedAt,
       controller,
     });
     void this.decide(row, controller).finally(finish);
@@ -312,12 +327,13 @@ export class SmartQueue {
       const thread = await this.deps.thread(row.threadId);
       if (!isBusy(thread.status) || !this.eligibleThread(thread) || !(await this.deps.enabled())) return ignore();
       const key = `${row.threadId}\0${rowText(row)}`;
-      this.rerouted.set(key, (this.rerouted.get(key) ?? 0) + 1);
+      const at = this.now();
+      this.rerouted.set(key, [...this.freshRerouted(key), at]);
       try {
         await this.deps.route(row);
       } catch (error) {
-        const left = (this.rerouted.get(key) ?? 1) - 1;
-        if (left > 0) this.rerouted.set(key, left);
+        const left = this.freshRerouted(key).filter((each) => each !== at);
+        if (left.length) this.rerouted.set(key, left);
         else this.rerouted.delete(key);
         throw error;
       }
@@ -327,6 +343,23 @@ export class SmartQueue {
       if (error instanceof RouteFailed && error.restoredId) ignore(error.restoredId);
       ignore();
     }
+  }
+
+  /** The re-sends of `key` still young enough to be held, dropping the stale ones. */
+  private freshRerouted(key: string) {
+    const fresh = (this.rerouted.get(key) ?? []).filter((at) => this.now() - at < reroutedTtlMs);
+    if (fresh.length) this.rerouted.set(key, fresh);
+    else this.rerouted.delete(key);
+    return fresh;
+  }
+
+  /** Whether a held row is the re-sent copy of a row the owner queued; consumes one re-send. */
+  private takeRerouted(key: string) {
+    const [, ...rest] = this.freshRerouted(key);
+    if (!this.rerouted.has(key)) return false;
+    if (rest.length) this.rerouted.set(key, rest);
+    else this.rerouted.delete(key);
+    return true;
   }
 
   private followups(threadId: string) {
@@ -450,6 +483,11 @@ export class SmartQueue {
     const decision = this.entries.get(row.id);
     if (verdict.action === "steer") {
       try {
+        if (verdict === finishedVerdict) {
+          // The run ended: follow-ups the owner sent before this message go first.
+          await this.earlierApplied(row);
+          await this.releaseThread(row.threadId, row);
+        }
         await this.earlierApplied(row);
         // An edit replaces the entry and starts another classification. The
         // old result must not steer that new message while it is undecided.
@@ -491,26 +529,58 @@ export class SmartQueue {
    */
   async releaseFinished() {
     if (!this.deps.mainRunIdle) return;
-    const held = new Map<string, [string, Entry][]>();
-    for (const [id, entry] of this.entries)
-      if (entry.state === "decided" && entry.verdict.action === "followup") held.set(entry.threadId, [...(held.get(entry.threadId) ?? []), [id, entry]]);
-    for (const [threadId, rows] of held) {
+    const threads = new Set<string>();
+    for (const entry of this.entries.values()) if (entry.state === "decided" && entry.verdict.action === "followup") threads.add(entry.threadId);
+    for (const threadId of threads) {
       if (!(await this.deps.mainRunIdle(threadId).catch(() => false))) continue;
-      rows.sort(([a, x], [b, y]) => x.createdAt - y.createdAt || (a < b ? -1 : 1));
-      for (const [id, entry] of rows) {
-        if (this.entries.get(id) !== entry) continue;
-        this.entries.set(id, { ...entry, state: "decided", verdict: finishedVerdict });
-        try {
-          await this.deps.steer({ id, threadId });
-        } catch (error) {
-          if (/not found|HTTP 404|already being sent/i.test(String(error))) {
-            this.entries.delete(id);
-            continue;
-          }
-          this.entries.set(id, entry);
-          this.deps.warn(`Smart Queue could not release ${id}: ${String(error)}`);
-          break;
+      await this.releaseThread(threadId);
+    }
+  }
+
+  /**
+   * Sends a thread's held follow-ups, oldest first (only those sent before
+   * `before`, when given). One release per thread at a time, so the watcher
+   * and a decision never interleave their steers.
+   */
+  releaseThread(threadId: string, before?: Pick<QueuedRow, "id" | "createdAt">): Promise<void> {
+    const run = (this.releasing.get(threadId) ?? Promise.resolve()).then(() => this.releaseNow(threadId, before));
+    const tail = run.catch(() => {});
+    this.releasing.set(threadId, tail);
+    void tail.then(() => {
+      if (this.releasing.get(threadId) === tail) this.releasing.delete(threadId);
+    });
+    return run;
+  }
+
+  private async releaseNow(threadId: string, before?: Pick<QueuedRow, "id" | "createdAt">) {
+    const rows = [...this.entries.entries()].filter(
+      ([id, entry]) =>
+        entry.threadId === threadId &&
+        entry.state === "decided" &&
+        entry.verdict.action === "followup" &&
+        (!before || entry.createdAt < before.createdAt || (entry.createdAt === before.createdAt && id < before.id)),
+    );
+    rows.sort(([a, x], [b, y]) => x.createdAt - y.createdAt || (a < b ? -1 : 1));
+    for (const [id, entry] of rows) {
+      if (this.entries.get(id) !== entry) continue;
+      const released: Entry = { ...entry, state: "decided", verdict: finishedVerdict };
+      this.entries.set(id, released);
+      try {
+        await this.deps.steer({ id, threadId });
+        this.releaseWarnedAt.delete(id);
+      } catch (error) {
+        if (/not found|HTTP 404|already being sent/i.test(String(error))) {
+          if (this.entries.get(id) === released) this.entries.delete(id);
+          continue;
         }
+        // Still held unless the row was sent, cancelled or edited meanwhile.
+        if (this.entries.get(id) === released) this.entries.set(id, entry);
+        const warned = this.releaseWarnedAt.get(id);
+        if (warned === undefined || this.now() - warned >= releaseWarnEveryMs) {
+          this.releaseWarnedAt.set(id, this.now());
+          this.deps.warn(`Smart Queue could not release ${id}: ${String(error)}`);
+        }
+        break;
       }
     }
   }
@@ -523,6 +593,7 @@ export class SmartQueue {
 
   private drop(id: string) {
     this.routed.delete(id);
+    this.releaseWarnedAt.delete(id);
     const entry = this.entries.get(id);
     if (entry?.state === "pending") entry.controller.abort();
     entry?.finish();

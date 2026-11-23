@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import assert from "node:assert/strict";
-import { registerDecisions } from "../server";
+import { mainRunIdleFrom, readMainRunIdle, registerDecisions } from "../server";
 const plugin = (bb: any) => registerDecisions(bb, { get: async () => Object.fromEntries(Object.entries(await bb.settings.define().get()).map(([key, value]) => [`decisions_${key}`, value])) });
 import { rpcContract } from "../contract";
 
@@ -324,4 +324,39 @@ test("FM: a signed-out provider in thread mode is unavailable, not a failure log
     assert.match(result.error, /signed out or unavailable.*Sign in to it, or choose a fallback model/);
   }
   assert.deepEqual(warnings, []);
+});
+
+test("the main run reads idle only from the newest root turn event", () => {
+  const idle = { type: "turn/mainRun/updated", data: { state: "idle" } };
+  const running = { type: "turn/mainRun/updated", data: { state: "running" } };
+  assert.equal(mainRunIdleFrom([idle, { type: "turn/started" }]), true);
+  assert.equal(mainRunIdleFrom([running, idle]), false);
+  assert.equal(mainRunIdleFrom([{ type: "turn/started" }, idle]), false, "a new turn after idle");
+  assert.equal(mainRunIdleFrom([{ type: "turn/started", data: { parentToolCallId: "call_1" } }, idle]), true, "a child turn is skipped");
+  assert.equal(mainRunIdleFrom([]), false);
+});
+
+test("the main run check is false when the events can't be read", async () => {
+  const list = vi.fn(async () => { throw new Error("offline"); });
+  assert.equal(await readMainRunIdle({ threads: { events: { list } } } as never, "thr_1"), false);
+  const idle = vi.fn(async () => [{ type: "turn/mainRun/updated", data: { state: "idle" } }]);
+  assert.equal(await readMainRunIdle({ threads: { events: { list: idle } } } as never, "thr_1"), true);
+});
+
+test("the dispatch hook reads Studio's cached settings, and follows a change without get()", async () => {
+  const { bb, hooks } = setup();
+  let current: Record<string, unknown> = { decisions_enabled: true };
+  const get = vi.fn(async () => current);
+  await registerDecisions(bb as never, { get, current: () => current });
+  const hook = hooks["message.dispatch"]!;
+  const busySend = {
+    attempt: "join-turn", initiator: "user", senderThreadId: null, experimental_submission: null, queuedMessages: [],
+    input: { blocks: [], text: "also this" },
+    thread: { id: "thr_1", status: "active", visibility: "visible", originPluginId: null },
+  };
+  get.mockClear();
+  assert.equal((await hook(busySend)).action, "wait");
+  current = { decisions_enabled: false };
+  assert.deepEqual(await hook(busySend), { action: "proceed" });
+  expect(get).not.toHaveBeenCalled();
 });

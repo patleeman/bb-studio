@@ -146,6 +146,16 @@ describe("sending a message", () => {
     expect(timelineFilterOf("thr_main")).toBeNull();
     expect(zoomOf("thr_main")).toBe(0);
   });
+
+  it("from another conversation's composer leaves this one's filter alone", async () => {
+    const { selectionOf } = await import("./selection");
+    state.composerThread = "thr_other";
+    render(<StrandsBoxBanner />);
+    act(() => { select("thr_main", { strandId: "s1", seq: 3, turnIds: ["turn_1"] }); });
+    act(() => { for (const listener of submitted) listener(); });
+    expect(selectionOf("thr_main")).not.toBeNull();
+    expect(timelineFilterOf("thr_main")).not.toBeNull();
+  });
 });
 
 describe("the strands box above a conversation's composer", () => {
