@@ -77,4 +77,15 @@ final class EnergyTests: XCTestCase {
         XCTAssertNil(id)
         XCTAssertTrue(changes.isEmpty, "not streaming: the list reloads soon")
     }
+
+    // MARK: The socket's thread list
+
+    func testTheSocketAsksForTheListWithoutOtherThreadsEvents() throws {
+        let client = BBClient(baseURL: URL(string: "https://studio.invalid")!)
+        let url = client.webSocketURL
+        XCTAssertEqual(url.scheme, "wss")
+        XCTAssertEqual(url.path, "/ws")
+        let items = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        XCTAssertEqual(items, [URLQueryItem(name: "listEvents", value: "status")])
+    }
 }

@@ -208,6 +208,10 @@ public final class BBClient: @unchecked Sendable {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
         components.scheme = components.scheme == "https" ? "wss" : "ws"
         components.path = "/ws"
+        // The thread list's "events appended" (several a second per running
+        // agent) only for threads this phone subscribes to; BB Studio's
+        // server honours it (`list-quiet.fork.ts`), others ignore it.
+        components.queryItems = [URLQueryItem(name: "listEvents", value: "status")]
         return components.url!
     }
 }

@@ -319,6 +319,12 @@ run `node scripts/build-look.mjs` after a desktop theme or presence change
   30 s (5 min at rest), and the socket drops its thread-list subscription
   (every thread's "events appended" on a busy Mac) until the next touch, which
   subscribes again and catches up. An open thread keeps its own subscription.
+  The socket opens as `/ws?listEvents=status`: a BB Studio server then leaves
+  other threads' "events appended" off the list (seam `list-quiet`); others
+  ignore it. "Connected" is announced once the socket is open (its first
+  pong), not when an attempt starts, so retries while the Mac can't be reached
+  don't make every screen reload; the Bots' spaces and views load when the app
+  starts or switches server and each time it comes to the front, socket or not.
   Studio's list reloads on Studio's signals only while a Studio list shows;
   off screen it reloads when it shows again, and Bot turns never reload it.
   `HeatScreensUITests` measures five screens offline with the probe on

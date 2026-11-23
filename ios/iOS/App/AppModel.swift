@@ -205,6 +205,7 @@ final class AppModel: ObservableObject {
         case .active:
             realtime.start()
             BotSpacesStore.shared.askIfUnknown()
+            BotSpacesStore.shared.becameActive()
         default:
             break
         }

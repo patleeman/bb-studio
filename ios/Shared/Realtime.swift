@@ -98,7 +98,17 @@ public final class BBRealtime {
         pingTimer = Timer.scheduledTimer(withTimeInterval: 25, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.write(["type": "ping"]) }
         }
-        emit(.connected)
+        // "Connected" once the socket is open (its first pong), not when the
+        // attempt starts: every listener refetches on it, and while the Mac
+        // can't be reached (asleep, no network) each retry, every 15-30 s,
+        // had every screen reload everything. Screens load on their own when
+        // they appear; this only catches up what a dropped socket missed.
+        task.sendPing { [weak self] error in
+            Task { @MainActor in
+                guard let self, self.task === task, error == nil else { return }
+                self.emit(.connected)
+            }
+        }
     }
 
     private func receive(on task: URLSessionWebSocketTask) {

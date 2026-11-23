@@ -11,7 +11,17 @@ final class LookUITests: ServerIsolatedUITestCase {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "needs", "-qaNoDemoApprovals", "-qaLookTheme", theme, "-qaSplitShell"]
         if live { app.launchArguments.append("-qaLiveScene") }
         app.launchOffline()
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main opens")
+        // The split shell starts on the Bot's list and opens Main once it knows
+        // Main; when it stays on the list, open Main from it. (Main's build
+        // landed through the socket's retries reloading everything offline.)
+        let message = app.textViews["Message"]
+        let main = app.buttons["conversation-thr_botdemo01"]
+        let until = Date().addingTimeInterval(60)
+        while !message.exists, Date() < until {
+            if main.exists, main.isHittable { main.tap() }
+            _ = message.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(message.exists, "Main opens")
     }
 
     private func toList() {
