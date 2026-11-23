@@ -465,7 +465,14 @@ export interface ExperimentalThreadHeaderArgs {
  */
 export interface ExperimentalThreadHeaderDecoration {
   title?: string;
+  /** Drawn right after the title. */
   after?: ReactNode;
+  /**
+   * Drawn at the header's right end, first among bb's own header actions.
+   * Both `after` and `end` sit outside the desktop window's drag strip, so
+   * their controls take clicks.
+   */
+  end?: ReactNode;
 }
 
 /**

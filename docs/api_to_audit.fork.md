@@ -718,19 +718,23 @@ chat on Main.
 ## A thread header's title and a node after it (`slots.experimental_threadHeader`)
 
 A plugin's `useDecoration({ threadId })` hook runs in every thread header
-(main view and split panes). It returns null or `{ title?, after? }`:
+(main view and split panes). It returns null or `{ title?, after?, end? }`:
 `title` replaces the title text bb shows, `after` is drawn right after the
-title in the same row. The first plugin by id, then registration id, that
+title in the same row, and `end` is drawn at the header's right end, first
+among bb's own header actions. Both `after` and `end` sit in spans carved out
+of the desktop window's drag strip (`MACOS_WINDOW_NO_DRAG_CLASS`), so their
+controls take clicks instead of dragging the window. The first plugin by id, then registration id, that
 returns a decoration wins. Renaming (double click, the ··· menu, the
 shortcut) edits and saves the thread's real title; the decoration only
 changes what is shown. Each hook runs in its own error boundary; one that
 throws is dropped and bb's title stays. Studio is the caller: "Main · with
-<Bot>" for a Bot's chat thread, and a worker's status pill and repo tag in
-the row.
+<Bot>" for a Bot's chat thread, a worker's status pill and repo tag in
+the row, and the semantic-zoom controls at the end.
 
 **Core callers.** `components/fork/ForkThreadHeader.tsx`
 (`useForkThreadHeader`), called from `ThreadDetailHeader.tsx`, which draws
-the returned title and `after` node.
+the returned title, the `after` node after it and the `end` node first in
+its workflow actions.
 
 **Audit before stabilizing.**
 
