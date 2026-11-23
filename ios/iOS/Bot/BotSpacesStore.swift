@@ -48,10 +48,6 @@ final class BotSpacesStore: ObservableObject {
         if let listener { self.realtime?.removeListener(listener) }
         self.realtime = realtime
         listener = realtime.listen { [weak self] event in self?.handle(event) }
-        // Load now, socket or not: "connected" comes only once the socket is
-        // open, and a Mac whose socket can't be reached would otherwise leave
-        // a new store (a launch, a server switch) on its cache.
-        if configured { schedule(spaces: true, views: watched) }
     }
 
     func restore() {
@@ -123,14 +119,6 @@ final class BotSpacesStore: ObservableObject {
         BotSpacesSupport.rememberErrorAnswer(false, serverURL: serverURL)
         if support == .unavailable { support = .unknown }
         schedule(spaces: true)
-    }
-
-    /// The app came to the front: catch up on the Bots now, whether or not the
-    /// socket opens. (It says "connected" only once it is open, so a Mac whose
-    /// socket can't be reached would otherwise leave the cached Bots showing.)
-    func becameActive() {
-        guard configured else { return }
-        schedule(spaces: true, views: watched)
     }
 
     func refresh() async {

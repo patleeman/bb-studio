@@ -20,6 +20,8 @@ public final class BBRealtime {
     private var backoff = ReconnectBackoff()
     /// When the current socket was opened, to tell a stable connection from one that drops at once.
     private var connectedAt: Date?
+    /// The socket failed or dropped since `start`: its next open says "connected".
+    private var dropped = false
     private var pingTimer: Timer?
     private var running = false
 
@@ -31,7 +33,11 @@ public final class BBRealtime {
         guard !running else { return }
         running = true
         backoff = ReconnectBackoff()
+        dropped = false
         connect()
+        // Launch and every return to the front (the socket closes in the
+        // background): everyone catches up once, socket or not.
+        emit(.connected)
     }
 
     public func stop() {
@@ -98,14 +104,15 @@ public final class BBRealtime {
         pingTimer = Timer.scheduledTimer(withTimeInterval: 25, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.write(["type": "ping"]) }
         }
-        // "Connected" once the socket is open (its first pong), not when the
-        // attempt starts: every listener refetches on it, and while the Mac
-        // can't be reached (asleep, no network) each retry, every 15-30 s,
-        // had every screen reload everything. Screens load on their own when
-        // they appear; this only catches up what a dropped socket missed.
+        // A retry says "connected" once the socket is open again (its first
+        // pong), for what the gap missed; not when an attempt starts. Every
+        // listener refetches on it, and while the Mac couldn't be reached
+        // (asleep, no network) each retry, every 15-30 s, had every screen
+        // reload everything. `start` already caught everyone up.
         task.sendPing { [weak self] error in
             Task { @MainActor in
-                guard let self, self.task === task, error == nil else { return }
+                guard let self, self.task === task, error == nil, self.dropped else { return }
+                self.dropped = false
                 self.emit(.connected)
             }
         }
@@ -128,6 +135,7 @@ public final class BBRealtime {
 
     private func scheduleReconnect() {
         task = nil
+        dropped = true
         pingTimer?.invalidate()
         guard running else { return }
         // A socket that connects and drops at once keeps backing off; only one

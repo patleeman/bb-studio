@@ -296,7 +296,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         appearedAt = ProcessInfo.processInfo.systemUptime
-        if accessibilityTurnedOnBeforeAppearing || (AccessibilityTurnOn.last ?? -.infinity) >= createdAt {
+        // Accessibility on at any point before this (even before this
+        // transcript existed, as on a relaunch under XCUITest): its hosts'
+        // subtrees can stay empty although drawn, so ask them once.
+        if accessibilityTurnedOnBeforeAppearing || AccessibilityTurnOn.last != nil {
             accessibilityTurnedOnBeforeAppearing = false
             wakeHostedAccessibility()
         }
@@ -313,8 +316,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     }
 
     private func accessibilityTurnedOn(at uptime: TimeInterval) {
-        if let appearedAt {
-            if uptime < appearedAt { wakeHostedAccessibility() }
+        if appearedAt != nil {
+            // On while it shows, or just before: either way accessibility is
+            // on now, so waking can't cause the scroll jump waking early did.
+            wakeHostedAccessibility()
         } else {
             accessibilityTurnedOnBeforeAppearing = true
         }

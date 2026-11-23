@@ -136,6 +136,9 @@ final class AppModel: ObservableObject {
     private init() {
         let client = BBClient()
         self.client = client
+        // From launch, so an accessibility install before the first
+        // transcript still counts (it wakes the transcript's hosted chrome).
+        _ = AccessibilityTurnOn.watch()
         realtime = BBRealtime(client: client)
         // Started when the scene becomes active, so a background launch (a watch
         // relay, a Live Activity token) doesn't open a socket.
@@ -205,7 +208,6 @@ final class AppModel: ObservableObject {
         case .active:
             realtime.start()
             BotSpacesStore.shared.askIfUnknown()
-            BotSpacesStore.shared.becameActive()
         default:
             break
         }
