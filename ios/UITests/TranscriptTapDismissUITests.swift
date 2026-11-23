@@ -72,16 +72,16 @@ final class TranscriptTapDismissUITests: ServerIsolatedUITestCase {
         composerField.tap()
         expectKeyboard(true, "keyboard up while reading")
         let before = record("keyboard up while reading")
+        let watched = anchor()
         shot("4-reading-keyboard-up")
         // Over the rows' text, clear of the jump button in the trailing corner.
         transcriptPoint(dx: composer.frame.minX + composer.frame.width * 0.4, dy: (composer.frame.minY + headerBottom) / 2).tap()
         expectKeyboard(false, "tap while reading")
         let after = watch("tap while reading closed it", atEnd: false)
         if let before, let after {
-            let moved = after.contentOffsetY - before.contentOffsetY
-            steps.append(String(format: "reading position moved %.1f pt", moved))
-            if abs(moved) > 2 { failures.append(String(format: "tap while reading: the rows moved %.1f pt", moved)) }
+            steps.append(String(format: "reading offset moved %.1f pt", after.contentOffsetY - before.contentOffsetY))
         }
+        anchorMoved(watched, "tap while reading")
         expectDraft("tap while reading")
         shot("5-reading-tapped")
         finish()
@@ -294,5 +294,32 @@ final class TranscriptTapDismissUITests: ServerIsolatedUITestCase {
         let adjustedTop: CGFloat
         /// How far the unobscured bottom of the viewport is below the content's end.
         var past: CGFloat { contentOffsetY + height - adjustedBottom - contentHeight }
+    }
+
+    /// A message's text in the upper half of the screen and where it sits:
+    /// what the reader sees. The content offset alone can't say: a row above
+    /// that changes height (one measures in, or the keyboard changes a safe
+    /// area) moves the offset and the content together, and nothing on
+    /// screen moves (HeaderTapUITests, B16).
+    private func anchor() -> (label: String, y: CGFloat)? {
+        let screen = app.frame
+        for text in app.staticTexts.allElementsBoundByIndex.prefix(80) where text.exists {
+            let frame = text.frame
+            let label = text.label
+            guard label.count > 12, frame.minY > screen.minY + 140, frame.maxY < screen.midY,
+                  app.staticTexts.matching(NSPredicate(format: "label == %@", label)).count == 1 else { continue }
+            return (label, frame.minY)
+        }
+        return nil
+    }
+
+    /// Fails `step` when the anchor's text moved on screen (or left it).
+    private func anchorMoved(_ anchor: (label: String, y: CGFloat)?, _ step: String) {
+        guard let anchor else { return failures.append("\(step): no message in view to watch") }
+        let text = app.staticTexts.matching(NSPredicate(format: "label == %@", anchor.label)).firstMatch
+        guard text.exists else { return failures.append("\(step): \"\(anchor.label.prefix(30))\" left the screen") }
+        let delta = text.frame.minY - anchor.y
+        steps.append(String(format: "%@: the text on screen moved %.1f", step, delta))
+        if abs(delta) > 2 { failures.append(String(format: "%@: the rows moved %.1f pt on screen", step, delta)) }
     }
 }
