@@ -162,7 +162,7 @@ export function FallbackModel({ bare = false }: { bare?: boolean }) {
     <div className={bare ? "divide-y divide-border px-4" : "divide-y divide-border rounded-lg border border-border bg-card px-4"}>
       <Row
         label="If the decision model doesn’t answer, use"
-        description="Off sends every undecided Smart Queue message as a follow-up."
+        description="Smart Queue doesn’t use it."
       >
         <Select disabled={busy} value={value.mode} onValueChange={(mode) => void chooseMode(mode as Fallback["mode"])}>
           <SelectTrigger className="w-56" aria-label="Fallback model source">

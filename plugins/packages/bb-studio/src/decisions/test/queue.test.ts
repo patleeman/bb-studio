@@ -547,3 +547,66 @@ test("Studio-owned visible work remains eligible after queue ownership moves to 
   assert.equal(queue.eligibleThread(thread({ originPluginId: "studio", visibility: "hidden" })), false);
   queue.dispose();
 });
+
+const sleepMs = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("a message the composer steered steers when Jev misses the decision budget", async () => {
+  const { queue, calls } = harness(new Promise<Verdict>(() => {}), { decideBudgetMs: 20 });
+  queue.queued(row());
+  await sleepMs(40);
+  await settle();
+  assert.deepEqual(calls.steered, ["q_1"]);
+  const [record] = calls.records as { verdict: Verdict; ms: number }[];
+  assert.equal(record.verdict.source, "default");
+  assert.equal(record.verdict.action, "steer");
+});
+
+test("a message the owner queued stays a follow-up when Jev misses the budget", async () => {
+  let routed: QueuedRow | null = null;
+  const { queue, calls } = harness(new Promise<Verdict>(() => {}), {
+    decideBudgetMs: 20,
+    route: async (r) => {
+      routed = r;
+    },
+  });
+  queue.queued(row({ id: "q_core", waitingOn: { kind: "thread-busy" } }));
+  await settle();
+  assert.ok(routed);
+  // The re-sent copy comes back held by Smart Queue under a new id.
+  queue.queued(row({ id: "q_held" }));
+  await sleepMs(40);
+  await settle();
+  assert.deepEqual(calls.steered, []);
+  const [record] = calls.records as { verdict: Verdict }[];
+  assert.equal(record.verdict.action, "followup");
+});
+
+test("no classifier answering sends the message the way BB would", async () => {
+  const { queue, calls } = harness({ action: "followup", source: "default", confidence: null, note: "Jev: down" });
+  queue.queued(row());
+  await settle();
+  assert.deepEqual(calls.steered, ["q_1"]);
+});
+
+test("a turn kept open only by background work is not busy: the message steers without asking Jev", async () => {
+  const { queue, calls } = harness(followup, { mainRunIdle: async () => true });
+  queue.queued(row());
+  await settle();
+  assert.equal(calls.classified, 0);
+  assert.deepEqual(calls.steered, ["q_1"]);
+});
+
+test("held follow-ups are sent once the agent's run ends, oldest first", async () => {
+  let idle = false;
+  const { queue, calls } = harness(followup, { mainRunIdle: async () => idle });
+  queue.queued(row({ id: "q_b", createdAt: 2 }));
+  queue.queued(row({ id: "q_a", createdAt: 1 }));
+  await settle();
+  await queue.releaseFinished();
+  assert.deepEqual(calls.steered, [], "still running: they wait");
+  idle = true;
+  await queue.releaseFinished();
+  assert.deepEqual(calls.steered, ["q_a", "q_b"]);
+  await queue.releaseFinished();
+  assert.deepEqual(calls.steered, ["q_a", "q_b"], "sent once");
+});

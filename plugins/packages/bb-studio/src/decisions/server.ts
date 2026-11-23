@@ -45,7 +45,7 @@ const standaloneCheckMs = 30_000;
 const jevFailureWindowMs = 30 * 60_000;
 
 /** `before` runs first on every dispatch; a result from it wins (BB allows one hook per plugin). */
-export async function registerDecisions(bb: BbPluginApi, settings: { get(): Promise<Record<string, unknown>> }, before?: (context: { thread: { id: string } }) => Promise<{ action: "reject"; message: string } | null>) {
+export async function registerDecisions(bb: BbPluginApi, settings: { get(): Promise<Record<string, unknown>>; current?(): Record<string, unknown> }, before?: (context: { thread: { id: string } }) => Promise<{ action: "reject"; message: string } | null>) {
   const config = async (): Promise<ClassifierSettings & { enabled: boolean }> => ({ ...decisionsDefaults, ...Object.fromEntries(Object.entries(await settings.get()).filter(([key]) => key.startsWith("decisions_")).map(([key, value]) => [key.slice(10), value])) }) as ClassifierSettings & { enabled: boolean };
   const sessions = new Set<string>();
   const lifetime = new AbortController();
@@ -107,7 +107,7 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
         id: "jev-route",
         status: "broken",
         title: "No Jev provider is set up",
-        detail: "The fallback model is off too, so Smart Queue queues every message as a follow-up and other plugins' decisions fail. Add a TypeSafe, Vercel AI Gateway, OpenRouter or OpenCode Zen key.",
+        detail: "The fallback model is off too, so other plugins' decisions fail and Smart Queue sends each message the way BB does. Add a TypeSafe, Vercel AI Gateway, OpenRouter or OpenCode Zen key.",
         fix: { label: "Add a key", path: pluginSettingsPath(bb.pluginId) },
       });
     } else if (!routes.length) {
@@ -259,7 +259,14 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     return standaloneQueue.on;
   }
   await refreshStandaloneQueue();
-  const queueEnabled = async () => (await config()).enabled && !standaloneQueue.on;
+  // The dispatch hook runs under core's server-wide lock, so it reads the
+  // settings Studio already holds instead of BB's key files.
+  const enabledNow = async () => {
+    const values = settings.current?.();
+    const enabled = values ? (values.decisions_enabled ?? decisionsDefaults.enabled) !== false : (await config()).enabled;
+    return enabled && !standaloneQueue.on;
+  };
+  const queueEnabled = enabledNow;
 
   // One read-modify-write at a time, so concurrent decisions don't drop each other.
   let recording: Promise<unknown> = Promise.resolve();
@@ -271,29 +278,35 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     recording = write.catch(() => {});
     await write;
     bb.log.info(
-      `Smart Queue chose ${entry.verdict.action} for ${entry.queuedMessageId} in ${entry.threadId} (${describeVerdict(entry.verdict)}).`,
+      `Smart Queue chose ${entry.verdict.action} for ${entry.queuedMessageId} in ${entry.threadId} (${entry.verdict.source === "default" && entry.verdict.note ? entry.verdict.note.replace(/\.$/, "") : describeVerdict(entry.verdict)}${entry.ms === undefined ? "" : `, ${entry.ms} ms`}).`,
     );
+  }
+
+  /** The newest turn event says the agent's main run is idle: the turn is open only for background work. */
+  async function mainRunIdle(threadId: string): Promise<boolean> {
+    const [latest] = (await bb.sdk.threads.events.list({ threadId, order: "desc", limit: "1", types: ["turn/started", "turn/completed", "turn/mainRun/updated"] } as never)) as {
+      type?: string;
+      data?: { state?: string };
+    }[];
+    return latest?.type === "turn/mainRun/updated" && latest.data?.state === "idle";
   }
 
   const queue = new SmartQueue({
     pluginId: bb.pluginId,
     enabled: queueEnabled,
     thread: (threadId) => bb.sdk.threads.get({ threadId }),
+    mainRunIdle,
     classify: async (row, thread, signal) => {
       const settingsNow = await config();
       const state = await situation(row.threadId, rowText(row), thread);
       return classify(
         {
           jev: (s) => tracked(askJev(settingsNow, state, s), s),
-          model: async (s) =>
-            askModel(
-              bb,
-              await fallback(),
-              await modelTarget(thread, row.id),
-              state,
-              s,
-              sessions,
-            ),
+          // A fallback-model session takes seconds to start, past the decision
+          // budget (queue.ts decideBudgetMs), so a held message never waits on one.
+          model: async () => {
+            throw new UnavailableError("Smart Queue decides with Jev only.");
+          },
           warn: (message) => bb.log.warn(message),
         },
         signal,
@@ -385,7 +398,10 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
         const listedAt = Date.now();
         try {
           await refreshStandaloneQueue();
-          if (await queueEnabled()) queue.sync(await bb.sdk.threads.queue.list({ signal }), listedAt);
+          if (await queueEnabled()) {
+            queue.sync(await bb.sdk.threads.queue.list({ signal }), listedAt);
+            await queue.releaseFinished();
+          }
         } catch (error) {
           if (!signal.aborted) bb.log.warn(`Studio Decisions could not read queued messages: ${String(error)}`);
         }
