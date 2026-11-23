@@ -147,6 +147,8 @@ export const rpcContract = defineRpcContract({
       strands: z.array(z.object({ id: z.string(), title: z.string(), done: z.boolean().default(false), /** The strand it branched from, when sorting knows one. */ parentId: z.string().nullable().default(null), trunk: z.boolean().default(false) })),
       /** Tagged replies, oldest first: each turn's reply needs-you or status, its ask line, and whether the user is past it. */
       replies: z.array(replyTagView).default([]),
+      /** The conversation's first sorted message and its turn's reply. BB's timeline gives a thread's opening message no turn, so a strand filter never shows it; a jump to it under a filter lands on the reply instead. */
+      opening: z.object({ seq: z.number(), replySeq: z.number().nullable() }).nullable().default(null),
     }),
   },
   "strands.overview": {

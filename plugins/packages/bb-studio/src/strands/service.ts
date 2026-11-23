@@ -302,14 +302,16 @@ export class StrandService {
     return this.store.items(threadId, limit, ["user", "report", "worker"]).map(({ quiet: _quiet, ...item }) => ({ ...item }));
   }
 
-  tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null; kind: "user" | "report"; at: number | null; line: string | null; also: string[] }[]; strands: { id: string; title: string; done: boolean; parentId: string | null; trunk: boolean }[]; replies: ReplyTagView[] } {
-    if (!this.enabled(threadId)) return { tags: [], strands: [], replies: [] };
+  tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null; kind: "user" | "report"; at: number | null; line: string | null; also: string[] }[]; strands: { id: string; title: string; done: boolean; parentId: string | null; trunk: boolean }[]; replies: ReplyTagView[]; opening: { seq: number; replySeq: number | null } | null } {
+    if (!this.enabled(threadId)) return { tags: [], strands: [], replies: [], opening: null };
     const rows = this.store.db.prepare("SELECT turn_id, seq, strand_id, kind, at, line, also_strands FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq DESC LIMIT 2000").all(threadId) as { turn_id: string; seq: number; strand_id: string | null; kind: "user" | "report"; at: number | null; line: string | null; also_strands: string | null }[];
+    const first = this.store.db.prepare("SELECT seq, turn_id FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq LIMIT 1").get(threadId) as { seq: number; turn_id: string } | undefined;
     const alsoOf = (value: string | null): string[] => { try { const list = value ? JSON.parse(value) as unknown : []; return Array.isArray(list) ? list.filter((each): each is string => typeof each === "string") : []; } catch { return []; } };
     return {
       tags: rows.reverse().map((row) => ({ turnId: row.turn_id, seq: row.seq, strandId: row.strand_id, kind: row.kind, at: row.at, line: row.line, also: alsoOf(row.also_strands) })),
       strands: this.store.list(threadId).map((strand) => ({ id: strand.id, title: strand.title, done: strand.doneAt !== null, parentId: strand.parentId, trunk: strand.trunk })),
       replies: this.store.replies(threadId, this.now() - REPLY_OPEN_MS).flatMap((reply) => (reply.turnId && reply.tag ? [{ turnId: reply.turnId, seq: reply.seq, tag: reply.tag, ask: reply.ask, resolved: reply.resolved, line: reply.line }] : [])),
+      opening: first ? { seq: first.seq, replySeq: this.store.replyOfTurn(threadId, first.turn_id)?.seq ?? null } : null,
     };
   }
 

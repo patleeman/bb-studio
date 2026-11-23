@@ -213,6 +213,10 @@ describe("strands.list", () => {
     expect(tags).toMatchObject([{ turnId: a.turnId, seq: a.seq, strandId: strands[0]!.id, kind: "user", line: "Look at the router", also: [] }, { turnId: b.turnId, seq: b.seq, strandId: null, kind: "user", line: "thanks", also: [] }]);
     expect(typeof tags[0]!.at).toBe("number");
     expect(strands[0]).toEqual({ id: strands[0]!.id, title: strands[0]!.title, done: false, parentId: null, trunk: false });
+    // The opening message, with its turn's reply (a filter never shows the opening message; a jump lands on the reply).
+    const opening = x.svc.tags(x.thread.id).opening;
+    expect(opening?.seq).toBe(a.seq);
+    expect(opening?.replySeq).toBeGreaterThan(a.seq);
   });
 });
 

@@ -213,6 +213,25 @@ describe("the strands box above a conversation's composer", () => {
     expect(container.querySelector('[data-testid="strands-menu"]')).toBeNull();
   });
 
+  it("under a filter, a jump to the conversation's opening message (BB's filter never shows it) lands on its reply, or doesn't navigate", async () => {
+    state.tags = { ...TAGS, opening: { seq: 4, replySeq: 6 } };
+    render(<StrandsBoxBanner />);
+    click(container.querySelector("[data-strands-line]"));
+    await typeInto(box()!.querySelector<HTMLInputElement>("[data-strand-query]")!, "codex");
+    key(box()!.querySelector("[data-strand-query]")!, "Enter");
+    const previous = () => click(box()!.querySelector('[aria-label="Previous message in this strand"]'));
+    previous(); previous(); previous();
+    expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=8", { replace: true });
+    previous();
+    expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=6", { replace: true });
+    state.tags = { ...TAGS, opening: { seq: 4, replySeq: null } };
+    render(<StrandsBoxBanner />);
+    state.toAppPath.mockClear();
+    click(box()!.querySelector('[aria-label="Next message in this strand"]'));
+    previous();
+    expect(state.toAppPath.mock.calls.map((call) => call[0])).toEqual(["/threads/thr_main#msg=8"]);
+  });
+
   it("applies the picked strand as a filter: a token with ×, BB's timeline filter, stepping; × and Esc clear it", async () => {
     const slot = vi.fn();
     registerTimelineFilter({ experimental_timelineFilter: slot });

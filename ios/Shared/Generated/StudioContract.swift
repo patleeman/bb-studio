@@ -42201,15 +42201,27 @@ public enum Studio {
     }
   }
 
+  public struct StrandsTagsOutputOpening: Sendable, Hashable, Codable {
+    public var seq: Double?
+    public var replySeq: Double?
+
+    public init(seq: Double? = nil, replySeq: Double? = nil) {
+      self.seq = seq
+      self.replySeq = replySeq
+    }
+  }
+
   public struct StrandsTagsOutput: Sendable, Hashable, Codable {
     public var tags: [StrandsTagsOutputTagsItem]?
     public var strands: [StrandsTagsOutputStrandsItem]?
     public var replies: [StrandsTagsOutputRepliesItem]?
+    public var opening: StrandsTagsOutputOpening?
 
-    public init(tags: [StrandsTagsOutputTagsItem]? = nil, strands: [StrandsTagsOutputStrandsItem]? = nil, replies: [StrandsTagsOutputRepliesItem]? = nil) {
+    public init(tags: [StrandsTagsOutputTagsItem]? = nil, strands: [StrandsTagsOutputStrandsItem]? = nil, replies: [StrandsTagsOutputRepliesItem]? = nil, opening: StrandsTagsOutputOpening? = nil) {
       self.tags = tags
       self.strands = strands
       self.replies = replies
+      self.opening = opening
     }
   }
 

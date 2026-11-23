@@ -3,7 +3,7 @@
 import type { ReplyTagView, StrandAsk, StrandList, StrandView } from "../contract";
 
 type TagReply = Omit<ReplyTagView, "line"> & { line?: string | null };
-export type Tags = { tags: readonly { turnId: string; seq: number; strandId: string | null; kind?: "user" | "report"; at?: number | null; line?: string | null }[]; strands: readonly { id: string; title: string; done?: boolean; parentId?: string | null }[]; replies?: readonly TagReply[] };
+export type Tags = { tags: readonly { turnId: string; seq: number; strandId: string | null; kind?: "user" | "report"; at?: number | null; line?: string | null }[]; strands: readonly { id: string; title: string; done?: boolean; parentId?: string | null }[]; replies?: readonly TagReply[]; opening?: { seq: number; replySeq: number | null } | null };
 
 /** A run of status replies shorter than this stays open. */
 export const RUN_MIN = 3;

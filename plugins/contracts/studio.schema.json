@@ -57418,12 +57418,40 @@
               ],
               "additionalProperties": false
             }
+          },
+          "opening": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "seq": {
+                    "type": "number"
+                  },
+                  "replySeq": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "seq",
+                  "replySeq"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "tags",
           "strands",
-          "replies"
+          "replies",
+          "opening"
         ],
         "additionalProperties": false
       }

@@ -31,16 +31,26 @@ import { openFoldOf, select, selectionOf, setStrandTurns, showSent, useSelection
 export const STRANDS_TAB = "strands";
 export const STRANDS_POLL_MS = 30_000;
 
-/** Opens message `seq` of a thread in the timeline (its #msg= link, the search jump). */
+/**
+ * Opens message `seq` of a thread in the timeline (its #msg= link, the search
+ * jump). Under a strand filter, the conversation's opening message (which BB's
+ * filtered timeline never shows) opens at its turn's reply, or not at all,
+ * instead of BB saying "Message not found".
+ */
 export function useJump(threadId: string): (seq: number) => boolean {
   const navigate = useBbNavigate();
   const pathname = usePathname();
-  return useCallback((seq: number) => {
+  const opening = useLive("strands.tags", { threadId }, { pollMs: 60_000 }).data?.opening ?? null;
+  const openingSeq = opening?.seq ?? null;
+  const openingReply = opening?.replySeq ?? null;
+  return useCallback((asked: number) => {
+    const seq = selectionOf(threadId) && asked === openingSeq ? openingReply : asked;
+    if (seq === null) return false;
     const path = messageLinkPath(pathname, threadId, seq);
     // A message in a folded run of status replies: open the run first, so the jump lands on it.
     openFoldOf(threadId, seq);
     return !!path && !!toAppPathOf(navigate)?.(path, { replace: true });
-  }, [navigate, pathname, threadId]);
+  }, [navigate, pathname, threadId, openingSeq, openingReply]);
 }
 
 /**
