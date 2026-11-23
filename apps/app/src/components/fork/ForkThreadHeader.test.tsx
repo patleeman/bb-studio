@@ -155,6 +155,32 @@ describe("thread header decorations", () => {
     expect(screen.queryByText("Running")).toBeNull();
   });
 
+  it("draws the decoration's end at the header's right, and keeps both parts out of the window's drag strip", () => {
+    const clicked = vi.fn();
+    register("studio", [
+      {
+        id: "chat",
+        useDecoration: () => ({
+          after: <b>Running</b>,
+          end: <button type="button" onClick={clicked}>Strands</button>,
+        }),
+      },
+    ]);
+    render(header("thr_bot", "Real title"), { wrapper: Host });
+    const end = screen.getByText("Strands");
+    // Not in the title row: the right end, before bb's own actions.
+    expect(screen.getByTestId("center").contains(end)).toBe(false);
+    expect(end.closest("[data-thread-header-workflow-actions]")).not.toBeNull();
+    const endSpan = end.closest<HTMLElement>("[data-fork-thread-header-end]")!;
+    const afterSpan = screen.getByText("Running").closest<HTMLElement>("[data-fork-thread-header-after]")!;
+    for (const span of [endSpan, afterSpan]) {
+      expect(span.className).toContain("[-webkit-app-region:no-drag]");
+      expect(span.className).toContain("[app-region:no-drag]");
+    }
+    fireEvent.click(end);
+    expect(clicked).toHaveBeenCalledTimes(1);
+  });
+
   it("edits and saves the real title, not the decorated one", async () => {
     mocks.renameThreadAsync.mockResolvedValue(undefined);
     register("studio", [
