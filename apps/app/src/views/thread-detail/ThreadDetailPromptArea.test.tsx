@@ -1859,7 +1859,7 @@ describe("ThreadDetailPromptArea", () => {
       permissionMode: "auto",
     });
     expect(host!.getSelection?.()).toEqual(result);
-    expect(screen.getByTestId("submit-label").textContent).toBe("New thread");
+    expect(screen.getByTestId("submit-label").textContent).toBe("Send");
     expect(screen.getByTestId("command-suggestions").textContent).toBe(
       "claude-code:new-thread",
     );
@@ -1943,7 +1943,7 @@ describe("ThreadDetailPromptArea", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Same provider handoff" }),
     );
-    expect(screen.getByTestId("submit-label").textContent).toBe("New thread");
+    expect(screen.getByTestId("submit-label").textContent).toBe("Send");
     expect(screen.getByTestId("command-suggestions").textContent).toBe(
       "codex:new-thread",
     );
@@ -2020,7 +2020,7 @@ describe("ThreadDetailPromptArea", () => {
     mocks.promptDraft.text = "Keep going";
     renderPromptArea();
     fireEvent.click(screen.getByRole("button", { name: "Start handoff" }));
-    expect(screen.getByTestId("submit-label").textContent).toBe("New thread");
+    expect(screen.getByTestId("submit-label").textContent).toBe("Send");
     fireEvent.click(
       screen.getByRole("button", { name: "Same provider handoff" }),
     );
@@ -2044,12 +2044,12 @@ describe("ThreadDetailPromptArea", () => {
 
       fireEvent.click(screen.getByRole("button", { name: entryAction }));
 
-      expect(screen.getByTestId("submit-label").textContent).toBe("New thread");
+      expect(screen.getByTestId("submit-label").textContent).toBe("Send");
       expect(screen.getByTestId("submit-icon").textContent).toBe(
         "MessageSquarePlus",
       );
       expect(screen.getByTestId("submit-title").textContent).toBe(
-        "Create new thread (Enter)",
+        "Send in a new conversation (Enter)",
       );
       expect(screen.getByTestId("selected-model").textContent).toBe(
         "claude-opus-5",
@@ -2281,7 +2281,7 @@ describe("ThreadDetailPromptArea", () => {
 
       await waitFor(() =>
         expect(screen.getByTestId("submit-label").textContent).toBe(
-          "New thread",
+          "Send",
         ),
       );
       expect(mocks.promptDraft.getCurrent().text).toMatch(
@@ -2296,7 +2296,7 @@ describe("ThreadDetailPromptArea", () => {
       mocks.promptDraft.text = "Keep going";
       renderPromptArea();
       fireEvent.click(screen.getByRole("button", { name: "Start handoff" }));
-      expect(screen.getByTestId("submit-label").textContent).toBe("New thread");
+      expect(screen.getByTestId("submit-label").textContent).toBe("Send");
 
       store.edit("Continue from \n\nKeep going", []);
 
@@ -2321,7 +2321,7 @@ describe("ThreadDetailPromptArea", () => {
       await waitFor(() =>
         expect(mocks.createThreadMutateAsync).toHaveBeenCalled(),
       );
-      expect(screen.getByTestId("submit-label").textContent).toBe("New thread");
+      expect(screen.getByTestId("submit-label").textContent).toBe("Send");
       await act(async () => {
         created.resolve({ id: "thr_new", projectId: "proj_1" });
         await created.promise;
