@@ -8,8 +8,9 @@
 // the header also carries what the strands box did: the strand filter, the
 // Strands tab and "N need you". Tree (level 2) draws the strands as branches;
 // Esc Esc opens keyboard mode on it.
-import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
+import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "../../kit/ui/utils";
+import type { StrandList } from "../contract";
 import { useLive } from "../../ui/live";
 import { flashReply } from "./ask-mark";
 import { countsOf, replyAskOf, strayCountsOf } from "./model";
@@ -24,6 +25,16 @@ const PINCH_STEP = 60;
 const PINCH_PAUSE_MS = 350;
 const LEVELS = ["Messages", "Strands", "Tree"] as const;
 export const ZOOM_KEYS = "⌃⌘− ⌃⌘= · pinch · Esc Esc";
+/**
+ * BB's thread header is the window's drag strip in the desktop app: what Studio
+ * puts there must carve itself out, as BB's own header buttons do
+ * (MACOS_WINDOW_NO_DRAG_CLASS), or every click drags the window instead. The
+ * class names are the host's own; the inline style holds even where the host's
+ * CSS lacks them.
+ */
+export const NO_DRAG_CLASS = "relative z-50 [app-region:no-drag] [-webkit-app-region:no-drag]";
+export const NO_DRAG_STYLE = { appRegion: "no-drag", WebkitAppRegion: "no-drag", position: "relative", zIndex: 50 } as CSSProperties;
+
 /** Pinching over these zooms them, not the conversation. */
 const OWN_ZOOM = "img, canvas, iframe, video, [data-zoomable]";
 
@@ -345,10 +356,14 @@ const isolate = (text: string) => `⁨${text}⁩`;
 /** "9:05 AM": the time with its marker, so a day-long thread isn't ambiguous. */
 const clockOf = (at: number) => new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
-/** Whether `element` is in the focused split pane (or no split at all). */
+/**
+ * Whether `element` is in the focused split pane. A pane says data-focused
+ * "true" or "false" only while the window is split; a lone pane carries the
+ * id without it, and counts as focused.
+ */
 function paneFocused(element: Element | null): boolean {
   const pane = element?.closest<HTMLElement>("[data-split-pane-id]");
-  return !pane || pane.dataset.focused === "true";
+  return !pane || pane.dataset.focused !== "false";
 }
 
 /** What had focus when keyboard mode opened, per conversation: Esc gives it back. */
@@ -370,13 +385,14 @@ function leaveKeyboardMode(threadId: string, restore: boolean) {
  * filter (chip, clear, previous and next), the zoom switch, the Strands tab
  * and "N need you". Nothing elsewhere: there the box above the composer shows them.
  */
-export function ZoomSwitch({ threadId }: { threadId: string }) {
+export function ZoomSwitch({ threadId, botConversation = false }: { threadId: string; /** A Bot's conversation: show the controls (disabled) even with its strands off. */ botConversation?: boolean }) {
   const list = useLive("strands.list", { threadId }, { enabled: !!threadId, pollMs: STRANDS_POLL_MS });
   const level = useZoom(threadId);
   const zoomTo = useZoomTo(threadId);
   const jump = useJump(threadId);
   const openTab = useOpenStrandsTab();
-  const enabled = !!list.data?.enabled && zoomInHost();
+  const reason = zoomBlocked(list.data, zoomInHost(), botConversation);
+  const enabled = reason === "";
   const zoomBy = useCallback((delta: number) => zoomTo(zoomOf(threadId) + delta), [threadId, zoomTo]);
   // Before paint: coming back to a zoomed-out conversation draws the list at once, not the timeline first.
   useLayoutEffect(() => {
@@ -392,7 +408,7 @@ export function ZoomSwitch({ threadId }: { threadId: string }) {
   usePinch(threadId, enabled, zoomBy);
   const own = useRef<HTMLSpanElement>(null);
   useEscEsc(threadId, enabled, own);
-  if (!enabled) return null;
+  if (reason === null) return null;
   const needs = countsOf(list.data).needs + strayCountsOf(list.data).needs;
   const waiting = list.data?.strands.find((strand) => strand.state === "needs-you") ?? null;
   // To what waits on the user: a strand's ask, else (only stray workers wait) the Strands tab, which lists them.
@@ -403,46 +419,88 @@ export function ZoomSwitch({ threadId }: { threadId: string }) {
     if (reply) flashReply(threadId, reply.seq);
     if (zoomOf(threadId) > 0) zoomTo(0, seq); else jump(seq);
   };
+  const iconButton = "grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-muted-foreground hover:bg-accent/60 hover:text-foreground disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent";
   return (
-    <span ref={own} className="studio-root inline-flex min-w-0 shrink items-center gap-2" data-zoom-switch="">
-      <StrandFilterChip threadId={threadId} />
-      <span role="group" aria-label="Zoom" title={`Zoom: ${ZOOM_KEYS}`} className="inline-flex shrink-0 rounded-lg bg-foreground/5 p-0.5">
+    <span ref={own} className={cn("studio-root inline-flex min-w-0 shrink items-center justify-end gap-1.5", NO_DRAG_CLASS)} style={NO_DRAG_STYLE} data-zoom-switch="" data-zoom-blocked={enabled ? undefined : reason}>
+      {enabled ? <StrandFilterChip threadId={threadId} /> : null}
+      <span role="group" aria-label="Zoom" className="inline-flex shrink-0 items-center rounded-lg bg-foreground/5 p-0.5">
         {LEVELS.map((label, index) => (
-          <button key={label} type="button" data-zoom-level={index} aria-pressed={level === index}
-            title={`${label} (${ZOOM_KEYS})`}
+          <button key={label} type="button" data-zoom-level={index} aria-pressed={enabled && level === index} aria-label={label} disabled={!enabled} style={NO_DRAG_STYLE}
+            title={enabled ? `${label}: ${LEVEL_HINTS[index]}` : `${label}: ${reason}`}
             onClick={() => zoomTo(index)}
-            className={cn("cursor-pointer rounded-md px-2 py-0.5 text-[11.5px] text-muted-foreground disabled:cursor-default disabled:opacity-40",
-              level === index && "bg-foreground/10 text-foreground")}>
-            {label}
+            className={cn(iconButton, "size-[22px]", enabled && level === index && "bg-foreground/10 text-foreground")}>
+            <LevelIcon level={index} />
           </button>
         ))}
       </span>
-      <button type="button" data-zoom-strands-tab="" onClick={openTab} title="Every strand, its asks and workers"
-        className="shrink-0 cursor-pointer rounded-md px-1.5 py-0.5 text-[11.5px] text-muted-foreground hover:bg-accent/50 hover:text-foreground">
-        All strands
-      </button>
-      {needs > 0 ? (
-        <button type="button" data-zoom-needs="" onClick={goToAsk}
-          className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-warning/10 px-2 py-0.5 text-[11.5px] font-medium text-warning hover:bg-warning/15">
-          <span aria-hidden className="size-1.5 rounded-full bg-warning" />{needs} need you
+      {enabled ? (
+        <button type="button" data-zoom-strands-tab="" onClick={openTab} style={NO_DRAG_STYLE} aria-label="All strands" title="All strands: every strand, its asks and workers"
+          className={iconButton}>
+          <ListIcon />
+        </button>
+      ) : null}
+      {enabled && needs > 0 ? (
+        <button type="button" data-zoom-needs="" onClick={goToAsk} style={NO_DRAG_STYLE} aria-label={`${needs} need you`} title={`${needs} need you: go to ${needs === 1 ? "it" : "the first"}`}
+          className="inline-flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-full bg-warning/10 px-1.5 text-[11.5px] font-semibold text-warning hover:bg-warning/15">
+          <span aria-hidden className="size-1.5 rounded-full bg-warning" />{needs}
         </button>
       ) : null}
     </span>
   );
 }
 
-/** The strand the conversation is filtered to: its name, clear, its message count, and previous and next (Esc clears too). */
+/** What each level's button says, with its keys. */
+const LEVEL_HINTS = [
+  "every message (⌃⌘= or pinch out)",
+  "one line per stretch of a strand (⌃⌘− or pinch in)",
+  "the strands as branches (⌃⌘− again, or Esc Esc to search it)",
+];
+
+/**
+ * Why a conversation can't zoom, shown on its disabled controls; "" when it
+ * can, null when nothing should show (strands are off and it isn't a Bot's
+ * conversation, or the strands haven't loaded).
+ */
+export function zoomBlocked(list: StrandList | null | undefined, hostZooms: boolean, botConversation: boolean): string | null {
+  if (!list) return null;
+  if (!list.enabled) return botConversation ? "strands are off for this conversation." : null;
+  if (!hostZooms) return "this version of BB can't zoom a conversation out; update the app to 1.0.14 or later.";
+  if (!list.strands.length && !list.earlier.length) return "no messages are sorted into strands yet.";
+  return "";
+}
+
+function LevelIcon({ level }: { level: number }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden className="size-[14px] fill-none stroke-current" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      {level === 0 ? <path d="M3 3.5h10v6.5H7.5L4.5 12.5V10H3z" />
+        : level === 1 ? <><path d="M3 4h10" /><path d="M3 8h7" /><path d="M3 12h9" /></>
+          : <><path d="M4.5 2.5v11" /><path d="M4.5 5.5c0 2.5 6 1.5 6 4.5v3.5" /><circle cx="4.5" cy="13.5" r="0.6" /></>}
+    </svg>
+  );
+}
+
+function ListIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden className="size-[14px] fill-none stroke-current" strokeWidth={1.5} strokeLinecap="round">
+      <path d="M6 4h7.5" /><path d="M6 8h7.5" /><path d="M6 12h7.5" />
+      <circle cx="3" cy="4" r="0.7" /><circle cx="3" cy="8" r="0.7" /><circle cx="3" cy="12" r="0.7" />
+    </svg>
+  );
+}
+
+/** The strand the conversation is filtered to, compact: its name, previous and next, and clear (Esc clears too). */
 function StrandFilterChip({ threadId }: { threadId: string }) {
   const { filtered, seqs, step } = useStrandFilter(threadId);
   if (!filtered) return null;
   const count = seqs.length || filtered.messages;
   return (
-    <span data-strand-filter={filtered.id} className="inline-flex min-w-0 max-w-[260px] items-center gap-1 rounded-md border border-foreground/25 bg-accent px-1.5 py-0.5 text-[11.5px]">
+    <span data-strand-filter={filtered.id} style={NO_DRAG_STYLE} title={`Showing only ${filtered.title}: ${count} ${count === 1 ? "message" : "messages"} (Esc clears)`}
+      className="inline-flex h-6 min-w-0 max-w-[200px] items-center gap-0.5 rounded-md border border-foreground/20 bg-accent pl-1.5 text-[11.5px]">
       <span className="truncate font-medium text-foreground">{filtered.title}</span>
-      <button type="button" aria-label="Clear filter" onClick={() => select(threadId, null)} className="grid size-4 shrink-0 cursor-pointer place-items-center rounded text-muted-foreground hover:text-foreground">×</button>
-      <span className="shrink-0 whitespace-nowrap text-muted-foreground">{count} {count === 1 ? "message" : "messages"}</span>
+      <span className="shrink-0 px-0.5 text-muted-foreground">{count}</span>
       <button type="button" aria-label="Previous message in this strand" onClick={() => step(-1)} className="shrink-0 cursor-pointer rounded px-0.5 text-muted-foreground hover:text-foreground">↑</button>
       <button type="button" aria-label="Next message in this strand" onClick={() => step(1)} className="shrink-0 cursor-pointer rounded px-0.5 text-muted-foreground hover:text-foreground">↓</button>
+      <button type="button" aria-label="Clear filter" onClick={() => select(threadId, null)} className="grid size-5 shrink-0 cursor-pointer place-items-center rounded text-muted-foreground hover:text-foreground">×</button>
     </span>
   );
 }
@@ -462,33 +520,42 @@ function useEscEsc(threadId: string, enabled: boolean, own: { readonly current: 
   useEffect(() => {
     if (!enabled) return;
     let last = Number.NEGATIVE_INFINITY;
+    // The composer whose Esc was the first press: it has blurred by the second, and Esc gives focus back to it.
+    let firstFrom: HTMLElement | null = null;
     const timers = new Set<ReturnType<typeof setTimeout>>();
     const onKey = (event: globalThis.KeyboardEvent) => {
       if (event.key !== "Escape" || event.repeat || !paneFocused(own.current)) return;
+      // Never take an Esc that closes something: a menu, a popup, the slash or mention menu, a dictation.
+      if (escapeHasWork()) return;
       const target = event.target instanceof HTMLElement ? event.target : null;
-      const composer = !!target?.closest(COMPOSER);
-      if (target && !composer && (target.isContentEditable || /^(?:INPUT|TEXTAREA|SELECT)$/u.test(target.tagName))) return;
+      const editor = target?.closest(COMPOSER) ?? null;
+      if (target && !editor && (target.isContentEditable || /^(?:INPUT|TEXTAREA|SELECT)$/u.test(target.tagName))) return;
+      const draft = editor?.textContent ?? null;
       const at = event.timeStamp;
       const timer = setTimeout(() => {
         timers.delete(timer);
-        // The composer's Esc is prevented only to blur it: it counts once focus has left it.
-        const handled = event.defaultPrevented && !(composer && !document.activeElement?.closest(COMPOSER));
+        // The composer's Esc only blurs it: that counts as the first press, when it left the draft as it was.
+        if (editor && editor.textContent !== draft) return;
+        const handled = event.defaultPrevented && !(editor && !document.activeElement?.closest(COMPOSER));
         if (handled) return;
         if (keyboardModeOf(threadId)) { leaveKeyboardMode(threadId, true); return; }
-        if (at - last > ESC_ESC_MS) { last = at; return; }
+        if (at - last > ESC_ESC_MS) { last = at; firstFrom = editor ? target : null; return; }
         last = Number.NEGATIVE_INFINITY;
         // From Strands, the tree opens on the line that was in the middle; from the messages, BB gives the anchor.
         const level = zoomOf(threadId);
         if (level > 0 && level < ZOOM_MAX) levelAnchors.set(threadId, middles.get(threadId)?.() ?? null);
         else if (level === 0) levelAnchors.delete(threadId);
-        returnFocus.set(threadId, document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : target);
+        const active = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+        returnFocus.set(threadId, active ?? firstFrom ?? target);
+        firstFrom = null;
         setKeyboardMode(threadId, true);
       }, 0);
       timers.add(timer);
     };
-    document.addEventListener("keydown", onKey);
+    // Capture: the draft and any open menu are read before anything handles the Esc; the decision waits for the dispatch.
+    document.addEventListener("keydown", onKey, true);
     return () => {
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       for (const timer of timers) clearTimeout(timer);
     };
   }, [enabled, threadId, own]);
@@ -496,6 +563,25 @@ function useEscEsc(threadId: string, enabled: boolean, own: { readonly current: 
 
 /** BB's composer (its editor), whose Esc only blurs it. */
 const COMPOSER = "[data-promptbox-editor-content]";
+
+/** Something an Esc would close or stop: an open menu or popup, the composer's slash or mention menu, a dictation. */
+const ESCAPE_WORK = [
+  "[data-radix-popper-content-wrapper]",
+  "[data-bb-portaled-overlay]",
+  '[role="menu"]',
+  '[role="dialog"]',
+  `${COMPOSER} [aria-expanded="true"]`,
+  'button[aria-label="Cancel recording"]',
+  'button[aria-label="Cancel transcription"]',
+].join(",");
+
+function escapeHasWork(doc: Document = document): boolean {
+  for (const element of doc.querySelectorAll<HTMLElement>(ESCAPE_WORK)) {
+    // Open popups are mounted only while open, so being there is enough.
+    if (!element.closest("[data-zoom-tree],[data-zoom-switch]")) return true;
+  }
+  return false;
+}
 
 /**
  * Trackpad pinch over the conversation (wheel events with ctrlKey): pinching

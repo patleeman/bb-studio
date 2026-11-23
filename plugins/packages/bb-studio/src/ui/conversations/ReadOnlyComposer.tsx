@@ -216,15 +216,16 @@ export function useThreadHeaderParts({ threadId }: { threadId: string }): Thread
 export function useStudioThreadHeader({ threadId }: { threadId: string }): ThreadHeaderDecoration | null {
   const { title, detail, worker } = useThreadHeaderParts({ threadId });
   if (worker) return { after: <span className="studio-root">{detail}</span> };
-  if (!detail) return null;
+  // At the header's right end, in every conversation whose strands run (and in a Bot's, disabled with the
+  // reason, when they can't): the zoom levels, the strand filter, All strands and what needs the user.
+  const end = <ZoomSwitch threadId={threadId} botConversation={!!detail} />;
+  if (!detail) return { end };
   const after = (
     <span className="studio-root inline-flex min-w-0 items-center gap-2">
       {detail}
-      {/* The zoom switch and "N need you" (semantic zoom): drawn only where strands run and BB zooms. */}
-      <ZoomSwitch threadId={threadId} />
     </span>
   );
-  return title ? { title, after } : { after };
+  return title ? { title, after, end } : { after, end };
 }
 
 /** Over the Ask box of a waiting worker whose state is in the header: where to answer it. */

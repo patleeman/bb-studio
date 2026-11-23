@@ -218,7 +218,7 @@ it("puts the status line at the top of a worker where BB has no header slot, and
 
 function Header({ threadId }: { threadId: string }) {
   const decoration = useStudioThreadHeader({ threadId });
-  return decoration ? <header><h1>{decoration.title ?? "BB title"}</h1>{decoration.after}</header> : null;
+  return decoration ? <header><h1>{decoration.title ?? "BB title"}</h1>{decoration.after}<nav>{decoration.end}</nav></header> : null;
 }
 
 it("decorates BB's thread header in one row: a worker's state as a dot and muted text, a conversation's Bot as muted text", async () => {
@@ -239,9 +239,10 @@ it("decorates BB's thread header in one row: a worker's state as a dot and muted
   expect($('[data-testid="worker-state"]')?.className).not.toContain("rounded-full");
   await act(async () => { root.render(<Header threadId="w9" />); });
   expect($('[data-testid="worker-state"]')?.textContent).toBe("Waiting for you");
-  // A thread no Bot has keeps BB's header.
+  // A thread no Bot has keeps BB's title; only the zoom controls go at the end (drawn where its strands run).
   await act(async () => { root.render(<Header threadId="other" />); });
-  expect(host.innerHTML).toBe("");
+  expect($("h1")?.textContent).toBe("BB title");
+  expect($('[data-testid="conversation-bot"]')).toBeNull();
 });
 
 it("with the state in the header, draws no row under it; a waiting worker's box says where to answer", async () => {

@@ -180,7 +180,7 @@ vi.mock("../../kit/composer", () => ({ useComposerThread: () => "thr_main" }));
 vi.mock("../../kit/app/thread-panel", () => ({ openThreadTab: state.openTab }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
 
-const { ZoomSwitch, ZoomView, canZoom, zoomThreadBy } = await import("./Zoom");
+const { ZoomSwitch, ZoomView, canZoom, zoomBlocked, zoomThreadBy } = await import("./Zoom");
 const { holdZoomable, keyboardModeOf, registerTimelineFilter, resetSelectionForTests, select, selectionOf, setKeyboardMode, setZoom, zoomInHost, zoomOf } = await import("./selection");
 const { StrandsBoxFor, useStrandFilter } = await import("./Strip");
 const { promptStackSource, resetPromptStackForTests } = await import("./prompt-stack");
@@ -236,13 +236,32 @@ describe("the zoomed-out view BB draws in the timeline's place", () => {
     expect(zoomOf("thr_main")).toBe(2);
   });
 
-  it("on a BB that drops zoom: no switch, and the box stays with BB's running children hidden behind it", () => {
+  it("on a BB that drops zoom: the controls show disabled with why, and the box stays with BB's running children hidden behind it", () => {
     droppingHost();
     expect(zoomInHost()).toBe(false);
     render(<><ZoomSwitch threadId="thr_main" /><StrandsBoxFor threadId="thr_main" /></>);
-    expect(container.querySelector("[data-zoom-switch]")).toBeNull();
+    const controls = container.querySelector<HTMLElement>("[data-zoom-switch]")!;
+    expect(controls.dataset.zoomBlocked).toContain("update the app");
+    const levels = [...container.querySelectorAll<HTMLButtonElement>("[data-zoom-level]")];
+    expect(levels.every((button) => button.disabled)).toBe(true);
+    expect(levels[1]!.title).toContain("update the app");
+    expect(container.querySelector("[data-zoom-strands-tab]")).toBeNull();
     expect(container.querySelector('[data-testid="strands-strip"]')).not.toBeNull();
     expect(promptStackSource.get("thr_main")).toContain("active-child-threads");
+  });
+
+  it("says why a conversation can't zoom: strands off (a Bot's conversation only), nothing sorted yet", () => {
+    zoomingHost();
+    expect(zoomBlocked(null, true, true)).toBeNull();
+    expect(zoomBlocked({ ...LIST, enabled: false }, true, false)).toBeNull();
+    expect(zoomBlocked({ ...LIST, enabled: false }, true, true)).toContain("strands are off");
+    expect(zoomBlocked({ ...LIST, strands: [], earlier: [] }, true, true)).toContain("no messages are sorted");
+    expect(zoomBlocked(LIST, true, false)).toBe("");
+    state.list = { ...LIST, enabled: false };
+    render(<ZoomSwitch threadId="thr_main" botConversation />);
+    expect(container.querySelector<HTMLElement>("[data-zoom-switch]")?.dataset.zoomBlocked).toContain("strands are off");
+    render(<ZoomSwitch threadId="thr_main" />);
+    expect(container.querySelector("[data-zoom-switch]")).toBeNull();
   });
 
   it("draws one line per stretch, centres the line of the message that was in the middle, and zooms in where a line is clicked", () => {
@@ -415,6 +434,12 @@ describe("the tree view and keyboard mode", () => {
     await esc(document.body, 1_000);
     await esc(document.body, 1_100);
     expect(keyboardModeOf("thr_main")).toBe(false);
+    // A lone pane carries the id without data-focused: it counts as focused.
+    delete container.dataset.focused;
+    await esc(document.body, 1_500);
+    await esc(document.body, 1_600);
+    expect(keyboardModeOf("thr_main")).toBe(true);
+    act(() => setKeyboardMode("thr_main", false));
     container.dataset.focused = "true";
     // Something on window (a lightbox closing) handled the first: it doesn't count.
     await esc(document.body, 2_000, (event) => event.preventDefault());
@@ -440,6 +465,57 @@ describe("the tree view and keyboard mode", () => {
     delete container.dataset.focused;
   });
 
+  it("counts the composer's blur-Esc as the first press, but never while a menu, popup or dictation would take the Esc, or when it changed the draft", async () => {
+    zoomingHost();
+    render(<ZoomSwitch threadId="thr_main" />);
+    // BB's composer: its Esc is prevented and only blurs it.
+    const box = document.createElement("div");
+    box.setAttribute("data-promptbox-editor-content", "");
+    const editor = document.createElement("div");
+    editor.contentEditable = "true";
+    editor.tabIndex = 0;
+    editor.textContent = "a draft";
+    box.appendChild(editor);
+    document.body.appendChild(box);
+    const blurs = (event: Event) => { event.preventDefault(); editor.blur(); };
+    editor.addEventListener("keydown", blurs);
+    editor.focus();
+    await esc(editor, 1_000);
+    expect(keyboardModeOf("thr_main")).toBe(false);
+    await esc(document.body, 1_200);
+    expect(keyboardModeOf("thr_main")).toBe(true);
+    // Esc from anywhere leaves keyboard mode and gives focus back to the composer.
+    await esc(document.body, 1_400);
+    expect(keyboardModeOf("thr_main")).toBe(false);
+    expect(document.activeElement).toBe(editor);
+    // An open menu (the slash or mention menu, a popup) takes the Esc: it doesn't count.
+    const menu = document.createElement("div");
+    menu.setAttribute("role", "menu");
+    document.body.appendChild(menu);
+    editor.focus();
+    await esc(editor, 5_000);
+    await esc(document.body, 5_200);
+    expect(keyboardModeOf("thr_main")).toBe(false);
+    menu.remove();
+    // A running dictation takes it too.
+    const cancel = document.createElement("button");
+    cancel.setAttribute("aria-label", "Cancel recording");
+    document.body.appendChild(cancel);
+    await esc(document.body, 7_000);
+    await esc(document.body, 7_200);
+    expect(keyboardModeOf("thr_main")).toBe(false);
+    cancel.remove();
+    // An Esc that changed the draft (say, it undid something) isn't a first press.
+    editor.removeEventListener("keydown", blurs);
+    const edits = (event: Event) => { event.preventDefault(); editor.textContent = "a dra"; editor.blur(); };
+    editor.addEventListener("keydown", edits);
+    editor.focus();
+    await esc(editor, 9_000);
+    await esc(document.body, 9_200);
+    expect(keyboardModeOf("thr_main")).toBe(false);
+    box.remove();
+  });
+
   it("clears a strand filter that hides the node it zooms in to", () => {
     zoomingHost();
     setZoom("thr_main", 2);
@@ -461,21 +537,30 @@ function StrandFilterProbe() {
 describe("the header where BB zooms", () => {
   it("shows Messages · Strands · Tree, All strands and N need you; the box goes and BB's running children show", () => {
     render(<ZoomSwitch threadId="thr_main" />);
-    expect(container.querySelector("[data-zoom-switch]")).toBeNull();
+    // Before a BB says it zooms, the controls say why they can't.
+    expect(container.querySelector<HTMLElement>("[data-zoom-switch]")?.dataset.zoomBlocked).toContain("update the app");
     zoomingHost();
     render(<><ZoomSwitch threadId="thr_main" /><StrandsBoxFor threadId="thr_main" /></>);
+    expect(container.querySelector<HTMLElement>("[data-zoom-switch]")?.dataset.zoomBlocked).toBeUndefined();
     expect(container.querySelector('[data-testid="strands-strip"]')).toBeNull();
     expect(promptStackSource.get("thr_main")).not.toContain("active-child-threads");
     const levels = [...container.querySelectorAll<HTMLButtonElement>("[data-zoom-level]")];
-    expect(levels.map((button) => [button.textContent, button.disabled])).toEqual([["Messages", false], ["Strands", false], ["Tree", false]]);
-    expect(levels[0]!.getAttribute("title")).toContain("⌃⌘−");
+    expect(levels.map((button) => [button.getAttribute("aria-label"), button.disabled])).toEqual([["Messages", false], ["Strands", false], ["Tree", false]]);
+    // Icons, each saying what it is and its keys.
+    expect(levels.every((button) => button.querySelector("svg") !== null)).toBe(true);
+    expect(levels[0]!.title).toContain("⌃⌘=");
+    expect(levels[1]!.title).toContain("⌃⌘−");
+    expect(levels[2]!.title).toContain("Esc Esc");
+    // Out of the window's drag strip, so they take clicks in the desktop app.
+    expect(container.querySelector<HTMLElement>("[data-zoom-switch]")!.className).toContain("[-webkit-app-region:no-drag]");
     click(levels[1]);
     expect(zoomOf("thr_main")).toBe(1);
     expect(levels[1]!.getAttribute("aria-pressed")).toBe("true");
     click(container.querySelector("[data-zoom-strands-tab]"));
     expect(state.openTab).toHaveBeenCalledTimes(1);
     const needs = container.querySelector("[data-zoom-needs]");
-    expect(needs?.textContent).toBe("1 need you");
+    expect(needs?.getAttribute("aria-label")).toBe("1 need you");
+    expect(needs?.textContent).toBe("1");
     click(needs);
     expect(zoomOf("thr_main")).toBe(0);
     expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=85", { replace: true });
@@ -487,7 +572,7 @@ describe("the header where BB zooms", () => {
     render(<ZoomSwitch threadId="thr_main" />);
     const chip = container.querySelector('[data-strand-filter="cx"]');
     expect(chip?.textContent).toContain("Context cuts");
-    expect(chip?.textContent).toContain("4 messages");
+    expect(chip?.getAttribute("title")).toContain("4 messages");
     click(chip?.querySelector('[aria-label="Previous message in this strand"]'));
     expect(selectionOf("thr_main")?.seq).toBe(40);
     expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=40", { replace: true });
@@ -503,7 +588,7 @@ describe("the header where BB zooms", () => {
     state.list = { ...LIST, strands: [view("cx", "Context cuts")], strayWorkers: [{ threadId: "thr_w", title: "router worker", status: "needs-you", endedAt: null }] };
     render(<ZoomSwitch threadId="thr_main" />);
     const needs = container.querySelector("[data-zoom-needs]");
-    expect(needs?.textContent).toBe("1 need you");
+    expect(needs?.getAttribute("aria-label")).toBe("1 need you");
     click(needs);
     expect(state.openTab).toHaveBeenCalledTimes(1);
     expect(state.toAppPath).not.toHaveBeenCalled();
