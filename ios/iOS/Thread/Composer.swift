@@ -51,9 +51,13 @@ struct ComposerField: UIViewRepresentable {
             view.textContainerInset.right = trailingInset
             view.invalidateIntrinsicContentSize()
         }
-        if view.text != text {
+        let stale = context.coordinator.isStale(text)
+        if view.text != text, !stale {
+            let typing = view.isFirstResponder
             view.text = text
             view.placeholder.isHidden = !text.isEmpty
+            // Replaced while typing (a restored draft, dictation): keep typing at its end.
+            if typing { view.selectedRange = NSRange(location: (text as NSString).length, length: 0) }
         }
         if focused != view.isFirstResponder, focused ? view.window != nil : true {
             context.coordinator.applyFocus(to: view)
@@ -128,7 +132,26 @@ struct ComposerField: UIViewRepresentable {
             }
         }
 
+        /// What the field last sent its binding, until the binding gives it
+        /// back. The composer is hosted apart from the thread view, and can
+        /// render with the text from before a keystroke first: that stale
+        /// value overwrote the keystroke, or put the caret before it, so the
+        /// first letter typed after opening a thread was lost or moved to the end.
+        private var sent: (text: String, at: TimeInterval)?
+
+        /// A value from before the field's own latest edit, which the binding
+        /// hasn't caught up with yet (for at most a second).
+        func isStale(_ incoming: String) -> Bool {
+            guard let sent else { return false }
+            if incoming == sent.text || ProcessInfo.processInfo.systemUptime - sent.at > 1 {
+                self.sent = nil
+                return false
+            }
+            return true
+        }
+
         func textViewDidChange(_ view: UITextView) {
+            sent = (view.text, ProcessInfo.processInfo.systemUptime)
             parent.text = view.text
             (view as? PastingTextView)?.placeholder.isHidden = !view.text.isEmpty
             parent.dictation?.handle(.edited)
