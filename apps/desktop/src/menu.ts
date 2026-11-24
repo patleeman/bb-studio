@@ -13,14 +13,12 @@ import type { ConnectServerSyncSkipReason } from "./connect-server-sync.js";
 const LOCAL_LOGS_MENU_LABEL = "Local Logs";
 const OPEN_NEW_TAB_MENU_LABEL = "New Tab";
 const REOPEN_CLOSED_TAB_MENU_LABEL = "Reopen Closed Tab";
-const NEW_THREAD_MENU_LABEL = "New Thread";
+const NEW_THREAD_MENU_LABEL = "New Conversation";
 const NEW_WINDOW_MENU_LABEL = "New Window";
 const CLOSE_WINDOW_MENU_LABEL = "Close Window";
 const OPEN_SETTINGS_MENU_LABEL = "Settings…";
 const VIEW_LICENSE_MENU_LABEL = "View License";
-const LICENSE_URL = "https://github.com/get-bb/bb/blob/main/LICENSE";
-const UNINSTALL_MENU_LABEL = "How to Uninstall bb";
-const UNINSTALL_URL = "https://getbb.app/uninstall";
+const LICENSE_URL = "https://github.com/patleeman/bb-studio/blob/main/LICENSE";
 const TOGGLE_DEVELOPER_TOOLS_MENU_LABEL = "Toggle Developer Tools";
 const TOGGLE_DEVELOPER_TOOLS_ACCELERATOR = "Command+Option+I";
 const RELOAD_ACCELERATOR = "CommandOrControl+R";
@@ -343,12 +341,6 @@ export function buildApplicationMenuTemplate(
           label: VIEW_LICENSE_MENU_LABEL,
           click: () => {
             void shell.openExternal(LICENSE_URL);
-          },
-        },
-        {
-          label: UNINSTALL_MENU_LABEL,
-          click: () => {
-            void shell.openExternal(UNINSTALL_URL);
           },
         },
       ],
