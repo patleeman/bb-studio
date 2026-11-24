@@ -9,7 +9,7 @@
 // its newest message, with a quiet Done (AskMark). It stays until Jev says a
 // message of the user's answers it, or Done.
 import { useBbNavigate, type ExperimentalMessageMetadataProps } from "@get-bb/plugin-sdk/app";
-import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { toAppPathOf } from "../../kit/app/host-sdk";
 import { currentPathname } from "../../kit/app/route";
@@ -118,11 +118,13 @@ export function AskMark({ threadId, reply }: { threadId: string; reply: Pick<Rep
   );
 }
 
-export const StrandTag = memo(function StrandTag({ message }: ExperimentalMessageMetadataProps) {
+// A plain function on purpose: BB rejects a memo() object as a slot component
+// ("must be a React component function"), and that fails Studio's whole frontend.
+export function StrandTag({ message }: ExperimentalMessageMetadataProps) {
   const bots = useIsBotThread(message.threadId);
   if (!bots) return null;
   return <Tag message={message} />;
-});
+}
 
 /** "Move to…": mounts its Radix Popover only once clicked so closed message rows carry zero popover overhead. */
 function MoveMenu({ threadId, seq, current, strands }: { threadId: string; seq: number; current: string; strands: Tags["strands"] }) {
