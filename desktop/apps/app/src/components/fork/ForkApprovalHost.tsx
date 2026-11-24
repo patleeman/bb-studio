@@ -42,7 +42,14 @@ export function ForkApprovalHost() {
       if (document.visibilityState !== "visible") return;
       const approvals = await listPendingApprovals();
       if (!live) return;
-      setPending(approvals);
+      setPending((previous) =>
+        previous.length === 0 && approvals.length === 0
+          ? previous
+          : previous.length === approvals.length &&
+              previous.every((item, index) => item.id === approvals[index]?.id)
+            ? previous
+            : approvals,
+      );
       const answer = getBbDesktopInfo()?.experimental_answerApproval;
       if (answer === undefined) return;
       for (const approval of approvals) {

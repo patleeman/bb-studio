@@ -102,6 +102,70 @@ export class FoldedRows extends Set<string> {
 
 const NO_FOLDS = new FoldedRows();
 const NO_TARGET: ReadonlySet<string> = new Set();
+const MAX_CACHED_THREADS = 64;
+const lastFoldedByThread = new Map<string, FoldedRows>();
+
+function sameQuietDetails(
+  a: QuietFoldDetails | undefined,
+  b: QuietFoldDetails | undefined,
+): boolean {
+  if (a === b) return true;
+  if (a === undefined || b === undefined) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function sameFoldedRows(a: FoldedRows, b: FoldedRows): boolean {
+  if (a === b) return true;
+  if (a.size !== b.size || a.quiet.size !== b.quiet.size || a.runs.size !== b.runs.size) {
+    return false;
+  }
+  for (const id of a) {
+    if (!b.has(id)) return false;
+  }
+  for (const [id, fold] of a.quiet) {
+    const other = b.quiet.get(id);
+    if (
+      other === undefined ||
+      fold.label !== other.label ||
+      fold.state !== other.state ||
+      fold.createdAt !== other.createdAt ||
+      !sameQuietDetails(fold.details, other.details)
+    ) {
+      return false;
+    }
+  }
+  for (const [id, run] of a.runs) {
+    const other = b.runs.get(id);
+    if (
+      other === undefined ||
+      run.foldId !== other.foldId ||
+      run.threadId !== other.threadId ||
+      run.label !== other.label
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Keeps the previous FoldedRows identity when streaming tokens leave folds unchanged, avoiding full-timeline context re-renders. */
+function stabilizeFoldedRows(
+  threadId: string | null,
+  next: FoldedRows,
+): FoldedRows {
+  if (threadId === null || next === NO_FOLDS) return next;
+  const previous = lastFoldedByThread.get(threadId);
+  if (previous !== undefined && sameFoldedRows(previous, next)) {
+    return previous;
+  }
+  lastFoldedByThread.delete(threadId);
+  lastFoldedByThread.set(threadId, next);
+  if (lastFoldedByThread.size > MAX_CACHED_THREADS) {
+    const oldest = lastFoldedByThread.keys().next().value;
+    if (oldest !== undefined) lastFoldedByThread.delete(oldest);
+  }
+  return next;
+}
 
 export const RelayedFoldContext = createContext<FoldedRows>(NO_FOLDS);
 export const RelayedRowFoldedContext = createContext(false);
@@ -374,13 +438,22 @@ export function useRelayedFold(
         isQuietReply(row.text, slots.replyClassifiers),
       targetRowIds,
     });
-    if (runs.markers.size === 0) return { ...relayed, opened: runs.opened };
+    if (runs.markers.size === 0) {
+      return {
+        rows: relayed.rows,
+        folded: stabilizeFoldedRows(threadId, relayed.folded),
+        opened: runs.opened,
+      };
+    }
     return {
       rows: runs.rows,
-      folded: new FoldedRows(relayed.folded, relayed.folded.quiet, runs.markers),
+      folded: stabilizeFoldedRows(
+        threadId,
+        new FoldedRows(relayed.folded, relayed.folded.quiet, runs.markers),
+      ),
       opened: runs.opened,
     };
-  }, [rows, scopeActive, findStreamingAssistantMessageId, slots.replyClassifiers, unfold, runFolds, targetSeq, targetMatch]);
+  }, [rows, scopeActive, findStreamingAssistantMessageId, slots.replyClassifiers, unfold, runFolds, targetSeq, targetMatch, threadId]);
   const opened = fold.opened.join("\n");
   useEffect(() => {
     if (threadId === null || opened === "") return;
