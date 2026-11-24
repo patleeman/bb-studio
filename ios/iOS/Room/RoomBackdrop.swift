@@ -100,6 +100,14 @@ struct RoomFrost: View {
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+        #if DEBUG
+        // UI tests read how far down the frost reaches (`roomFrost`'s frame):
+        // a point-wide strip at its leading edge, over no control's centre,
+        // so it never makes a button look covered.
+        .overlay(alignment: .leading) {
+            Color.clear.frame(width: 1).accessibilityElement().accessibilityIdentifier("roomFrost")
+        }
+        #endif
     }
 
     @ViewBuilder private var mask: some View {

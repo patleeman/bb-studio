@@ -335,6 +335,10 @@ struct RoomView: View {
             #endif
             RoomShade(standing: pages == nil)
         }
+        // The whole window, the keyboard's part too: as the conversation's
+        // background it was only as tall as the room above the keyboard, and
+        // the frost (blurred within its own frame) stopped there.
+        .ignoresSafeArea()
         .animation(reduceMotion ? .easeInOut(duration: 0.2) : .easeInOut(duration: 0.5), value: pager.shown)
         .allowsHitTesting(false)
     }
