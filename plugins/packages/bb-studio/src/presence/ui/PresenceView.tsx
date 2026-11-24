@@ -26,6 +26,7 @@ type ShownProps = Omit<PresenceViewProps, "custom" | "form"> & { surfaceLight: b
 const START_TIME = 5.5;
 const CUSTOM_STEP = 1 / 31;
 const BUILTIN_STEP = 1 / 31;
+const IDLE_STEP = 1 / 16;
 
 function watchSeen(element: Element, set: (seen: boolean) => void): () => void {
   if (typeof IntersectionObserver !== "function") return () => {};
@@ -68,7 +69,8 @@ function BuiltinPresence(props: ShownProps & { form: BuiltinForm }) {
         clock.real += dt;
         clock.form += dt * STATE_SPEED[live.current.state] * live.current.motion;
         clock.due += dt;
-        if (clock.due < BUILTIN_STEP) return;
+        const step = live.current.state === "idle" ? IDLE_STEP : BUILTIN_STEP;
+        if (clock.due < step) return;
         clock.due = 0;
         draw();
       },

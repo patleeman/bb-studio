@@ -30,7 +30,7 @@
 // The server's view (bot_threads_view) and BB's live thread state are merged
 // in model.ts. The header and the switcher are marked no-drag.
 import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, experimental_useProviders as useProviders, experimental_useSidebarThreads, useBbNavigate, useSdk, type PluginThreadActionTarget, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type WheelEvent } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type WheelEvent } from "react";
 import type { BotSpace } from "../../bot-threads-contract";
 import { Icon } from "../../kit/app/index";
 import { noteBotThread } from "./bot-thread-owners";
@@ -94,7 +94,7 @@ function StatusGlyph({ status, slot }: { status: WorkerLine["status"]; slot?: nu
  * spinner while one runs, amber while one needs the user, so a closed nest
  * still shows its work. Separate from the row's own click.
  */
-export function WorkersToggle({ nest, open, onToggle, title }: { nest: Pick<WorkerNest<unknown>, "total" | "running" | "needsYou">; open: boolean; onToggle(): void; title: string }) {
+export const WorkersToggle = memo(function WorkersToggle({ nest, open, onToggle, title }: { nest: Pick<WorkerNest<unknown>, "total" | "running" | "needsYou">; open: boolean; onToggle(): void; title: string }) {
   const tone = nest.needsYou ? "needs-you" : nest.running ? "running" : "quiet";
   return (
     <button type="button" data-testid="workers-toggle" data-tone={tone} aria-expanded={open} aria-label={`${open ? "Hide" : "Show"} ${title}'s workers: ${nestLabel(nest)}`}
@@ -106,9 +106,9 @@ export function WorkersToggle({ nest, open, onToggle, title }: { nest: Pick<Work
       <span data-testid="workers-toggle-count">{nest.total}</span>
     </button>
   );
-}
+});
 
-export function ConversationRowView({ row, now, onOpen, menuTarget, providers = NO_PROVIDERS, toggle = null }: { row: ConversationLine; now: number; onOpen(row: ConversationLine): void; menuTarget: PluginThreadActionTarget | null; providers?: readonly ProviderCatalogEntry[]; toggle?: ReactNode }) {
+export const ConversationRowView = memo(function ConversationRowView({ row, now, onOpen, menuTarget, providers = NO_PROVIDERS, toggle = null }: { row: ConversationLine; now: number; onOpen(row: ConversationLine): void; menuTarget: PluginThreadActionTarget | null; providers?: readonly ProviderCatalogEntry[]; toggle?: ReactNode }) {
   const line = secondLine(row);
   const button = (
     <button type="button" data-testid="conversation-row" data-thread-id={row.threadId} data-needs-you={row.needsYou ? "" : undefined} aria-current={row.selected ? "page" : undefined}
@@ -134,9 +134,9 @@ export function ConversationRowView({ row, now, onOpen, menuTarget, providers = 
   );
   const item = toggle ? <div className="relative">{button}<span className="absolute bottom-[5px] right-1.5 flex">{toggle}</span></div> : button;
   return menuTarget ? <ThreadActionsContextMenu thread={menuTarget}><div>{item}</div></ThreadActionsContextMenu> : item;
-}
+});
 
-export function WorkerRowView({ row, now, onOpen, menuTarget, slot, providers = NO_PROVIDERS }: { row: WorkerLine; now: number; onOpen(row: WorkerLine): void; menuTarget: PluginThreadActionTarget | null; slot?: number; providers?: readonly ProviderCatalogEntry[] }) {
+export const WorkerRowView = memo(function WorkerRowView({ row, now, onOpen, menuTarget, slot, providers = NO_PROVIDERS }: { row: WorkerLine; now: number; onOpen(row: WorkerLine): void; menuTarget: PluginThreadActionTarget | null; slot?: number; providers?: readonly ProviderCatalogEntry[] }) {
   const button = (
     <button type="button" data-testid="worker-row" data-thread-id={row.threadId} data-status={row.status} aria-current={row.selected ? "page" : undefined}
       onClick={() => onOpen(row)}
@@ -151,7 +151,7 @@ export function WorkerRowView({ row, now, onOpen, menuTarget, slot, providers = 
     </button>
   );
   return menuTarget ? <ThreadActionsContextMenu thread={menuTarget}><div>{button}</div></ThreadActionsContextMenu> : button;
-}
+});
 
 const NEST_INDENT = "pl-3";
 
@@ -248,7 +248,7 @@ export function SpaceDots({ bots, current, onSwitch, onNew, onEdit, accents, the
                   {...dragSourceProps(refDragItem({ kind: "bot", id: dot.id }, dot.name))}
                   onClick={() => onSwitch(dot.id)}
                   className={`relative flex size-7 items-center justify-center rounded-md outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring ${dot.active ? "bg-state-active" : "opacity-60 hover:opacity-100"}`}>
-                  <BotPresence bot={bot} size={24} />
+                  <BotPresence bot={bot} size={24} still={!dot.active && !dot.amber && !bot.activity?.turn && !bot.activity?.workers} />
                   {accents?.[dot.id] ? <span aria-hidden data-testid="space-dot-accent" className="absolute inset-x-1.5 bottom-0 h-0.5 rounded-full" style={{ background: accents[dot.id] }} /> : null}
                   {dot.amber ? <span aria-hidden data-testid="space-dot-amber" className="absolute right-0.5 top-0.5 size-2 rounded-full border border-[var(--sidebar,var(--background))] bg-warning" /> : null}
                 </button>
@@ -449,7 +449,9 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
       conversations: conversations.map((row) => ({ threadId: row.threadId, running: row.running, needsYou: !!row.needsYou })),
     });
   }, [bot?.id, workers, conversations]);
-  const workerRow = { now, onOpen: (row: WorkerLine) => openThread(row.threadId), providers, targetOf: (id: string) => rowTargets.get(id) ?? null, slotOf: (id: string) => slots?.get(id) };
+  const openConversation = useCallback((row: ConversationLine) => openThread(row.threadId), [openThread]);
+  const openWorker = useCallback((row: WorkerLine) => openThread(row.threadId), [openThread]);
+  const workerRow = useMemo(() => ({ now, onOpen: openWorker, providers, targetOf: (id: string) => rowTargets.get(id) ?? null, slotOf: (id: string) => slots?.get(id) }), [now, openWorker, providers, rowTargets, slots]);
   const botRow = list.data?.bots.find((each) => each.id === bot?.id);
   const running = workers.filter((row) => row.status === "running").length + conversations.filter((row) => row.running).length;
   // The Strands page's row counts the strands that need the user.
@@ -507,7 +509,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
           const open = !!nest && nestOpen(row.threadId, nest);
           return (
             <div key={row.threadId} data-testid="conversation-item">
-              <ConversationRowView row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} providers={providers}
+              <ConversationRowView row={row} now={now} onOpen={openConversation} menuTarget={rowTargets.get(row.threadId) ?? null} providers={providers}
                 toggle={nest ? <WorkersToggle nest={nest} open={open} title={row.title} onToggle={() => toggleNest(row.threadId, !open)} /> : null} />
               {nest && open ? (
                 <div role="group" aria-label={`${row.title}'s workers`} data-testid="worker-nest" data-conversation={row.threadId} className={NEST_INDENT}>

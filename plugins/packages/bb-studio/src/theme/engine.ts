@@ -118,6 +118,7 @@ export class ThemeEngine {
   private tokens: Record<string, string> = {};
   private env: SceneEnvironment = FRONT_ENVIRONMENT;
   private signals: SceneSignals = NO_SIGNALS;
+  private workerSlotMap = new Map<string, number>();
   private ripples: Ripple[] = [];
   private appeared = new Map<string, number>();
   private needsYouLevel = 0;
@@ -218,6 +219,7 @@ export class ThemeEngine {
   setSignals(next: SceneSignals): void {
     const events = sceneEvents(this.signals, next);
     this.signals = next;
+    this.workerSlotMap = workerSlots(next.workers);
     const appearance = this.shown?.appearance;
     const live = this.top()?.renderer;
     if (appearance && live && this.currentMode() === "run") {
@@ -432,7 +434,7 @@ export class ThemeEngine {
         this.pendingDt = 0;
         this.needsYouLevel = target;
       }
-      this.ripples = this.ripples.filter((ripple) => this.sceneTime - ripple.start < RIPPLE_SECONDS);
+      if (this.ripples.length > 0) this.ripples = this.ripples.filter((ripple) => this.sceneTime - ripple.start < RIPPLE_SECONDS);
       let drew = false;
       for (const layer of this.layers) {
         if (!layer.renderer || !layer.canvas) continue;
@@ -560,19 +562,36 @@ export class ThemeEngine {
   private fillWorkers(time: number, still: boolean): void {
     this.workers.fill(0);
     if (!this.shown?.appearance.effects.workers) return;
-    const slots = workerSlots(this.signals.workers);
-    for (const id of [...this.appeared.keys()]) if (!slots.has(id)) this.appeared.delete(id);
+    const slots = this.workerSlotMap;
+    if (this.appeared.size > 0) {
+      for (const id of this.appeared.keys()) if (!slots.has(id)) this.appeared.delete(id);
+    }
     for (const [threadId, slot] of slots) {
-      if (!this.appeared.has(threadId)) this.appeared.set(threadId, this.sceneTime);
-      const age = still ? slot * 3 : Math.max(0, time - this.appeared.get(threadId)!);
-      this.workers.set([workerSeed(slot), age, 1, 0], slot * 4);
+      let started = this.appeared.get(threadId);
+      if (started === undefined) {
+        started = this.sceneTime;
+        this.appeared.set(threadId, started);
+      }
+      const age = still ? slot * 3 : Math.max(0, time - started);
+      const offset = slot * 4;
+      this.workers[offset] = workerSeed(slot);
+      this.workers[offset + 1] = age;
+      this.workers[offset + 2] = 1;
+      this.workers[offset + 3] = 0;
     }
   }
 
   private fillRipples(still: boolean): void {
     this.rippleData.fill(0);
-    if (still) return;
-    this.ripples.forEach((ripple, index) => this.rippleData.set([ripple.x, ripple.y, this.sceneTime - ripple.start, ripple.kind], index * 4));
+    if (still || this.ripples.length === 0) return;
+    for (let index = 0; index < this.ripples.length; index += 1) {
+      const ripple = this.ripples[index]!;
+      const offset = index * 4;
+      this.rippleData[offset] = ripple.x;
+      this.rippleData[offset + 1] = ripple.y;
+      this.rippleData[offset + 2] = this.sceneTime - ripple.start;
+      this.rippleData[offset + 3] = ripple.kind;
+    }
   }
 }
 
