@@ -59,7 +59,37 @@ export function ForkHeaderTitle({ children }: { children: ReactNode }) {
     };
     place();
     if (scope === null) return () => box.remove();
-    const observer = new MutationObserver(place);
+    const observer = new MutationObserver((records) => {
+      const parent = box.parentElement;
+      if (
+        parent !== null &&
+        parent !== anchor &&
+        parent.isConnected &&
+        parent.hasAttribute(FORK_TITLE_HOST_ATTRIBUTE) &&
+        scope.contains(parent)
+      ) {
+        return;
+      }
+      let hasElementChange = false;
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node.nodeType === 1) {
+            hasElementChange = true;
+            break;
+          }
+        }
+        if (hasElementChange) break;
+        for (const node of record.removedNodes) {
+          if (node.nodeType === 1) {
+            hasElementChange = true;
+            break;
+          }
+        }
+        if (hasElementChange) break;
+      }
+      if (!hasElementChange) return;
+      place();
+    });
     observer.observe(scope, { childList: true, subtree: true });
     return () => {
       observer.disconnect();
