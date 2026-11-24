@@ -100,6 +100,12 @@ struct RoomFrost: View {
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+        #if DEBUG
+        // UI tests read where the frost reaches (`roomFrost`'s frame).
+        .overlay {
+            Color.clear.accessibilityElement().accessibilityIdentifier("roomFrost")
+        }
+        #endif
     }
 
     @ViewBuilder private var mask: some View {
