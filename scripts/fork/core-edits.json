@@ -371,6 +371,11 @@
       "intent": "notifyThread, where events-appended is announced to plugins, also calls announceThreadFilesChanged (fork-plugin-events.ts), which emits experimental_thread.fileChanged for new completed file-change items. One import and one condition in notifyThreadListOnlySockets: a socket isListQuiet (list-quiet.fork.ts) marked gets no thread-list events-appended for threads it does not subscribe to.",
       "budget": 5
     },
+    "apps/app/src/lib/ws.ts": {
+      "seam": "list-quiet",
+      "intent": "Wraps buildBrowserWebSocketUrl(\"/ws\") with withListQuiet (ws-list-quiet.fork.ts) so the desktop client opens /ws?listEvents=status and skips background thread-list events-appended wakeups for unviewed threads.",
+      "budget": 3
+    },
     "plugins/git/ui/diff/DiffTab.tsx": {
       "seam": "diff-to-editor",
       "intent": "The diff view's open-in-editor button passes the first changed line of the file (fork-first-changed-line.ts), so the editor opens at the change and not at the top. DiffTab turns the line into the open request's location.",
