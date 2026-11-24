@@ -19,7 +19,7 @@ final class StudioStore: ObservableObject {
     /// Studio's tags, in name order.
     @Published private(set) var tags: [StudioTag] = [] {
         didSet {
-            tagsById = Dictionary(tags.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            tagOrderById = Dictionary(tags.enumerated().map { ($1.id, ($0, $1)) }, uniquingKeysWith: { first, _ in first })
         }
     }
     @Published private(set) var supportsTags = false
@@ -28,8 +28,21 @@ final class StudioStore: ObservableObject {
         didSet { starredIds = Set(starred.map(\.id)) }
     }
     private var infoByKey: [String: StudioKindInfo] = [:]
-    private(set) var tagsById: [String: StudioTag] = [:]
+    private var tagOrderById: [String: (rank: Int, tag: StudioTag)] = [:]
     private var starredIds: Set<String> = []
+
+    /// Tags for an item, deduplicated and in `tags` name order.
+    func orderedTags(for ids: [String]?) -> [StudioTag] {
+        guard let ids, !ids.isEmpty else { return [] }
+        var seen = Set<String>()
+        var matches: [(rank: Int, tag: StudioTag)] = []
+        matches.reserveCapacity(ids.count)
+        for id in ids where seen.insert(id).inserted {
+            if let entry = tagOrderById[id] { matches.append(entry) }
+        }
+        matches.sort { $0.rank < $1.rank }
+        return matches.map(\.tag)
+    }
     private static let cacheQueue = DispatchQueue(label: "nyc.plee.bbgo.studio-cache", qos: .utility)
     @Published private(set) var supportsStars = false
     @Published private(set) var projectNames: [String: String] = [:]
@@ -959,7 +972,7 @@ struct StudioView: View {
 
     @ViewBuilder
     private func row(_ item: StudioItem) -> some View {
-        let itemTags = (item.tags ?? []).compactMap { store.tagsById[$0] }
+        let itemTags = store.orderedTags(for: item.tags)
         let content = StudioRow(
             item: item, project: project.isEmpty ? projectName(item) : nil,
             tags: itemTags,

@@ -11,6 +11,7 @@ struct MarkdownImage: View {
     let src: String
     @State private var url: URL?
     @State private var image: UIImage?
+    @State private var loadedSrc: String?
     @State private var failed = false
     @State private var resolved = false
     @State private var viewing = false
@@ -39,18 +40,31 @@ struct MarkdownImage: View {
             }
         }
         .task(id: src) {
+            if loadedSrc != src {
+                image = nil
+                url = nil
+                resolved = false
+            }
             failed = false
             let resolvedURL = await resolve()
             url = resolvedURL
             resolved = true
-            guard let resolvedURL else { return }
+            guard let resolvedURL else {
+                image = nil
+                loadedSrc = src
+                return
+            }
             if let hit = AttachmentImages.shared.cached(resolvedURL, pixels: Self.maxPixels) {
                 image = hit
+                loadedSrc = src
                 return
             }
             if let loaded = await AttachmentImages.shared.image(resolvedURL, pixels: Self.maxPixels) {
                 image = loaded
+                loadedSrc = src
             } else if !Task.isCancelled {
+                image = nil
+                loadedSrc = nil
                 failed = true
             }
         }

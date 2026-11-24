@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import BBStudio
 
@@ -124,6 +125,58 @@ final class ThreadRowsMemoTests: XCTestCase {
         model.rows = Self.rows(3)
         XCTAssertNotEqual(model.rowsBox.version, beforeVersion)
         XCTAssertEqual(modelChanges, 0, "streaming row updates should notify rowsBox without redrawing ThreadView.body")
+    }
+
+    func testTranscriptCoordinatorFallbackReportsEarlierChangedRowsBeforeInsertion() {
+        struct Row: Identifiable, Equatable {
+            var id: String
+            var text: String
+        }
+        let coordinator = TranscriptContainer<Row, EmptyView, EmptyView, EmptyView, EmptyView>.Coordinator()
+
+        // Initial rows: [msg v1, working]
+        let initial = coordinator.apply([Row(id: "m1", text: "v1"), Row(id: "working", text: "")])
+        XCTAssertTrue(initial.rowsChanged)
+        XCTAssertTrue(initial.needsSetRows)
+        XCTAssertTrue(initial.changed.isEmpty)
+
+        // F1 trigger: m1 changes AND activity is inserted before trailing working in one tick.
+        // Fast prefix check mismatches at index 1 ("act1" != "working") and falls back to the slow path;
+        // m1 must still be reported in `changed` so its visible cell reconfigures.
+        let inserted = coordinator.apply([
+            Row(id: "m1", text: "v2"),
+            Row(id: "act1", text: "tool"),
+            Row(id: "working", text: ""),
+        ])
+        XCTAssertTrue(inserted.rowsChanged)
+        XCTAssertTrue(inserted.needsSetRows)
+        XCTAssertEqual(inserted.changed, [AnyHashable("m1")])
+        XCTAssertEqual(coordinator.byID[AnyHashable("m1")]?.text, "v2")
+
+        // In-place update (fast path, same count & ids)
+        let inPlace = coordinator.apply([
+            Row(id: "m1", text: "v3"),
+            Row(id: "act1", text: "tool"),
+            Row(id: "working", text: ""),
+        ])
+        XCTAssertTrue(inPlace.rowsChanged)
+        XCTAssertFalse(inPlace.needsSetRows)
+        XCTAssertEqual(inPlace.changed, [AnyHashable("m1")])
+        XCTAssertEqual(coordinator.byID[AnyHashable("m1")]?.text, "v3")
+
+        // Pure tail append with an earlier changed row (fast path)
+        let appended = coordinator.apply([
+            Row(id: "m1", text: "v4"),
+            Row(id: "act1", text: "tool"),
+            Row(id: "working", text: ""),
+            Row(id: "m2", text: "new"),
+        ])
+        XCTAssertTrue(appended.rowsChanged)
+        XCTAssertTrue(appended.needsSetRows)
+        XCTAssertEqual(appended.changed, [AnyHashable("m1")])
+        XCTAssertEqual(coordinator.itemIDs, [AnyHashable("m1"), AnyHashable("act1"), AnyHashable("working"), AnyHashable("m2")])
+        XCTAssertEqual(coordinator.byID[AnyHashable("m1")]?.text, "v4")
+        XCTAssertEqual(coordinator.byID[AnyHashable("m2")]?.text, "new")
     }
 
     private static func rows(_ count: Int, from start: Int = 0) -> [TimelineRow] {

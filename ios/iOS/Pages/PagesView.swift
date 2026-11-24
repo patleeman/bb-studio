@@ -70,6 +70,7 @@ final class PagesStore: ObservableObject {
     }
 
     private var loadGeneration = 0
+    private static let cacheQueue = DispatchQueue(label: "nyc.plee.bbgo.pages-cache", qos: .utility)
 
     func load(_ client: BBClient) async {
         guard client.baseURL == serverURL else { return }
@@ -85,9 +86,12 @@ final class PagesStore: ObservableObject {
             error = nil
             let snapshot = PagesSnapshot(pages: pages, projectNames: projectNames)
             let url = serverURL
-            await Task.detached(priority: .utility) {
-                DiskCache.save(snapshot, as: PagesSnapshot.cacheKey, serverURL: url)
-            }.value
+            await withCheckedContinuation { continuation in
+                Self.cacheQueue.async {
+                    DiskCache.save(snapshot, as: PagesSnapshot.cacheKey, serverURL: url)
+                    continuation.resume()
+                }
+            }
         } catch where BBClient.isCancellation(error) {
         } catch {
             guard generation == loadGeneration else { return }

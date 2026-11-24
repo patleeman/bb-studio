@@ -115,11 +115,13 @@ final class EnergyTests: XCTestCase {
             count.increment()
             return (200, Data(#"{"providers":[],"models":[]}"#.utf8))
         }
-        _ = try await client.executionOptions(providerId: "claude-code")
-        _ = try await client.executionOptions(providerId: "claude-code")
-        XCTAssertEqual(count.value, 1, "same provider reuses cached options")
-        _ = try await client.executionOptions(providerId: "codex")
+        _ = try await client.executionOptions(providerId: "claude-code", cachedFor: .seconds(300))
+        _ = try await client.executionOptions(providerId: "claude-code", cachedFor: .seconds(300))
+        XCTAssertEqual(count.value, 1, "same provider reuses cached options when cachedFor is set")
+        _ = try await client.executionOptions(providerId: "codex", cachedFor: .seconds(300))
         XCTAssertEqual(count.value, 2, "different provider fetches separately")
+        _ = try await client.executionOptions(providerId: "claude-code")
+        XCTAssertEqual(count.value, 3, "pickers without cachedFor always fetch fresh options")
     }
 
     func testSinglePassRPCDecodingHandlesOkErrorAndNullResult() async throws {

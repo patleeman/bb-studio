@@ -511,11 +511,16 @@ extension BBClient {
 
     // MARK: New-thread options
 
-    public func executionOptions(providerId: String? = nil) async throws -> ExecutionOptions {
+    /// Fetches `/api/v1/system/execution-options`. Pickers omit `cachedFor` so
+    /// permission ceiling, sign-in state, and custom models are always fresh;
+    /// display-only labels (e.g. `ThreadView`'s model chip) opt into a TTL cache.
+    public func executionOptions(providerId: String? = nil, cachedFor maxAge: Duration? = nil) async throws -> ExecutionOptions {
         let key = providerId ?? ""
-        let now = ContinuousClock.now
-        if let hit = executionOptionsCache.withLock({ $0[key] }), now - hit.at < .seconds(300) {
-            return hit.value
+        if let maxAge {
+            let now = ContinuousClock.now
+            if let hit = executionOptionsCache.withLock({ $0[key] }), now - hit.at < maxAge {
+                return hit.value
+            }
         }
         let fetched: ExecutionOptions = try await get("/api/v1/system/execution-options" + (providerId.map { "?providerId=\($0)" } ?? ""))
         executionOptionsCache.withLock { $0[key] = (ContinuousClock.now, fetched) }

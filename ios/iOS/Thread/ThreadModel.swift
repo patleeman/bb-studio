@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 @MainActor
 final class ThreadModel: ObservableObject {
@@ -281,9 +282,22 @@ final class ThreadModel: ObservableObject {
                 break
             }
         }
+        if backgroundObserver == nil {
+            backgroundObserver = NotificationCenter.default.addObserver(
+                forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.flushCacheIfPending() }
+            }
+        }
     }
 
     func detach() {
+        if let backgroundObserver {
+            NotificationCenter.default.removeObserver(backgroundObserver)
+            self.backgroundObserver = nil
+        }
+        cacheFlushTask?.cancel()
+        cacheFlushTask = nil
         guard let client = boundClient else { return }
         if loaded { cache(force: true) }
         if readPending {
@@ -305,6 +319,8 @@ final class ThreadModel: ObservableObject {
     private var readPending = false
     private var lastCachedAt = ContinuousClock.now - .seconds(60)
     private var cachePending = false
+    private var cacheFlushTask: Task<Void, Never>?
+    private var backgroundObserver: NSObjectProtocol?
 
     /// Each mark comes back as a read-state change that every open list refetches
     /// on, so while a turn streams, mark at most every 5 seconds and once on leaving.
@@ -318,14 +334,33 @@ final class ThreadModel: ObservableObject {
         try? await client.markRead(threadId)
     }
 
+    /// Flushes a throttled `TimelineCache` write when the app backgrounds.
+    func flushCacheIfPending() {
+        guard cachePending, loaded else { return }
+        cache(force: true)
+    }
+
     /// After each load and update; encoded and written off the main thread.
     /// Streaming ticks arrive up to ~6 times/sec; throttle intermediate writes
-    /// to every 2 s and always flush on load, turn end, or detach.
+    /// to every 2 s with a trailing flush, and always flush on load, turn end,
+    /// backgrounding, or detach.
     private func cache(force: Bool = false) {
-        guard force || ContinuousClock.now - lastCachedAt >= .seconds(2) else {
+        let elapsed = ContinuousClock.now - lastCachedAt
+        guard force || elapsed >= .seconds(2) else {
             cachePending = true
+            if cacheFlushTask == nil {
+                let remaining = .seconds(2) - elapsed
+                cacheFlushTask = Task { [weak self] in
+                    try? await Task.sleep(for: remaining)
+                    guard !Task.isCancelled, let self else { return }
+                    self.cacheFlushTask = nil
+                    self.flushCacheIfPending()
+                }
+            }
             return
         }
+        cacheFlushTask?.cancel()
+        cacheFlushTask = nil
         lastCachedAt = .now
         cachePending = false
         TimelineCache.save(threadId, thread: thread, rows: rows, serverURL: serverURL)

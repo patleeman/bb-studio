@@ -317,7 +317,7 @@ struct ThreadView: View {
         .task(id: "\(model.threadId) \(model.thread?.providerId ?? "") \(choosingModel)") {
             guard !choosingModel else { return }
             async let executionTask = try? app.client.execution(model.threadId)
-            async let optionsTask = try? app.client.executionOptions(providerId: model.thread?.providerId)
+            async let optionsTask = try? app.client.executionOptions(providerId: model.thread?.providerId, cachedFor: .seconds(300))
             guard let execution = await executionTask else { return }
             let options = await optionsTask
             let name = execution.model.map { id in options?.models.first { $0.id == id || $0.model == id }?.displayName ?? id }
@@ -1848,11 +1848,13 @@ extension ThreadView {
                 Group {
                     if let worker {
                         // A worker: its name and state, as the navigation bar's WorkerTitle says them.
-                        FoldedChatTitle(avatar: nil, title: worker.displayTitle, status: worker.headerLabel(now: .now))
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("\(worker.displayTitle), \(worker.stateLabel)")
-                            .accessibilityValue(worker.status.rawValue)
-                            .accessibilityIdentifier("workerTitle")
+                        TimelineView(.periodic(from: .now, by: 60)) { context in
+                            FoldedChatTitle(avatar: nil, title: worker.displayTitle, status: worker.headerLabel(now: context.date))
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel("\(worker.displayTitle), \(worker.stateLabel)")
+                                .accessibilityValue(worker.status.rawValue)
+                                .accessibilityIdentifier("workerTitle")
+                        }
                     } else {
                         FoldedChatTitle(avatar: nil, title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread", status: nil)
                     }

@@ -612,11 +612,15 @@ struct DownsampledRemoteImage<Placeholder: View>: View {
             }
         }
         .task(id: url) {
-            guard let url else { return }
+            guard let url else {
+                image = nil
+                return
+            }
             if let hit = AttachmentImages.shared.cached(url, pixels: pixels) {
                 image = hit
                 return
             }
+            image = nil
             if let loaded = await AttachmentImages.shared.image(url, pixels: pixels) {
                 image = loaded
             }
