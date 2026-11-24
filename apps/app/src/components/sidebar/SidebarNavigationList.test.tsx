@@ -206,7 +206,7 @@ describe("SidebarNavigationList", () => {
         .map((item) => item.textContent),
     ).toEqual([
       "New thread",
-      "Search threads",
+      "Search",
       "Skills",
       "Customize navigation",
     ]);

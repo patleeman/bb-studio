@@ -17,7 +17,7 @@ export function machineServerAccessReady(
 }
 
 export const MACHINE_SERVER_ACCESS_UNSET_REASON =
-  "Configure how machines should connect to this bb server.";
+  "Configure how machines should connect to this BB Studio server.";
 
 export function machineServerAccessBlockedReason(
   access: ServerAccessStatus | undefined,
