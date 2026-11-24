@@ -23,6 +23,7 @@ import type {
   ReceivedThreadTimelineSignal,
 } from "@bb/server-contract";
 import { buildBrowserWebSocketUrl } from "./dev-websocket-url";
+import { withListQuiet } from "./ws-list-quiet.fork";
 import {
   isDocumentVisible,
   subscribeToDocumentVisibility,
@@ -124,7 +125,7 @@ export class WebSocketManager {
   connect(): void {
     if (this.socket) return;
 
-    const url = buildBrowserWebSocketUrl("/ws");
+    const url = withListQuiet(buildBrowserWebSocketUrl("/ws"));
 
     const socket = new ReconnectingWebSocket(url, undefined, {
       minReconnectionDelay: this.minReconnectionDelay,
