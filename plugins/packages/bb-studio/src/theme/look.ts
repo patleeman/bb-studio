@@ -8,7 +8,7 @@ export const UI_MIN = 3;
 export const INK_TARGET = 7;
 
 export const HALO_SURFACES: readonly Surface[] = ["sidebar", "transcript"];
-export const HALO_LAYERS = [{ blur: 2, alpha: 0.9 }, { blur: 2, alpha: 0.9 }, { blur: 8, alpha: 0.55 }] as const;
+export const HALO_LAYERS = [{ blur: 1, alpha: 1 }] as const;
 export const HALO_STROKE_PX = 1;
 
 function normalCdf(x: number): number {

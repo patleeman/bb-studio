@@ -138,8 +138,8 @@ describe("the text halo", () => {
     expect(haloCoverage([{ blur: 2, alpha: 1 }], 1)).toBeCloseTo(0.341, 2);
     expect(haloCoverage([{ blur: 16, alpha: 1 }], 1)).toBeCloseTo(0.05, 2);
     expect(haloCoverage([{ blur: 2, alpha: 1 }], 3)).toBeGreaterThan(haloCoverage([{ blur: 2, alpha: 1 }], 1));
-    expect(HALO).toBeGreaterThan(0.5);
-    expect(HALO).toBeLessThan(0.6);
+    expect(HALO).toBeGreaterThan(0.45);
+    expect(HALO).toBeLessThan(0.5);
   });
 
   it("measures text on the sidebar and transcript cards with the halo over the card over the brightest backdrop, and still needs 3:1 without it, 4.5:1 for dark text on a light variant", () => {
