@@ -320,14 +320,13 @@ struct RoomView: View {
         let spot = RoomSceneLight.spot(proxy, pages: pages, rail: columnHeader)
         let covered = pages == nil
         return ZStack {
-            // When `pages == nil` (phone / folded Duo), `RoomFrost` covers the
-            // entire screen opaquely; skip the obscured duplicate backdrop beneath it.
-            if !covered {
-                SceneBackdrop(theme: look.theme, botId: bot.id, view: view, light: spot, paused: false, motion: true)
-                RoomLightLayer(light: light, seed: pager.shown, spot: spot)
-                    .id(pager.shown)
-                    .transition(.opacity)
-            }
+            // Under the frost on one page too (the phone, the folded Duo), paused
+            // and still: the frost's blurred still need not reach the bottom (on
+            // the folded Duo it stopped halfway, black below), and this fills it.
+            SceneBackdrop(theme: look.theme, botId: bot.id, view: view, light: spot, paused: covered, motion: !covered)
+            RoomLightLayer(light: light, seed: pager.shown, spot: spot)
+                .id(pager.shown)
+                .transition(.opacity)
             RoomFrost(pages: pages, layout: layout, light: light, seed: pager.shown, spot: spot, botId: bot.id, view: view)
             #if DEBUG
             Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityIdentifier("roomScene").accessibilityValue(look.theme.id)
