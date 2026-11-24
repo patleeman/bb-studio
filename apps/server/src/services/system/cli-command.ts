@@ -269,12 +269,12 @@ function describeShadow(
   shadow: SystemCliCommandShadow,
 ): string {
   if (shadow.source === "npm") {
-    return `bb is already on your PATH at ${shadow.path}, installed by npm.`;
+    return `bbs is already on your PATH at ${shadow.path}, installed by npm.`;
   }
   if (shadow.source === "machine") {
-    return `bb is already on your PATH at ${shadow.path}, installed with the bb machine on this computer.`;
+    return `bbs is already on your PATH at ${shadow.path}, installed with the bb machine on this computer.`;
   }
-  return `Another bb at ${shadow.path} comes first on your PATH. Remove it, or run bb's command directly at ${context.launcherPath}.`;
+  return `Another bbs at ${shadow.path} comes first on your PATH. Remove it, or run BB Studio's command directly at ${context.launcherPath}.`;
 }
 
 async function installWindows(context: CliCommandContext): Promise<void> {
@@ -335,7 +335,7 @@ async function installUnix(context: CliCommandContext): Promise<void> {
     }
   }
   throw blocked(
-    `Another bb command is already installed, or no folder on your PATH is writable. Run bb's command directly at ${context.launcherPath}.`,
+    `Another bbs command is already installed, or no folder on your PATH is writable. Run BB Studio's command directly at ${context.launcherPath}.`,
   );
 }
 
