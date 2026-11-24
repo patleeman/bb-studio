@@ -4,20 +4,29 @@ import Foundation
 final class ThreadModel: ObservableObject {
     let serverURL = ServerScope.selectedURL
     let threadId: String
+    /// Observed only by the transcript container so streaming `rows` updates
+    /// don't re-evaluate the whole `ThreadView.body` (toolbar, sheets, dialogs).
+    @Observable @MainActor final class RowsBox {
+        var version = 0
+    }
+    let rowsBox = RowsBox()
+
     @Published var thread: ThreadEntry?
-    @Published var rows: [TimelineRow] = [] {
+    var rows: [TimelineRow] = [] {
         didSet {
             chainMemo = nil
             rowIdsMemo = nil
             itemsMemo = nil
+            rowsBox.version &+= 1
             if !pendingSends.isEmpty { confirmPending() }
         }
     }
     /// Messages sent from here that the server hasn't shown yet, drawn after the rows.
-    @Published private(set) var pendingSends: [PendingSend] = [] {
+    private(set) var pendingSends: [PendingSend] = [] {
         didSet {
             chainMemo = nil
             itemsMemo = nil
+            rowsBox.version &+= 1
         }
     }
     /// Rows that stood for a pending send already.
@@ -105,7 +114,10 @@ final class ThreadModel: ObservableObject {
     }
     /// Earlier threads' loaded rows, oldest first; the first may be partly loaded.
     @Published private(set) var earlierPages: [BotChain.Page] = [] {
-        didSet { chainMemo = nil }
+        didSet {
+            chainMemo = nil
+            rowsBox.version &+= 1
+        }
     }
     /// The cursor into `earlierPages.first`'s older rows, nil once its start is in.
     private var earlierCursor: TimelineCursor?

@@ -51,7 +51,9 @@ public struct MiniApp: Decodable, Identifiable, Hashable, Sendable {
 
     /// `mini_` and 16 lowercase hex digits.
     public static func isId(_ value: String) -> Bool {
-        value.wholeMatch(of: /mini_[0-9a-f]{16}/) != nil
+        let utf8 = value.utf8
+        guard utf8.count == 21, value.hasPrefix("mini_") else { return false }
+        return utf8.dropFirst(5).allSatisfy { ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x61 && $0 <= 0x66) }
     }
 
     /// The access banner's text while capabilities wait, as the desktop says it; nil when none wait.

@@ -158,13 +158,16 @@ public enum FilePathLink {
         "lock", "gradle", "pdf", "png", "jpg", "jpeg", "gif", "svg", "webp",
     ]
 
+    nonisolated(unsafe) private static let pathRegex = /(\.{1,2}\/)?\/?[\w@.+\-\[\]]+(\/[\w@.+\-\[\]()]+)*/
+    nonisolated(unsafe) private static let lineSuffixRegex = /(:\d+(-\d+)?(:\d+)?|#L\d+(-L?\d+)?)$/
+
     /// The path in inline code, or nil when it doesn't look like a file.
     public static func path(inCode code: String) -> String? {
         guard code.count >= 3, code.count <= 400, !code.contains(where: \.isWhitespace), !code.contains("://"),
             !code.hasPrefix("~"), !code.hasPrefix("@"), !code.hasSuffix("/")
         else { return nil }
         let path = stripLine(code)
-        guard path.wholeMatch(of: /(\.{1,2}\/)?\/?[\w@.+\-\[\]]+(\/[\w@.+\-\[\]()]+)*/) != nil else { return nil }
+        guard path.wholeMatch(of: Self.pathRegex) != nil else { return nil }
         let name = path.split(separator: "/").last.map(String.init) ?? path
         guard let dot = name.lastIndex(of: "."), dot != name.startIndex else {
             return nil
@@ -175,7 +178,8 @@ public enum FilePathLink {
 
     /// `file.swift:12`, `file.swift:12:4` and `file.swift#L12-L20` → `file.swift`.
     public static func stripLine(_ path: String) -> String {
-        path.replacing(/(:\d+(-\d+)?(:\d+)?|#L\d+(-L?\d+)?)$/, with: "")
+        guard path.contains(":") || path.contains("#L") else { return path }
+        return path.replacing(Self.lineSuffixRegex, with: "")
     }
 
     /// `bbstudio://file?path=…`, which the thread view opens in the file viewer.

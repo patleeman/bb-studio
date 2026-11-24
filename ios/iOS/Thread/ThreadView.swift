@@ -112,6 +112,10 @@ struct ThreadView: View {
     /// The new chat transcript's requests, when it's on (Settings ▸ Diagnostics).
     @State private var transcriptV2 = TranscriptHandle()
     @State private var jumpState = TranscriptPillState()
+    /// Bumped each time `ThreadView.body` runs (outside `Isolated`), so pure
+    /// `model.rowsBox` streaming updates keep the same token and skip
+    /// re-assigning `composerHost`/`topHost` rootViews.
+    @State private var chromeTick = ChromeTick()
 
     init(threadId: String, hidesTabBar: Bool = true, session: RoomSession? = nil) {
         self.hidesTabBar = hidesTabBar
@@ -1570,7 +1574,7 @@ extension ThreadView {
     fileprivate var transcriptV2Screen: some View {
         transcriptV2Body
             .modifier(TranscriptV2Hooks(view: self, sends: sends, outboxCount: outbox.messages.count, finding: finding,
-                                        findQuery: findQuery, currentMatch: currentMatch))
+                                        findQuery: findQuery))
             .environment(\.threadId, model.threadId)
             .environment(\.openURL, transcriptV2OpenURL)
             .navigationTitle(model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
@@ -1629,34 +1633,50 @@ extension ThreadView {
     fileprivate var jumpInRail: Bool { compactHeader && !lying }
 
     private var transcriptV2Body: some View {
-        TranscriptContainer(
-            items: transcriptV2Rows, chrome: transcriptV2Chrome, handle: transcriptV2,
-            row: { [actions = transcriptV2Actions] row in ThreadTranscriptRowView(row: row, actions: actions) },
-            composer: { Isolated { composer }.opacity(lying ? 0 : 1).allowsHitTesting(!lying).accessibilityHidden(lying) },
-            top: transcriptV2HasTop ? { transcriptV2Top } : nil,
-            pill: { state, jump in transcriptV2Pill(state, jump: jump) },
-            onNearTop: { transcriptV2LoadOlder() },
-            onEmptyTap: roomChat?.layDown,
-            onPage: lying || composerFocused ? nil : roomChat?.page,
-            rowsHidden: lying,
-            onPillChange: { state in
-                let next = TranscriptPillState(shown: state.shown, unseen: min(state.unseen, 1), note: state.note)
-                Task { @MainActor in if jumpState != next { jumpState = next } }
-            },
-            log: ScrollLog.on ? { ScrollLog.request($0) } : nil,
-            // Not while the window resizes, which reloads the keyboard mid-transition (crash 3).
-            dismissKeyboard: { window in
-                ResizeSettling.shared.afterSettling { [weak window] in
-                    Breadcrumbs.shared.focus("transcript-tap", "end-editing")
-                    window?.endEditing(true)
-                }
-            },
-            pillNote: transcriptV2PillNote,
-            probe: transcriptV2Probe,
-            describeID: { ($0.base as? String).map(ScrollLog.id) ?? "?" },
-            spotKey: model.threadId,
-            composerVersion: transcriptV2ComposerVersion,
-            topVersion: transcriptV2TopVersion)
+        let chrome = transcriptV2Chrome
+        let actions = transcriptV2Actions
+        let hasTop = transcriptV2HasTop
+        let pillNote = transcriptV2PillNote
+        let probe = transcriptV2Probe
+        let chromeToken = chromeTick.next()
+        return Isolated {
+            let _ = model.rowsBox.version
+            let activeMatch = finding ? currentMatch : nil
+            let effectiveTopVersion: AnyHashable = finding
+                ? AnyHashable(FindTopToken(tick: chromeToken, matchCount: findMatches.count))
+                : AnyHashable(chromeToken)
+            TranscriptContainer(
+                items: transcriptV2Rows, chrome: chrome, handle: transcriptV2,
+                row: { row in ThreadTranscriptRowView(row: row, actions: actions) },
+                composer: { Isolated { composer }.opacity(lying ? 0 : 1).allowsHitTesting(!lying).accessibilityHidden(lying) },
+                top: hasTop ? { transcriptV2Top } : nil,
+                pill: { state, jump in transcriptV2Pill(state, jump: jump) },
+                onNearTop: { transcriptV2LoadOlder() },
+                onEmptyTap: roomChat?.layDown,
+                onPage: lying || composerFocused ? nil : roomChat?.page,
+                rowsHidden: lying,
+                onPillChange: { state in
+                    let next = TranscriptPillState(shown: state.shown, unseen: min(state.unseen, 1), note: state.note)
+                    Task { @MainActor in if jumpState != next { jumpState = next } }
+                },
+                log: ScrollLog.on ? { ScrollLog.request($0) } : nil,
+                // Not while the window resizes, which reloads the keyboard mid-transition (crash 3).
+                dismissKeyboard: { window in
+                    ResizeSettling.shared.afterSettling { [weak window] in
+                        Breadcrumbs.shared.focus("transcript-tap", "end-editing")
+                        window?.endEditing(true)
+                    }
+                },
+                pillNote: pillNote,
+                probe: probe,
+                describeID: { ($0.base as? String).map(ScrollLog.id) ?? "?" },
+                spotKey: model.threadId,
+                composerVersion: chromeToken,
+                topVersion: effectiveTopVersion)
+            .onChange(of: activeMatch) { _, id in
+                if let id { transcriptV2.scrollTo(id, position: .center, animated: true) }
+            }
+        }
         // Under the header and to the edges; it ends at the keyboard's top.
         .ignoresSafeArea(.container)
         .overlay {
@@ -1703,7 +1723,6 @@ extension ThreadView {
         let outboxCount: Int
         let finding: Bool
         let findQuery: String
-        let currentMatch: String?
 
         func body(content: Content) -> some View {
             content
@@ -1711,9 +1730,6 @@ extension ThreadView {
                 .onChange(of: outboxCount) { old, new in if new > old { view.transcriptV2.jumpToLatest() } }
                 .onChange(of: finding) { _, finding in if finding { Task { await view.model.loadAll() } } }
                 .onChange(of: findQuery) { _, _ in view.findIndex = 0 }
-                .onChange(of: currentMatch) { _, id in
-                    if let id { view.transcriptV2.scrollTo(id, position: .center, animated: true) }
-                }
                 #if DEBUG
                 .onReceive(NotificationCenter.default.publisher(for: Notification.Name("qa-draft"))) { event in
                     let lines = event.object as? Int ?? 0
@@ -1811,160 +1827,18 @@ extension ThreadView {
 
     fileprivate var transcriptV2HasTop: Bool { finding || duoLayout.twoPages || compactHeader }
 
-    /// Every input that affects the hosted composer chrome, excluding `model.rows`,
-    /// so streaming ticks don't re-assign `composerHost.rootView` while typing.
-    fileprivate struct TranscriptComposerVersion: Hashable {
-        var threadId: String
-        var threadStatus: String?
-        var isRunning: Bool
-        var projectId: String?
-        var providerId: String?
-        var environmentId: String?
-        var sending: Bool
-        var planReview: PlanReview?
-        var firstInteractionId: String?
-        var shelf: ThreadModel.Shelf
-        var queued: [QueuedMessage]
-        var outboxStorageError: String?
-        var note: StudioNote?
-        var noteExpanding: Bool
-        var composerFocused: Bool
-        var attachmentIds: [UUID]
-        var mentionsCount: Int
-        var editing: Bool
-        var executionLabel: String?
-        var handoffText: String?
-        var handoffWorking: Bool
-        var pendingPermission: String?
-        var jumpState: TranscriptPillState
-        var jumpInRail: Bool
-        var lying: Bool
-        var runningPlugins: String
-        var compactInput: Bool
-        var placeholder: String
-        var worker: WorkerInfo?
-        var workerAskError: String?
-        var askingWorker: Bool
-        var answeringHere: Bool
-        var inConversation: Bool
-        var botId: String?
-        var botName: String?
-        var botPause: String?
-        var strandsBeside: Bool
-        var onlyStrand: String?
-        var flashStrand: Double?
-        var approvalsCount: Int
-        var approvalsWaiting: Bool
-        var talkState: HoldToTalk.State
-        var dictationBlocksSend: Bool
-        var twoPages: Bool
-        var statusColumn: CGFloat
-        var lookThemeId: String
-        var lookShowsScene: Bool
+    /// Monotonic token bumped only when `ThreadView.body` runs, never on pure `rowsBox` ticks.
+    fileprivate final class ChromeTick {
+        private var value = 0
+        func next() -> Int {
+            value &+= 1
+            return value
+        }
     }
 
-    fileprivate var transcriptV2ComposerVersion: TranscriptComposerVersion {
-        TranscriptComposerVersion(
-            threadId: model.threadId,
-            threadStatus: model.thread?.status,
-            isRunning: model.thread?.isRunning == true,
-            projectId: model.thread?.projectId,
-            providerId: model.thread?.providerId,
-            environmentId: model.thread?.environmentId,
-            sending: model.sending,
-            planReview: model.planReview,
-            firstInteractionId: model.interactions.first?.id,
-            shelf: model.shelf,
-            queued: model.queued,
-            outboxStorageError: outbox.storageError,
-            note: notes.note,
-            noteExpanding: notes.expanding,
-            composerFocused: composerFocused,
-            attachmentIds: attachments.map(\.id),
-            mentionsCount: mentions.count,
-            editing: editing,
-            executionLabel: executionLabel,
-            handoffText: handoffStatus?.text,
-            handoffWorking: handoffStatus?.working == true,
-            pendingPermission: pendingPermission,
-            jumpState: jumpState,
-            jumpInRail: jumpInRail,
-            lying: lying,
-            runningPlugins: runningPlugins,
-            compactInput: compactInput,
-            placeholder: placeholder,
-            worker: worker,
-            workerAskError: workerAskError,
-            askingWorker: askingWorker,
-            answeringHere: answeringHere,
-            inConversation: conversation != nil,
-            botId: conversation?.botId,
-            botName: conversation?.botName,
-            botPause: conversation?.botPause,
-            strandsBeside: roomChat?.strandsBeside == true,
-            onlyStrand: strands.only[model.threadId],
-            flashStrand: strands.flash[model.threadId],
-            approvalsCount: approvals.cards.count,
-            approvalsWaiting: approvals.waiting,
-            talkState: talk.state,
-            dictationBlocksSend: dictation.blocksSend,
-            twoPages: duoLayout.twoPages,
-            statusColumn: duoLayout.statusColumn,
-            lookThemeId: look.theme.id,
-            lookShowsScene: look.showsScene
-        )
-    }
-
-    /// Every input that affects the hosted top header/find bar, excluding `model.rows`
-    /// unless Find is active.
-    fileprivate struct TranscriptTopVersion: Hashable {
-        var compactHeader: Bool
-        var twoPages: Bool
-        var statusColumn: CGFloat
-        var lying: Bool
-        var worker: WorkerInfo?
-        var title: String?
-        var conversationTitle: String?
-        var conversationChip: String?
-        var executionLabel: String?
-        var inConversation: Bool
-        var isRunning: Bool
-        var sizeClassCompact: Bool
-        var canSaveFiles: Bool
-        var sourcePageId: String?
-        var finishing: Bool
-        var isMuted: Bool
-        var finding: Bool
-        var findQuery: String
-        var findIndex: Int
-        var findMatchCount: Int
-        var loadingAll: Bool
-    }
-
-    fileprivate var transcriptV2TopVersion: TranscriptTopVersion {
-        TranscriptTopVersion(
-            compactHeader: compactHeader,
-            twoPages: duoLayout.twoPages,
-            statusColumn: duoLayout.statusColumn,
-            lying: lying,
-            worker: worker,
-            title: model.thread.map { ThreadTitles.resolve($0.displayTitle) },
-            conversationTitle: conversation?.conversation?.title,
-            conversationChip: conversationModel?.chip,
-            executionLabel: executionLabel,
-            inConversation: conversation != nil,
-            isRunning: model.thread?.isRunning == true,
-            sizeClassCompact: sizeClass == .compact,
-            canSaveFiles: canSaveFiles,
-            sourcePageId: sourcePage?.id,
-            finishing: finishing,
-            isMuted: muted.ids.contains(model.threadId),
-            finding: finding,
-            findQuery: findQuery,
-            findIndex: findIndex,
-            findMatchCount: finding ? findMatches.count : 0,
-            loadingAll: model.loadingAll
-        )
+    fileprivate struct FindTopToken: Hashable {
+        var tick: Int
+        var matchCount: Int
     }
 
     /// The Duo's header beside two pages, and the find bar under it.

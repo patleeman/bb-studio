@@ -12,7 +12,11 @@ enum LoopDirective: Equatable {
         switch directive.name {
         case "loop", "work":
             guard let id = directive.attributes["id"]?.trimmingCharacters(in: .whitespaces),
-                  id.wholeMatch(of: /[A-Za-z0-9_-]{1,120}/) != nil else { return nil }
+                  (1...120).contains(id.utf8.count),
+                  id.utf8.allSatisfy({
+                      ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x41 && $0 <= 0x5A)
+                          || ($0 >= 0x61 && $0 <= 0x7A) || $0 == 0x5F || $0 == 0x2D
+                  }) else { return nil }
             let row = Int(directive.attributes["row"]?.trimmingCharacters(in: .whitespaces) ?? "").map { $0 >= 1 } ?? (directive.attributes["row"] == "true")
             self = directive.name == "loop" && row ? .row(id: id) : .card(id: id)
         default:

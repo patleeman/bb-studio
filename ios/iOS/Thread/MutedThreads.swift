@@ -24,7 +24,11 @@ final class MutedThreads: ObservableObject {
     }
 
     private func update(_ threadIds: [String]) {
-        ids = Set(threadIds)
-        UserDefaults.standard.set(threadIds, forKey: ServerScope.key("mutedThreads", serverURL: client.baseURL))
+        let next = Set(threadIds)
+        if ids != next { ids = next }
+        let key = ServerScope.key("mutedThreads", serverURL: client.baseURL)
+        if UserDefaults.standard.stringArray(forKey: key) != threadIds {
+            UserDefaults.standard.set(threadIds, forKey: key)
+        }
     }
 }

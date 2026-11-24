@@ -83,7 +83,11 @@ final class PagesStore: ObservableObject {
             for project in names { projectNames[project.id] = project.name }
             self.pages = pages
             error = nil
-            DiskCache.save(PagesSnapshot(pages: pages, projectNames: projectNames), as: PagesSnapshot.cacheKey, serverURL: serverURL)
+            let snapshot = PagesSnapshot(pages: pages, projectNames: projectNames)
+            let url = serverURL
+            await Task.detached(priority: .utility) {
+                DiskCache.save(snapshot, as: PagesSnapshot.cacheKey, serverURL: url)
+            }.value
         } catch where BBClient.isCancellation(error) {
         } catch {
             guard generation == loadGeneration else { return }

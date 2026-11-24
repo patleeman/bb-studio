@@ -114,6 +114,18 @@ final class ThreadRowsMemoTests: XCTestCase {
         if case .image(alt: "alt", src: "https://example.com/a.png") = blocks[6] {} else { XCTFail("expected image, got \(blocks[6])") }
     }
 
+    func testUpdatingRowsNotifiesRowsBoxWithoutFiringThreadModelObjectWillChange() {
+        let model = ThreadModel(threadId: "thread", client: BBClient(baseURL: URL(string: "https://memo.invalid")!))
+        var modelChanges = 0
+        let cancellable = model.objectWillChange.sink { modelChanges += 1 }
+        defer { cancellable.cancel() }
+
+        let beforeVersion = model.rowsBox.version
+        model.rows = Self.rows(3)
+        XCTAssertNotEqual(model.rowsBox.version, beforeVersion)
+        XCTAssertEqual(modelChanges, 0, "streaming row updates should notify rowsBox without redrawing ThreadView.body")
+    }
+
     private static func rows(_ count: Int, from start: Int = 0) -> [TimelineRow] {
         let json = "[" + (start..<(start + count)).map { index in
             #"{"id":"r\#(index)","kind":"conversation","role":"\#(index.isMultiple(of: 2) ? "user" : "assistant")","text":"Message \#(index)","createdAt":\#(index)}"#

@@ -102,7 +102,12 @@ final class AppModel: ObservableObject {
     /// The last thread opened.
     var lastThreadId: String {
         get { UserDefaults.standard.string(forKey: ServerScope.key("lastThreadId", serverURL: serverURL)) ?? "" }
-        set { UserDefaults.standard.set(newValue, forKey: ServerScope.key("lastThreadId", serverURL: serverURL)) }
+        set {
+            let key = ServerScope.key("lastThreadId", serverURL: serverURL)
+            if UserDefaults.standard.string(forKey: key) != newValue {
+                UserDefaults.standard.set(newValue, forKey: key)
+            }
+        }
     }
 
     private init() {

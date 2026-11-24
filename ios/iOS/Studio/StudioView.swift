@@ -121,8 +121,12 @@ final class StudioStore: ObservableObject {
         let generation = loadGeneration
         async let projects = try? client.projects()
         if let running = try? await client.runningPlugins(), generation == loadGeneration {
-            plugins = running
-            UserDefaults.standard.set(running.sorted().joined(separator: ","), forKey: ServerScope.key("runningPlugins", serverURL: serverURL))
+            if plugins != running { plugins = running }
+            let joined = running.sorted().joined(separator: ",")
+            let key = ServerScope.key("runningPlugins", serverURL: serverURL)
+            if UserDefaults.standard.string(forKey: key) != joined {
+                UserDefaults.standard.set(joined, forKey: key)
+            }
         }
         do {
             let listing = try await fetch(client)

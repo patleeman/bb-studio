@@ -76,8 +76,6 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         var topMounted = false
         var topVersion: AnyHashable?
         var hasTop = false
-        var colorScheme: ColorScheme?
-        var dynamicTypeSize: DynamicTypeSize?
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -111,27 +109,14 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         let pill = pill
         controller.pillContent = { state, jump in AnyView(pill(state, jump).environment(\.self, environment)) }
 
-        let envChanged = coordinator.colorScheme != environment.colorScheme
-            || coordinator.dynamicTypeSize != environment.dynamicTypeSize
-        if !coordinator.composerMounted || envChanged || composerVersion == nil || coordinator.composerVersion != composerVersion {
-            coordinator.composerMounted = true
-            coordinator.composerVersion = composerVersion
-            controller.setComposer(AnyView(composer().environment(\.self, environment)))
-        }
-        let nextHasTop = top != nil
-        if !coordinator.topMounted || envChanged || coordinator.hasTop != nextHasTop || (nextHasTop && (topVersion == nil || coordinator.topVersion != topVersion)) {
-            coordinator.topMounted = true
-            coordinator.hasTop = nextHasTop
-            coordinator.topVersion = topVersion
-            controller.setTop(top.map { AnyView($0().environment(\.self, environment)) })
-        }
-        coordinator.colorScheme = environment.colorScheme
-        coordinator.dynamicTypeSize = environment.dynamicTypeSize
-
         defer { controller.pillNote = pillNote }
-        // Fast path for the common cases: unchanged rows, in-place updates
-        // (streaming tokens into existing rows), or pure tail appends.
+        // Diff rows first so we know whether this update is purely a streaming
+        // row update (unchanged composerVersion/topVersion with changed items)
+        // vs. a SwiftUI environment/chrome update (e.g. Accessibility, theme,
+        // focus, or dynamic type), which must always refresh the hosted chrome.
+        var rowsChanged = false
         let oldCount = coordinator.items.count
+        var handledRows = false
         if items.count >= oldCount, oldCount > 0 {
             var samePrefix = true
             var changed: [AnyHashable] = []
@@ -149,37 +134,65 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
                 }
             }
             if samePrefix {
+                handledRows = true
                 if items.count == oldCount {
-                    guard !changed.isEmpty else { return }
+                    if !changed.isEmpty {
+                        rowsChanged = true
+                        coordinator.items = items
+                        controller.reconfigure(changed)
+                    }
+                } else {
+                    rowsChanged = true
+                    for index in oldCount..<items.count {
+                        let item = items[index]
+                        let id = AnyHashable(item.id)
+                        coordinator.itemIDs.append(id)
+                        coordinator.byID[id] = item
+                    }
                     coordinator.items = items
-                    controller.reconfigure(changed)
-                    return
+                    controller.setRows(coordinator.itemIDs, changed: changed)
                 }
-                for index in oldCount..<items.count {
-                    let item = items[index]
-                    let id = AnyHashable(item.id)
-                    coordinator.itemIDs.append(id)
-                    coordinator.byID[id] = item
-                }
-                coordinator.items = items
-                controller.setRows(coordinator.itemIDs, changed: changed)
-                return
             }
         }
-        var changed: [AnyHashable] = []
-        var byID: [AnyHashable: Item] = [:]
-        var itemIDs: [AnyHashable] = []
-        byID.reserveCapacity(items.count)
-        itemIDs.reserveCapacity(items.count)
-        for item in items {
-            let id = AnyHashable(item.id)
-            if let old = coordinator.byID[id], old != item { changed.append(id) }
-            byID[id] = item
-            itemIDs.append(id)
+        if !handledRows {
+            rowsChanged = items != coordinator.items
+            if rowsChanged {
+                var changed: [AnyHashable] = []
+                var byID: [AnyHashable: Item] = [:]
+                var itemIDs: [AnyHashable] = []
+                byID.reserveCapacity(items.count)
+                itemIDs.reserveCapacity(items.count)
+                for item in items {
+                    let id = AnyHashable(item.id)
+                    if let old = coordinator.byID[id], old != item { changed.append(id) }
+                    byID[id] = item
+                    itemIDs.append(id)
+                }
+                coordinator.items = items
+                coordinator.itemIDs = itemIDs
+                coordinator.byID = byID
+                controller.setRows(itemIDs, changed: changed)
+            }
         }
-        coordinator.items = items
-        coordinator.itemIDs = itemIDs
-        coordinator.byID = byID
-        controller.setRows(itemIDs, changed: changed)
+
+        // Skip re-assigning hosted chrome only on pure streaming row updates;
+        // when rows didn't change (SwiftUI environment/AX update) or the chrome
+        // token changed, refresh the hosted composer/top with the fresh environment.
+        let skipComposer = rowsChanged && coordinator.composerMounted
+            && composerVersion != nil && coordinator.composerVersion == composerVersion
+        if !skipComposer {
+            coordinator.composerMounted = true
+            coordinator.composerVersion = composerVersion
+            controller.setComposer(AnyView(composer().environment(\.self, environment)))
+        }
+        let nextHasTop = top != nil
+        let skipTop = rowsChanged && coordinator.topMounted && coordinator.hasTop == nextHasTop
+            && (!nextHasTop || (topVersion != nil && coordinator.topVersion == topVersion))
+        if !skipTop {
+            coordinator.topMounted = true
+            coordinator.hasTop = nextHasTop
+            coordinator.topVersion = topVersion
+            controller.setTop(top.map { AnyView($0().environment(\.self, environment)) })
+        }
     }
 }
