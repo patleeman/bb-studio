@@ -59,6 +59,61 @@ final class ThreadRowsMemoTests: XCTestCase {
         XCTAssertNil(Directive.last(in: "Plain message without directives"))
     }
 
+    func testMarkdownInlineFastPathMatchesCommonMarkParser() throws {
+        let plainSamples = [
+            "",
+            "region-1000-0",
+            "4512",
+            "p95 (ms)",
+            "Hello, world.",
+            "Status ok / degraded",
+            "foo--bar",
+            "\"quoted\" and 'single'",
+        ]
+        for sample in plainSamples {
+            XCTAssertFalse(MarkdownText.hasInlineSyntax(sample), "expected plain fast path for \(sample)")
+            let expected = try AttributedString(markdown: sample, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))
+            XCTAssertEqual(MarkdownText.inline(sample), expected, "mismatch for \(sample)")
+        }
+        for rich in ["team **0**", "`ok`", "[link](https://example.com)", "a &amp; b", "https://example.com", "@thread:thr_abc123", "a_b_c", "~~strike~~"] {
+            XCTAssertTrue(MarkdownText.hasInlineSyntax(rich), "expected rich path for \(rich)")
+        }
+    }
+
+    func testMarkdownBlockGuardsParseAllBlockKinds() {
+        let source = """
+        ## Heading Two
+
+        Plain paragraph line.
+
+        ---
+
+        - First bullet
+        - [x] Done task
+        1. Numbered item
+
+        | Region | p95 (ms) |
+        | --- | ---: |
+        | region-1-0 | 120 |
+
+        > Quoted line
+
+        ![alt](https://example.com/a.png)
+        """
+        let blocks = MarkdownBlock.parse(source)
+        XCTAssertEqual(blocks.count, 7)
+        if case .heading(2, "Heading Two") = blocks[0] {} else { XCTFail("expected heading, got \(blocks[0])") }
+        if case .paragraph("Plain paragraph line.") = blocks[1] {} else { XCTFail("expected paragraph, got \(blocks[1])") }
+        if case .rule = blocks[2] {} else { XCTFail("expected rule, got \(blocks[2])") }
+        if case .list(let items) = blocks[3] { XCTAssertEqual(items.count, 3) } else { XCTFail("expected list, got \(blocks[3])") }
+        if case .table(let header, let rows) = blocks[4] {
+            XCTAssertEqual(header, ["Region", "p95 (ms)"])
+            XCTAssertEqual(rows, [["region-1-0", "120"]])
+        } else { XCTFail("expected table, got \(blocks[4])") }
+        if case .quote("Quoted line") = blocks[5] {} else { XCTFail("expected quote, got \(blocks[5])") }
+        if case .image(alt: "alt", src: "https://example.com/a.png") = blocks[6] {} else { XCTFail("expected image, got \(blocks[6])") }
+    }
+
     private static func rows(_ count: Int, from start: Int = 0) -> [TimelineRow] {
         let json = "[" + (start..<(start + count)).map { index in
             #"{"id":"r\#(index)","kind":"conversation","role":"\#(index.isMultiple(of: 2) ? "user" : "assistant")","text":"Message \#(index)","createdAt":\#(index)}"#

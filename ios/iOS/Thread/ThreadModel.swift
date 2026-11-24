@@ -47,7 +47,7 @@ final class ThreadModel: ObservableObject {
     @Published var unreadFrom: String?
 
     /// What BB shows above the composer: todos, goal, plan mode, background work, model fallback.
-    struct Shelf: Equatable {
+    struct Shelf: Equatable, Hashable {
         var thinking: String?
         var todos: [Todos.Item] = []
         var goal: Goal?
@@ -150,7 +150,7 @@ final class ThreadModel: ObservableObject {
     /// `shownRows` grouped into the timeline's items, once per change.
     var shownItems: [TimelineItem] {
         if let itemsMemo { return itemsMemo }
-        let items = TimelineItem.group(shownRows.filter { !$0.isQuietThought })
+        let items = TimelineItem.group(shownRows, skipQuietThoughts: true)
         itemsMemo = items
         return items
     }
@@ -511,10 +511,24 @@ final class ThreadModel: ObservableObject {
     private func replaceLatest(with window: [TimelineRow]) -> Bool {
         guard let first = window.first, let index = rows.lastIndex(where: { $0.id == first.id }) else { return false }
         windowStart = first.id
-        // Compare only the replaced tail instead of copying and comparing the whole history prefix.
-        guard !rows[index...].elementsEqual(window) else { return false }
+        // Compare only the replaced tail, and preserve unchanged TimelineRow instances
+        // so their String buffers stay pointer-equal during downstream transcript diffs.
+        let tailCount = rows.count - index
+        let common = min(tailCount, window.count)
+        var changedIndices: [Int] = []
+        for offset in 0..<common where rows[index + offset] != window[offset] {
+            changedIndices.append(offset)
+        }
+        guard !changedIndices.isEmpty || tailCount != window.count else { return false }
         var updated = rows
-        updated.replaceSubrange(index..., with: window)
+        for offset in changedIndices {
+            updated[index + offset] = window[offset]
+        }
+        if window.count > tailCount {
+            updated.append(contentsOf: window[tailCount...])
+        } else if window.count < tailCount {
+            updated.removeLast(tailCount - window.count)
+        }
         rows = updated
         return true
     }
@@ -757,14 +771,16 @@ enum TimelineItem: Identifiable {
         }
     }
 
-    static func group(_ rows: [TimelineRow]) -> [TimelineItem] {
+    static func group(_ rows: [TimelineRow], skipQuietThoughts: Bool = false) -> [TimelineItem] {
         var items: [TimelineItem] = []
+        items.reserveCapacity(rows.count)
         var pending: [TimelineRow] = []
         func flush() {
             if !pending.isEmpty { items.append(.activity(pending)) }
             pending = []
         }
         for row in rows {
+            if skipQuietThoughts, row.isQuietThought { continue }
             if row.isConversation, !(row.text ?? "").isEmpty || row.hasAttachments {
                 flush()
                 items.append(.message(row))

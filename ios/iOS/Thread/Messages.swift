@@ -585,31 +585,50 @@ struct ActivityGroup: View {
         .tint(.secondary)
     }
 
-    private var work: [TimelineRow] { rows.filter { $0.kind == "work" } }
-
     private var diffStats: TimelineRow.FileChange.Stats? {
-        let all = rows.compactMap { $0.change?.diffStats }
-        guard !all.isEmpty else { return nil }
-        return .init(added: all.map(\.added).reduce(0, +), removed: all.map(\.removed).reduce(0, +))
+        var added = 0
+        var removed = 0
+        var found = false
+        for row in rows {
+            if let stats = row.change?.diffStats {
+                added += stats.added
+                removed += stats.removed
+                found = true
+            }
+        }
+        return found ? .init(added: added, removed: removed) : nil
     }
     private var running: Bool { rows.contains { $0.status == "inProgress" || $0.status == "running" || $0.status == "pending" } }
     private var failed: Bool { rows.contains { $0.status == "failed" || $0.status == "error" } }
 
     private var summary: String {
-        if work.isEmpty { return rows.last?.title ?? "Thinking" }
-        if running, let current = rows.last(where: { $0.kind == "work" }) {
-            return ActivityStep.label(for: current)
+        var workCount = 0
+        var commands = 0
+        var reads = 0
+        var tools = 0
+        var editedPaths = Set<String>()
+        var lastWork: TimelineRow?
+        for row in rows where row.kind == "work" {
+            workCount += 1
+            lastWork = row
+            switch row.workKind {
+            case "command": commands += 1
+            case "file-read": reads += 1
+            case "file-change":
+                if let path = row.change?.path ?? row.path { editedPaths.insert(path) }
+            case "tool": tools += 1
+            default: break
+            }
         }
+        if workCount == 0 { return rows.last?.title ?? "Thinking" }
+        if running, let lastWork { return ActivityStep.label(for: lastWork) }
         var counts: [String] = []
-        let commands = work.filter { $0.workKind == "command" }.count
-        let reads = work.filter { $0.workKind == "file-read" }.count
-        let edits = Set(work.filter { $0.workKind == "file-change" }.compactMap { $0.change?.path ?? $0.path }).count
-        let tools = work.filter { $0.workKind == "tool" }.count
+        let edits = editedPaths.count
         if commands > 0 { counts.append("\(commands) command\(commands == 1 ? "" : "s")") }
         if reads > 0 { counts.append("read \(reads) file\(reads == 1 ? "" : "s")") }
         if edits > 0 { counts.append("edited \(edits) file\(edits == 1 ? "" : "s")") }
         if tools > 0 { counts.append("\(tools) tool call\(tools == 1 ? "" : "s")") }
-        return counts.isEmpty ? "\(work.count) step\(work.count == 1 ? "" : "s")" : counts.joined(separator: ", ").capitalizedFirst
+        return counts.isEmpty ? "\(workCount) step\(workCount == 1 ? "" : "s")" : counts.joined(separator: ", ").capitalizedFirst
     }
 }
 
@@ -682,7 +701,11 @@ struct ActivityStep: View {
         row.change?.path ?? (["file-change", "file-read"].contains(row.workKind ?? "") ? row.path : nil)
     }
 
-    private var hasDetail: Bool { detail != nil || row.change?.diff?.isEmpty == false }
+    private var hasDetail: Bool {
+        if row.change?.diff?.isEmpty == false { return true }
+        guard let text = row.output ?? row.detail else { return false }
+        return text.contains { !$0.isWhitespace && !$0.isNewline }
+    }
 
     private var icon: String {
         if row.status == "failed" || row.status == "error" { return "xmark.circle" }

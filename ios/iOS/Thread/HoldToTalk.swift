@@ -9,7 +9,7 @@ import SwiftUI
 /// hands-free, and the next press or a tap on the mic sends it.
 @MainActor
 final class HoldToTalk: ObservableObject {
-    enum State: Equatable { case idle, recording, cancelling, handsFree, dictating, sending }
+    enum State: Equatable, Hashable { case idle, recording, cancelling, handsFree, dictating, sending }
 
     @Published private(set) var state: State = .idle
     @Published private(set) var startedAt: Date?

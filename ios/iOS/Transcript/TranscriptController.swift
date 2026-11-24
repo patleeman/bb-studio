@@ -44,7 +44,7 @@ struct TranscriptChrome: Equatable {
 
 /// The "jump to latest" pill: shown while the reader is up in the history,
 /// with how many rows came in meanwhile.
-struct TranscriptPillState: Equatable {
+struct TranscriptPillState: Equatable, Hashable {
     var shown = false
     var unseen = 0
     /// The app's word for something waiting at the end (a question), shown
@@ -429,6 +429,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     /// Above the transcript's top (a find bar, a header); rows scroll under it.
     func setTop(_ top: AnyView?) {
+        guard top != nil || hasTop else { return }
         if hasTop != (top != nil) { view.setNeedsLayout() }
         hasTop = top != nil
         topHost.rootView = top.map(resizing) ?? AnyView(EmptyView())
@@ -517,16 +518,19 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     /// Reconfigures the cells on screen for these rows; off-screen rows
     /// pick up their content when they show.
     func reconfigure(_ changed: [AnyHashable]) {
+        var updated: [TranscriptCell] = []
         for id in changed {
             guard let indexPath = dataSource.indexPath(for: TranscriptRowID(id)),
                   let cell = collectionView.cellForItem(at: indexPath) as? TranscriptCell else { continue }
             configure(cell, id)
-            measure([cell])
+            updated.append(cell)
         }
+        guard !updated.isEmpty else { return }
+        measure(updated)
         // A reconfigured row measured before SwiftUI applied it keeps its old
         // height, and nothing else lays out while the reader is still: a
         // photo arriving on a shown message stood over the rows below it.
-        if !changed.isEmpty { remeasureNextTurn() }
+        remeasureNextTurn()
     }
 
     /// "Row A is now row B": it keeps its measured height, so the swap that

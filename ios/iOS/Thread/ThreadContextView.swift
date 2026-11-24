@@ -54,9 +54,13 @@ struct ThreadContextView: View {
         }
     }
 
-    private func captureDate(_ value: String) -> String {
+    private static let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: value)?.formatted(date: .abbreviated, time: .shortened) ?? value
+        return formatter
+    }()
+
+    private func captureDate(_ value: String) -> String {
+        Self.isoFormatter.date(from: value)?.formatted(date: .abbreviated, time: .shortened) ?? value
     }
 }

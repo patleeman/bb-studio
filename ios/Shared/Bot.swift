@@ -539,11 +539,15 @@ public struct BotLearning: Decodable, Hashable, Sendable {
     public var reviewing: Bool
     public var lastReview: Result?
 
+    private static let relativeLock = NSLock()
+    nonisolated(unsafe) private static let relativeFormatter = RelativeDateTimeFormatter()
+
     /// "Saved 1 skill · 2h ago", "Reviewing now…" or nil before the first review.
     public func status(now: Date = Date()) -> String? {
         if reviewing { return "Reviewing now…" }
         guard let lastReview else { return nil }
-        let ago = RelativeDateTimeFormatter().localizedString(for: Date(timeIntervalSince1970: lastReview.at / 1000), relativeTo: now)
+        let date = Date(timeIntervalSince1970: lastReview.at / 1000)
+        let ago = Self.relativeLock.withLock { Self.relativeFormatter.localizedString(for: date, relativeTo: now) }
         return "\(lastReview.result) · \(ago)"
     }
 }

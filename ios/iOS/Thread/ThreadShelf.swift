@@ -3,7 +3,9 @@ import SwiftUI
 /// The cards BB web stacks above the composer: model fallback, plan mode, goal,
 /// background work, todos and queued messages. Each shows only when it applies.
 struct ThreadShelf: View {
-    @ObservedObject var model: ThreadModel
+    let model: ThreadModel
+    let shelf: ThreadModel.Shelf
+    let queued: [QueuedMessage]
     var showsBackground = true
     @EnvironmentObject private var app: AppModel
     @AppStorage(ServerScope.key("dismissedFallbacks")) private var dismissedFallbacks = ""
@@ -11,7 +13,6 @@ struct ThreadShelf: View {
     @State private var queueExpanded = false
 
     var body: some View {
-        let shelf = model.shelf
         VStack(spacing: 6) {
             if let fallback = shelf.fallback, let seq = fallback.sourceSeq,
                 !dismissedFallbacks.split(separator: ",").contains(Substring(String(Int(seq))))
@@ -57,32 +58,34 @@ struct ThreadShelf: View {
             if !shelf.todos.isEmpty {
                 TodoCard(items: shelf.todos)
             }
-            if model.queued.count > 1, !queueExpanded {
-                queueSummary
-            } else {
-                if model.queued.count > 1 { queueHeader }
-                List {
-                    ForEach(model.queued) { message in
-                        queuedCard(message)
-                            .listRowInsets(EdgeInsets(top: 3, leading: 0, bottom: 3, trailing: 0))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
+            if !queued.isEmpty {
+                if queued.count > 1, !queueExpanded {
+                    queueSummary
+                } else {
+                    if queued.count > 1 { queueHeader }
+                    List {
+                        ForEach(queued) { message in
+                            queuedCard(message)
+                                .listRowInsets(EdgeInsets(top: 3, leading: 0, bottom: 3, trailing: 0))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        }
+                        .onMove { from, to in
+                            guard let index = from.first else { return }
+                            move(queued[index].id, to: to > index ? to - 1 : to)
+                        }
                     }
-                    .onMove { from, to in
-                        guard let index = from.first else { return }
-                        move(model.queued[index].id, to: to > index ? to - 1 : to)
-                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .scrollBounceBehavior(.basedOnSize)
+                    .environment(\.defaultMinListRowHeight, 40)
+                    .contentMargins(.vertical, 0, for: .scrollContent)
+                    .frame(height: min(CGFloat(queued.count) * 55, 250))
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .scrollBounceBehavior(.basedOnSize)
-                .environment(\.defaultMinListRowHeight, 40)
-                .contentMargins(.vertical, 0, for: .scrollContent)
-                .frame(height: min(CGFloat(model.queued.count) * 55, 250))
             }
         }
-        .animation(.snappy, value: model.shelf)
-        .animation(.snappy, value: model.queued)
+        .animation(.snappy, value: shelf)
+        .animation(.snappy, value: queued)
         .sheet(item: $editing) { message in
             QueuedMessageEditor(client: app.client, message: message) {
                 Task { await model.loadInteractions() }
@@ -92,11 +95,11 @@ struct ThreadShelf: View {
 
     /// Two or more queued messages fold into one row so the shelf stays short.
     private var queueSummary: some View {
-        let next = model.queued[0]
+        let next = queued[0]
         return ShelfCard(icon: "tray.full", tint: .secondary) {
             Button { withAnimation(.snappy) { queueExpanded = true } } label: {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("\(model.queued.count) queued").fontWeight(.medium)
+                    Text("\(queued.count) queued").fontWeight(.medium)
                     Text(next.text.isEmpty ? "Attachment" : next.text).foregroundStyle(.secondary).lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,7 +115,7 @@ struct ThreadShelf: View {
     private var queueHeader: some View {
         Button { withAnimation(.snappy) { queueExpanded = false } } label: {
             HStack {
-                Text("\(model.queued.count) queued · hold and drag to reorder")
+                Text("\(queued.count) queued · hold and drag to reorder")
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)

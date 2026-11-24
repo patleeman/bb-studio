@@ -103,7 +103,7 @@ public struct RelayedMessage: Hashable, Sendable {
     }
 
     public static func parse(_ text: String, initiator: String?) -> RelayedMessage? {
-        guard !text.isEmpty else { return nil }
+        guard text.hasPrefix("[bb ") else { return nil }
         let all = text[...]
         if let automation = all.prefixMatch(of: automationHeader) {
             let rest = all[automation.range.upperBound...]

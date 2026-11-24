@@ -172,30 +172,57 @@ struct MarkdownText: View {
     }()
 
     private static func parseInline(_ text: String) -> AttributedString {
-        let linked = text.replacing(MarkdownRegex.threadMention) { match in
-            let id = String(match.1)
-            let title = ThreadTitles.titles[id].map { $0.replacingOccurrences(of: "]", with: "") } ?? id
-            return "[@\(title)](bbstudio://thread/\(id))"
-        }
+        guard hasInlineSyntax(text) else { return AttributedString(text) }
+        let linked = text.contains("@thread:")
+            ? text.replacing(MarkdownRegex.threadMention) { match in
+                let id = String(match.1)
+                let title = ThreadTitles.titles[id].map { $0.replacingOccurrences(of: "]", with: "") } ?? id
+                return "[@\(title)](bbstudio://thread/\(id))"
+            }
+            : text
         guard
             var attributed = try? AttributedString(
                 markdown: linked, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))
         else { return AttributedString(text) }
         for run in attributed.runs {
-            guard let url = run.link else { continue }
-            if url.scheme == "thread" {
-                attributed[run.range].link = URL(string: "bbstudio://thread/\(url.absoluteString.dropFirst("thread:".count))")
-            } else if url.scheme == nil || url.scheme == "file" {
-                let path = url.scheme == "file" ? url.path : url.relativeString.removingPercentEncoding ?? url.relativeString
-                attributed[run.range].link = FilePathLink.url(FilePathLink.stripLine(path))
-            }
-        }
-        for run in attributed.runs where run.link == nil && run.inlinePresentationIntent?.contains(.code) == true {
-            if let path = FilePathLink.path(inCode: String(attributed[run.range].characters)) {
+            if let url = run.link {
+                if url.scheme == "thread" {
+                    attributed[run.range].link = URL(string: "bbstudio://thread/\(url.absoluteString.dropFirst("thread:".count))")
+                } else if url.scheme == nil || url.scheme == "file" {
+                    let path = url.scheme == "file" ? url.path : url.relativeString.removingPercentEncoding ?? url.relativeString
+                    attributed[run.range].link = FilePathLink.url(FilePathLink.stripLine(path))
+                }
+            } else if run.inlinePresentationIntent?.contains(.code) == true,
+                      let path = FilePathLink.path(inCode: String(attributed[run.range].characters)) {
                 attributed[run.range].link = FilePathLink.url(path)
             }
         }
         return attributed
+    }
+
+    /// Plain strings without any CommonMark inline syntax characters, entities,
+    /// or autolink/mention prefixes skip `AttributedString(markdown:)` entirely.
+    static func hasInlineSyntax(_ text: String) -> Bool {
+        for byte in text.utf8 {
+            switch byte {
+            case 0x2A, // *
+                 0x5F, // _
+                 0x60, // `
+                 0x5B, // [
+                 0x5D, // ]
+                 0x21, // !
+                 0x7E, // ~
+                 0x5C, // \
+                 0x3C, // <
+                 0x3E, // >
+                 0x26, // &
+                 0x3A: // : (URLs, @thread:)
+                return true
+            default:
+                continue
+            }
+        }
+        return false
     }
 }
 
@@ -354,10 +381,11 @@ enum MarkdownBlock {
                     flush()
                     blocks.append(.loop(loop))
                 }
-            } else if let heading = trimmed.firstMatch(of: MarkdownRegex.heading) {
+            } else if trimmed.first == "#", let heading = trimmed.firstMatch(of: MarkdownRegex.heading) {
                 flush()
                 blocks.append(.heading(heading.1.count, String(heading.2)))
-            } else if trimmed.wholeMatch(of: MarkdownRegex.rule) != nil {
+            } else if let first = trimmed.first, (first == "-" || first == "*" || first == "_"),
+                      trimmed.wholeMatch(of: MarkdownRegex.rule) != nil {
                 flush()
                 blocks.append(.rule)
             } else if trimmed.hasPrefix(">") {
@@ -373,7 +401,8 @@ enum MarkdownBlock {
                     index += 1
                 }
                 blocks.append(.table(header: header, rows: rows))
-            } else if let item = line.firstMatch(of: MarkdownRegex.listItem) {
+            } else if let first = trimmed.first, (first == "-" || first == "*" || first == "+" || (first.isASCII && first.isNumber)),
+                      let item = line.firstMatch(of: MarkdownRegex.listItem) {
                 if !paragraph.isEmpty || !quote.isEmpty { flush() }
                 let indent = item.1.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
                 if let last = indents.last, indent > last {
@@ -410,6 +439,7 @@ enum MarkdownBlock {
 
     /// A paragraph's text without its images, then the images.
     private static func withImages(_ text: String) -> [MarkdownBlock] {
+        guard text.contains("![") else { return [.paragraph(text)] }
         let images = text.matches(of: imagePattern).map {
             MarkdownBlock.image(alt: String($0.1), src: String($0.2 ?? $0.3 ?? ""))
         }
@@ -642,8 +672,10 @@ private struct CappedWidth: Layout {
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         guard let content = subviews.first else { return .zero }
-        var width = min(content.sizeThatFits(.unspecified).width.rounded(.up), max)
+        let ideal = content.sizeThatFits(.unspecified)
+        var width = min(ideal.width.rounded(.up), max)
         if let offered = proposal.width, offered.isFinite, offered > width { width = min(offered, max) }
+        if ideal.width <= width { return CGSize(width: width, height: ideal.height) }
         return CGSize(width: width, height: content.sizeThatFits(ProposedViewSize(width: width, height: nil)).height)
     }
 

@@ -554,7 +554,7 @@ struct ThreadView: View {
     /// The page goes in above the reader, so bring back what was the first
     /// item. By id rather than offset: rows above are only estimated heights.
     private func loadOlder() async -> OlderPage {
-        let first = TimelineItem.group(model.rows).first?.id
+        let first = model.shownItems.first?.id
         guard let first else { return .nothing }
         let result = await model.loadOlder()
         ScrollLog.request("loadOlder \(result) keep \(ScrollLog.id(first))")
@@ -703,7 +703,7 @@ struct ThreadView: View {
     /// The item holding the first unread row.
     private func unreadItem(in items: [TimelineItem]? = nil) -> String? {
         guard let id = model.unreadFrom else { return nil }
-        return (items ?? TimelineItem.group(model.rows)).first { $0.rows.contains { $0.id == id } }?.id
+        return (items ?? model.shownItems).first { $0.rows.contains { $0.id == id } }?.id
     }
 
     private var currentMatch: String? {
@@ -1153,7 +1153,7 @@ struct ThreadView: View {
                 WorkerApprovalCards(approvals: approvals, openWorker: { conversation.push(.thread(id: $0)) }, decide: decideApproval)
             }
             if !(composerFocused && stackLine) {
-                ThreadShelf(model: model, showsBackground: true)
+                ThreadShelf(model: model, shelf: model.shelf, queued: model.queued, showsBackground: true)
                     .padding(.trailing, stackClear)
             }
             if let error = outbox.storageError {
@@ -1654,7 +1654,9 @@ extension ThreadView {
             pillNote: transcriptV2PillNote,
             probe: transcriptV2Probe,
             describeID: { ($0.base as? String).map(ScrollLog.id) ?? "?" },
-            spotKey: model.threadId)
+            spotKey: model.threadId,
+            composerVersion: transcriptV2ComposerVersion,
+            topVersion: transcriptV2TopVersion)
         // Under the header and to the edges; it ends at the keyboard's top.
         .ignoresSafeArea(.container)
         .overlay {
@@ -1808,6 +1810,162 @@ extension ThreadView {
     }
 
     fileprivate var transcriptV2HasTop: Bool { finding || duoLayout.twoPages || compactHeader }
+
+    /// Every input that affects the hosted composer chrome, excluding `model.rows`,
+    /// so streaming ticks don't re-assign `composerHost.rootView` while typing.
+    fileprivate struct TranscriptComposerVersion: Hashable {
+        var threadId: String
+        var threadStatus: String?
+        var isRunning: Bool
+        var projectId: String?
+        var providerId: String?
+        var environmentId: String?
+        var sending: Bool
+        var planReview: PlanReview?
+        var firstInteractionId: String?
+        var shelf: ThreadModel.Shelf
+        var queued: [QueuedMessage]
+        var outboxStorageError: String?
+        var note: StudioNote?
+        var noteExpanding: Bool
+        var composerFocused: Bool
+        var attachmentIds: [UUID]
+        var mentionsCount: Int
+        var editing: Bool
+        var executionLabel: String?
+        var handoffText: String?
+        var handoffWorking: Bool
+        var pendingPermission: String?
+        var jumpState: TranscriptPillState
+        var jumpInRail: Bool
+        var lying: Bool
+        var runningPlugins: String
+        var compactInput: Bool
+        var placeholder: String
+        var worker: WorkerInfo?
+        var workerAskError: String?
+        var askingWorker: Bool
+        var answeringHere: Bool
+        var inConversation: Bool
+        var botId: String?
+        var botName: String?
+        var botPause: String?
+        var strandsBeside: Bool
+        var onlyStrand: String?
+        var flashStrand: Double?
+        var approvalsCount: Int
+        var approvalsWaiting: Bool
+        var talkState: HoldToTalk.State
+        var dictationBlocksSend: Bool
+        var twoPages: Bool
+        var statusColumn: CGFloat
+        var lookThemeId: String
+        var lookShowsScene: Bool
+    }
+
+    fileprivate var transcriptV2ComposerVersion: TranscriptComposerVersion {
+        TranscriptComposerVersion(
+            threadId: model.threadId,
+            threadStatus: model.thread?.status,
+            isRunning: model.thread?.isRunning == true,
+            projectId: model.thread?.projectId,
+            providerId: model.thread?.providerId,
+            environmentId: model.thread?.environmentId,
+            sending: model.sending,
+            planReview: model.planReview,
+            firstInteractionId: model.interactions.first?.id,
+            shelf: model.shelf,
+            queued: model.queued,
+            outboxStorageError: outbox.storageError,
+            note: notes.note,
+            noteExpanding: notes.expanding,
+            composerFocused: composerFocused,
+            attachmentIds: attachments.map(\.id),
+            mentionsCount: mentions.count,
+            editing: editing,
+            executionLabel: executionLabel,
+            handoffText: handoffStatus?.text,
+            handoffWorking: handoffStatus?.working == true,
+            pendingPermission: pendingPermission,
+            jumpState: jumpState,
+            jumpInRail: jumpInRail,
+            lying: lying,
+            runningPlugins: runningPlugins,
+            compactInput: compactInput,
+            placeholder: placeholder,
+            worker: worker,
+            workerAskError: workerAskError,
+            askingWorker: askingWorker,
+            answeringHere: answeringHere,
+            inConversation: conversation != nil,
+            botId: conversation?.botId,
+            botName: conversation?.botName,
+            botPause: conversation?.botPause,
+            strandsBeside: roomChat?.strandsBeside == true,
+            onlyStrand: strands.only[model.threadId],
+            flashStrand: strands.flash[model.threadId],
+            approvalsCount: approvals.cards.count,
+            approvalsWaiting: approvals.waiting,
+            talkState: talk.state,
+            dictationBlocksSend: dictation.blocksSend,
+            twoPages: duoLayout.twoPages,
+            statusColumn: duoLayout.statusColumn,
+            lookThemeId: look.theme.id,
+            lookShowsScene: look.showsScene
+        )
+    }
+
+    /// Every input that affects the hosted top header/find bar, excluding `model.rows`
+    /// unless Find is active.
+    fileprivate struct TranscriptTopVersion: Hashable {
+        var compactHeader: Bool
+        var twoPages: Bool
+        var statusColumn: CGFloat
+        var lying: Bool
+        var worker: WorkerInfo?
+        var title: String?
+        var conversationTitle: String?
+        var conversationChip: String?
+        var executionLabel: String?
+        var inConversation: Bool
+        var isRunning: Bool
+        var sizeClassCompact: Bool
+        var canSaveFiles: Bool
+        var sourcePageId: String?
+        var finishing: Bool
+        var isMuted: Bool
+        var finding: Bool
+        var findQuery: String
+        var findIndex: Int
+        var findMatchCount: Int
+        var loadingAll: Bool
+    }
+
+    fileprivate var transcriptV2TopVersion: TranscriptTopVersion {
+        TranscriptTopVersion(
+            compactHeader: compactHeader,
+            twoPages: duoLayout.twoPages,
+            statusColumn: duoLayout.statusColumn,
+            lying: lying,
+            worker: worker,
+            title: model.thread.map { ThreadTitles.resolve($0.displayTitle) },
+            conversationTitle: conversation?.conversation?.title,
+            conversationChip: conversationModel?.chip,
+            executionLabel: executionLabel,
+            inConversation: conversation != nil,
+            isRunning: model.thread?.isRunning == true,
+            sizeClassCompact: sizeClass == .compact,
+            canSaveFiles: canSaveFiles,
+            sourcePageId: sourcePage?.id,
+            finishing: finishing,
+            isMuted: muted.ids.contains(model.threadId),
+            finding: finding,
+            findQuery: findQuery,
+            findIndex: findIndex,
+            findMatchCount: finding ? findMatches.count : 0,
+            loadingAll: model.loadingAll
+        )
+    }
 
     /// The Duo's header beside two pages, and the find bar under it.
     fileprivate var transcriptV2Top: some View {

@@ -61,10 +61,23 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
     var describeID: ((AnyHashable) -> String)?
     /// The conversation, for its reading spot across rebuilds (`TranscriptReadingSpots`).
     var spotKey: String?
+    /// Optional change keys for the hosted composer and top chrome. When set and
+    /// unchanged (along with colorScheme / dynamicTypeSize), their UIHostingController
+    /// rootViews aren't replaced on unrelated row updates (e.g. streaming tokens).
+    var composerVersion: AnyHashable? = nil
+    var topVersion: AnyHashable? = nil
 
     final class Coordinator {
         var items: [Item] = []
+        var itemIDs: [AnyHashable] = []
         var byID: [AnyHashable: Item] = [:]
+        var composerMounted = false
+        var composerVersion: AnyHashable?
+        var topMounted = false
+        var topVersion: AnyHashable?
+        var hasTop = false
+        var colorScheme: ColorScheme?
+        var dynamicTypeSize: DynamicTypeSize?
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -97,45 +110,76 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         }
         let pill = pill
         controller.pillContent = { state, jump in AnyView(pill(state, jump).environment(\.self, environment)) }
-        controller.setComposer(AnyView(composer().environment(\.self, environment)))
-        controller.setTop(top.map { AnyView($0().environment(\.self, environment)) })
+
+        let envChanged = coordinator.colorScheme != environment.colorScheme
+            || coordinator.dynamicTypeSize != environment.dynamicTypeSize
+        if !coordinator.composerMounted || envChanged || composerVersion == nil || coordinator.composerVersion != composerVersion {
+            coordinator.composerMounted = true
+            coordinator.composerVersion = composerVersion
+            controller.setComposer(AnyView(composer().environment(\.self, environment)))
+        }
+        let nextHasTop = top != nil
+        if !coordinator.topMounted || envChanged || coordinator.hasTop != nextHasTop || (nextHasTop && (topVersion == nil || coordinator.topVersion != topVersion)) {
+            coordinator.topMounted = true
+            coordinator.hasTop = nextHasTop
+            coordinator.topVersion = topVersion
+            controller.setTop(top.map { AnyView($0().environment(\.self, environment)) })
+        }
+        coordinator.colorScheme = environment.colorScheme
+        coordinator.dynamicTypeSize = environment.dynamicTypeSize
 
         defer { controller.pillNote = pillNote }
-        // Fast path for the common cases: unchanged rows, or in-place updates
-        // (streaming tokens into existing rows) with identical order and count.
-        if items.count == coordinator.items.count {
-            var sameOrder = true
+        // Fast path for the common cases: unchanged rows, in-place updates
+        // (streaming tokens into existing rows), or pure tail appends.
+        let oldCount = coordinator.items.count
+        if items.count >= oldCount, oldCount > 0 {
+            var samePrefix = true
             var changed: [AnyHashable] = []
-            for index in items.indices {
+            for index in 0..<oldCount {
                 let item = items[index]
                 let old = coordinator.items[index]
                 if item.id != old.id {
-                    sameOrder = false
+                    samePrefix = false
                     break
                 }
                 if item != old {
-                    let id = AnyHashable(item.id)
+                    let id = coordinator.itemIDs[index]
                     changed.append(id)
                     coordinator.byID[id] = item
                 }
             }
-            if sameOrder {
-                guard !changed.isEmpty else { return }
+            if samePrefix {
+                if items.count == oldCount {
+                    guard !changed.isEmpty else { return }
+                    coordinator.items = items
+                    controller.reconfigure(changed)
+                    return
+                }
+                for index in oldCount..<items.count {
+                    let item = items[index]
+                    let id = AnyHashable(item.id)
+                    coordinator.itemIDs.append(id)
+                    coordinator.byID[id] = item
+                }
                 coordinator.items = items
-                controller.reconfigure(changed)
+                controller.setRows(coordinator.itemIDs, changed: changed)
                 return
             }
         }
         var changed: [AnyHashable] = []
         var byID: [AnyHashable: Item] = [:]
+        var itemIDs: [AnyHashable] = []
         byID.reserveCapacity(items.count)
+        itemIDs.reserveCapacity(items.count)
         for item in items {
             let id = AnyHashable(item.id)
             if let old = coordinator.byID[id], old != item { changed.append(id) }
             byID[id] = item
+            itemIDs.append(id)
         }
         coordinator.items = items
+        coordinator.itemIDs = itemIDs
         coordinator.byID = byID
-        controller.setRows(items.map { AnyHashable($0.id) }, changed: changed)
+        controller.setRows(itemIDs, changed: changed)
     }
 }
