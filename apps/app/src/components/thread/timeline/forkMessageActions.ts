@@ -56,6 +56,25 @@ function run(
   }
 }
 
+const sortedSlotsCache = new WeakMap<
+  readonly PluginMessageActionMenuSlot[],
+  readonly PluginMessageActionMenuSlot[]
+>();
+
+function sortedSlots(
+  slots: readonly PluginMessageActionMenuSlot[],
+): readonly PluginMessageActionMenuSlot[] {
+  let cached = sortedSlotsCache.get(slots);
+  if (cached === undefined) {
+    cached = [...slots].sort(
+      (a, b) =>
+        a.pluginId.localeCompare(b.pluginId) || a.id.localeCompare(b.id),
+    );
+    sortedSlotsCache.set(slots, cached);
+  }
+  return cached;
+}
+
 export function forkMessageMenuActions(
   slots: readonly PluginMessageActionMenuSlot[],
   row: MessageRow,
@@ -68,11 +87,7 @@ export function forkMessageMenuActions(
     role: row.role,
     sourceSeqEnd: row.sourceSeqEnd,
   };
-  return [...slots]
-    .sort(
-      (a, b) =>
-        a.pluginId.localeCompare(b.pluginId) || a.id.localeCompare(b.id),
-    )
+  return sortedSlots(slots)
     .filter((slot) => isAvailable(slot, message))
     .map((slot) => ({
       key: `${slot.experimental_replaces === "thread.fork" ? REPLACES_FORK_KEY_PREFIX : MENU_KEY_PREFIX}${slot.pluginId}/${slot.id}/${slot.generation}`,
