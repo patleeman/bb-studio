@@ -28,6 +28,7 @@ final class Breadcrumbs {
     private var flushPending = false
     /// Waits before a write: `flush` runs at most this often while events come in.
     var flushDelay: Duration = .seconds(1)
+    private let writeQueue = DispatchQueue(label: "nyc.plee.bbgo.breadcrumbs", qos: .utility)
 
     init(directory: URL) {
         self.directory = directory
@@ -70,11 +71,16 @@ final class Breadcrumbs {
         mark(phase == "background" ? "background" : "active")
     }
 
-    /// Writes the lines now.
+    /// Writes the lines now (synchronously, serialized with background flushes).
     func flush() {
         flushPending = false
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try? Data((lines.joined(separator: "\n") + "\n").utf8).write(to: file, options: .atomic)
+        let payload = Data((lines.joined(separator: "\n") + "\n").utf8)
+        let dir = directory
+        let target = file
+        writeQueue.sync {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try? payload.write(to: target, options: .atomic)
+        }
     }
 
     func clearLastCrash() {
@@ -94,7 +100,14 @@ final class Breadcrumbs {
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: delay)
             guard let self, flushPending else { return }
-            flush()
+            flushPending = false
+            let payload = Data((lines.joined(separator: "\n") + "\n").utf8)
+            let dir = directory
+            let target = file
+            writeQueue.async {
+                try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                try? payload.write(to: target, options: .atomic)
+            }
         }
     }
 }

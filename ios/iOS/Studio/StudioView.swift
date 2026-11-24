@@ -11,12 +11,26 @@ final class StudioStore: ObservableObject {
     /// Archived ones too; the list shows them on request.
     @Published private(set) var items: [StudioItem] = []
     /// What each add-on says its kinds can do, from the Studio plugin.
-    @Published private(set) var kindInfo: [StudioKindInfo] = []
+    @Published private(set) var kindInfo: [StudioKindInfo] = [] {
+        didSet {
+            infoByKey = Dictionary(kindInfo.map { ("\($0.pluginId):\($0.id)", $0) }, uniquingKeysWith: { first, _ in first })
+        }
+    }
     /// Studio's tags, in name order.
-    @Published private(set) var tags: [StudioTag] = []
+    @Published private(set) var tags: [StudioTag] = [] {
+        didSet {
+            tagsById = Dictionary(tags.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        }
+    }
     @Published private(set) var supportsTags = false
     /// Starred items, newest-starred first.
-    @Published private(set) var starred: [StudioItem] = []
+    @Published private(set) var starred: [StudioItem] = [] {
+        didSet { starredIds = Set(starred.map(\.id)) }
+    }
+    private var infoByKey: [String: StudioKindInfo] = [:]
+    private(set) var tagsById: [String: StudioTag] = [:]
+    private var starredIds: Set<String> = []
+    private static let cacheQueue = DispatchQueue(label: "nyc.plee.bbgo.studio-cache", qos: .utility)
     @Published private(set) var supportsStars = false
     @Published private(set) var projectNames: [String: String] = [:]
     @Published private(set) var plugins: Set<String> = []
@@ -122,11 +136,13 @@ final class StudioStore: ObservableObject {
             self.items = Self.shown(listing.items).sorted { $0.updatedAt > $1.updatedAt }
             Spotlight.indexStudio(self.items, serverURL: serverURL)
             error = nil
-            DiskCache.save(
-                StudioSnapshot(
-                    items: self.items, kinds: kindInfo, tags: supportsTags ? tags : nil,
-                    starred: supportsStars ? starred : nil),
-                as: StudioSnapshot.cacheKey, serverURL: serverURL)
+            let snapshot = StudioSnapshot(
+                items: self.items, kinds: kindInfo, tags: supportsTags ? tags : nil,
+                starred: supportsStars ? starred : nil)
+            let serverURL = self.serverURL
+            Self.cacheQueue.async {
+                DiskCache.save(snapshot, as: StudioSnapshot.cacheKey, serverURL: serverURL)
+            }
         } catch where BBClient.isCancellation(error) {
         } catch {
             guard generation == loadGeneration else { return }
@@ -209,7 +225,7 @@ final class StudioStore: ObservableObject {
     }
 
     func info(_ item: StudioItem) -> StudioKindInfo? {
-        kindInfo.first { $0.pluginId == item.pluginId && $0.id == item.kind }
+        infoByKey["\(item.pluginId):\(item.kind)"]
     }
 
     func archive(_ item: StudioItem, _ archived: Bool, client: BBClient) async throws {
@@ -244,7 +260,7 @@ final class StudioStore: ObservableObject {
         }
     }
 
-    func isStarred(_ item: StudioItem) -> Bool { starred.contains { $0.id == item.id } }
+    func isStarred(_ item: StudioItem) -> Bool { starredIds.contains(item.id) }
 
     /// The item a route opens, for its star.
     func item(for route: Route) -> StudioItem? {
@@ -720,8 +736,11 @@ struct StudioView: View {
                     .listRowBackground(Color.clear)
             }
             if selectsDetail, query.isEmpty {
+                let parentKeys: Set<String> = Set(store.items.compactMap { item in
+                    item.parentId.map { "\(item.pluginId):\($0)" }
+                })
                 let folders = store.items.filter { parent in
-                    !parent.archived && store.items.contains { $0.pluginId == parent.pluginId && $0.parentId == parent.itemId }
+                    !parent.archived && parentKeys.contains("\(parent.pluginId):\(parent.itemId)")
                 }
                 if !folders.isEmpty {
                     Section("Folders") {
@@ -936,9 +955,10 @@ struct StudioView: View {
 
     @ViewBuilder
     private func row(_ item: StudioItem) -> some View {
+        let itemTags = (item.tags ?? []).compactMap { store.tagsById[$0] }
         let content = StudioRow(
             item: item, project: project.isEmpty ? projectName(item) : nil,
-            tags: store.tags.filter { item.tags?.contains($0.id) == true },
+            tags: itemTags,
             snippet: query.isEmpty ? nil : contentMatches[item.id].flatMap { $0.isEmpty ? nil : $0 },
             highlight: query.trimmingCharacters(in: .whitespaces))
         opener(item, id: "studioItem") { content }
@@ -1104,25 +1124,26 @@ struct StudioView: View {
 
     private struct DaySection {
         let title: String
-        let items: [StudioItem]
+        var items: [StudioItem]
     }
 
     /// Today, Yesterday, Previous 7 Days, then by month.
     private func sections(_ visible: [StudioItem]) -> [DaySection] {
         let calendar = Calendar.current
         let now = Date.now
+        let week = calendar.date(byAdding: .day, value: -7, to: now)
         func title(_ item: StudioItem) -> String {
             let date = Date(timeIntervalSince1970: item.updatedAt / 1000)
             if calendar.isDateInToday(date) { return "Today" }
             if calendar.isDateInYesterday(date) { return "Yesterday" }
-            if let week = calendar.date(byAdding: .day, value: -7, to: now), date > week { return "Previous 7 Days" }
+            if let week, date > week { return "Previous 7 Days" }
             return date.formatted(calendar.isDate(date, equalTo: now, toGranularity: .year) ? .dateTime.month(.wide) : .dateTime.month(.wide).year())
         }
         var result: [DaySection] = []
         for item in visible {
             let key = title(item)
             if result.last?.title == key {
-                result[result.count - 1] = DaySection(title: key, items: result[result.count - 1].items + [item])
+                result[result.count - 1].items.append(item)
             } else {
                 result.append(DaySection(title: key, items: [item]))
             }
@@ -1542,9 +1563,7 @@ struct StudioThumbnail: View {
             }
             .task(id: key) { await draw() }
         } else {
-            AsyncImage(url: URL(string: path, relativeTo: client.baseURL)) { image in
-                image.resizable().scaledToFill()
-            } placeholder: {
+            DownsampledRemoteImage(url: URL(string: path, relativeTo: client.baseURL), pixels: 180, contentMode: .fill) {
                 Image(systemName: kind.symbol).font(.body.weight(.medium)).foregroundStyle(kind.tint)
             }
         }

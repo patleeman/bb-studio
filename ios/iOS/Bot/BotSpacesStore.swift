@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 @MainActor
@@ -28,6 +29,8 @@ final class BotSpacesStore: ObservableObject {
     private var spacesDirty = false
     private var dirtyViews: Set<String> = []
     private var flushTask: Task<Void, Never>?
+    private var waitTask: Task<Void, Never>?
+    private var idleWatch: AnyCancellable?
     private var spacesGeneration = 0
     private var viewGeneration: [String: Int] = [:]
     private var retryTask: Task<Void, Never>?
@@ -36,6 +39,14 @@ final class BotSpacesStore: ObservableObject {
     init(serverURL: URL = ServerScope.selectedURL) {
         self.serverURL = serverURL
         support = BotSpacesSupport.stored(serverURL: serverURL)
+        idleWatch = EnergyGate.shared.$idle.removeDuplicates().sink { [weak self] idle in
+            if !idle { self?.wakePacedWait() }
+        }
+    }
+
+    private func wakePacedWait() {
+        waitTask?.cancel()
+        waitTask = nil
     }
 
     var useSpaces: Bool { support == .available }
@@ -122,6 +133,7 @@ final class BotSpacesStore: ObservableObject {
     }
 
     func refresh() async {
+        wakePacedWait()
         flushTask?.cancel()
         flushTask = nil
         spacesDirty = true
@@ -133,19 +145,28 @@ final class BotSpacesStore: ObservableObject {
     private func schedule(spaces: Bool = false, views: Set<String> = [], paced: Bool = false) {
         spacesDirty = spacesDirty || spaces
         dirtyViews.formUnion(views)
-        if !paced { unpaced = true }
+        if !paced {
+            unpaced = true
+            wakePacedWait()
+        }
         guard flushTask == nil, spacesDirty || !dirtyViews.isEmpty else { return }
         flushTask = Task { [weak self] in
             guard let delay = self?.coalesceDelay else { return }
             try? await Task.sleep(for: delay)
-            // Signals only, while idle: at most one flush every 30 s (5 min at
-            // rest). In use, or for anything unpaced, no wait, as before.
-            // Looks again every second, so a touch or an unpaced request lets
-            // a held flush go.
+            // Signals only, while idle: sleep for the full gap (30 s, or 5 min
+            // at rest) with zero timer wakeups, waking immediately on a touch
+            // (EnergyGate.$idle -> false) or an unpaced request.
             while let self, !Task.isCancelled, !self.unpaced {
                 let wait = self.lastFlush + EnergyGate.shared.changeGap(.zero) - ContinuousClock.now
                 if wait <= .zero { break }
-                try? await Task.sleep(for: min(wait, .seconds(1)))
+                let sleeper = Task<Void, Never> { _ = try? await Task.sleep(for: wait) }
+                self.waitTask = sleeper
+                await withTaskCancellationHandler {
+                    await sleeper.value
+                } onCancel: {
+                    sleeper.cancel()
+                }
+                self.waitTask = nil
             }
             guard !Task.isCancelled, let self else { return }
             while spacesDirty || !dirtyViews.isEmpty {

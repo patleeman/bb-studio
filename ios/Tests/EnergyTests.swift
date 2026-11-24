@@ -88,4 +88,80 @@ final class EnergyTests: XCTestCase {
         let items = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
         XCTAssertEqual(items, [URLQueryItem(name: "listEvents", value: "status")])
     }
+
+    // MARK: Cancellation, caching, and session bounds
+
+    @MainActor
+    func testCancelledBackgroundPollExitsWithoutWaitingForForeground() async {
+        let gate = EnergyGate(watchKeyboard: false)
+        gate.setBackground(true)
+        let started = expectation(description: "poll started")
+        let ended = expectation(description: "poll ended on cancel")
+        let task = Task { @MainActor in
+            started.fulfill()
+            await gate.pollWait(.milliseconds(10))
+            ended.fulfill()
+        }
+        await fulfillment(of: [started], timeout: 1)
+        try? await Task.sleep(for: .milliseconds(40))
+        task.cancel()
+        await fulfillment(of: [ended], timeout: 1)
+    }
+
+    func testExecutionOptionsAreCachedPerClientAndProvider() async throws {
+        let count = ExecutionOptionsCallCounter()
+        let client = BBClient(baseURL: URL(string: "https://cache.invalid")!)
+        client.transport = { _, path, _ in
+            count.increment()
+            return (200, Data(#"{"providers":[],"models":[]}"#.utf8))
+        }
+        _ = try await client.executionOptions(providerId: "claude-code")
+        _ = try await client.executionOptions(providerId: "claude-code")
+        XCTAssertEqual(count.value, 1, "same provider reuses cached options")
+        _ = try await client.executionOptions(providerId: "codex")
+        XCTAssertEqual(count.value, 2, "different provider fetches separately")
+    }
+
+    func testSinglePassRPCDecodingHandlesOkErrorAndNullResult() async throws {
+        struct Payload: Decodable, Equatable { var name: String }
+        let client = BBClient(baseURL: URL(string: "https://rpc.invalid")!)
+        client.transport = { _, path, _ in
+            if path.hasSuffix("/ok") { return (200, Data(#"{"ok":true,"result":{"name":"ready"}}"#.utf8)) }
+            if path.hasSuffix("/null") { return (200, Data(#"{"ok":true,"result":null}"#.utf8)) }
+            return (200, Data(#"{"ok":false,"error":{"message":"denied"}}"#.utf8))
+        }
+        let ok: Payload = try await client.rpc("studio", "ok")
+        XCTAssertEqual(ok, Payload(name: "ready"))
+        let none: Payload? = try await client.rpcIfPresent("studio", "null")
+        XCTAssertNil(none)
+        do {
+            let _: Payload = try await client.rpc("studio", "fail")
+            XCTFail("expected error")
+        } catch let error as BBError {
+            XCTAssertEqual(error.message, "denied")
+        }
+    }
+
+    @MainActor
+    func testRoomSessionsEvictsLeastRecentlyUsedSessionsBeyondCap() {
+        let sessions = RoomSessions(main: "t0")
+        let first = sessions.current
+        for i in 1...10 {
+            sessions.show("t\(i)")
+            _ = sessions.current
+        }
+        let latest = sessions.session(for: "t10")
+        XCTAssertTrue(sessions.current === latest)
+        // Oldest session t0 was evicted, so asking for it builds a fresh instance.
+        let reloaded = sessions.session(for: "t0")
+        XCTAssertEqual(reloaded.threadId, "t0")
+        XCTAssertFalse(first === reloaded, "oldest session should be evicted past maxCached")
+    }
+}
+
+private final class ExecutionOptionsCallCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _value = 0
+    var value: Int { lock.withLock { _value } }
+    func increment() { lock.withLock { _value += 1 } }
 }

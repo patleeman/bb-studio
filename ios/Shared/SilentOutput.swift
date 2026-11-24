@@ -6,8 +6,22 @@ import Foundation
 /// see docs/silent-output.md.
 public enum SilentOutput {
     public static func isPass(_ text: String?) -> Bool {
-        guard let text else { return false }
-        return text.range(of: #"^[\s`*_~]*\[pass\][\s`*_~]*$"#, options: [.regularExpression, .caseInsensitive]) != nil
+        guard let text, !text.isEmpty else { return false }
+        let scalars = text.unicodeScalars
+        var start = scalars.startIndex
+        var end = scalars.endIndex
+        func isTrim(_ s: Unicode.Scalar) -> Bool {
+            s.properties.isWhitespace || s == "`" || s == "*" || s == "_" || s == "~"
+        }
+        while start < end, isTrim(scalars[start]) { scalars.formIndex(after: &start) }
+        while end > start {
+            let prev = scalars.index(before: end)
+            guard isTrim(scalars[prev]) else { break }
+            end = prev
+        }
+        let slice = scalars[start..<end]
+        guard slice.count == 6 else { return false }
+        return Substring(slice).lowercased() == "[pass]"
     }
 }
 

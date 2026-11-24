@@ -110,7 +110,11 @@ final class PresenceCatalog: ObservableObject {
 final class PresenceStills {
     static let shared = PresenceStills()
 
-    private var memory: [String: UIImage] = [:]
+    private let memory: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.totalCostLimit = 16 << 20
+        return cache
+    }()
     private var host: LookWebView?
     private var queue: Task<Void, Never>?
     private(set) var renders = 0
@@ -122,11 +126,16 @@ final class PresenceStills {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
+    private static func imageCost(_ image: UIImage) -> Int {
+        Int(image.size.width * image.size.height * image.scale * image.scale * 4)
+    }
+
     func cached(_ spec: PresenceSpec) -> UIImage? {
         let key = spec.stillKey
-        if let image = memory[key] { return image }
+        let cacheKey = key as NSString
+        if let image = memory.object(forKey: cacheKey) { return image }
         guard let data = try? Data(contentsOf: directory.appending(path: key + ".png")), let image = UIImage(data: data, scale: spec.scale) else { return nil }
-        memory[key] = image
+        memory.setObject(image, forKey: cacheKey, cost: Self.imageCost(image))
         return image
     }
 
@@ -155,8 +164,11 @@ final class PresenceStills {
                   let image = SceneStills.decode(url).flatMap({ $0.cgImage }).map({ UIImage(cgImage: $0, scale: spec.scale, orientation: .up) })
             else { return nil }
             renders += 1
-            memory[spec.stillKey] = image
-            if let data = image.pngData() { try? data.write(to: directory.appending(path: spec.stillKey + ".png"), options: .atomic) }
+            memory.setObject(image, forKey: spec.stillKey as NSString, cost: Self.imageCost(image))
+            let target = directory.appending(path: spec.stillKey + ".png")
+            await Task.detached(priority: .utility) {
+                if let data = image.pngData() { try? data.write(to: target, options: .atomic) }
+            }.value
             return image
         } catch {
             failures[spec.form] = error.localizedDescription

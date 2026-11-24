@@ -48,11 +48,12 @@ struct MessageBubble: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(.contextMenuPreview, .rect(cornerRadius: 8))
                     .contextMenu { menu }
-                let reactions = Directive.reactions(in: text)
+                let lastDirective = Directive.last(in: text)
+                let reactions = Directive.reactions(from: lastDirective)
                 if !reactions.isEmpty {
                     ReactionChips(items: reactions, react: react)
                 }
-                let next = Directive.next(in: text)
+                let next = Directive.next(from: lastDirective)
                 if !next.isEmpty {
                     NextCard(next: next, react: react)
                 }

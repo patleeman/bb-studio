@@ -330,13 +330,17 @@ enum LibraryPage {
         return words.allSatisfy { text.contains($0) }
     }
 
+    nonisolated(unsafe) private static let extensionRegex = try! Regex(#"\.[a-z0-9]{2,4}$"#)
+    nonisolated(unsafe) private static let digitsRegex = try! Regex(#"\d+"#)
+    nonisolated(unsafe) private static let separatorRegex = try! Regex(#"[\s…·-]+"#)
+
     static func titleStem(_ title: String) -> String {
         let clean = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var head = clean
         if let colon = clean.firstIndex(of: ":"), clean.distance(from: clean.startIndex, to: colon) >= 12 { head = String(clean[..<colon]) }
-        head = head.replacingOccurrences(of: #"\.[a-z0-9]{2,4}$"#, with: "", options: .regularExpression)
-        head = head.replacingOccurrences(of: #"\d+"#, with: "#", options: .regularExpression)
-        head = head.replacingOccurrences(of: #"[\s…·-]+"#, with: " ", options: .regularExpression)
+        head = head.replacing(extensionRegex, with: "")
+        head = head.replacing(digitsRegex, with: "#")
+        head = head.replacing(separatorRegex, with: " ")
         return head.trimmingCharacters(in: .whitespaces)
     }
 

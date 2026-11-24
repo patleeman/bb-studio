@@ -311,8 +311,11 @@ struct ThreadView: View {
         }
         // Again after the sheet closes, in case it changed them.
         .task(id: "\(model.threadId) \(model.thread?.providerId ?? "") \(choosingModel)") {
-            guard !choosingModel, let execution = try? await app.client.execution(model.threadId) else { return }
-            let options = try? await app.client.executionOptions(providerId: model.thread?.providerId)
+            guard !choosingModel else { return }
+            async let executionTask = try? app.client.execution(model.threadId)
+            async let optionsTask = try? app.client.executionOptions(providerId: model.thread?.providerId)
+            guard let execution = await executionTask else { return }
+            let options = await optionsTask
             let name = execution.model.map { id in options?.models.first { $0.id == id || $0.model == id }?.displayName ?? id }
             executionLabel = [name, execution.reasoningLevel].compactMap { $0 }.joined(separator: " · ")
         }
@@ -691,7 +694,7 @@ struct ThreadView: View {
     private var findMatches: [String] {
         let query = findQuery.trimmingCharacters(in: .whitespaces)
         guard finding, query.count >= 2 else { return [] }
-        return TimelineItem.group(model.rows).reversed().compactMap { item in
+        return model.shownItems.reversed().compactMap { item in
             guard case .message(let row) = item, row.text?.localizedStandardContains(query) == true else { return nil }
             return row.id
         }

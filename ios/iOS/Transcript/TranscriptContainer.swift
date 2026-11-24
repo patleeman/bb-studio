@@ -101,8 +101,31 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         controller.setTop(top.map { AnyView($0().environment(\.self, environment)) })
 
         defer { controller.pillNote = pillNote }
-        // Same rows (usually the very same storage): nothing to diff.
-        guard items != coordinator.items else { return }
+        // Fast path for the common cases: unchanged rows, or in-place updates
+        // (streaming tokens into existing rows) with identical order and count.
+        if items.count == coordinator.items.count {
+            var sameOrder = true
+            var changed: [AnyHashable] = []
+            for index in items.indices {
+                let item = items[index]
+                let old = coordinator.items[index]
+                if item.id != old.id {
+                    sameOrder = false
+                    break
+                }
+                if item != old {
+                    let id = AnyHashable(item.id)
+                    changed.append(id)
+                    coordinator.byID[id] = item
+                }
+            }
+            if sameOrder {
+                guard !changed.isEmpty else { return }
+                coordinator.items = items
+                controller.reconfigure(changed)
+                return
+            }
+        }
         var changed: [AnyHashable] = []
         var byID: [AnyHashable: Item] = [:]
         byID.reserveCapacity(items.count)

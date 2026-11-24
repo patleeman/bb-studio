@@ -69,8 +69,28 @@ enum RoomText {
         }
     }
 
+    private static let statusTokens: Set<String> = ["pass", "fail", "failed", "done", "ok", "skip", "skipped", "noop"]
+
     static func isStatusToken(_ line: String) -> Bool {
-        line.range(of: #"^[\s`*_~]*\[(pass|fail|failed|done|ok|skip|skipped|noop)\][\s`*_~]*$"#, options: [.regularExpression, .caseInsensitive]) != nil
+        guard !line.isEmpty else { return false }
+        let scalars = line.unicodeScalars
+        var start = scalars.startIndex
+        var end = scalars.endIndex
+        func isTrim(_ s: Unicode.Scalar) -> Bool {
+            s.properties.isWhitespace || s == "`" || s == "*" || s == "_" || s == "~"
+        }
+        while start < end, isTrim(scalars[start]) { scalars.formIndex(after: &start) }
+        while end > start {
+            let prev = scalars.index(before: end)
+            guard isTrim(scalars[prev]) else { break }
+            end = prev
+        }
+        guard start < end, scalars[start] == "[" else { return false }
+        let last = scalars.index(before: end)
+        guard last > start, scalars[last] == "]" else { return false }
+        let inner = scalars[scalars.index(after: start)..<last]
+        guard inner.count <= 8 else { return false }
+        return statusTokens.contains(Substring(inner).lowercased())
     }
 
     static func plain(_ text: String) -> String {
@@ -190,17 +210,24 @@ enum RoomPager {
 
 @MainActor
 final class RoomSessions: ObservableObject {
+    static let maxCached = 6
     @Published private(set) var shown: String
     private var sessions: [String: RoomSession] = [:]
+    private var recentOrder: [String] = []
 
-    init(main: String) { shown = main }
+    init(main: String) {
+        shown = main
+        recentOrder = [main]
+    }
 
     var current: RoomSession { session(for: shown) }
 
     func session(for threadId: String) -> RoomSession {
+        touch(threadId)
         if let session = sessions[threadId] { return session }
         let session = RoomSession(threadId: threadId)
         sessions[threadId] = session
+        evictIfNeeded()
         return session
     }
 
@@ -210,5 +237,20 @@ final class RoomSessions: ObservableObject {
         leaving.talk.end()
         leaving.stop()
         shown = threadId
+        touch(threadId)
+        evictIfNeeded()
+    }
+
+    private func touch(_ threadId: String) {
+        if let idx = recentOrder.firstIndex(of: threadId) { recentOrder.remove(at: idx) }
+        recentOrder.append(threadId)
+    }
+
+    private func evictIfNeeded() {
+        while sessions.count > Self.maxCached {
+            guard let victim = recentOrder.first(where: { $0 != shown && sessions[$0] != nil }) else { break }
+            sessions.removeValue(forKey: victim)?.stop()
+            if let idx = recentOrder.firstIndex(of: victim) { recentOrder.remove(at: idx) }
+        }
     }
 }

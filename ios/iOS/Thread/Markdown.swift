@@ -217,9 +217,23 @@ enum ThreadTitles {
 
     /// Looks up titles for mentioned threads not seen yet (archived ones, say).
     static func fetchUnknown(in texts: [String], client: BBClient) async {
-        for id in unknownMentions(in: texts).prefix(10) {
-            if let thread = try? await client.thread(id), client.baseURL == ServerScope.selectedURL { set(id, thread.displayTitle) }
+        let ids = Array(unknownMentions(in: texts).prefix(10))
+        guard !ids.isEmpty else { return }
+        let fetched: [(String, String)] = await withTaskGroup(of: (String, String)?.self) { group in
+            for id in ids {
+                group.addTask {
+                    guard let thread = try? await client.thread(id) else { return nil }
+                    return (id, thread.displayTitle)
+                }
+            }
+            var out: [(String, String)] = []
+            for await pair in group {
+                if let pair { out.append(pair) }
+            }
+            return out
         }
+        guard client.baseURL == ServerScope.selectedURL else { return }
+        for (id, title) in fetched { set(id, title) }
     }
 
     /// `@thread:thr_x` becomes `@Title` when the title is known.
@@ -268,7 +282,11 @@ enum MarkdownBlock {
     }
 
     /// Messages re-render on every timeline refresh; parse each text once.
-    nonisolated(unsafe) private static let cache = NSCache<NSString, Box>()
+    nonisolated(unsafe) private static let cache: NSCache<NSString, Box> = {
+        let cache = NSCache<NSString, Box>()
+        cache.countLimit = 500
+        return cache
+    }()
 
     static func parse(_ source: String) -> [MarkdownBlock] {
         if let hit = cache.object(forKey: source as NSString) { return hit.blocks }
@@ -437,6 +455,7 @@ struct Directive {
 
     /// The directive on the reply's last non-empty line, outside code blocks.
     static func last(in text: String) -> Directive? {
+        guard text.contains("::") else { return nil }
         var inCode = false
         var last: String?
         for line in text.components(separatedBy: "\n") {
@@ -449,7 +468,11 @@ struct Directive {
 
     /// The last line can offer up to five short "emoji label" replies.
     static func reactions(in text: String) -> [String] {
-        guard let directive = last(in: text), directive.name == "reactions",
+        reactions(from: last(in: text))
+    }
+
+    static func reactions(from directive: Directive?) -> [String] {
+        guard let directive, directive.name == "reactions",
             let raw = directive.attributes["items"] else { return [] }
         return parseReactions(raw)
     }
@@ -474,7 +497,11 @@ struct Directive {
     }
 
     static func next(in text: String) -> Next {
-        guard let directive = last(in: text), directive.name == "next" else { return Next(reply: [], ask: []) }
+        next(from: last(in: text))
+    }
+
+    static func next(from directive: Directive?) -> Next {
+        guard let directive, directive.name == "next" else { return Next(reply: [], ask: []) }
         let notes = parseNotes(directive.attributes["btw"], max: 3)
         return Next(reply: parseNextItems(directive.attributes["reply"], max: 5),
             ask: parseNextItems(directive.attributes["do"], max: 3),

@@ -29,7 +29,7 @@ final class EnergyGate: ObservableObject {
     private var watched: Set<ObjectIdentifier> = []
     /// In the background: polls hold until the app is back.
     private(set) var background = false
-    private var waitingForForeground: [CheckedContinuation<Void, Never>] = []
+    private var waitingForForeground: [UUID: CheckedContinuation<Void, Never>] = [:]
 
     init(watchKeyboard: Bool = true) {
         guard watchKeyboard else { return }
@@ -96,7 +96,20 @@ final class EnergyGate: ObservableObject {
     func pollWait(_ base: Duration, backsOff: Bool = true) async {
         try? await Task.sleep(for: backsOff ? pollDelay(base) : base)
         while background, !Task.isCancelled {
-            await withCheckedContinuation { waitingForForeground.append($0) }
+            let token = UUID()
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    if !background || Task.isCancelled {
+                        continuation.resume()
+                    } else {
+                        waitingForForeground[token] = continuation
+                    }
+                }
+            } onCancel: {
+                Task { @MainActor [weak self] in
+                    self?.waitingForForeground.removeValue(forKey: token)?.resume()
+                }
+            }
         }
     }
 
@@ -104,8 +117,8 @@ final class EnergyGate: ObservableObject {
         background = now
         guard !now else { return }
         let waiting = waitingForForeground
-        waitingForForeground = []
-        waiting.forEach { $0.resume() }
+        waitingForForeground = [:]
+        waiting.values.forEach { $0.resume() }
     }
 
     /// A touch or keystroke: wake now, and look again when it would turn idle.

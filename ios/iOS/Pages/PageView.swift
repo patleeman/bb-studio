@@ -55,6 +55,8 @@ final class PageModel: ObservableObject {
         }
     }
 
+    private static let cacheQueue = DispatchQueue(label: "nyc.plee.bbgo.page-cache", qos: .utility)
+
     func load(_ client: BBClient) async {
         guard client.baseURL == serverURL else { return }
         if pageId == "qa-demo", ProcessInfo.processInfo.arguments.contains("-qaPageDemo") {
@@ -62,12 +64,16 @@ final class PageModel: ObservableObject {
             return
         }
         do {
-            let markdown = try await client.pageMarkdown(pageId)
+            async let markdownTask = client.pageMarkdown(pageId)
+            async let commentsTask: Void = loadComments(client)
+            let markdown = try await markdownTask
             if self.markdown != markdown { self.markdown = markdown }
             error = nil
             missing = false
-            DiskCache.save(markdown, as: cacheKey, serverURL: serverURL)
-            await loadComments(client)
+            let key = cacheKey
+            let serverURL = self.serverURL
+            Self.cacheQueue.async { DiskCache.save(markdown, as: key, serverURL: serverURL) }
+            await commentsTask
         } catch where BBClient.isCancellation(error) {
         } catch let failure as BBError where failure.message.localizedCaseInsensitiveContains("not found") {
             missing = true

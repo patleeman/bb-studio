@@ -70,7 +70,11 @@ enum SceneSignals {
 final class SceneStills {
     static let shared = SceneStills()
 
-    private var memory: [String: UIImage] = [:]
+    private let memory: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.totalCostLimit = 48 << 20
+        return cache
+    }()
     private var inFlight: [String: Task<UIImage?, Never>] = [:]
     private(set) var renders = 0
     private(set) var lastError: String?
@@ -79,6 +83,10 @@ final class SceneStills {
     init(directory: URL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appending(path: "LookStills", directoryHint: .isDirectory)) {
         self.directory = directory
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    private static func imageCost(_ image: UIImage) -> Int {
+        Int(image.size.width * image.size.height * image.scale * image.scale * 4)
     }
 
     static func key(theme: LookTheme, mode: LookTheme.Mode, size: CGSize, scale: CGFloat, now: Date = Date(), light: SceneLight? = nil) -> String {
@@ -102,9 +110,10 @@ final class SceneStills {
     }
 
     func cached(_ key: String) -> UIImage? {
-        if let image = memory[key] { return image }
+        let cacheKey = key as NSString
+        if let image = memory.object(forKey: cacheKey) { return image }
         guard let data = try? Data(contentsOf: directory.appending(path: key + ".jpg")), let image = UIImage(data: data) else { return nil }
-        memory[key] = image
+        memory.setObject(image, forKey: cacheKey, cost: Self.imageCost(image))
         return image
     }
 
@@ -142,8 +151,11 @@ final class SceneStills {
             }
             try await host.call("BBLook.scene.stop()")
             renders += 1
-            memory[key] = image
-            if let data = image.jpegData(compressionQuality: 0.9) { try? data.write(to: directory.appending(path: key + ".jpg"), options: .atomic) }
+            memory.setObject(image, forKey: key as NSString, cost: Self.imageCost(image))
+            let target = directory.appending(path: key + ".jpg")
+            await Task.detached(priority: .utility) {
+                if let data = image.jpegData(compressionQuality: 0.9) { try? data.write(to: target, options: .atomic) }
+            }.value
             return image
         } catch {
             lastError = error.localizedDescription
@@ -157,7 +169,7 @@ final class SceneStills {
         return UIImage(data: data, scale: 1)
     }
 
-    func clearMemory() { memory.removeAll() }
+    func clearMemory() { memory.removeAllObjects() }
 }
 
 /// Look web views that render off screen sit under the app's root view, so

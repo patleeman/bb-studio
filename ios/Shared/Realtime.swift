@@ -24,6 +24,8 @@ public final class BBRealtime {
     private var dropped = false
     private var pingTimer: Timer?
     private var running = false
+    private let decoder = JSONDecoder()
+    private let encoder = JSONEncoder()
 
     public init(client: BBClient) {
         self.client = client
@@ -104,6 +106,7 @@ public final class BBRealtime {
         pingTimer = Timer.scheduledTimer(withTimeInterval: 25, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.write(["type": "ping"]) }
         }
+        pingTimer?.tolerance = 5
         // A retry says "connected" once the socket is open again (its first
         // pong), for what the gap missed; not when an attempt starts. Every
         // listener refetches on it, and while the Mac couldn't be reached
@@ -155,7 +158,7 @@ public final class BBRealtime {
         case .data(let bytes): data = bytes
         @unknown default: data = nil
         }
-        guard let data, let json = try? JSONDecoder().decode(JSONValue.self, from: data) else { return }
+        guard let data, let json = try? decoder.decode(JSONValue.self, from: data) else { return }
         switch json["type"]?.stringValue {
         case "changed":
             let changes = json["changes"]?.arrayValue?.compactMap(\.stringValue) ?? []
@@ -175,7 +178,7 @@ public final class BBRealtime {
     }
 
     private func write(_ value: JSONValue) {
-        guard let task, let data = try? JSONEncoder().encode(value), let text = String(data: data, encoding: .utf8)
+        guard let task, let data = try? encoder.encode(value), let text = String(data: data, encoding: .utf8)
         else { return }
         task.send(.string(text)) { _ in }
     }

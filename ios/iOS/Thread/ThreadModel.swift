@@ -273,7 +273,7 @@ final class ThreadModel: ObservableObject {
 
     func detach() {
         guard let client = boundClient else { return }
-        if loaded { cache() }
+        if loaded { cache(force: true) }
         if readPending {
             Task { await markRead(client, force: true) }
         }
@@ -291,6 +291,8 @@ final class ThreadModel: ObservableObject {
     private var lastMarkedRead = ContinuousClock.now - .seconds(60)
     /// Rows arrived since the last mark.
     private var readPending = false
+    private var lastCachedAt = ContinuousClock.now - .seconds(60)
+    private var cachePending = false
 
     /// Each mark comes back as a read-state change that every open list refetches
     /// on, so while a turn streams, mark at most every 5 seconds and once on leaving.
@@ -305,7 +307,15 @@ final class ThreadModel: ObservableObject {
     }
 
     /// After each load and update; encoded and written off the main thread.
-    private func cache() {
+    /// Streaming ticks arrive up to ~6 times/sec; throttle intermediate writes
+    /// to every 2 s and always flush on load, turn end, or detach.
+    private func cache(force: Bool = false) {
+        guard force || ContinuousClock.now - lastCachedAt >= .seconds(2) else {
+            cachePending = true
+            return
+        }
+        lastCachedAt = .now
+        cachePending = false
         TimelineCache.save(threadId, thread: thread, rows: rows, serverURL: serverURL)
     }
 
@@ -335,6 +345,8 @@ final class ThreadModel: ObservableObject {
         guard let client else { return }
         do {
             async let thread = client.thread(threadId)
+            async let interactionsTask: Void = loadInteractions()
+            async let planReviewTask: Void = loadPlanReview()
             let page = try await inTimelineOrder { [self] in
                 let page = try await client.timeline(threadId)
                 // Drawn as soon as the rows are in, while the thread's details may still be on the way.
@@ -359,12 +371,12 @@ final class ThreadModel: ObservableObject {
             unreadFrom = Self.firstUnread(in: page.rows, thread: fresh)
             self.thread = fresh
             error = nil
-            cache()
-            await loadInteractions()
-            await loadPlanReview()
-            try? await client.markRead(threadId)
-            await NotificationActions.clear(threadIds: [threadId], client: client)
-            await ThreadTitles.fetchUnknown(in: rows.compactMap(\.text), client: client)
+            cache(force: true)
+            let rowTexts = rows.compactMap(\.text)
+            async let markReadTask: Void = { _ = try? await client.markRead(self.threadId) }()
+            async let clearNotifTask: Void = NotificationActions.clear(threadIds: [threadId], client: client)
+            async let titlesTask: Void = ThreadTitles.fetchUnknown(in: rowTexts, client: client)
+            _ = await (interactionsTask, planReviewTask, markReadTask, clearNotifTask, titlesTask)
         } catch where BBClient.isCancellation(error) {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
@@ -422,8 +434,10 @@ final class ThreadModel: ObservableObject {
             if error != nil { error = nil }
             if touched("interactions-changed", "queue-changed", "status-changed") { await loadInteractions() }
             if grew, !Task.isCancelled {
-                cache()
+                cache(force: self.thread?.isRunning == false)
                 await markRead(client)
+            } else if cachePending, self.thread?.isRunning == false, !Task.isCancelled {
+                cache(force: true)
             }
         } catch where BBClient.isCancellation(error) {
         } catch {
@@ -447,7 +461,7 @@ final class ThreadModel: ObservableObject {
             return replaceLatest(with: window)
         }
         maxSeq = page.maxSeq
-        if let first = page.rows.first, rows.contains(where: { $0.id == first.id }) {
+        if let first = page.rows.first, rows.lastIndex(where: { $0.id == first.id }) != nil {
             return replaceLatest(with: page.rows)
         }
         rows = page.rows
@@ -459,29 +473,48 @@ final class ThreadModel: ObservableObject {
 
     /// The newest page with `delta` applied, or nil when a row it names is missing.
     private func applying(_ delta: TimelinePage.Delta) -> [TimelineRow]? {
-        let start = windowStart.flatMap { id in rows.firstIndex { $0.id == id } } ?? rows.startIndex
+        let start = windowStart.flatMap { id in rows.lastIndex { $0.id == id } } ?? rows.startIndex
         var window = Array(rows[start...])
         if let order = delta.rowOrder {
-            var known = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { $1 })
+            // Almost all delta ids live in the current window (~50 rows); only build the full map on a miss.
+            var known = Dictionary<String, TimelineRow>(minimumCapacity: window.count + delta.upsertRows.count)
+            for row in window { known[row.id] = row }
             for row in delta.upsertRows { known[row.id] = row }
-            window = order.compactMap { known[$0] }
-            guard window.count == order.count else { return nil }
+            var prefixKnown: [String: TimelineRow]?
+            var ordered: [TimelineRow] = []
+            ordered.reserveCapacity(order.count)
+            for id in order {
+                if let row = known[id] {
+                    ordered.append(row)
+                } else {
+                    if prefixKnown == nil {
+                        var map = Dictionary<String, TimelineRow>(minimumCapacity: start)
+                        for row in rows[..<start] { map[row.id] = row }
+                        prefixKnown = map
+                    }
+                    guard let row = prefixKnown?[id] else { return nil }
+                    ordered.append(row)
+                }
+            }
+            window = ordered
         } else {
             for row in delta.upsertRows {
-                if let index = window.firstIndex(where: { $0.id == row.id }) { window[index] = row } else { window.append(row) }
+                if let index = window.lastIndex(where: { $0.id == row.id }) { window[index] = row } else { window.append(row) }
             }
         }
         // It has to start on a row already here, to know where the older pages end.
-        guard let first = window.first, rows.contains(where: { $0.id == first.id }) else { return nil }
+        guard let first = window.first, rows.lastIndex(where: { $0.id == first.id }) != nil else { return nil }
         return window
     }
 
     /// Swaps in the newest page and keeps the older pages above it. Whether anything changed.
     private func replaceLatest(with window: [TimelineRow]) -> Bool {
-        guard let first = window.first, let index = rows.firstIndex(where: { $0.id == first.id }) else { return false }
+        guard let first = window.first, let index = rows.lastIndex(where: { $0.id == first.id }) else { return false }
         windowStart = first.id
-        let updated = Array(rows[..<index]) + window
-        guard updated != rows else { return false }
+        // Compare only the replaced tail instead of copying and comparing the whole history prefix.
+        guard !rows[index...].elementsEqual(window) else { return false }
+        var updated = rows
+        updated.replaceSubrange(index..., with: window)
         rows = updated
         return true
     }

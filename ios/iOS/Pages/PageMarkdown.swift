@@ -32,7 +32,15 @@ enum PageSegment {
     }
 
     /// Pages re-render whenever the tree changes; parse each source once.
-    nonisolated(unsafe) private static let cache = NSCache<NSString, Box>()
+    nonisolated(unsafe) private static let cache: NSCache<NSString, Box> = {
+        let cache = NSCache<NSString, Box>()
+        cache.countLimit = 100
+        return cache
+    }()
+    nonisolated(unsafe) private static let dataFenceRegex = /```(chart|stats|embed)\s*/
+    nonisolated(unsafe) private static let mentionRegex = /@\[((?:\\.|[^\]\\])*)\]\(([a-z]+):([^)\s]+)\)/
+    nonisolated(unsafe) private static let calloutRegex = /(\s*>\s*)\[!(\w+)\]\s*(.*)/
+    private static let jsonDecoder = JSONDecoder()
 
     static func parse(_ source: String) -> [PageSegment] {
         if let hit = cache.object(forKey: source as NSString) { return hit.segments }
@@ -63,7 +71,7 @@ enum PageSegment {
                 text.append(line)
                 continue
             }
-            if let kind = trimmed.wholeMatch(of: /```(chart|stats|embed)\s*/)?.1, line.first == "`" {
+            if line.first == "`", let kind = trimmed.wholeMatch(of: Self.dataFenceRegex)?.1 {
                 var body: [String] = []
                 while index < lines.count, !lines[index].trimmingCharacters(in: .whitespaces).hasPrefix("```") {
                     body.append(lines[index])
@@ -91,7 +99,7 @@ enum PageSegment {
 
     private static func data(_ kind: String, _ json: String) -> PageSegment? {
         let data = Data(json.utf8)
-        let decoder = JSONDecoder()
+        let decoder = Self.jsonDecoder
         switch kind {
         case "stats": return (try? decoder.decode([StatItem].self, from: data)).flatMap { $0.isEmpty ? nil : .stats($0) }
         case "chart": return (try? decoder.decode(ChartSpec.self, from: data)).flatMap { $0.data.isEmpty ? nil : .chart($0) }
@@ -103,15 +111,18 @@ enum PageSegment {
     /// Mentions to links or bold names, callout markers to bold labels, and
     /// backslash hard breaks to plain newlines (`MarkdownText` keeps newlines).
     static func prepare(_ line: String) -> String {
-        var line = line.replacing(/@\[((?:\\.|[^\]\\])*)\]\(([a-z]+):([^)\s]+)\)/) { match in
-            let label = match.1.isEmpty ? String(match.3) : String(match.1)
-            switch match.2 {
-            case "page": return "[\(label)](bbstudio://page/\(match.3))"
-            case "thread": return "[\(label)](bbstudio://thread/\(match.3))"
-            default: return "**\(label)**"
+        var line = line
+        if line.contains("@[") {
+            line = line.replacing(Self.mentionRegex) { match in
+                let label = match.1.isEmpty ? String(match.3) : String(match.1)
+                switch match.2 {
+                case "page": return "[\(label)](bbstudio://page/\(match.3))"
+                case "thread": return "[\(label)](bbstudio://thread/\(match.3))"
+                default: return "**\(label)**"
+                }
             }
         }
-        if let callout = line.wholeMatch(of: /(\s*>\s*)\[!(\w+)\]\s*(.*)/) {
+        if line.contains("[!"), let callout = line.wholeMatch(of: Self.calloutRegex) {
             let label = callout.2.lowercased().capitalized
             line = callout.3.isEmpty ? "\(callout.1)**\(label)**" : "\(callout.1)**\(label):** \(callout.3)"
         }

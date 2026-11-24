@@ -24,7 +24,7 @@ struct InlineVis: Hashable {
         file = directive.attributes["file"]?.trimmingCharacters(in: .whitespaces) ?? ""
         source = directive.attributes["source"]?.trimmingCharacters(in: .whitespaces)
         let raw = directive.attributes["height"]?.trimmingCharacters(in: .whitespaces) ?? ""
-        let parsed = raw.isEmpty ? Self.defaultHeight : raw.wholeMatch(of: /\d+/).flatMap { Int($0.output) }
+        let parsed = raw.isEmpty ? Self.defaultHeight : (raw.allSatisfy { $0.isASCII && $0.isNumber } ? Int(raw) : nil)
         height = parsed.map { min(max($0, 120), 1200) } ?? Self.defaultHeight
         if file.isEmpty {
             problem = "inline-vis requires a file attribute, e.g. ::inline-vis{file=\"demo.html\"}"

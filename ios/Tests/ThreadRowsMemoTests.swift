@@ -38,6 +38,27 @@ final class ThreadRowsMemoTests: XCTestCase {
         XCTAssertLessThan(elapsed, 0.05, "240 redraws' reads of a 5,000-row chat took \(elapsed) s")
     }
 
+    func testFastPathStatusTokenAndPassChecksMatchEdgeCases() {
+        XCTAssertTrue(SilentOutput.isPass("[PASS]"))
+        XCTAssertTrue(SilentOutput.isPass("  **[pass]** \n"))
+        XCTAssertTrue(SilentOutput.isPass("`_[PaSs]_`"))
+        XCTAssertFalse(SilentOutput.isPass("[PASS] done"))
+        XCTAssertFalse(SilentOutput.isPass(""))
+        XCTAssertFalse(SilentOutput.isPass(nil))
+
+        for token in ["[pass]", " `[FAIL]` ", "**[failed]**", "~[DONE]~", "[ok]", "[skip]", "[SKIPPED]", "[noop]"] {
+            XCTAssertTrue(RoomText.isStatusToken(token), token)
+        }
+        XCTAssertFalse(RoomText.isStatusToken("[PASS] extra"))
+        XCTAssertFalse(RoomText.isStatusToken("[unknown]"))
+        XCTAssertFalse(RoomText.isStatusToken("plain text"))
+
+        let directive = Directive.last(in: "Hello\n\n::next{reply=\"👍 Looks good\"}")
+        XCTAssertEqual(Directive.next(from: directive).reply, ["👍 Looks good"])
+        XCTAssertTrue(Directive.reactions(from: directive).isEmpty)
+        XCTAssertNil(Directive.last(in: "Plain message without directives"))
+    }
+
     private static func rows(_ count: Int, from start: Int = 0) -> [TimelineRow] {
         let json = "[" + (start..<(start + count)).map { index in
             #"{"id":"r\#(index)","kind":"conversation","role":"\#(index.isMultiple(of: 2) ? "user" : "assistant")","text":"Message \#(index)","createdAt":\#(index)}"#

@@ -15,15 +15,32 @@ final class StrandsModel {
     /// Jump to reply: the reply (its message seq) a conversation brings into view and flashes.
     private(set) var flash: [String: Double] = [:]
     private var flashEnds: [String: Task<Void, Never>] = [:]
+    /// Servers where `strands.list` has answered once, so list and tags fetch concurrently.
+    @ObservationIgnored private var supportedServers: Set<URL> = []
     private var client: BBClient { AppModel.shared.client }
 
     func list(_ threadId: String) -> StrandList? { lists[threadId] }
 
     func load(_ threadId: String) async {
         let base = client.baseURL
+        if supportedServers.contains(base) {
+            async let listRequest = client.strandsList(threadId: threadId)
+            async let tagsRequest = try? client.strandsTags(threadId: threadId)
+            do {
+                let next = try await listRequest
+                guard base == client.baseURL else { return }
+                if lists[threadId] != next { lists[threadId] = next }
+            } catch {
+                _ = await tagsRequest
+                return
+            }
+            if let next = await tagsRequest, base == client.baseURL, tags[threadId] != next { tags[threadId] = next }
+            return
+        }
         do {
             let next = try await client.strandsList(threadId: threadId)
             guard base == client.baseURL else { return }
+            supportedServers.insert(base)
             if lists[threadId] != next { lists[threadId] = next }
         } catch {
             return
