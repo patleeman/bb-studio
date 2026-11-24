@@ -30,44 +30,84 @@ export function mountActionDecoration(settings: MenuSettings, signal: AbortSigna
     return null;
   };
 
-  const sweep = () => {
+  const decorateIcon = (icon: Element) => {
+    const button = icon.closest("button");
+    if (!button || edited.has(button)) return;
+    const title = button.getAttribute("aria-label")?.trim() || button.textContent?.trim() || "";
+    if (!titles.has(title)) return;
+    const selection = Boolean(button.textContent?.trim());
+    const role = selection ? null : roleOf(button);
+    const hidden = selection ? !settings.showInSelectionMenu
+      : role === "assistant" ? !settings.showInAssistantBar
+      : role === "user" ? !settings.showInUserBar
+      : !settings.showInAssistantBar && !settings.showInUserBar;
+    const original = { icon, next: icon.nextSibling, glyph: null as Element | null, display: button.style.display, hidden: button.hidden, hid: hidden };
+    edited.set(button, original);
+    if (hidden) { button.style.display = "none"; button.hidden = true; return; }
+    if (selection) icon.remove();
+    else {
+      const glyph = document.createElement("span");
+      glyph.setAttribute("aria-hidden", "true");
+      glyph.setAttribute("data-emoji-react-glyph", "");
+      glyph.textContent = title;
+      original.glyph = glyph;
+      icon.replaceWith(glyph);
+    }
+  };
+
+  const pendingRoots = new Set<Element>();
+  let needsPrune = false;
+
+  const sweepRoot = (root: Document | Element) => {
+    if (root instanceof Element && root.matches(ICON)) decorateIcon(root);
+    for (const icon of root.querySelectorAll(ICON)) decorateIcon(icon);
+  };
+
+  const sweep = (full = false) => {
     if (disposed) return;
-    // Buttons the host unmounted have nothing left to restore.
-    for (const button of edited.keys()) if (!button.isConnected) edited.delete(button);
-    for (const icon of document.querySelectorAll(ICON)) {
-      const button = icon.closest("button");
-      if (!button || edited.has(button)) continue;
-      const title = button.getAttribute("aria-label")?.trim() || button.textContent?.trim() || "";
-      if (!titles.has(title)) continue;
-      const selection = Boolean(button.textContent?.trim());
-      const role = selection ? null : roleOf(button);
-      const hidden = selection ? !settings.showInSelectionMenu
-        : role === "assistant" ? !settings.showInAssistantBar
-        : role === "user" ? !settings.showInUserBar
-        : !settings.showInAssistantBar && !settings.showInUserBar;
-      const original = { icon, next: icon.nextSibling, glyph: null as Element | null, display: button.style.display, hidden: button.hidden, hid: hidden };
-      edited.set(button, original);
-      if (hidden) { button.style.display = "none"; button.hidden = true; continue; }
-      if (selection) icon.remove();
-      else {
-        const glyph = document.createElement("span");
-        glyph.setAttribute("aria-hidden", "true");
-        glyph.setAttribute("data-emoji-react-glyph", "");
-        glyph.textContent = title;
-        original.glyph = glyph;
-        icon.replaceWith(glyph);
-      }
+    if (full || needsPrune) {
+      needsPrune = false;
+      // Buttons the host unmounted have nothing left to restore.
+      for (const button of edited.keys()) if (!button.isConnected) edited.delete(button);
+    }
+    if (full) {
+      pendingRoots.clear();
+      sweepRoot(document);
+      return;
+    }
+    if (!pendingRoots.size) return;
+    const roots = [...pendingRoots];
+    pendingRoots.clear();
+    for (const root of roots) {
+      if (root.isConnected) sweepRoot(root);
     }
   };
   const schedule = () => {
     if (disposed || frame !== undefined) return;
-    frame = requestAnimationFrame(() => { frame = undefined; sweep(); });
+    frame = requestAnimationFrame(() => { frame = undefined; sweep(false); });
   };
-  const observer = new MutationObserver(schedule);
+  const observer = new MutationObserver((records) => {
+    let addedAny = false;
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node instanceof Element && !node.hasAttribute("data-emoji-react-glyph")) {
+          pendingRoots.add(node);
+          addedAny = true;
+        }
+      }
+      if (!needsPrune && record.removedNodes.length > 0) {
+        for (const node of record.removedNodes) {
+          if (node instanceof Element) { needsPrune = true; break; }
+        }
+      }
+    }
+    if (addedAny || needsPrune) schedule();
+  });
   const dispose = () => {
     if (disposed) return;
     disposed = true;
     observer.disconnect();
+    pendingRoots.clear();
     signal.removeEventListener("abort", dispose);
     if (frame !== undefined) cancelAnimationFrame(frame);
     for (const [button, original] of edited) {
@@ -83,6 +123,6 @@ export function mountActionDecoration(settings: MenuSettings, signal: AbortSigna
   if (signal.aborted) { dispose(); return dispose; }
   observer.observe(document.body, { childList: true, subtree: true });
   signal.addEventListener("abort", dispose, { once: true });
-  sweep();
+  sweep(true);
   return dispose;
 }

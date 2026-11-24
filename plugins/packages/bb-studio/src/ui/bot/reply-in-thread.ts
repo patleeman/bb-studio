@@ -66,6 +66,7 @@ export function mountSideThreadRows(
   let shown = "";
   let frame: number | undefined;
   let disposed = false;
+  let lastPath = "";
 
   const fetchChat = (threadId: string) => {
     if (loading.has(threadId)) return;
@@ -85,27 +86,49 @@ export function mountSideThreadRows(
 
   const sweep = () => {
     if (disposed) return;
-    const threadId = threadInPath(location.pathname);
+    lastPath = location.pathname;
+    const threadId = threadInPath(lastPath);
     const known = threadId ? chats.get(threadId) : undefined;
     if (threadId && (!known || (known.data.chat && Date.now() - known.at > REFRESH_MS))) fetchChat(threadId);
     const chat = known?.data.chat === true ? known.data : null;
-    const byMessage = new Map<string, SideThreadView[]>();
-    for (const thread of chat?.threads ?? []) byMessage.set(thread.messageId, [...byMessage.get(thread.messageId) ?? [], thread]);
-    for (const message of document.querySelectorAll<HTMLElement>("[data-timeline-row-id]")) {
-      const host = [...message.querySelectorAll<HTMLElement>(`[${FOOTER}]`)].find((each) => each.closest("[data-timeline-row-id]") === message);
-      const messageId = message.getAttribute("data-timeline-row-id") ?? "";
-      const own = !!chat && !!threadId && isOwnMessage(message, threadId);
-      const threads = chat && threadId && isChatReply(message, threadId) ? byMessage.get(messageId)
-        : own ? byMessage.get(messageId)?.filter((thread) => thread.kind === "fork") : undefined;
-      if (!threads?.length || !threadId) {
-        if (host) { footers.delete(host); host.remove(); }
-        continue;
+    if (!chat?.threads.length || !threadId) {
+      if (footers.size > 0) {
+        for (const host of footers.keys()) host.remove();
+        footers.clear();
       }
-      const footer = host ?? makeFooter(own);
-      if (!host) (columnOf(message) ?? message).appendChild(footer);
-      footers.set(footer, { key: messageId, host: footer, sourceThreadId: threadId, threads });
+      publish();
+      return;
     }
-    for (const host of [...footers.keys()]) if (!host.isConnected) footers.delete(host);
+    const byMessage = new Map<string, SideThreadView[]>();
+    for (const thread of chat.threads) {
+      const existing = byMessage.get(thread.messageId);
+      if (existing) existing.push(thread);
+      else byMessage.set(thread.messageId, [thread]);
+    }
+    const kept = new Set<HTMLElement>();
+    for (const [messageId, all] of byMessage) {
+      const selector = `[data-timeline-row-id="${messageId.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"]`;
+      for (const message of document.querySelectorAll<HTMLElement>(selector)) {
+        const host = [...message.querySelectorAll<HTMLElement>(`[${FOOTER}]`)].find((each) => each.closest("[data-timeline-row-id]") === message);
+        const own = isOwnMessage(message, threadId);
+        const threads = isChatReply(message, threadId) ? all
+          : own ? all.filter((thread) => thread.kind === "fork") : undefined;
+        if (!threads?.length) {
+          if (host) { footers.delete(host); host.remove(); }
+          continue;
+        }
+        const footer = host ?? makeFooter(own);
+        if (!host) (columnOf(message) ?? message).appendChild(footer);
+        footers.set(footer, { key: messageId, host: footer, sourceThreadId: threadId, threads });
+        kept.add(footer);
+      }
+    }
+    for (const host of [...footers.keys()]) {
+      if (!kept.has(host) || !host.isConnected) {
+        footers.delete(host);
+        if (host.isConnected) host.remove();
+      }
+    }
     publish();
   };
   const schedule = () => {
@@ -113,12 +136,28 @@ export function mountSideThreadRows(
     frame = requestAnimationFrame(() => { frame = undefined; sweep(); });
   };
   const ours = (node: Node) => !!(node instanceof HTMLElement ? node : node.parentElement)?.closest(`[${FOOTER}]`) || (node instanceof HTMLElement && node.hasAttribute(FOOTER));
+  const hasElementNode = (list: NodeList) => {
+    for (let i = 0; i < list.length; i += 1) if (list[i]!.nodeType === 1) return true;
+    return false;
+  };
   const observer = new MutationObserver((records) => {
-    if (records.every((record) => ours(record.target) || (record.addedNodes.length + record.removedNodes.length > 0 && [...record.addedNodes, ...record.removedNodes].every(ours)))) return;
+    if (records.every((record) => (!hasElementNode(record.addedNodes) && !hasElementNode(record.removedNodes)) || ours(record.target) || (record.addedNodes.length + record.removedNodes.length > 0 && [...record.addedNodes, ...record.removedNodes].every(ours)))) return;
+    const path = location.pathname;
+    const threadId = threadInPath(path);
+    const known = threadId ? chats.get(threadId) : undefined;
+    if (path === lastPath && !footers.size && (!known || !known.data.chat || !known.data.threads.length)) return;
     schedule();
   });
   observer.observe(document.body, { childList: true, subtree: true });
-  const timer = setInterval(schedule, 1000);
+  const timer = setInterval(() => {
+    if (document.visibilityState === "hidden") return;
+    const path = location.pathname;
+    const threadId = threadInPath(path);
+    const known = threadId ? chats.get(threadId) : undefined;
+    const needsFetch = !!threadId && (!known || (known.data.chat && Date.now() - known.at > REFRESH_MS));
+    if (path === lastPath && !needsFetch && !footers.size) return;
+    schedule();
+  }, 1000);
   signal.addEventListener("abort", () => {
     disposed = true;
     observer.disconnect();

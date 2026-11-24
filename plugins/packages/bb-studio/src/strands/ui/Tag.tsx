@@ -8,19 +8,22 @@
 // need you", round 3, option a) has its asking sentence marked in place in
 // its newest message, with a quiet Done (AskMark). It stays until Jev says a
 // message of the user's answers it, or Done.
-import type { ExperimentalMessageMetadataProps } from "@get-bb/plugin-sdk/app";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useBbNavigate, type ExperimentalMessageMetadataProps } from "@get-bb/plugin-sdk/app";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { toAppPathOf } from "../../kit/app/host-sdk";
+import { currentPathname } from "../../kit/app/route";
 import { errorMessage } from "../../kit/format";
 import { cn, Icon, Popover, PopoverContent, PopoverTrigger } from "../../kit/ui/index";
-import { useCall, useLive } from "../../ui/live";
+import { peekLive, useCall, useLive } from "../../ui/live";
 import { useIsBotThread } from "../../ui/conversations/bot-thread-owners";
+import { messageLinkPath } from "../../work/ui/in-flight-model";
 import type { ReplyTagView } from "../contract";
-import { replyOf, tagOf, type Tags } from "./model";
+import { filterTurnsOf, replyOf, seqsOf, tagOf, type Tags } from "./model";
 import { useNewestInTurn } from "./reply-marks";
 import { findText, FLASH_MS, lastParagraph, markRange, takeFlash, useFlashVersion } from "./ask-mark";
-import { ensureDimStyle, setFoldTags, timelineFiltersInHost, useSelection } from "./selection";
-import { moveFocus, useSelectStrand } from "./Strip";
+import { ensureDimStyle, openFoldOf, select, selectionOf, setFoldTags, timelineFiltersInHost, useSelection } from "./selection";
+import { moveFocus } from "./Strip";
 
 const ROW = "[data-timeline-row-id]";
 const DIM = "data-studio-strand-dim";
@@ -58,7 +61,17 @@ export function AskMark({ threadId, reply }: { threadId: string; reply: Pick<Rep
     observer.observe(row, { childList: true, subtree: true, characterData: true });
     const onMove = (event: Event) => {
       const { clientX: x, clientY: y, target } = event as MouseEvent;
-      setHovered(target === button.current || rectsOf(range.current).some((rect) => x >= rect.left - 4 && x <= rect.right + 64 && y >= rect.top - 3 && y <= rect.bottom + 3));
+      if (target === button.current) { setHovered(true); return; }
+      const current = range.current;
+      if (!current) { setHovered(false); return; }
+      if (typeof current.getBoundingClientRect === "function") {
+        const bounds = current.getBoundingClientRect();
+        if (x < bounds.left - 4 || x > bounds.right + 64 || y < bounds.top - 3 || y > bounds.bottom + 3) {
+          setHovered(false);
+          return;
+        }
+      }
+      setHovered(rectsOf(current).some((rect) => x >= rect.left - 4 && x <= rect.right + 64 && y >= rect.top - 3 && y <= rect.bottom + 3));
     };
     const onLeave = () => setHovered(false);
     row.addEventListener("mousemove", onMove);
@@ -105,16 +118,29 @@ export function AskMark({ threadId, reply }: { threadId: string; reply: Pick<Rep
   );
 }
 
-export function StrandTag({ message }: ExperimentalMessageMetadataProps) {
+export const StrandTag = memo(function StrandTag({ message }: ExperimentalMessageMetadataProps) {
   const bots = useIsBotThread(message.threadId);
   if (!bots) return null;
   return <Tag message={message} />;
+});
+
+/** "Move to…": mounts its Radix Popover only once clicked so closed message rows carry zero popover overhead. */
+function MoveMenu({ threadId, seq, current, strands }: { threadId: string; seq: number; current: string; strands: Tags["strands"] }) {
+  const [mounted, setMounted] = useState(false);
+  if (!mounted) {
+    return (
+      <button type="button" data-strand-move="" aria-haspopup="menu" onClick={() => setMounted(true)}
+        className="cursor-pointer rounded px-0.5 text-[11px] text-muted-foreground/70 hover:text-foreground">
+        Move to…
+      </button>
+    );
+  }
+  return <MoveMenuPopover threadId={threadId} seq={seq} current={current} strands={strands} />;
 }
 
-/** "Move to…": the conversation's strands (this one checked), then "New strand from here". */
-function MoveMenu({ threadId, seq, current, strands }: { threadId: string; seq: number; current: string; strands: Tags["strands"] }) {
+function MoveMenuPopover({ threadId, seq, current, strands }: { threadId: string; seq: number; current: string; strands: Tags["strands"] }) {
   const call = useCall();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const run = async (what: () => Promise<{ ok: boolean }>, done?: string) => {
     setOpen(false);
     try {
@@ -155,7 +181,8 @@ function Tag({ message }: ExperimentalMessageMetadataProps) {
   // BB's timeline folds the conversation's runs of status replies from these tags.
   useEffect(() => { setFoldTags(message.threadId, tags.data); }, [message.threadId, tags.data]);
   const selection = useSelection(message.threadId);
-  const choose = useSelectStrand(message.threadId);
+  const call = useCall();
+  const navigate = useBbNavigate();
   const ref = useRef<HTMLElement | null>(null);
   const tag = tagOf(tags.data, message.turnId);
   const reply = message.role === "assistant" ? replyOf(tags.data, message.turnId) : null;
@@ -176,7 +203,25 @@ function Tag({ message }: ExperimentalMessageMetadataProps) {
     if (ask) return <><span ref={ref} hidden />{ask}</>;
     return selection ? <span ref={ref} hidden /> : null;
   }
-  const open = () => choose({ id: tag.strandId, latestSeq: null });
+  const open = () => {
+    const threadId = message.threadId;
+    const current = selectionOf(threadId);
+    if (current?.strandId === tag.strandId) { select(threadId, null); return; }
+    const listData = peekLive("strands.list", { threadId });
+    const turns = filterTurnsOf(tags.data, listData, tag.strandId, threadId);
+    const seq = seqsOf(tags.data, tag.strandId).at(-1) ?? null;
+    select(threadId, { strandId: tag.strandId, seq, firstSeq: turns.firstSeq, turnIds: turns.turnIds });
+    if (seq !== null) {
+      const opening = tags.data?.opening ?? null;
+      const targetSeq = selectionOf(threadId) && seq === (opening?.seq ?? null) ? (opening?.replySeq ?? null) : seq;
+      if (targetSeq !== null) {
+        const path = messageLinkPath(currentPathname(), threadId, targetSeq);
+        openFoldOf(threadId, targetSeq);
+        if (path) toAppPathOf(navigate)?.(path, { replace: true });
+      }
+    }
+    void call("strands.opened", { strandId: tag.strandId }).catch(() => undefined);
+  };
   const move = <MoveMenu threadId={message.threadId} seq={tag.seq} current={tag.strandId} strands={tags.data.strands} />;
   // Under a filter for another strand, this message is kept in view because it waits for an answer.
   const name = selection && selection.strandId !== tag.strandId ? `from ${tag.title}` : tag.title;

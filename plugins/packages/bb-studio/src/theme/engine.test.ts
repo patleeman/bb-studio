@@ -336,4 +336,23 @@ describe("the theme engine", () => {
     expect(root().hasAttribute("data-studio-theme")).toBe(false);
     expect(scene.childElementCount).toBe(0);
   });
+
+  it("caps ambient WebGL draws to ~30fps even on 120Hz displays, and pauses layout polling while unfocused", () => {
+    const timers: { ms: number; run: () => void }[] = [];
+    engine.dispose();
+    engine = new ThemeEngine(deps({
+      layout: () => ({ width: 800, height: 500, sidebar: 280, panel: null }),
+      every: (ms, run) => { const timer = { ms, run }; timers.push(timer); return () => { const at = timers.indexOf(timer); if (at >= 0) timers.splice(at, 1); }; },
+    }));
+    engine.setEnvironment(FRONT_ENVIRONMENT);
+    engine.show(grid(), "dark");
+    expect(timers).toHaveLength(1);
+    advance(1000, 8);
+    expect(fake.draws()).toBeGreaterThanOrEqual(25);
+    expect(fake.draws()).toBeLessThanOrEqual(36);
+    engine.setEnvironment({ ...FRONT_ENVIRONMENT, focused: false });
+    expect(timers).toHaveLength(0);
+    engine.setEnvironment(FRONT_ENVIRONMENT);
+    expect(timers).toHaveLength(1);
+  });
 });

@@ -48,6 +48,7 @@ export function emptyRipples(): Float32Array {
 
 export class SceneRenderer {
   private readonly locations = new Map<string, WebGLUniformLocation | null>();
+  private readonly paletteData = new Float32Array(12);
   private disposed = false;
   private layerTexture: WebGLTexture | null = null;
   private layerVersion: number | null = null;
@@ -139,7 +140,16 @@ export class SceneRenderer {
     set1("u_motion", frame.motion);
     set1("u_needsYou", frame.needsYou);
     const palette = this.location("u_palette");
-    if (palette) gl.uniform3fv(palette, frame.palette.flatMap((color) => [color.r, color.g, color.b]));
+    if (palette) {
+      const data = this.paletteData;
+      for (let i = 0; i < 4; i += 1) {
+        const color = frame.palette[i]!;
+        data[i * 3] = color.r;
+        data[i * 3 + 1] = color.g;
+        data[i * 3 + 2] = color.b;
+      }
+      gl.uniform3fv(palette, data);
+    }
     const workers = this.location("u_workers");
     if (workers) gl.uniform4fv(workers, frame.workers);
     const ripples = this.location("u_ripples");

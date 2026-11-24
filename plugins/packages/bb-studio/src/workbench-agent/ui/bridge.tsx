@@ -67,6 +67,7 @@ export function WorkbenchAgentBridge() {
   useEffect(() => setTabNavigator(navigate), [navigate]);
   useEffect(() => {
     const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       const nav = latest.current.navigate;
       const rename = renameTabOf(nav);
       if (!rename) return;

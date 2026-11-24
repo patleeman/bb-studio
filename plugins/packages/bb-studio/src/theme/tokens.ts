@@ -249,10 +249,11 @@ ${ON} [data-sidebar="inset"] :where([data-thread-window]) { font-family: var(--s
 [data-studio-scene] { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 [data-studio-scene] > [data-studio-scene-layer] { position: absolute; inset: 0; }
 [data-studio-scene] canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-html[${EFFECTS_ATTRIBUTE}~="needs-you"] [data-testid="conversation-row"][data-needs-you] { box-shadow: inset 0 0 0 1px var(--studio-needs-you), 0 0 16px color-mix(in oklab, var(--studio-needs-you) 30%, transparent); animation: studio-needs-you 2.4s ease-in-out infinite; }
-html[${STILL_ATTRIBUTE}] [data-testid="conversation-row"][data-needs-you] { animation: none; }
-@keyframes studio-needs-you { 50% { box-shadow: inset 0 0 0 1px var(--studio-needs-you), 0 0 26px color-mix(in oklab, var(--studio-needs-you) 55%, transparent); } }
-@media (prefers-reduced-motion: reduce) { html[${EFFECTS_ATTRIBUTE}] [data-testid="conversation-row"][data-needs-you] { animation: none; } }
+html[${EFFECTS_ATTRIBUTE}~="needs-you"] [data-testid="conversation-row"][data-needs-you] { position: relative; box-shadow: inset 0 0 0 1px var(--studio-needs-you), 0 0 16px color-mix(in oklab, var(--studio-needs-you) 30%, transparent); }
+html[${EFFECTS_ATTRIBUTE}~="needs-you"] [data-testid="conversation-row"][data-needs-you]::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: 0 0 26px color-mix(in oklab, var(--studio-needs-you) 55%, transparent); opacity: 0; animation: studio-needs-you 2.4s ease-in-out infinite; will-change: opacity; }
+html[${STILL_ATTRIBUTE}] [data-testid="conversation-row"][data-needs-you]::after { animation: none; opacity: 0; }
+@keyframes studio-needs-you { 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { html[${EFFECTS_ATTRIBUTE}] [data-testid="conversation-row"][data-needs-you]::after { animation: none; opacity: 0; } }
 ${LIST_PAGE} { position: relative; isolation: isolate; margin-bottom: -1.25rem; }
 ${LIST_PAGE}::before { content: ""; position: absolute; z-index: -1; inset: 0; width: min(100%, var(--fork-cards-wide-column, 1032px)); margin-inline: auto; pointer-events: none; ${cardOf("transcript")} }
 ${LIST_PAGE} .md\\:pr-3 { padding-right: 0; }
