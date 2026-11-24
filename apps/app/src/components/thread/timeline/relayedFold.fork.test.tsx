@@ -713,14 +713,14 @@ describe("an automated input sent with a notice", () => {
     }
     const { rerender } = render(
       <MemoryRouter>
-        <SearchMessageLocationProvider>
+        <SearchMessageLocationProvider threadId="thr_test">
           <Probe text="First chunk" />
         </SearchMessageLocationProvider>
       </MemoryRouter>,
     );
     rerender(
       <MemoryRouter>
-        <SearchMessageLocationProvider>
+        <SearchMessageLocationProvider threadId="thr_test">
           <Probe text="First chunk, second chunk" />
         </SearchMessageLocationProvider>
       </MemoryRouter>,
