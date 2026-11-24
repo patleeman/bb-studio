@@ -421,12 +421,13 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const theme = resolveTheme(registry, appearance).theme;
   const glass = !!theme?.glass;
   const navRef = useRef<HTMLElement>(null);
+  const hasMainNav = !(spaces.data && !bots.length);
   useLayoutEffect(() => {
-    const content = glass ? navRef.current?.closest<HTMLElement>('[data-sidebar="content"]') : null;
+    const content = glass && hasMainNav ? navRef.current?.closest<HTMLElement>('[data-sidebar="content"]') : null;
     if (!content) return;
     content.setAttribute(OWN_SCROLL_ATTRIBUTE, "");
     return () => content.removeAttribute(OWN_SCROLL_ATTRIBUTE);
-  });
+  }, [glass, hasMainNav]);
   const slots = useMemo(() => (theme?.kind === "scene" && appearance?.effects.workers ? workerSlots(workers) : null), [theme, appearance?.effects.workers, workers]);
   const accents = useMemo(() => Object.fromEntries(bots.flatMap((each) => {
     const own = shownAppearance(each, appearanceDraft);

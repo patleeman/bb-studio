@@ -28,16 +28,30 @@ export function linkRecordingMentions(open: (href: string) => void, signal: Abor
     element.removeAttribute(LINK);
     originals.delete(element);
   };
-  const sync = () => {
-    for (const element of originals.keys()) if (!element.isConnected || !hrefFor(element)) restore(element);
-    for (const element of document.querySelectorAll<HTMLElement>(SELECTOR)) {
-      const href = hrefFor(element);
-      if (!href) continue;
-      if (!originals.has(element)) originals.set(element, { role: element.getAttribute("role"), tabIndex: element.getAttribute("tabindex") });
-      element.setAttribute(LINK, href);
-      element.setAttribute("role", "link");
-      element.tabIndex = 0;
+  const syncElement = (element: HTMLElement) => {
+    const href = hrefFor(element);
+    if (!href) {
+      restore(element);
+      return;
     }
+    if (!originals.has(element)) originals.set(element, { role: element.getAttribute("role"), tabIndex: element.getAttribute("tabindex") });
+    if (element.getAttribute(LINK) !== href) element.setAttribute(LINK, href);
+    if (element.getAttribute("role") !== "link") element.setAttribute("role", "link");
+    if (element.tabIndex !== 0) element.tabIndex = 0;
+  };
+  const syncSubtree = (root: Element) => {
+    if (root instanceof HTMLElement && root.matches(SELECTOR)) syncElement(root);
+    if (root.firstElementChild !== null) {
+      for (const element of root.querySelectorAll<HTMLElement>(SELECTOR)) syncElement(element);
+    }
+  };
+  const prune = () => {
+    if (originals.size === 0) return;
+    for (const element of originals.keys()) if (!element.isConnected || !hrefFor(element)) restore(element);
+  };
+  const syncAll = () => {
+    prune();
+    for (const element of document.querySelectorAll<HTMLElement>(SELECTOR)) syncElement(element);
   };
   const activate = (event: MouseEvent | KeyboardEvent) => {
     if (event instanceof KeyboardEvent && event.key !== "Enter" && event.key !== " ") return;
@@ -52,11 +66,26 @@ export function linkRecordingMentions(open: (href: string) => void, signal: Abor
   const style = document.createElement("style");
   style.textContent = `[${LINK}] { cursor: pointer !important; } [${LINK}]:hover { background: var(--state-hover); } [${LINK}]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }`;
   document.head.append(style);
-  const observer = new MutationObserver(sync);
+  const observer = new MutationObserver((records) => {
+    prune();
+    for (const record of records) {
+      if (record.type === "attributes") {
+        if (record.target instanceof HTMLElement) {
+          if (record.attributeName === "contenteditable") syncSubtree(record.target);
+          else if (record.target.matches(SELECTOR)) syncElement(record.target);
+          else restore(record.target);
+        }
+        continue;
+      }
+      for (const node of record.addedNodes) {
+        if (node instanceof Element) syncSubtree(node);
+      }
+    }
+  });
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-prompt-mention-resource", "contenteditable"] });
   window.addEventListener("click", activate, { capture: true, signal });
   window.addEventListener("keydown", activate, { capture: true, signal });
-  sync();
+  syncAll();
   signal.addEventListener("abort", () => {
     observer.disconnect();
     style.remove();
