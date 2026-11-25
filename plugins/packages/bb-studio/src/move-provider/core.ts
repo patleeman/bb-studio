@@ -158,6 +158,8 @@ export interface MoveRequest {
   permission: PermissionMode | null;
   historyTokens: number;
   patchAutomations: boolean;
+  /** Archived threads were asked for: one archived while deferred still moves. */
+  includeArchived?: boolean;
 }
 
 export interface LedgerEntry {
@@ -207,7 +209,7 @@ export function parseLedger(value: unknown): Ledger {
     out[id] = {
       state: each.state, error: typeof each.error === "string" ? each.error : null, at: Number(each.at) || 0, attempts: Number(each.attempts) || 0,
       from: each.from && typeof each.from.providerId === "string" ? { providerId: each.from.providerId, model: each.from.model ?? null } : null,
-      request: { providerId: request.providerId, model: request.model, permission: isPermissionMode(request.permission) ? request.permission : null, historyTokens: Number(request.historyTokens) || DEFAULT_HISTORY_TOKENS, patchAutomations: !!request.patchAutomations },
+      request: { providerId: request.providerId, model: request.model, permission: isPermissionMode(request.permission) ? request.permission : null, historyTokens: Number(request.historyTokens) || DEFAULT_HISTORY_TOKENS, patchAutomations: !!request.patchAutomations, ...(request.includeArchived ? { includeArchived: true } : {}) },
       ...(Array.isArray(each.patchErrors) && each.patchErrors.length ? { patchErrors: each.patchErrors.filter((line): line is string => typeof line === "string") } : {}),
     };
   }

@@ -380,14 +380,16 @@ export function turnText(threadId: string, context: TurnContextInput, base: () =
     return base();
   }
   const move = context.providerMove;
+  // A move turn answers with the handoff, or null when there is none: core takes any text as "history
+  // delivered", so the digest never goes alone (null makes core hold the turn and try again).
   // Core counts the whole answer against the move budget and cuts the end when it is over: the digest
   // comes along only when it fits after the handoff (which is built to fit on its own).
   const limit = moveMaxChars(move.historyTokens);
   return moves.forTurn(threadId, move).catch(() => null)
     .then((handoff) => {
+      if (handoff === null) return null;
       const digest = base();
-      const parts = handoff && digest && handoff.length + 2 + digest.length > limit ? [handoff] : [handoff, digest];
-      return parts.filter((part): part is string => !!part).join("\n\n") || null;
+      return digest && handoff.length + 2 + digest.length <= limit ? `${handoff}\n\n${digest}` : handoff;
     });
 }
 

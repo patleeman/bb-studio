@@ -621,3 +621,33 @@ describe("review fixes", () => {
     expect(out.threads[0].handoffEstimate).toEqual({ maxChars: 16_000, historyTokens: 2000 });
   });
 });
+
+describe("deferred threads that went away", () => {
+  it("a thread deleted or archived since it was deferred is dropped, not left deferred or failed", async () => {
+    const w = world([thread("gone", { status: "active" }), thread("put-away", { status: "active" })]);
+    await w.cli(["gone", "put-away", "--to", TO, "--json"]);
+    w.store.delete("gone");
+    Object.assign(w.store.get("put-away")!, { status: "idle", archived: true });
+    expect(await w.service.onIdle("gone")).toBeNull();
+    expect(await w.service.onIdle("put-away")).toBeNull();
+    expect(parseLedger(w.kv.get(LEDGER_KEY))).toEqual({});
+    expect(w.calls.core).toEqual([]);
+    expect((await w.cli(["status", "--json"])).exitCode).toBe(0);
+  });
+
+  it("core's thread_not_found during the watcher's move drops the entry too", async () => {
+    const w = world([thread("a", { status: "active" })]);
+    await w.cli(["a", "--to", TO, "--json"]);
+    w.store.get("a")!.status = "idle";
+    w.deps.coreMove = async () => ({ status: 404, body: { code: "thread_not_found", message: "Thread not found" } });
+    expect(await w.service.onIdle("a")).toMatchObject({ result: "skipped", reason: "thread-not-found" });
+    expect(parseLedger(w.kv.get(LEDGER_KEY))).toEqual({});
+  });
+
+  it("an archived thread that was asked for still moves when its deferral comes due", async () => {
+    const w = world([thread("old", { status: "active", archived: true })]);
+    await w.cli(["old", "--to", TO, "--include-archived", "--json"]);
+    w.store.get("old")!.status = "idle";
+    expect(await w.service.onIdle("old")).toMatchObject({ result: "moved" });
+  });
+});

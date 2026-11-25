@@ -283,3 +283,12 @@ it("sets the transcript folder to 0700 even when it already existed, and forgets
   expect(existsSync(dir)).toBe(false);
   expect([...kv.keys()].filter((key) => key.includes("thr_mode"))).toEqual([]);
 });
+
+
+it("a move turn with no handoff answers null, never the digest alone (core would take it as delivered)", async () => {
+  const moves = { forTurn: vi.fn(async () => { throw new Error("build failed"); }), settled: vi.fn(async () => undefined) };
+  const move = { from: FROM, to: TO, historyTokens: 2_000 };
+  expect(await turnText("thr_n", { threadId: "thr_n", providerMove: move }, () => "Elsewhere: digest", moves as never)).toBeNull();
+  // A turn without a move gets the digest as always.
+  expect(await turnText("thr_n", { threadId: "thr_n" }, () => "Elsewhere: digest", moves as never)).toBe("Elsewhere: digest");
+});

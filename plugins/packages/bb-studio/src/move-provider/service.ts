@@ -223,7 +223,7 @@ export class MoveProviderService {
     const historyTokens = options.historyTokens ?? DEFAULT_HISTORY_TOKENS;
     if (!Number.isInteger(historyTokens) || historyTokens < 1) throw new MoveInputError("--history-tokens is a whole number of at least 1.");
     const { threads, roles, botIds } = await this.select(selection);
-    const request: MoveRequest = { providerId: options.to, model, permission: options.permission ?? null, historyTokens, patchAutomations: options.automations || selection.runners };
+    const request: MoveRequest = { providerId: options.to, model, permission: options.permission ?? null, historyTokens, patchAutomations: options.automations || selection.runners, ...(selection.includeArchived ? { includeArchived: true } : {}) };
     const items: ThreadItem[] = [];
     for (const thread of threads) {
       const role = roles.get(thread.id) ?? "other";
@@ -524,7 +524,14 @@ export class MoveProviderService {
 
   private async retry(threadId: string, entry: LedgerEntry): Promise<ThreadItem | null> {
     const [thread] = await this.deps.getThreads([threadId]);
-    if (!thread) return null;
+    // Deleted since it was deferred: nothing left to move.
+    if (!thread) { await this.forgetThread(threadId); return null; }
+    // Archived since it was deferred (and it wasn't an archived thread asked for): the user put it away; not moved.
+    if (thread.archived && !entry.request.includeArchived) {
+      await this.cancel([threadId], false);
+      this.deps.log?.(`Move provider: ${threadId} archived since it was deferred; not moved`);
+      return null;
+    }
     // Someone changed its provider or model since it was deferred: the old request no longer applies.
     if (entry.from && (thread.providerId !== entry.from.providerId || thread.model !== entry.from.model)) {
       const detail = `it is on ${thread.providerId ?? "?"}/${thread.model ?? "?"} now, not ${entry.from.providerId}/${entry.from.model ?? "?"} as when deferred`;
@@ -535,6 +542,11 @@ export class MoveProviderService {
     const target = await this.deps.target(entry.request.providerId).catch(() => null);
     const roles = (await this.select({ ids: [threadId], includeArchived: true, runners: false })).roles;
     const item = await this.moveOne(thread, roles.get(threadId) ?? "other", entry.request, { dryRun: false, noDefer: false, callerThreadId: null, supported: target?.permissionModes ?? null });
+    // Deleted or archived while it moved (core's answer): dropped, not kept as a failure nobody can fix.
+    if (item.result === "failed" && (item.reason === "thread-not-found" || (item.reason === "thread-archived" && !entry.request.includeArchived))) {
+      await this.forgetThread(threadId);
+      return { ...item, result: "skipped" };
+    }
     if (entry.request.patchAutomations && (item.result === "moved" || item.result === "already-moved")) {
       const patched = await this.patchAutomations([item.threadId], entry.request, false, target?.permissionModes ?? null);
       await this.recordPatchErrors([item.threadId], patched);
