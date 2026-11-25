@@ -1,3 +1,4 @@
+import { assertRequestAfterProviderMove } from "./provider-move-state.fork.js";
 import { retrySystemCompactionNotice } from "./system-compaction.fork.js";
 import {
   getFirstUnclaimedQueuedRetry,
@@ -268,6 +269,7 @@ export async function retryTurnAfterRestart(
         `Thread ${args.thread.id} has no turn to resume.`,
       );
     }
+    assertRequestAfterProviderMove(deps.db, args.thread.id, latest.requestSequence);
     return dispatchRetry(deps, { ...args, failed: latest });
   }
   return dispatchRetry(deps, {
