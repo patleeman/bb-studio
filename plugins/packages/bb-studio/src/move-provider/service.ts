@@ -35,7 +35,7 @@ export interface ThreadInfo {
   projectId: string | null;
 }
 
-export interface PrepareResult { ok: boolean; transcriptPath?: string; verbatimTurns?: number; outlinedTurns?: number; bytes?: number; error?: string }
+export interface PrepareResult { ok: boolean; transcriptPath?: string | null; verbatimTurns?: number; outlinedTurns?: number; bytes?: number; error?: string }
 
 /** An agent automation in BB's automations plugin. */
 export interface BbAutomation {
@@ -338,7 +338,7 @@ export class MoveProviderService {
 
   private async patchRouter(fromProviderId: string | undefined, providerId: string, model: string, dryRun: boolean): Promise<RouterItem> {
     if (!this.deps.router) return { result: "skipped", targetsChanged: 0, reason: "the router isn't loaded" };
-    if (!fromProviderId) return { result: "skipped", targetsChanged: 0, reason: "--router-rules needs --from" };
+    if (!fromProviderId) return { result: "skipped-info", targetsChanged: 0, reason: "--router-rules rewrites only with --from; router rules left as they are" };
     try {
       const { policy, changed } = rewriteRouterPolicy(await this.deps.router.get(), fromProviderId, { providerId, model });
       if (!changed) return { result: "unchanged", targetsChanged: 0 };

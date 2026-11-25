@@ -1770,6 +1770,9 @@ export default async function plugin(bb: BbPluginApi) {
     setBotDefault: async (botId, providerId, model) => { await bots.setDefaultModel({ botId, providerId, model }); },
     leadThreads: () => projectLeads.list().flatMap((lead) => (lead.leadThreadId ? [lead.leadThreadId] : [])),
     router: { get: async () => modelRouter.current(), set: async (policy) => { await modelRouter.setPolicy(policy as never); } },
+    // The handoff (src/provider-move/handoff.ts): built at move time; delivered once the first turn started and it was forgotten.
+    prepare: (threadId, input) => moveHandoffs.prepare(threadId, input),
+    handoffDelivered: async (threadId) => (await moveHandoffs.stored(threadId)) === null,
   });
   bb.onDispose(() => moveProvider.dispose());
   registerStudioCli({

@@ -112,7 +112,7 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
       const response = await fetchImpl(`${base}/api/v1/threads/${encodeURIComponent(threadId)}/move-provider`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       return { status: response.status, body: await response.json().catch(() => null) };
     },
-    prepare: deps.prepare ?? (async (threadId, input) => await sdk.plugins.callRpc({ pluginId: "studio", method: "moveProvider.prepare", input: { threadId, ...input } as never, outputSchema: z.object({ ok: z.boolean(), transcriptPath: z.string().optional(), verbatimTurns: z.number().optional(), outlinedTurns: z.number().optional(), bytes: z.number().optional(), error: z.string().optional() }).passthrough() })),
+    prepare: deps.prepare ?? (async (threadId, input) => await sdk.plugins.callRpc({ pluginId: "studio", method: "moveProvider.prepare", input: { threadId, ...input } as never, outputSchema: z.object({ ok: z.boolean(), transcriptPath: z.string().nullish(), verbatimTurns: z.number().optional(), outlinedTurns: z.number().optional(), bytes: z.number().optional(), error: z.string().optional() }).passthrough() })),
     bbAutomations: async () => {
       // BB's automations plugin off (a BB Studio copy runs Studio's own): nothing of BB's to patch.
       if (await automationsOff()) return [];

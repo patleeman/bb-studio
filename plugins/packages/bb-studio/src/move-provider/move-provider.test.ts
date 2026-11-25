@@ -474,3 +474,13 @@ describe("ledger parsing", () => {
 
 // The CLI never reads stdin: nothing here passes any, and every command above returned.
 export type { PermissionMode };
+
+describe("router rules without --from", () => {
+  it("is a note, not a failure: exit 0", async () => {
+    const w = world([thread("a")]);
+    const out = await w.cli(["a", "--to", TO, "--router-rules", "--json"]);
+    expect(out.exitCode).toBe(0);
+    expect(parse(out).router).toMatchObject({ result: "skipped-info", targetsChanged: 0 });
+    expect(w.policy.rules[0]!.chain[0]!.providerId).toBe("claude-code");
+  });
+});

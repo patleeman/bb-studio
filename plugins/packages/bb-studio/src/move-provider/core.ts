@@ -65,7 +65,8 @@ export interface ThreadItem {
   automationsPatched: string[];
 }
 
-export type PatchResult = "patched" | "would-patch" | "unchanged" | "failed" | "skipped";
+/** "skipped-info": not done, by design (a note, not a failure). */
+export type PatchResult = "patched" | "would-patch" | "unchanged" | "failed" | "skipped" | "skipped-info";
 
 export interface AutomationItem {
   automationId: string;
