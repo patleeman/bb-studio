@@ -110,8 +110,19 @@ struct LookRoot: ViewModifier {
             .preferredColorScheme(fixed)
     }
 
+    #if DEBUG
+    /// `-qaSceneMode light|dark`: a scene theme's variant whatever its driver chooses for the hour.
+    private static let qaSceneMode: LookTheme.Mode? = {
+        let arguments = ProcessInfo.processInfo.arguments
+        return arguments.firstIndex(of: "-qaSceneMode").flatMap { arguments.indices.contains($0 + 1) ? LookTheme.Mode(rawValue: arguments[$0 + 1]) : nil }
+    }()
+    #endif
+
     static func fixedScheme(_ theme: LookTheme, store: LookStore) -> ColorScheme? {
-        let chosen = store.sceneModes[theme.id].flatMap { theme.modes[$0.rawValue] != nil ? $0 : nil }
+        var chosen = store.sceneModes[theme.id].flatMap { theme.modes[$0.rawValue] != nil ? $0 : nil }
+        #if DEBUG
+        if let pinned = qaSceneMode, theme.kind == .scene, theme.modes[pinned.rawValue] != nil { chosen = pinned }
+        #endif
         return chosen.map { $0 == .dark ? .dark : .light } ?? theme.fixedScheme
     }
 

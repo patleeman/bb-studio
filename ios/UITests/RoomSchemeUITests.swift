@@ -3,8 +3,8 @@ import XCTest
 /// The room is dark under its frost, whatever variant the scene's driver chose
 /// for the hour: the composer's band, the strands pill and the composer are dark
 /// like the transcript above them, never a light canvas under a dark transcript.
-/// Offline, a two-mode scene theme (`tonights-sky`) with the simulator in its
-/// default light appearance, on the iPhone and the folded Duo.
+/// Offline, a two-mode scene theme (`tonights-sky`) in its light variant (as
+/// its driver picks by day; `-qaSceneMode light`), on the iPhone and the folded Duo.
 /// `SCHEME_OUT` keeps the screenshot.
 final class RoomSchemeUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
@@ -26,7 +26,9 @@ final class RoomSchemeUITests: ServerIsolatedUITestCase {
 
     func testTheComposerBandAndStrandsPillAreDarkLikeTheTranscript() throws {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaConversationHome",
-                               "-qaStrandsDemo", "-qaReplyAskDemo", "-qaRoomConversation", "thr_botdemo01", "-qaRoomTheme", "tonights-sky"]
+                               "-qaStrandsDemo", "-qaReplyAskDemo", "-qaRoomConversation", "thr_botdemo01", "-qaRoomTheme", "tonights-sky",
+                               // Its light variant, as by day, at any hour.
+                               "-qaSceneMode", "light"]
         app.launchOffline()
         let composer = app.textViews["Message"]
         XCTAssertTrue(composer.waitForExistence(timeout: 40), "the conversation")
