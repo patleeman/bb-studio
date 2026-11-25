@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { callRuns, mergedTools } from "./merged-tools";
+import { callRuns, createMergedShownCache, mergedTools } from "./merged-tools";
 
 describe("callRuns()", () => {
   it("matches absorbed tools (pages_list, pages_comments, code_comment_reply) as well as MERGES", () => {
@@ -59,8 +59,8 @@ describe("mergedTools().execute()", () => {
     expect(allowed).toHaveBeenCalledWith({}, "memory_search");
   });
 
-  it("preserves the exact refusal message listing usable ops and ignores prototype keys", async () => {
-    const { book } = makeBook();
+  it("preserves the exact refusal message listing usable ops and ignores prototype keys (__proto__, constructor, toString)", async () => {
+    const { book, ran } = makeBook();
     const allowed = vi.fn(async (_ctx: unknown, old: string) => old === "memory_search");
     const tools = mergedTools({ book, allowed });
     const memory = tools.find((t) => t.name === "memory")!;
@@ -70,7 +70,78 @@ describe("mergedTools().execute()", () => {
     // Should not re-check memory_add after it already returned false.
     expect(allowed.mock.calls.filter(([, name]) => name === "memory_add")).toHaveLength(1);
 
-    const protoRefused = await memory.execute({ op: "toString" }, {});
-    expect(protoRefused).toBe("memory: op must be one of: search (needs query).");
+    for (const badOp of ["toString", "__proto__", "constructor"]) {
+      const protoRefused = await memory.execute({ op: badOp }, {});
+      expect(protoRefused).toBe("memory: op must be one of: search (needs query).");
+    }
+    expect(ran).toEqual([]);
+  });
+
+  it("isolates two ctx objects with different allow-sets", async () => {
+    const { book, ran } = makeBook();
+    const ctxA = { threadId: "thr_a" };
+    const ctxB = { threadId: "thr_b" };
+    const allowed = vi.fn(async (ctx: unknown, old: string) => {
+      if (ctx === ctxA) return old === "memory_search";
+      if (ctx === ctxB) return old === "memory_add";
+      return false;
+    });
+    const tools = mergedTools({ book, allowed });
+    const memory = tools.find((t) => t.name === "memory")!;
+
+    expect(await memory.execute({ op: "search", query: "q" }, ctxA)).toBe("ran:memory_search");
+    expect(await memory.execute({ op: "add", topic: "t", text: "x" }, ctxA)).toBe("memory: op must be one of: search (needs query).");
+    expect(await memory.execute({ op: "add", topic: "t", text: "x" }, ctxB)).toBe("ran:memory_add");
+    expect(await memory.execute({ op: "search", query: "q" }, ctxB)).toBe("memory: op must be one of: add (needs topic, text).");
+    expect(ran).toEqual([
+      { name: "memory_search", input: { query: "q" } },
+      { name: "memory_add", input: { topic: "t", text: "x" } },
+    ]);
+  });
+});
+
+describe("createMergedShownCache()", () => {
+  it("keys pages_read by allow-set (['page'] vs ['page', 'list']), freezes cached schemas, and never caches null", () => {
+    let available = false;
+    const baseSchema = () => (available ? {
+      type: "object",
+      properties: {
+        page: { type: "string" },
+        query: { type: "string" },
+        type: { type: "string" },
+        after: { type: "string" },
+        comments: { type: "object" },
+      },
+    } : null);
+    const base = vi.fn((name: string) => (name === "pages_read" ? baseSchema() : null));
+    const shown = createMergedShownCache({
+      base,
+      slim: (s) => s,
+      book: { get: () => null, run: async () => null },
+    });
+
+    // When base returns null, nothing is cached; once available, the schema resolves.
+    const pageOnly = new Map([["pages_read", ["page"]]]);
+    expect(shown("pages_read", pageOnly)).toBeNull();
+    available = true;
+    const sPageOnly = shown("pages_read", pageOnly)!;
+    expect(sPageOnly).not.toBeNull();
+    expect(Object.keys(sPageOnly.properties as Record<string, unknown>)).toEqual(["page"]);
+    expect(sPageOnly.required).toEqual(["page"]);
+
+    // Repeated call hits the cache and returns the same deeply frozen object.
+    expect(shown("pages_read", pageOnly)).toBe(sPageOnly);
+    expect(Object.isFrozen(sPageOnly)).toBe(true);
+    expect(Object.isFrozen(sPageOnly.properties)).toBe(true);
+    expect(Object.isFrozen(sPageOnly.required)).toBe(true);
+
+    // Different allow-set (["page", "list"]) gets its own cached schema with list fields and no required page.
+    const pageAndList = new Map([["pages_read", ["page", "list"]]]);
+    const sPageAndList = shown("pages_read", pageAndList)!;
+    expect(sPageAndList).not.toBe(sPageOnly);
+    expect(Object.keys(sPageAndList.properties as Record<string, unknown>).sort()).toEqual(["after", "page", "query", "type"]);
+    expect(sPageAndList.required).toBeUndefined();
+    expect(Object.isFrozen(sPageAndList)).toBe(true);
+    expect(shown("pages_read", new Map([["pages_read", ["list", "page"]]]))).toBe(sPageAndList);
   });
 });

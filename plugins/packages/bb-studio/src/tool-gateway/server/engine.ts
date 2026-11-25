@@ -431,7 +431,7 @@ export class ToolGatewayEngine {
     if (failure && !options.retryNow && Date.now() - failure.at < this.backoffMs(id)) throw new Error(failure.message);
     const controller = new AbortController();
     this.connectControllers.set(id, controller);
-    const connecting = this.connect(record, controller.signal);
+    const connecting = this.connect(record, controller);
     this.pending.set(id, connecting);
     this.deps.changed();
     try {
@@ -442,7 +442,8 @@ export class ToolGatewayEngine {
     }
   }
 
-  private async connect(record: ServerRecord, signal: AbortSignal): Promise<Connected> {
+  private async connect(record: ServerRecord, controller: AbortController): Promise<Connected> {
+    const { signal } = controller;
     const id = record.id;
     const epoch = this.epochs.get(id) ?? 0;
     const config = record.config;
@@ -464,7 +465,7 @@ export class ToolGatewayEngine {
         const stdio: StdioConfig = { key: id, command: config.command, args: config.args, cwd, env: serverEnvironment(this.deps.baseEnv, secrets, config.envNames) };
         if (this.deps.stdioHost) {
           hostStarted = true;
-          const catalog = await withTimeout(this.deps.stdioHost.start(stdio, signal), this.limits.connectMs, `Starting ${id}`, () => this.connectControllers.get(id)?.abort(new Error(`Starting ${id} timed out`)));
+          const catalog = await withTimeout(this.deps.stdioHost.start(stdio, signal), this.limits.connectMs, `Starting ${id}`, () => controller.abort(new Error(`Starting ${id} timed out`)));
           conn = { kind: "host", hostKey: id, tools: catalog.tools, expectedClose: false, lastUsed: Date.now(), active: 0, waiting: [], configKey: this.configKey(record) };
         } else {
           // Tests and a BB without host workers: the same client, in this process.

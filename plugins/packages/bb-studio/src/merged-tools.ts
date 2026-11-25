@@ -122,6 +122,58 @@ export const ABSORB_FIELDS: Readonly<Record<string, Record<string, readonly stri
   code_comments: { reply: ["op", "id", "body", "resolve"] },
 };
 
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object") {
+    Object.freeze(value);
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  }
+  return value;
+}
+
+/**
+ * Cached resolver for a merged/absorbed tool's shown JSON Schema keyed by its
+ * allowed op set. Null results are never cached, and cached schemas are deeply
+ * frozen so callers cannot mutate shared state.
+ */
+export function createMergedShownCache(deps: {
+  base(name: string): Record<string, unknown> | null;
+  slim(schema: unknown): unknown;
+  book: Book;
+}): (name: string, ops: ReadonlyMap<string, string[]>) => Record<string, unknown> | null {
+  const cache = new Map<string, Record<string, unknown>>();
+  return (name, ops) => {
+    const allowed = ops.get(name);
+    if (!allowed) return null;
+    const key = `${name}:${[...allowed].sort().join(",")}`;
+    const cached = cache.get(key);
+    if (cached) return cached;
+
+    const absorb = ABSORB_FIELDS[name];
+    if (absorb) {
+      // An absorb shows only its allowed ops' fields; without the list op, page is required.
+      const base = deps.base(name);
+      if (!base) return null;
+      const drop = Object.entries(absorb).filter(([op]) => !allowed.includes(op)).flatMap(([, fields]) => fields);
+      const properties = Object.fromEntries(Object.entries((base.properties ?? {}) as Record<string, unknown>).filter(([prop]) => !drop.includes(prop)));
+      const required = name === "pages_read" && !allowed.includes("list") ? ["page"] : (base.required as string[] | undefined);
+      const schema = deepFreeze({ ...base, properties, ...(required ? { required } : {}) });
+      cache.set(key, schema);
+      return schema;
+    }
+
+    const merge = MERGES.find((each) => each.name === name);
+    if (!merge) return null;
+    let schema: Record<string, unknown> | null = null;
+    try {
+      // Always flattened: BB takes a parameters override only with an object at its root, never a bare oneOf.
+      const flat = deps.slim(mergedParameters(merge, deps.book, Object.keys(merge.ops).filter((op) => allowed.includes(op))).toJSONSchema()) as Record<string, unknown>;
+      schema = flat && typeof flat === "object" && flat.type === "object" ? deepFreeze(flat) : null;
+    } catch { /* Shown as registered. */ }
+    if (schema) cache.set(key, schema);
+    return schema;
+  };
+}
+
 interface BookTool { name: string; description: string; parameters: z.ZodType; execute(input: never, ctx: never): unknown }
 interface Book { get(name: string): BookTool | null; run(name: string, input: unknown, ctx: unknown, as?: string): Promise<unknown> }
 

@@ -48,7 +48,7 @@ import { sessionTitlePrefix } from "./src/decisions/server/classifier";
 import { ON_DEMAND_EXTRAS, scopeEntries, scopeTools, trioInstructions, type Scope, type ScopeKind } from "./src/tool-scope";
 import { registerScopedTools, ScopeMemory } from "./src/tool-scope-tools";
 import { slim, slimmedIfSmaller } from "./src/slim-schema";
-import { ABSORB_FIELDS, INTERNAL_RENAMES, MERGES, mergedParameters, mergedTools, presentScope } from "./src/merged-tools";
+import { createMergedShownCache, INTERNAL_RENAMES, mergedTools, presentScope } from "./src/merged-tools";
 import { LeanStore, leanFor } from "./src/context-lean";
 import { contextLeanContract } from "./src/context-lean-contract";
 import { requireAppWindow } from "./src/tool-gateway/server/caller";
@@ -454,40 +454,11 @@ export default async function plugin(bb: BbPluginApi) {
   const isClassifier = (title: string | null | undefined) => typeof title === "string" && title.startsWith(sessionTitlePrefix);
   const isLead = (threadId: string) => { try { return projectLeads.list().some((lead) => lead.leadThreadId === threadId); } catch { return false; } };
   /** A merged tool's schema for the ops this thread may run (src/merged-tools.ts), slimmed; null for any other tool. */
-  const mergedShownCache = new Map<string, Record<string, unknown> | null>();
-  const mergedShown = (name: string, ops: ReadonlyMap<string, string[]>): Record<string, unknown> | null => {
-    const merge = MERGES.find((each) => each.name === name);
-    const allowed = ops.get(name);
-    const absorb = ABSORB_FIELDS[name];
-    if (absorb && allowed) {
-      const key = `${name}:${allowed.join(",")}`;
-      if (!mergedShownCache.has(key)) {
-        // An absorb shows only its allowed ops' fields; without the list op, page is required.
-        const base = slimFor(name) ?? fullSchema(name);
-        if (!base) {
-          mergedShownCache.set(key, null);
-        } else {
-          const drop = Object.entries(absorb).filter(([op]) => !allowed.includes(op)).flatMap(([, fields]) => fields);
-          const properties = Object.fromEntries(Object.entries((base.properties ?? {}) as Record<string, unknown>).filter(([prop]) => !drop.includes(prop)));
-          const required = name === "pages_read" && !allowed.includes("list") ? ["page"] : (base.required as string[] | undefined);
-          mergedShownCache.set(key, { ...base, properties, ...(required ? { required } : {}) });
-        }
-      }
-      return mergedShownCache.get(key)!;
-    }
-    if (!merge || !allowed) return null;
-    const key = `${name}:${allowed.join(",")}`;
-    if (!mergedShownCache.has(key)) {
-      let schema: Record<string, unknown> | null = null;
-      try {
-        // Always flattened: BB takes a parameters override only with an object at its root, never a bare oneOf.
-        const flat = slim(mergedParameters(merge, toolBook as never, Object.keys(merge.ops).filter((op) => allowed.includes(op))).toJSONSchema()) as Record<string, unknown>;
-        schema = flat.type === "object" ? flat : null;
-      } catch { /* Shown as registered. */ }
-      mergedShownCache.set(key, schema);
-    }
-    return mergedShownCache.get(key)!;
-  };
+  const mergedShown = createMergedShownCache({
+    base: (name) => slimFor(name) ?? fullSchema(name),
+    slim,
+    book: toolBook as never,
+  });
   /** The configure() entries for a scope in old names: merged names, each merged tool showing only the ops it may run. */
   const presentedEntries = (scope: Scope) => {
     const presented = presentScope(scope);

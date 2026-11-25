@@ -1,6 +1,7 @@
 // Lifecycle regression tests for ToolGatewayEngine and tool-gateway-host:
 // waking queued waiters on crash/drop, reaping timed-out host starts,
 // ignoring host callbacks after close, and suppressing stale transport.onerror.
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToolGatewayEngine, type EngineDeps, type StdioHost } from "../server/engine";
 import type { ServerRecord } from "../server/store";
@@ -156,6 +157,100 @@ describe("ToolGatewayEngine host lifecycle", () => {
     await expect(engine.ensureServer("s1")).rejects.toThrow();
     expect(closed).toEqual(["s1"]);
   });
+
+  it("stale timed-out start() aborts only its own controller and does not close a newer attempt (ownAttempt === false)", async () => {
+    vi.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      const closed: string[] = [];
+      let attempt = 0;
+      const host: StdioHost = {
+        start: (_config, signal) => {
+          attempt += 1;
+          if (signal) signals.push(signal);
+          if (attempt === 1) return new Promise(() => {}); // hangs forever, ignores abort
+          return new Promise(() => {}); // attempt 2 stays in flight while attempt 1's timeout fires
+        },
+        refresh: async () => ({ tools: [] }),
+        close: async (key) => { closed.push(key); },
+        callTool: async () => ({}),
+      };
+      const record = makeRecord("s1");
+      record.config.cwd = process.cwd();
+      const { deps } = makeDeps(host, { connectMs: 2_500 });
+      deps.server = (id) => (id === record.id ? record : null);
+      const engine = new ToolGatewayEngine(deps);
+      engines.push(engine);
+
+      // Start attempt #1 (connectMs = 2500 ms).
+      const first = engine.ensureServer("s1").catch((err: unknown) => err);
+      await Promise.resolve();
+      expect(signals).toHaveLength(1);
+
+      // closeServer() waits up to CLOSE_TIMEOUT_MS (2000 ms) for attempt #1, then clears pending.
+      const closing = engine.closeServer("s1");
+      await vi.advanceTimersByTimeAsync(2_050);
+      await closing;
+
+      // Start attempt #2 before attempt #1's 2500 ms connect timeout fires.
+      const second = engine.ensureServer("s1").catch((err: unknown) => err);
+      await Promise.resolve();
+      expect(signals).toHaveLength(2);
+      expect(signals[1]!.aborted).toBe(false);
+
+      // Advance past attempt #1's 2500 ms timeout (still well before attempt #2's 4550 ms timeout).
+      await vi.advanceTimersByTimeAsync(600);
+      await first;
+
+      // Attempt #1 must NOT have aborted attempt #2's controller and must NOT have called stdioHost.close("s1").
+      expect(signals[1]!.aborted).toBe(false);
+      expect(closed).toEqual([]);
+
+      // Clean up attempt #2.
+      const stop = engine.close();
+      await vi.advanceTimersByTimeAsync(2_500);
+      await stop;
+      await second;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("wakes queued waiters immediately when a local stdio transport closes unexpectedly", async () => {
+    const record = makeRecord("s1");
+    record.config.cwd = process.cwd();
+    const deps: EngineDeps = {
+      server: (id) => (id === record.id ? record : null),
+      secrets: () => ({ env: {}, headers: {} }),
+      blocked: () => null,
+      serverDir: () => process.cwd(),
+      baseEnv: { PATH: process.env.PATH },
+      redact: (text) => text,
+      log: () => {},
+      setStatus: () => {},
+      changed: () => {},
+      limits: { maxConcurrent: 1 },
+    };
+    const engine = new ToolGatewayEngine(deps);
+    engines.push(engine);
+
+    const conn = await engine.ensureServer("s1");
+    void engine.call("s1", "slow", { ms: 5_000 }).catch(() => {});
+    const queued = engine.call("s1", "count", {});
+    await new Promise((r) => setTimeout(r, 30));
+
+    // Kill the real child process so StdioClientTransport fires transport.onclose.
+    const pid = (conn.transport as StdioClientTransport).pid;
+    expect(pid).toBeTruthy();
+    process.kill(pid!, "SIGKILL");
+
+    const settled = await Promise.race([
+      queued.then(() => "resolved", (err: Error) => err.message),
+      new Promise<string>((r) => setTimeout(() => r("HUNG"), 1_000)),
+    ]);
+    expect(settled).not.toBe("HUNG");
+    expect(settled).toMatch(/stopped/i);
+  });
 });
 
 describe("tool-gateway-host replacement lifecycle", () => {
@@ -194,5 +289,46 @@ describe("tool-gateway-host replacement lifecycle", () => {
     ) as { content: { text: string }[] };
     expect(result.content[0]?.text).toContain("calls");
     expect(signals.filter((s) => s.name === "connectionChanged")).toEqual([]);
+  });
+
+  it("suppresses transport.onerror signals after expected close or key replacement", async () => {
+    const signals: Array<{ name: string; payload: unknown }> = [];
+    const makeCtx = () => ({
+      signal: new AbortController().signal,
+      experimental_retainWorker: () => ({ dispose: async () => {} }),
+      experimental_emitSignal: async (name: string, payload: unknown) => { signals.push({ name, payload }); },
+    }) as never;
+
+    const captured: StdioClientTransport[] = [];
+    const origStart = StdioClientTransport.prototype.start;
+    const spy = vi.spyOn(StdioClientTransport.prototype, "start").mockImplementation(function (this: StdioClientTransport) {
+      captured.push(this);
+      return origStart.call(this);
+    });
+    try {
+      await hostHandlers.start(
+        { key: "srv", command: process.execPath, args: [FIXTURE], cwd: process.cwd(), env: { PATH: process.env.PATH ?? "" } },
+        makeCtx(),
+      );
+      const firstTransport = captured[0]!;
+      expect(firstTransport).toBeDefined();
+
+      // Replace "srv" with a second connection; a late error on the replaced transport must be ignored.
+      await hostHandlers.start(
+        { key: "srv", command: process.execPath, args: [FIXTURE], cwd: process.cwd(), env: { PATH: process.env.PATH ?? "" } },
+        makeCtx(),
+      );
+      firstTransport.onerror?.(new Error("late replaced transport error"));
+
+      // Close the active connection; a late error on it must also be ignored.
+      const secondTransport = captured[1]!;
+      await hostHandlers.close({ key: "srv" });
+      secondTransport.onerror?.(new Error("late closed transport error"));
+
+      await new Promise((r) => setTimeout(r, 20));
+      expect(signals.filter((s) => s.name === "connectionChanged")).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
