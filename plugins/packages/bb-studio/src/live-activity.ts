@@ -355,7 +355,8 @@ type Bb = Pick<BbPluginApi, "events" | "sdk" | "agents"> & { experimental_hooks?
 
 /** The hook's input. `providerMove`: set by BB while the first turn after a provider move hasn't started. */
 export interface TurnContextInput { threadId: string; providerMove?: ProviderMoveInput }
-interface TurnContextHooks { experimental_turnContext?: (provider: (context: TurnContextInput) => string | null | Promise<string | null>) => void }
+/** `providerMove: true` opts in to the move handoff: BB then gives this hook `providerMove` and the history budget (and refuses a move with no such hook). */
+interface TurnContextHooks { experimental_turnContext?: (provider: (context: TurnContextInput) => string | null | Promise<string | null>, options?: { providerMove?: boolean }) => void }
 
 /** Registers the per-turn digest on a BB that has the hook. Answers whether it did. */
 export function registerTurnContext(bb: { experimental_hooks?: object }, provider: (threadId: string, context: TurnContextInput) => string | null | Promise<string | null>): boolean {
@@ -366,7 +367,7 @@ export function registerTurnContext(bb: { experimental_hooks?: object }, provide
       const text = provider(context.threadId, context);
       return text instanceof Promise ? text.catch(() => null) : text;
     } catch { return null; }
-  });
+  }, { providerMove: true });
   return true;
 }
 

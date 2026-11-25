@@ -115,6 +115,7 @@ const REASONS: Record<string, string> = {
   provider_unavailable: "provider-unavailable-on-machine",
   model_unavailable: "model-unavailable",
   permission_widening: "permission-widening",
+  permission_unsupported: "permission-unsupported",
   // No turn-context plugin opted in to carry the handoff: moving would lose the history.
   no_handoff_handler: "no-handoff-handler",
 };
@@ -130,6 +131,7 @@ export function coreOutcome(response: CoreMoveResponse): CoreOutcome {
   if (response.status === 409 && body.code === "thread_busy") {
     const reason = (body as { reason?: unknown }).reason;
     if (reason === "archived" || reason === "deleted") return { kind: "failed", reason: `thread-${reason}`, detail: words || `the thread is ${reason}` };
+    // running, pending-interaction, queued-messages, or "changed" (it changed while core checked it): try again later.
     return { kind: "busy" };
   }
   if (response.status === 404 && body.code === "thread_not_found") return { kind: "failed", reason: "thread-not-found", detail: words || "no such thread" };

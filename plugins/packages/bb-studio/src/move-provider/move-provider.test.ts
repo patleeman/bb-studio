@@ -105,6 +105,8 @@ describe("coreOutcome", () => {
     expect(coreOutcome({ status: 409, body: { code: "thread_busy" } })).toEqual({ kind: "busy" });
     expect(coreOutcome({ status: 422, body: { code: "provider_unavailable" } })).toMatchObject({ kind: "failed", reason: "provider-unavailable-on-machine" });
     expect(coreOutcome({ status: 422, body: { code: "permission_widening" } })).toMatchObject({ kind: "failed", reason: "permission-widening" });
+    expect(coreOutcome({ status: 422, body: { code: "permission_unsupported" } })).toMatchObject({ kind: "failed", reason: "permission-unsupported" });
+    expect(coreOutcome({ status: 409, body: { code: "thread_busy", reason: "changed" } })).toEqual({ kind: "busy" });
     expect(coreOutcome({ status: 422, body: { code: "no_handoff_handler", message: "no plugin carries the handoff" } })).toEqual({ kind: "failed", reason: "no-handoff-handler", detail: "no plugin carries the handoff" });
     expect(coreOutcome({ status: 404, body: null })).toMatchObject({ kind: "failed", reason: "core-unavailable" });
     expect(coreOutcome({ status: 500, body: { message: "boom" } })).toMatchObject({ kind: "failed", reason: "core-error", detail: "HTTP 500: boom" });
