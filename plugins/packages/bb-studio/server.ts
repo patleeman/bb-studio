@@ -394,6 +394,7 @@ export default async function plugin(bb: BbPluginApi) {
     builtinOn: (pluginId) => builtinOn(kindSettings.current, pluginId),
     route: (providers) => routeProviders(providers, kindSettings.current),
     itemTypes: (pluginId) => itemIndex.types(pluginId),
+    version: () => changes.current(),
   });
   // The agent configuration is synchronous, so it reads the last resolved
   // routes; they refresh in the background at most every 30 seconds.

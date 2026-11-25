@@ -216,8 +216,17 @@ export async function setupHubWiring({
       tags: tags.list(),
     };
   };
-  let overviewInFlight: ReturnType<typeof runOverview> | null = null;
-  const overview = () => overviewInFlight ??= runOverview().finally(() => { overviewInFlight = null; });
+  let overviewInFlight: { cursor: number; promise: ReturnType<typeof runOverview> } | null = null;
+  const overview = () => {
+    const cursor = changes.current();
+    if (overviewInFlight?.cursor === cursor) return overviewInFlight.promise;
+    // Shared result: callers must not mutate the returned arrays.
+    const promise = runOverview().finally(() => {
+      if (overviewInFlight?.promise === promise) overviewInFlight = null;
+    });
+    overviewInFlight = { cursor, promise };
+    return promise;
+  };
 
   /** Recent open threads, newest first, to pick a lead from. */
   const recentThreads = async (): Promise<ThreadOptionView[]> =>
