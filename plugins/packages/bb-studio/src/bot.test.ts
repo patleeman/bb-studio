@@ -1597,3 +1597,23 @@ it("FM (review F6): the automatic new Main skips a signed-out provider; with non
   // The Main last ran on Claude, so that is the one to sign in to.
   expect((await bots.get()).bot).toMatchObject({ mainProblem: "Sign in to Claude or choose a model", mainNeedsModel: true });
 });
+
+it("logs and tolerates corrupted warnings JSON in bot_skill_versions without crashing skillHistory()", async () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const x = await setup();
+    await x.bots.create({ name: "Dot", avatar: "🟣" });
+    x.db.prepare("INSERT INTO bot_skill_versions(bot_id, name, description, body, old_body, warnings, at) VALUES (?, 'triage', 'Triage inbox', 'Step 1', '', '{broken', 1000)").run(BOT_ID);
+    const history = x.bots.skillHistory(BOT_ID);
+    expect(history).toHaveLength(1);
+    expect(history[0]?.warnings).toEqual([]);
+    const matching = () => warn.mock.calls.filter(([msg]) => typeof msg === "string" && msg.includes("bot_skill_versions"));
+    expect(matching()).toHaveLength(1);
+
+    // Repeated reads warn at most once per version row.
+    x.bots.skillHistory(BOT_ID);
+    expect(matching()).toHaveLength(1);
+  } finally {
+    warn.mockRestore();
+  }
+});
