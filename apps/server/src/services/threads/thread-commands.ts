@@ -5,7 +5,7 @@ import {
   hasLiveChildThread,
   hasStoredSpawnAgentToolCall,
 } from "@bb/db";
-import { withTurnContext } from "./turn-context.fork.js";
+import { startsTurnForTurnContext, withTurnContext } from "./turn-context.fork.js";
 import {
   PromptInput,
   PromptMode,
@@ -408,7 +408,7 @@ export async function prepareTurnSubmitCommandPayload(
   args: PrepareTurnSubmitCommandPayloadArgs,
 ): Promise<PreparedTurnSubmitCommandPayload> {
   await deps.providerRegistry.whenRegistrationsSettled();
-  args = await withTurnContext(args.thread.id, args, args.target.mode === "start");
+  args = await withTurnContext(args.thread.id, args, startsTurnForTurnContext(deps.db, args.thread.id, args.target.mode));
   const providerThreadId = requireProviderThreadId(
     args.providerThreadId ??
       requireDispatchableProviderThreadId(deps, args.thread.id),

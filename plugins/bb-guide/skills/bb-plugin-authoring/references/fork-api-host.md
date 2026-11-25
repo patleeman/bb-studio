@@ -97,6 +97,25 @@ string | null | Promise<string | null>)`. bb calls it each time a turn
   bb's own `bb.agents.contributeInstructions` and `configure` instructions
   are different: they are read only when a provider session is built, so a
   live session never sees later changes.
+- A plugin that rebuilds history after a provider move registers with
+  `experimental_turnContext(fn, { providerMove: true })`. Only such plugins
+  get `providerMove: { operationId, from, to, historyTokens, at }`; they get
+  it on every turn start until a turn with real input completes on the new
+  provider (a failed start or failed turn gets it again; a later context
+  clear cancels it). That turn waits up to 5 s for them, they share about
+  `historyTokens` × 4 characters (at most 1.2M), and their text goes before
+  the user's message. If none returns text the turn fails to start (503
+  `handoff_unavailable`) so the history is never silently dropped. With no
+  such plugin registered, moves are refused (`no_handoff_handler`) unless
+  forced.
+- `bb.experimental_hooks.experimental_moveThreadProvider(threadId, {
+  providerId, model?, permissionMode?, historyTokens?, dryRun?,
+  includeArchived?, force? })` moves a thread in process, with the same checks and
+  result as `POST /threads/:id/move-provider`. It resolves
+  `{ ok: true, status, threadId, from, to, historyTokens }` or
+  `{ ok: false, threadId, httpStatus, code, message, reason }` and never
+  throws for a refusal. `experimental_features.providerMove` is true when
+  it exists.
 
 Names: `ExperimentalTurnContextProvider`.
 
