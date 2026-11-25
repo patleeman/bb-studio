@@ -121,7 +121,7 @@ import { PRESENCE_CHECK_CHANNEL, PresenceCheckRouter } from "./src/presence/chec
 import { PRESENCE_TOOLS } from "./src/presence/agent-tools";
 import { SideThreads } from "./src/bot-side-threads";
 import { alertBot, Runners } from "./src/runners";
-import { ensureColumns } from "./src/schema-columns";
+import { ensureColumns, ensureTables } from "./src/schema-columns";
 import { nudgeReason, BotNudges, type NudgeOwner } from "./src/bot-nudge";
 
 /** The note on a "stopped after failing" line in a Bot's chat: the Bot triages it (docs/needs-you/REDO.md). */
@@ -196,7 +196,8 @@ export default async function plugin(bb: BbPluginApi) {
   };
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
-  // Columns added by checking, not by index (src/schema-columns.ts).
+  // Tables and columns added by checking, not by index (src/schema-columns.ts).
+  ensureTables(db);
   ensureColumns(db);
   adoptAtStart(db, bb.log);
   // Strands replaced tasks: open agent tasks close as "Moved to strands", after a backup (src/tasks/retire.ts).
@@ -296,7 +297,7 @@ export default async function plugin(bb: BbPluginApi) {
   const code = registerCode(bb, db);
   // The agent's hands on its conversation's workbench (src/workbench-agent): the tools run here, the window showing the conversation does the work.
   let entryTitle: (kind: "automation" | "todo" | "record", id: string) => Promise<string | null> = async () => null;
-  registerWorkbenchAgent(bb, {
+  const threadWorkspace = registerWorkbenchAgent(bb, db, {
     itemTitle: (id) => itemIndex.get(id)?.title ?? searchIndex.titleOf(id),
     // `bots` is made further down; a tool is only called once the plugin has loaded.
     botName: (id) => bots.stored(id)?.name ?? null,
@@ -1153,6 +1154,7 @@ export default async function plugin(bb: BbPluginApi) {
   const threadSeeds = new ThreadSeeds(db);
   const pushRpc = (call: Parameters<typeof bb.sdk.plugins.callRpc>[0]) => bb.sdk.plugins.callRpc(call);
   const botThreads = registerBotThreads(bb, db, {
+    tabCounts: (threadIds) => threadWorkspace.store.tabCounts(threadIds),
     bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name, avatar: bot.avatar, shape: bot.shape ?? null, color: bot.color ?? null, primary: !!bot.primary, threadId: bot.threadId, appearance: bot.appearance ?? null, presence: bots.presenceOf(bot.id), state: bot.state })),
     signals: () => ({
       bots: bots.list().map((bot) => ({ id: bot.id, threadId: bot.threadId, chain: bots.chain(bot.id) })),

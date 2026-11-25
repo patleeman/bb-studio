@@ -395,10 +395,13 @@ public enum Studio {
     public static let router_notice_get = "router.notice.get"
     public static let router_notice_dismiss = "router.notice.dismiss"
     public static let router_handoff = "router.handoff"
+    public static let threadWorkbenchGet = "threadWorkbenchGet"
+    public static let threadWorkbenchMutate = "threadWorkbenchMutate"
   }
 
   public enum Channel {
     public static let bot_threads_changed = "bot-threads-changed"
+    public static let workbench_changed = "workbench-changed"
   }
 
   public typealias LoopsList = LoopsListOutput
@@ -1262,6 +1265,10 @@ public enum Studio {
   public typealias RouterNoticeDismiss = RouterNoticeDismissOutput
 
   public typealias RouterHandoff = RouterHandoffOutput
+
+  public typealias ThreadWorkbenchGet = ThreadWorkbenchGetOutput
+
+  public typealias ThreadWorkbenchMutate = ThreadWorkbenchMutateOutput
 
   public struct LoopsListInput: Sendable, Hashable, Codable {
     public var area: String?
@@ -19875,8 +19882,9 @@ public enum Studio {
     public var mirrored: Bool?
     public var providerId: String?
     public var modelName: String?
+    public var tabCount: Int?
 
-    public init(threadId: String? = nil, title: String? = nil, isMain: Bool? = nil, forkedFrom: BotThreadsViewOutputConversationsItemForkedFrom? = nil, projectId: String? = nil, updatedAt: Double? = nil, latest: String? = nil, running: Bool? = nil, needsYou: BotThreadsViewOutputConversationsItemNeedsYou? = nil, mirrored: Bool? = nil, providerId: String? = nil, modelName: String? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, isMain: Bool? = nil, forkedFrom: BotThreadsViewOutputConversationsItemForkedFrom? = nil, projectId: String? = nil, updatedAt: Double? = nil, latest: String? = nil, running: Bool? = nil, needsYou: BotThreadsViewOutputConversationsItemNeedsYou? = nil, mirrored: Bool? = nil, providerId: String? = nil, modelName: String? = nil, tabCount: Int? = nil) {
       self.threadId = threadId
       self.title = title
       self.isMain = isMain
@@ -19889,6 +19897,7 @@ public enum Studio {
       self.mirrored = mirrored
       self.providerId = providerId
       self.modelName = modelName
+      self.tabCount = tabCount
     }
   }
 
@@ -20044,8 +20053,9 @@ public enum Studio {
     public var mirrored: Bool?
     public var providerId: String?
     public var modelName: String?
+    public var tabCount: Int?
 
-    public init(threadId: String? = nil, title: String? = nil, isMain: Bool? = nil, forkedFrom: BotThreadsOlderOutputConversationsItemForkedFrom? = nil, projectId: String? = nil, updatedAt: Double? = nil, latest: String? = nil, running: Bool? = nil, needsYou: BotThreadsOlderOutputConversationsItemNeedsYou? = nil, mirrored: Bool? = nil, providerId: String? = nil, modelName: String? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, isMain: Bool? = nil, forkedFrom: BotThreadsOlderOutputConversationsItemForkedFrom? = nil, projectId: String? = nil, updatedAt: Double? = nil, latest: String? = nil, running: Bool? = nil, needsYou: BotThreadsOlderOutputConversationsItemNeedsYou? = nil, mirrored: Bool? = nil, providerId: String? = nil, modelName: String? = nil, tabCount: Int? = nil) {
       self.threadId = threadId
       self.title = title
       self.isMain = isMain
@@ -20058,6 +20068,7 @@ public enum Studio {
       self.mirrored = mirrored
       self.providerId = providerId
       self.modelName = modelName
+      self.tabCount = tabCount
     }
   }
 
@@ -42449,6 +42460,647 @@ public enum Studio {
     }
   }
 
+  public struct ThreadWorkbenchGetInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public enum ThreadWorkbenchGetOutputTabsItemRefKind: Sendable, Hashable, Codable {
+    case conversation
+    case worker
+    case bot
+    case page
+    case whiteboard
+    case design
+    case app
+    case artifact
+    case recording
+    case board
+    case memory
+    case skills
+    case library
+    case automations
+    case todos
+    case archive
+    case automation
+    case todo
+    case record
+    case vscode
+    case file
+    case diff
+    case browser
+    case terminal
+    case workflow
+    case plugin
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "conversation": self = .conversation
+      case "worker": self = .worker
+      case "bot": self = .bot
+      case "page": self = .page
+      case "whiteboard": self = .whiteboard
+      case "design": self = .design
+      case "app": self = .app
+      case "artifact": self = .artifact
+      case "recording": self = .recording
+      case "board": self = .board
+      case "memory": self = .memory
+      case "skills": self = .skills
+      case "library": self = .library
+      case "automations": self = .automations
+      case "todos": self = .todos
+      case "archive": self = .archive
+      case "automation": self = .automation
+      case "todo": self = .todo
+      case "record": self = .record
+      case "vscode": self = .vscode
+      case "file": self = .file
+      case "diff": self = .diff
+      case "browser": self = .browser
+      case "terminal": self = .terminal
+      case "workflow": self = .workflow
+      case "plugin": self = .plugin
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .conversation: try container.encode("conversation")
+      case .worker: try container.encode("worker")
+      case .bot: try container.encode("bot")
+      case .page: try container.encode("page")
+      case .whiteboard: try container.encode("whiteboard")
+      case .design: try container.encode("design")
+      case .app: try container.encode("app")
+      case .artifact: try container.encode("artifact")
+      case .recording: try container.encode("recording")
+      case .board: try container.encode("board")
+      case .memory: try container.encode("memory")
+      case .skills: try container.encode("skills")
+      case .library: try container.encode("library")
+      case .automations: try container.encode("automations")
+      case .todos: try container.encode("todos")
+      case .archive: try container.encode("archive")
+      case .automation: try container.encode("automation")
+      case .todo: try container.encode("todo")
+      case .record: try container.encode("record")
+      case .vscode: try container.encode("vscode")
+      case .file: try container.encode("file")
+      case .diff: try container.encode("diff")
+      case .browser: try container.encode("browser")
+      case .terminal: try container.encode("terminal")
+      case .workflow: try container.encode("workflow")
+      case .plugin: try container.encode("plugin")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ThreadWorkbenchGetOutputTabsItemRef: Sendable, Hashable, Codable {
+    public var kind: ThreadWorkbenchGetOutputTabsItemRefKind?
+    public var id: String?
+    public var path: String?
+    public var environmentId: String?
+    public var hostId: String?
+    public var url: String?
+    public var terminalId: String?
+    public var pluginId: String?
+    public var tabId: String?
+    public var params: StudioJSONValue?
+
+    public init(kind: ThreadWorkbenchGetOutputTabsItemRefKind? = nil, id: String? = nil, path: String? = nil, environmentId: String? = nil, hostId: String? = nil, url: String? = nil, terminalId: String? = nil, pluginId: String? = nil, tabId: String? = nil, params: StudioJSONValue? = nil) {
+      self.kind = kind
+      self.id = id
+      self.path = path
+      self.environmentId = environmentId
+      self.hostId = hostId
+      self.url = url
+      self.terminalId = terminalId
+      self.pluginId = pluginId
+      self.tabId = tabId
+      self.params = params
+    }
+  }
+
+  public enum ThreadWorkbenchGetOutputTabsItemOpenedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ThreadWorkbenchGetOutputTabsItemMobileSupport: Sendable, Hashable, Codable {
+    case native
+    case web
+    case desktopOnly
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "native": self = .native
+      case "web": self = .web
+      case "desktopOnly": self = .desktopOnly
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .native: try container.encode("native")
+      case .web: try container.encode("web")
+      case .desktopOnly: try container.encode("desktopOnly")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ThreadWorkbenchGetOutputTabsItem: Sendable, Hashable, Codable {
+    public var tabId: String?
+    public var ref: ThreadWorkbenchGetOutputTabsItemRef?
+    public var title: String?
+    public var position: Int?
+    public var openedBy: ThreadWorkbenchGetOutputTabsItemOpenedBy?
+    public var openedAt: Double?
+    public var mobileSupport: ThreadWorkbenchGetOutputTabsItemMobileSupport?
+
+    public init(tabId: String? = nil, ref: ThreadWorkbenchGetOutputTabsItemRef? = nil, title: String? = nil, position: Int? = nil, openedBy: ThreadWorkbenchGetOutputTabsItemOpenedBy? = nil, openedAt: Double? = nil, mobileSupport: ThreadWorkbenchGetOutputTabsItemMobileSupport? = nil) {
+      self.tabId = tabId
+      self.ref = ref
+      self.title = title
+      self.position = position
+      self.openedBy = openedBy
+      self.openedAt = openedAt
+      self.mobileSupport = mobileSupport
+    }
+  }
+
+  public struct ThreadWorkbenchGetOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var tabs: [ThreadWorkbenchGetOutputTabsItem]?
+    public var activeTabId: String?
+    public var panelOpen: Bool?
+    public var version: Int?
+
+    public init(threadId: String? = nil, tabs: [ThreadWorkbenchGetOutputTabsItem]? = nil, activeTabId: String? = nil, panelOpen: Bool? = nil, version: Int? = nil) {
+      self.threadId = threadId
+      self.tabs = tabs
+      self.activeTabId = activeTabId
+      self.panelOpen = panelOpen
+      self.version = version
+    }
+  }
+
+  public enum ThreadWorkbenchMutateInputOp: Sendable, Hashable, Codable {
+    case `open`
+    case close
+    case focus
+    case reorder
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "open": self = .`open`
+      case "close": self = .close
+      case "focus": self = .focus
+      case "reorder": self = .reorder
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`open`: try container.encode("open")
+      case .close: try container.encode("close")
+      case .focus: try container.encode("focus")
+      case .reorder: try container.encode("reorder")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ThreadWorkbenchMutateInputTabKind: Sendable, Hashable, Codable {
+    case conversation
+    case worker
+    case bot
+    case page
+    case whiteboard
+    case design
+    case app
+    case artifact
+    case recording
+    case board
+    case memory
+    case skills
+    case library
+    case automations
+    case todos
+    case archive
+    case automation
+    case todo
+    case record
+    case vscode
+    case file
+    case diff
+    case browser
+    case terminal
+    case workflow
+    case plugin
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "conversation": self = .conversation
+      case "worker": self = .worker
+      case "bot": self = .bot
+      case "page": self = .page
+      case "whiteboard": self = .whiteboard
+      case "design": self = .design
+      case "app": self = .app
+      case "artifact": self = .artifact
+      case "recording": self = .recording
+      case "board": self = .board
+      case "memory": self = .memory
+      case "skills": self = .skills
+      case "library": self = .library
+      case "automations": self = .automations
+      case "todos": self = .todos
+      case "archive": self = .archive
+      case "automation": self = .automation
+      case "todo": self = .todo
+      case "record": self = .record
+      case "vscode": self = .vscode
+      case "file": self = .file
+      case "diff": self = .diff
+      case "browser": self = .browser
+      case "terminal": self = .terminal
+      case "workflow": self = .workflow
+      case "plugin": self = .plugin
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .conversation: try container.encode("conversation")
+      case .worker: try container.encode("worker")
+      case .bot: try container.encode("bot")
+      case .page: try container.encode("page")
+      case .whiteboard: try container.encode("whiteboard")
+      case .design: try container.encode("design")
+      case .app: try container.encode("app")
+      case .artifact: try container.encode("artifact")
+      case .recording: try container.encode("recording")
+      case .board: try container.encode("board")
+      case .memory: try container.encode("memory")
+      case .skills: try container.encode("skills")
+      case .library: try container.encode("library")
+      case .automations: try container.encode("automations")
+      case .todos: try container.encode("todos")
+      case .archive: try container.encode("archive")
+      case .automation: try container.encode("automation")
+      case .todo: try container.encode("todo")
+      case .record: try container.encode("record")
+      case .vscode: try container.encode("vscode")
+      case .file: try container.encode("file")
+      case .diff: try container.encode("diff")
+      case .browser: try container.encode("browser")
+      case .terminal: try container.encode("terminal")
+      case .workflow: try container.encode("workflow")
+      case .plugin: try container.encode("plugin")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ThreadWorkbenchMutateInputTab: Sendable, Hashable, Codable {
+    public var kind: ThreadWorkbenchMutateInputTabKind?
+    public var id: String?
+    public var path: String?
+    public var environmentId: String?
+    public var hostId: String?
+    public var url: String?
+    public var terminalId: String?
+    public var pluginId: String?
+    public var tabId: String?
+    public var params: StudioJSONValue?
+
+    public init(kind: ThreadWorkbenchMutateInputTabKind? = nil, id: String? = nil, path: String? = nil, environmentId: String? = nil, hostId: String? = nil, url: String? = nil, terminalId: String? = nil, pluginId: String? = nil, tabId: String? = nil, params: StudioJSONValue? = nil) {
+      self.kind = kind
+      self.id = id
+      self.path = path
+      self.environmentId = environmentId
+      self.hostId = hostId
+      self.url = url
+      self.terminalId = terminalId
+      self.pluginId = pluginId
+      self.tabId = tabId
+      self.params = params
+    }
+  }
+
+  public struct ThreadWorkbenchMutateInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var baseVersion: Int?
+    public var op: ThreadWorkbenchMutateInputOp?
+    public var tab: ThreadWorkbenchMutateInputTab?
+    public var title: String?
+    public var tabId: String?
+    public var position: Int?
+    public var focus: Bool?
+    public var origin: String?
+
+    public init(threadId: String? = nil, baseVersion: Int? = nil, op: ThreadWorkbenchMutateInputOp? = nil, tab: ThreadWorkbenchMutateInputTab? = nil, title: String? = nil, tabId: String? = nil, position: Int? = nil, focus: Bool? = nil, origin: String? = nil) {
+      self.threadId = threadId
+      self.baseVersion = baseVersion
+      self.op = op
+      self.tab = tab
+      self.title = title
+      self.tabId = tabId
+      self.position = position
+      self.focus = focus
+      self.origin = origin
+    }
+  }
+
+  public enum ThreadWorkbenchMutateOutputTabsItemRefKind: Sendable, Hashable, Codable {
+    case conversation
+    case worker
+    case bot
+    case page
+    case whiteboard
+    case design
+    case app
+    case artifact
+    case recording
+    case board
+    case memory
+    case skills
+    case library
+    case automations
+    case todos
+    case archive
+    case automation
+    case todo
+    case record
+    case vscode
+    case file
+    case diff
+    case browser
+    case terminal
+    case workflow
+    case plugin
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "conversation": self = .conversation
+      case "worker": self = .worker
+      case "bot": self = .bot
+      case "page": self = .page
+      case "whiteboard": self = .whiteboard
+      case "design": self = .design
+      case "app": self = .app
+      case "artifact": self = .artifact
+      case "recording": self = .recording
+      case "board": self = .board
+      case "memory": self = .memory
+      case "skills": self = .skills
+      case "library": self = .library
+      case "automations": self = .automations
+      case "todos": self = .todos
+      case "archive": self = .archive
+      case "automation": self = .automation
+      case "todo": self = .todo
+      case "record": self = .record
+      case "vscode": self = .vscode
+      case "file": self = .file
+      case "diff": self = .diff
+      case "browser": self = .browser
+      case "terminal": self = .terminal
+      case "workflow": self = .workflow
+      case "plugin": self = .plugin
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .conversation: try container.encode("conversation")
+      case .worker: try container.encode("worker")
+      case .bot: try container.encode("bot")
+      case .page: try container.encode("page")
+      case .whiteboard: try container.encode("whiteboard")
+      case .design: try container.encode("design")
+      case .app: try container.encode("app")
+      case .artifact: try container.encode("artifact")
+      case .recording: try container.encode("recording")
+      case .board: try container.encode("board")
+      case .memory: try container.encode("memory")
+      case .skills: try container.encode("skills")
+      case .library: try container.encode("library")
+      case .automations: try container.encode("automations")
+      case .todos: try container.encode("todos")
+      case .archive: try container.encode("archive")
+      case .automation: try container.encode("automation")
+      case .todo: try container.encode("todo")
+      case .record: try container.encode("record")
+      case .vscode: try container.encode("vscode")
+      case .file: try container.encode("file")
+      case .diff: try container.encode("diff")
+      case .browser: try container.encode("browser")
+      case .terminal: try container.encode("terminal")
+      case .workflow: try container.encode("workflow")
+      case .plugin: try container.encode("plugin")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ThreadWorkbenchMutateOutputTabsItemRef: Sendable, Hashable, Codable {
+    public var kind: ThreadWorkbenchMutateOutputTabsItemRefKind?
+    public var id: String?
+    public var path: String?
+    public var environmentId: String?
+    public var hostId: String?
+    public var url: String?
+    public var terminalId: String?
+    public var pluginId: String?
+    public var tabId: String?
+    public var params: StudioJSONValue?
+
+    public init(kind: ThreadWorkbenchMutateOutputTabsItemRefKind? = nil, id: String? = nil, path: String? = nil, environmentId: String? = nil, hostId: String? = nil, url: String? = nil, terminalId: String? = nil, pluginId: String? = nil, tabId: String? = nil, params: StudioJSONValue? = nil) {
+      self.kind = kind
+      self.id = id
+      self.path = path
+      self.environmentId = environmentId
+      self.hostId = hostId
+      self.url = url
+      self.terminalId = terminalId
+      self.pluginId = pluginId
+      self.tabId = tabId
+      self.params = params
+    }
+  }
+
+  public enum ThreadWorkbenchMutateOutputTabsItemOpenedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ThreadWorkbenchMutateOutputTabsItemMobileSupport: Sendable, Hashable, Codable {
+    case native
+    case web
+    case desktopOnly
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "native": self = .native
+      case "web": self = .web
+      case "desktopOnly": self = .desktopOnly
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .native: try container.encode("native")
+      case .web: try container.encode("web")
+      case .desktopOnly: try container.encode("desktopOnly")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ThreadWorkbenchMutateOutputTabsItem: Sendable, Hashable, Codable {
+    public var tabId: String?
+    public var ref: ThreadWorkbenchMutateOutputTabsItemRef?
+    public var title: String?
+    public var position: Int?
+    public var openedBy: ThreadWorkbenchMutateOutputTabsItemOpenedBy?
+    public var openedAt: Double?
+    public var mobileSupport: ThreadWorkbenchMutateOutputTabsItemMobileSupport?
+
+    public init(tabId: String? = nil, ref: ThreadWorkbenchMutateOutputTabsItemRef? = nil, title: String? = nil, position: Int? = nil, openedBy: ThreadWorkbenchMutateOutputTabsItemOpenedBy? = nil, openedAt: Double? = nil, mobileSupport: ThreadWorkbenchMutateOutputTabsItemMobileSupport? = nil) {
+      self.tabId = tabId
+      self.ref = ref
+      self.title = title
+      self.position = position
+      self.openedBy = openedBy
+      self.openedAt = openedAt
+      self.mobileSupport = mobileSupport
+    }
+  }
+
+  public enum ThreadWorkbenchMutateOutputResult: Sendable, Hashable, Codable {
+    case ok
+    case unchanged
+    case conflict
+    case notFound
+    case refused
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ok": self = .ok
+      case "unchanged": self = .unchanged
+      case "conflict": self = .conflict
+      case "notFound": self = .notFound
+      case "refused": self = .refused
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ok: try container.encode("ok")
+      case .unchanged: try container.encode("unchanged")
+      case .conflict: try container.encode("conflict")
+      case .notFound: try container.encode("notFound")
+      case .refused: try container.encode("refused")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ThreadWorkbenchMutateOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var tabs: [ThreadWorkbenchMutateOutputTabsItem]?
+    public var activeTabId: String?
+    public var panelOpen: Bool?
+    public var version: Int?
+    public var result: ThreadWorkbenchMutateOutputResult?
+    public var tabId: String?
+    public var message: String?
+
+    public init(threadId: String? = nil, tabs: [ThreadWorkbenchMutateOutputTabsItem]? = nil, activeTabId: String? = nil, panelOpen: Bool? = nil, version: Int? = nil, result: ThreadWorkbenchMutateOutputResult? = nil, tabId: String? = nil, message: String? = nil) {
+      self.threadId = threadId
+      self.tabs = tabs
+      self.activeTabId = activeTabId
+      self.panelOpen = panelOpen
+      self.version = version
+      self.result = result
+      self.tabId = tabId
+      self.message = message
+    }
+  }
+
   public enum StudioItemFamily: Sendable, Hashable, Codable {
     case page
     case app
@@ -42634,6 +43286,20 @@ public enum Studio {
     public init(botId: String? = nil, changes: [BotThreadsChangedEventChangesItem]? = nil) {
       self.botId = botId
       self.changes = changes
+    }
+  }
+
+  public struct WorkbenchChangedEvent: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var version: Int?
+    public var origin: String?
+    public var tabCount: Int?
+
+    public init(threadId: String? = nil, version: Int? = nil, origin: String? = nil, tabCount: Int? = nil) {
+      self.threadId = threadId
+      self.version = version
+      self.origin = origin
+      self.tabCount = tabCount
     }
   }
 }

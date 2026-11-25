@@ -24,6 +24,42 @@ export const ENSURED_COLUMNS: Readonly<Record<string, readonly (readonly [string
   strands: [["done_at", "INTEGER"], ["parent_id", "TEXT"], ["kind", "TEXT"], ["merge_parent", "TEXT"]],
 };
 
+/**
+ * Tables Studio creates when missing, for the same reason: no migration
+ * index to collide on. Each statement is `CREATE … IF NOT EXISTS`, so it is
+ * safe to run at every start; later columns go in ENSURED_COLUMNS.
+ */
+export const ENSURED_TABLES: readonly string[] = [
+  // A conversation's Workspace (src/workbench-agent/store.ts): its tabs, open and closed, and its state.
+  `CREATE TABLE IF NOT EXISTS thread_workbench_tabs (
+     thread_id TEXT NOT NULL,
+     tab_id TEXT NOT NULL,
+     position INTEGER,
+     ref TEXT NOT NULL,
+     item TEXT NOT NULL,
+     title TEXT NOT NULL,
+     opened_by TEXT NOT NULL,
+     opened_at INTEGER NOT NULL,
+     dismissed_at INTEGER,
+     closed_by TEXT,
+     PRIMARY KEY (thread_id, tab_id)
+   )`,
+  `CREATE INDEX IF NOT EXISTS thread_workbench_tabs_item ON thread_workbench_tabs (thread_id, item)`,
+  `CREATE TABLE IF NOT EXISTS thread_workbench_state (
+     thread_id TEXT PRIMARY KEY,
+     active_tab_id TEXT,
+     panel_open INTEGER,
+     layout TEXT,
+     version INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL
+   )`,
+];
+
+/** Creates each missing table and index. */
+export function ensureTables(db: Database.Database, tables: readonly string[] = ENSURED_TABLES): void {
+  for (const statement of tables) db.exec(statement);
+}
+
 /** Adds each missing column (a table that isn't there yet is left alone); returns what it added. */
 export function ensureColumns(db: Database.Database, columns: Readonly<Record<string, readonly (readonly [string, string])[]>> = ENSURED_COLUMNS): string[] {
   const added: string[] = [];

@@ -48,7 +48,7 @@ const fileLocation = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("range"), startLine: z.number().int().min(1), endLine: z.number().int().min(1) }),
 ]);
 
-/** What `ExperimentalWorkbench.open` takes, as far as these tools use it (no terminals). */
+/** What `ExperimentalWorkbench.open` takes, as far as Studio uses it. */
 export const openSpecSchema = z.discriminatedUnion("kind", [
   /** `tab.pluginId`: another plugin's tab it lets others open (a Visual Chat board, a workflow run). */
   z.object({ kind: z.literal("tab"), tab: z.object({ id: z.string().min(1).max(100), pluginId: z.string().min(1).max(100).optional() }), params: json.optional(), title: z.string().max(300).optional() }),
@@ -62,6 +62,8 @@ export const openSpecSchema = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("diff"), path: z.string().min(1).max(4096) }),
   z.object({ kind: z.literal("url"), url: z.string().url().max(4096) }),
+  /** A terminal already running for this conversation (the Workspace sync reopens one; the agent can't start one). */
+  z.object({ kind: z.literal("terminal"), terminalId: z.string().min(1).max(200) }),
 ]);
 export type OpenSpec = z.infer<typeof openSpecSchema>;
 
@@ -91,7 +93,8 @@ export const opSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("close"), key: z.string().min(1).max(500), force: z.boolean() }),
   z.object({ type: z.literal("focus"), key: z.string().min(1).max(500), force: z.boolean() }),
-  z.object({ type: z.literal("popOut"), key: z.string().min(1).max(500), force: z.boolean() }),
+  /** `item`: what the tab shows (workspace.ts refKey), when `key` is the Workspace's tab id and the window must find its own key. */
+  z.object({ type: z.literal("popOut"), key: z.string().min(1).max(500), item: z.string().max(5000).optional(), force: z.boolean() }),
   z.object({ type: z.literal("arrange"), layout: layoutSchema.partial(), force: z.boolean() }),
 ]);
 export type WorkbenchOp = z.infer<typeof opSchema>;
@@ -127,6 +130,7 @@ export function itemOfSpec(spec: OpenSpec): string {
     case "file": return `file:${spec.target.path}`;
     case "diff": return `diff:${spec.path}`;
     case "url": return `url:${spec.url}`;
+    case "terminal": return `terminal:${spec.terminalId}`;
   }
 }
 

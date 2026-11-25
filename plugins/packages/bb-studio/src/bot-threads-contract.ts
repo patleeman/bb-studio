@@ -59,6 +59,8 @@ const conversation = z.object({
   providerId: z.string().nullable().optional(),
   /** Its model's display name ("Opus 5.5"); null when not included in the loaded thread data. */
   modelName: z.string().nullable().optional(),
+  /** Open tabs in its Workspace (the "· 4 tabs" subtitle); 0 when none. */
+  tabCount: z.number().int().min(0).optional(),
 });
 
 const worker = z.object({

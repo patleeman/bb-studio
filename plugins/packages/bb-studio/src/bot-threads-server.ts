@@ -27,7 +27,7 @@ import type { MirroredBatch, MirrorLive } from "./mirror-live";
 import { SideThreads } from "./bot-side-threads";
 import { MessageThreads, type MessageRef } from "./message-threads";
 import { MirrorCatchUp } from "./mirror-catch-up";
-import type { BotSpace, BotThreadInfo, LibraryItem, LibraryKind, NewConversationRequest } from "./bot-threads-contract";
+import type { BotSpace, BotThreadInfo, ConversationRow, LibraryItem, LibraryKind, NewConversationRequest } from "./bot-threads-contract";
 import type { ReasoningLevel } from "./kit/reasoning";
 import type { IndexedItem } from "./item-index";
 import { familyHref, itemType } from "./item-model";
@@ -62,6 +62,8 @@ export interface BotThreadsServerDeps {
   log(message: string): void;
   /** The Bot a thread acts for, for the tools (its own conversation, a runner's, a thread it started). */
   actingBot(threadId: string | undefined): Promise<string | null>;
+  /** Open Workspace tabs per conversation (src/workbench-agent/store.ts), for each row's tabCount. */
+  tabCounts?(threadIds: readonly string[]): ReadonlyMap<string, number>;
   /** Where BB forked a thread (`experimental_threadForkPoint`, the fork); absent on a BB without it. */
   forkPoint?(threadId: string): Promise<{ sourceThreadId: string; sourceTurnId: string | null } | null>;
   /** bb's live state of the threads BB Studio mirrors (src/mirror-live.ts); absent without an import. */
@@ -264,6 +266,12 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
   };
   const rechecked = new Set<string>();
 
+  /** Each conversation row with its Workspace's open tab count. */
+  const withTabCounts = <T extends { conversations: readonly ConversationRow[] }>(view: T): T => {
+    if (!deps.tabCounts || !view.conversations.length) return view;
+    const counts = deps.tabCounts(view.conversations.map((row) => row.threadId));
+    return { ...view, conversations: view.conversations.map((row) => ({ ...row, tabCount: counts.get(row.threadId) ?? 0 })) };
+  };
   /** One Bot's rows with BB's view of them, for the sidebar and its "N older" lists. */
   const botRows = async (id: string) => {
     await Promise.all([fillLatest(id).catch(() => {}), fillActivity(ACTIVITY_PER_VIEW).catch(() => 0)]);
@@ -296,7 +304,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     if (!id) return { botId: null, conversations: [], workers: [], hiddenWorkers: 0, hiddenToday: 0, olderConversations: 0 };
     const { records, threads } = await botRows(id);
     const { runnerBot } = deps.signals();
-    return threadsView(id, records, threads, Date.now(), (threadId, thread) => botOwnThread(threadId, thread, runnerBot));
+    return withTabCounts(threadsView(id, records, threads, Date.now(), (threadId, thread) => botOwnThread(threadId, thread, runnerBot)));
   };
   /** What the sidebar leaves out, and the finished conversations, newest first. */
   const older = async (botId: string | undefined) => {
@@ -312,7 +320,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     const bbTitles = new Map(archived.map((thread) => [thread.id, thread.title?.trim() || thread.titleFallback?.trim() || null]));
     const failed = new Set(archived.filter((thread) => thread.status === "error").map((thread) => thread.id));
     const finished = done.map((rec) => ({ threadId: rec.threadId, title: rec.title?.trim() || bbTitles.get(rec.threadId) || "Untitled conversation", finishedAt: rec.archivedAt!, summary: rec.finishedSummary!, failed: failed.has(rec.threadId) }));
-    return { ...rest, finished };
+    return { ...withTabCounts(rest), finished };
   };
 
   /** A conversation's whole summary: what finishing it wrote, else the record it saved under "Conversations". */

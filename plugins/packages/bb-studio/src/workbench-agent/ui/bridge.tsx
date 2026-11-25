@@ -2,15 +2,21 @@
 // in BB's main window: hears each command on WORKBENCH_CHANNEL, and when this
 // window shows that conversation, claims it, runs it (exec.ts) and replies.
 // It also takes the new mark off a tab opened behind the selected one once
-// the user selects it (clearSeenMark).
+// the user selects it (clearSeenMark), and keeps each conversation's
+// workbench on screen here the same as its Workspace on the server, both
+// ways (sync.ts), bringing this window's stored tabs over once (import.ts).
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useRef } from "react";
 import { renameTabOf, workbenchOf } from "../../kit/app/host-sdk";
 import { errorMessage } from "../../kit/format";
-import type { workbenchContract } from "../contract";
+import type { workbenchContract, workspaceRpcContract } from "../contract";
 import { setTabNavigator, requestPluginTab } from "../../ui/tab-open";
 import { adaptWorkbench, clearSeenMark, runOp, type WorkbenchLike } from "../exec";
 import { commandSchema, WORKBENCH_CHANNEL, type WorkbenchCommand } from "../shared";
+import { refKey, refOfPanelTab, sameKey } from "../workspace";
+import { WORKSPACE_CHANGED_CHANNEL, workspaceChanged } from "../workspace-contract";
+import { IMPORT_DONE_KEY, storedPanels } from "./import";
+import { localSnapshots, WorkspaceSync, type WorkspaceClient } from "./sync";
 
 /** How often the selected tab is checked for a new mark to take off. */
 const MARK_CHECK_MS = 1000;
@@ -26,7 +32,15 @@ export async function handleCommand(payload: unknown, deps: BridgeDeps): Promise
   const parsed = commandSchema.safeParse(payload);
   if (!parsed.success) return null;
   const { requestId, threadId, op, record } = parsed.data;
-  if (!deps.workbench(threadId)) return null;
+  const shown = deps.workbench(threadId);
+  if (!shown) return null;
+  // pop_out names the Workspace's tab: this window finds its own key for what it shows.
+  if (op.type === "popOut" && op.item) {
+    const item = op.item;
+    const tab = shown.list().tabs.find((each) => { const ref = refOfPanelTab(each); return !!ref && sameKey(refKey(ref), item); });
+    if (!tab) return null;
+    op.key = tab.key;
+  }
   if (!(await deps.claim(requestId).catch(() => false))) return null;
   // Read again: the claim took a round trip.
   const wb = deps.workbench(threadId);
@@ -43,13 +57,57 @@ export async function handleCommand(payload: unknown, deps: BridgeDeps): Promise
   return threadId;
 }
 
+/** This window's name in the Workspace's change events, so it can skip its own. */
+const WINDOW_ORIGIN = `desktop:${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
+
 export function WorkbenchAgentBridge() {
   const navigate = useBbNavigate();
-  const rpc = useRpc<typeof workbenchContract>();
+  const rpc = useRpc<typeof workbenchContract & typeof workspaceRpcContract>();
   const latest = useRef({ navigate, rpc });
   latest.current = { navigate, rpc };
   // Conversations the agent used the workbench of here, besides the main view's: where new marks may be.
   const threads = useRef(new Set<string>());
+  const sync = useRef<WorkspaceSync | null>(null);
+  if (!sync.current) {
+    const client: WorkspaceClient = {
+      get: (threadId) => latest.current.rpc.call("threadWorkbenchGet", { threadId }),
+      mutate: (input) => latest.current.rpc.call("threadWorkbenchMutate", input),
+      importOnce: (input) => latest.current.rpc.call("workbench.import", input),
+    };
+    sync.current = new WorkspaceSync(WINDOW_ORIGIN, client, localSnapshots(typeof localStorage === "undefined" ? null : localStorage));
+  }
+  const workbenchFor = (threadId?: string): WorkbenchLike | null => {
+    const nav = latest.current.navigate;
+    const host = workbenchOf(nav, threadId);
+    if (!host) return null;
+    const id = host.threadId;
+    return adaptWorkbench(host, (spec, options) => requestPluginTab({ pluginId: spec.tab.pluginId!, tabId: spec.tab.id, params: spec.params ?? null, title: spec.title ?? "" }, { threadId: id, ...options }));
+  };
+  const syncThread = (threadId?: string) => {
+    const wb = workbenchFor(threadId);
+    const host = workbenchOf(latest.current.navigate, threadId);
+    if (!wb || !host || host.threadId.startsWith("page:")) return;
+    threads.current.add(host.threadId);
+    void sync.current!.sync(host.threadId, wb).catch(() => {});
+  };
+  // Another window, the phone or the agent changed a Workspace: follow it here when it is on screen.
+  useRealtime(WORKSPACE_CHANGED_CHANNEL, (payload) => {
+    const event = workspaceChanged.safeParse(payload);
+    if (event.success && sync.current!.changed(event.data)) syncThread(event.data.threadId);
+  });
+  // Once per window profile: every stored side panel to the server (applied only where it has nothing yet).
+  useEffect(() => {
+    if (typeof localStorage === "undefined" || localStorage.getItem(IMPORT_DONE_KEY)) return;
+    let stopped = false;
+    void (async () => {
+      for (const panel of storedPanels(localStorage)) {
+        if (stopped) return;
+        await latest.current.rpc.call("workbench.import", { ...panel, tabs: panel.tabs.slice(0, 100), origin: WINDOW_ORIGIN }).catch(() => null);
+      }
+      if (!stopped) localStorage.setItem(IMPORT_DONE_KEY, String(Date.now()));
+    })();
+    return () => { stopped = true; };
+  }, []);
   useRealtime(WORKBENCH_CHANNEL, (payload) => {
     const { navigate: nav, rpc: client } = latest.current;
     void handleCommand(payload, {
@@ -70,12 +128,12 @@ export function WorkbenchAgentBridge() {
       if (document.visibilityState !== "visible") return;
       const nav = latest.current.navigate;
       const rename = renameTabOf(nav);
-      if (!rename) return;
       const seen = new Set<string>();
       for (const wb of [workbenchOf(nav), ...[...threads.current].map((threadId) => workbenchOf(nav, threadId))]) {
         if (!wb || seen.has(wb.threadId)) continue;
         seen.add(wb.threadId);
-        clearSeenMark(wb, (tab) => { rename({ tab: { id: tab.tabId }, ...(tab.params !== null ? { params: tab.params } : {}), title: tab.title }); });
+        if (rename) clearSeenMark(wb, (tab) => { rename({ tab: { id: tab.tabId }, ...(tab.params !== null ? { params: tab.params } : {}), title: tab.title }); });
+        syncThread(wb.threadId);
       }
     }, MARK_CHECK_MS);
     return () => clearInterval(timer);

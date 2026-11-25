@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { TAB_KIND_REGISTRY } from "../tab-kinds";
 import { adaptWorkbench, clearSeenMark, PANE_LIMITS, type HostWorkbenchLike, type PanelTab, type WorkbenchLike } from "./exec";
-import { fileTargetIn, localFileIn, NO_ANSWER, OFF_SCREEN, openOp, STACKED, WorkbenchRecords, WorkbenchRouter, workbenchTools, type WorkbenchToolDeps } from "./server";
-import { adaptLayout, NEW_MARK, type OpenSpec, type WorkbenchLayout } from "./shared";
+import Database from "better-sqlite3";
+import { ensureTables } from "../schema-columns";
+import { fileTargetIn, localFileIn, NO_ANSWER, OFF_SCREEN, openOp, STACKED, toolOp, WorkbenchRouter, workbenchTools, type ToolName, type WorkbenchToolDeps } from "./server";
+import { adaptLayout, EMPTY_RECORD, NEW_MARK, type OpenSpec, type WorkbenchLayout, type WorkbenchRecord } from "./shared";
+import { WorkspaceStore } from "./store";
+import { WorkspaceService } from "./workspace-server";
+
+/** A Workspace on an in-memory database. */
+function memoryWorkspace() {
+  const db = new Database(":memory:");
+  ensureTables(db);
+  return new WorkspaceService(new WorkspaceStore(db), () => {});
+}
 import { handleCommand } from "./ui/bridge";
 
 /** A conversation's workbench as BB keeps it: tabs, the selected one, the layout, and whether the user is typing. */
@@ -54,9 +65,9 @@ function harness(onScreen: Record<string, WorkbenchLike> = {}) {
       reply: async (requestId, message, record) => router.reply(requestId, message, record),
     });
   }, { claimMs: 40, resultMs: 1000 });
-  const records = new WorkbenchRecords();
+  const records = new Map<string, WorkbenchRecord>();
   const deps: WorkbenchToolDeps = {
-    router, records,
+    router, workspace: memoryWorkspace(),
     threadTitle: async (id) => (id === "thr_other" ? "Release notes" : null),
     itemTitle: (id) => (id === "pg_plan" ? "Plan" : null),
     botName: (id) => (id === "bot_main" ? "Chief of Staff" : null),
@@ -65,7 +76,16 @@ function harness(onScreen: Record<string, WorkbenchLike> = {}) {
     workspacePath: async (_threadId, path) => path,
   };
   const tools = workbenchTools(deps);
-  const call = (name: string, input: object, threadId = "thr_1") => (tools.find((tool) => tool.name === name)!.execute as (input: object, ctx: { threadId: string }) => Promise<string>)(input, { threadId });
+  // Each call as the window showing the conversation runs it (exec.ts): the path pop_out, arrange and pane opens take.
+  const call = async (name: string, input: object, threadId = "thr_1") => {
+    const op = await toolOp(name as ToolName, input, threadId, deps);
+    if (typeof op === "string") return op;
+    const outcome = await router.call(threadId, op, records.get(threadId) ?? EMPTY_RECORD);
+    if (outcome.status === "off-screen") return OFF_SCREEN;
+    if (outcome.status === "timeout") return NO_ANSWER;
+    records.set(threadId, outcome.record);
+    return outcome.message;
+  };
   return { call, published, records, tools };
 }
 
@@ -232,8 +252,9 @@ it("checks a file only on the machine BB runs on", () => {
 
 it("tells the agent when the window doesn't finish in time", async () => {
   const router = new WorkbenchRouter((command) => { router.claim(command.requestId); }, { claimMs: 1000, resultMs: 20 });
-  const tools = workbenchTools({ router, records: new WorkbenchRecords(), threadTitle: async () => null, itemTitle: () => null, botName: () => null, entryTitle: async () => null, fileTarget: async () => null, workspacePath: async (_t, path) => path });
-  expect(await (tools[0]!.execute as (input: object, ctx: { threadId: string }) => Promise<string>)({}, { threadId: "thr_1" })).toBe(NO_ANSWER);
+  const tools = workbenchTools({ router, workspace: memoryWorkspace(), threadTitle: async () => null, itemTitle: () => null, botName: () => null, entryTitle: async () => null, fileTarget: async () => null, workspacePath: async (_t, path) => path });
+  const arrange = tools.find((tool) => tool.name === "workbench_arrange")!;
+  expect(await (arrange.execute as (input: object, ctx: { threadId: string }) => Promise<string>)({ layout: "panel only" }, { threadId: "thr_1" })).toBe(NO_ANSWER);
 });
 
 /** A workbench with BB's two panes: each pane's tab keys and its share of the workbench. */

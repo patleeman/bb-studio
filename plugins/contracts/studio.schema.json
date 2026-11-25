@@ -25898,6 +25898,11 @@
                     "string",
                     "null"
                   ]
+                },
+                "tabCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
                 }
               },
               "required": [
@@ -26179,6 +26184,11 @@
                     "string",
                     "null"
                   ]
+                },
+                "tabCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
                 }
               },
               "required": [
@@ -47400,6 +47410,25 @@
                       "url"
                     ],
                     "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "terminal"
+                      },
+                      "terminalId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "terminalId"
+                    ],
+                    "additionalProperties": false
                   }
                 ]
               },
@@ -57733,6 +57762,799 @@
         ],
         "additionalProperties": false
       }
+    },
+    "threadWorkbenchGet": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "tabs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tabId": {
+                  "type": "string"
+                },
+                "ref": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "conversation",
+                        "worker",
+                        "bot",
+                        "page",
+                        "whiteboard",
+                        "design",
+                        "app",
+                        "artifact",
+                        "recording",
+                        "board",
+                        "memory",
+                        "skills",
+                        "library",
+                        "automations",
+                        "todos",
+                        "archive",
+                        "automation",
+                        "todo",
+                        "record",
+                        "vscode",
+                        "file",
+                        "diff",
+                        "browser",
+                        "terminal",
+                        "workflow",
+                        "plugin"
+                      ]
+                    },
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "path": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "environmentId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "hostId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "url": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "terminalId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pluginId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "tabId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "params": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                },
+                "title": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "openedBy": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "agent"
+                  ]
+                },
+                "openedAt": {
+                  "type": "number"
+                },
+                "mobileSupport": {
+                  "type": "string",
+                  "enum": [
+                    "native",
+                    "web",
+                    "desktopOnly"
+                  ]
+                }
+              },
+              "required": [
+                "tabId",
+                "ref",
+                "title",
+                "position",
+                "openedBy",
+                "openedAt",
+                "mobileSupport"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "activeTabId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "panelOpen": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "threadId",
+          "tabs",
+          "activeTabId",
+          "panelOpen",
+          "version"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "threadWorkbenchMutate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "baseVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "open",
+              "close",
+              "focus",
+              "reorder"
+            ]
+          },
+          "tab": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "conversation",
+                  "worker",
+                  "bot",
+                  "page",
+                  "whiteboard",
+                  "design",
+                  "app",
+                  "artifact",
+                  "recording",
+                  "board",
+                  "memory",
+                  "skills",
+                  "library",
+                  "automations",
+                  "todos",
+                  "archive",
+                  "automation",
+                  "todo",
+                  "record",
+                  "vscode",
+                  "file",
+                  "diff",
+                  "browser",
+                  "terminal",
+                  "workflow",
+                  "plugin"
+                ]
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "path": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "environmentId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "hostId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "terminalId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "pluginId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tabId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "params": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "tabId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500
+          },
+          "focus": {
+            "type": "boolean"
+          },
+          "origin": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId",
+          "baseVersion",
+          "op"
+        ],
+        "$defs": {
+          "__schema0": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "tabs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tabId": {
+                  "type": "string"
+                },
+                "ref": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "conversation",
+                        "worker",
+                        "bot",
+                        "page",
+                        "whiteboard",
+                        "design",
+                        "app",
+                        "artifact",
+                        "recording",
+                        "board",
+                        "memory",
+                        "skills",
+                        "library",
+                        "automations",
+                        "todos",
+                        "archive",
+                        "automation",
+                        "todo",
+                        "record",
+                        "vscode",
+                        "file",
+                        "diff",
+                        "browser",
+                        "terminal",
+                        "workflow",
+                        "plugin"
+                      ]
+                    },
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "path": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "environmentId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "hostId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "url": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "terminalId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pluginId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "tabId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "params": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                },
+                "title": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "openedBy": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "agent"
+                  ]
+                },
+                "openedAt": {
+                  "type": "number"
+                },
+                "mobileSupport": {
+                  "type": "string",
+                  "enum": [
+                    "native",
+                    "web",
+                    "desktopOnly"
+                  ]
+                }
+              },
+              "required": [
+                "tabId",
+                "ref",
+                "title",
+                "position",
+                "openedBy",
+                "openedAt",
+                "mobileSupport"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "activeTabId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "panelOpen": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unchanged",
+              "conflict",
+              "notFound",
+              "refused"
+            ]
+          },
+          "tabId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "tabs",
+          "activeTabId",
+          "panelOpen",
+          "version",
+          "result",
+          "tabId",
+          "message"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              }
+            ]
+          }
+        }
+      }
     }
   },
   "events": {
@@ -57762,6 +58584,38 @@
       "required": [
         "botId",
         "changes"
+      ],
+      "additionalProperties": false
+    },
+    "workbench-changed": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "threadId": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "origin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "threadId",
+        "version",
+        "origin",
+        "tabCount"
       ],
       "additionalProperties": false
     }

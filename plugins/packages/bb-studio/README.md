@@ -1210,17 +1210,41 @@ Studio RPC: `links.resolve({ kind, id, threadId })` → `{ found, title, spec
 `docs/link-audit.md` is the table of link source × kind and the tests behind
 each cell.
 
-**Agent tools.** The agent can arrange the workbench of its own
-conversation (`src/workbench-agent`). They need the fork's
-`experimental_workbench` and work only while that conversation is on screen
-in BB: the tool runs on the server, publishes the call on the
-`studio-workbench` realtime channel, the window showing the conversation
-claims it (`workbench.claim`), runs it and answers (`workbench.reply`). No
-claim within 1.5 seconds and the tool says the conversation isn't on screen.
+**The Workspace on the server.** Each conversation's workbench tabs are kept
+by Studio, per conversation, in SQLite (`src/workbench-agent/store.ts`,
+tables `thread_workbench_tabs` and `thread_workbench_state`), so the phone,
+every desktop window and the agent read and change the same tabs. Clients
+use `threadWorkbenchGet({ threadId })` and `threadWorkbenchMutate({ threadId,
+baseVersion, op: open | close | focus | reorder, tab?, title?, tabId?,
+position?, focus?, origin? })`; a change against an older `baseVersion`
+answers `result: "conflict"` with the current state and changes nothing.
+Each change is announced on the `workbench-changed` realtime channel
+(`{ threadId, version, origin, tabCount }`), and the Bot sidebar's
+conversation rows carry `tabCount`. A tab is a `WorkspaceTabRef` (a kind
+from `src/tab-kinds.ts` with its id, or a file's path and environment, a
+URL, a terminal, another plugin's tab) with `mobileSupport` (native, web or
+desktopOnly, `MOBILE_SUPPORT`). A desktop window follows the Workspace of
+each conversation it shows, both ways, through BB's public
+`experimental_workbench` (`src/workbench-agent/ui/sync.ts`): a three-way
+merge against the last state both agreed on, every second and on each
+change event, skipping its own events by origin and re-reading after a
+conflict. The first time, it brings its stored side panels over
+(`ui/import.ts`, only where the server has nothing yet). Info, New Tab and
+plugin details stay local to the window.
+
+**Agent tools.** The agent works the workbench of its own conversation
+(`src/workbench-agent`). List, open, close and focus act on the Workspace
+on the server, with or without a window on screen. What only a desktop
+window can do (`pop_out`, `arrange`, an open into pane 2 or a window of its
+own) needs the fork's `experimental_workbench` and that conversation on
+screen in BB: the tool publishes the call on the `studio-workbench` realtime
+channel, the window showing the conversation claims it (`workbench.claim`),
+runs it and answers (`workbench.reply`). No claim within 1.5 seconds and the
+tool says the conversation isn't on screen.
 
 | Tool | Input | Does |
 | --- | --- | --- |
-| `workbench (op: list)` | none | The tabs with their keys, the selected one, which the agent opened, the layout, and what the user closed or changed |
+| `workbench (op: list)` | none | The tabs with their keys, the selected one, which the agent opened, and what the user closed or changed |
 | `workbench (op: open)` | `type`: every kind of the registry the agent may open (conversation, worker, bot, page, whiteboard, design, app, artifact, recording, board, memory, library, automations, todos, archive, automation, todo, record, vscode, file, diff, url, workflow); `id`, `path` (file, diff), `line`/`endLine` (file), `url`; or `link` instead of type and id (`bb://page/pg_…`, a bb address, `::page{id="…"}`, `file:///…`, an http(s) URL); `pane` (1, 2, "new" or "window"), `index`; `focus` (default true); `force` | Opens it as a tab, or selects it if open, in that pane and place; with "window", in a window of its own. URLs need the desktop app's in-app browser |
 | `workbench (op: tab)` | `key`, `action`, `force` | `close` closes a tab; `focus` selects it and shows the panel; `pop_out` opens an open tab in a window of its own, out of the workbench |
 | `workbench (op: arrange)` | `layout`: side by side, panel only, conversation only or stacked; `widthPercent` 20 to 80; `panes` 1 or 2; `paneWidths` (a ratio, such as [2, 1]); `force` | Shows or hides the panel, sets its width, collapses the conversation, makes or merges the second pane |
@@ -1230,16 +1254,14 @@ stays on the left; panes don't stack, so `workbench (op: arrange)` answers that
 **stacked** isn't available. On a BB whose workbench has one pane, `pane` is
 ignored (the answer says so) and `panes` is refused. The rules:
 
-- While the user is typing in the panel, an open goes behind the selected
-  tab, and a Studio tab (thread, page, whiteboard, design) gets a "• " before
-  its title until the user selects it; a focus, closing the selected tab or
-  closing the panel is refused, and no second pane is made.
-- Studio remembers, per conversation, the tabs the agent opened and the
-  layout it set (in memory, until Studio restarts). A tab the agent opened
-  that the user then closed or moved out of the panel isn't reopened, a
-  panel the user closed stays closed (opens go behind), and a layout setting
-  the user changed isn't changed back, unless the call passes
-  `force: true`, which agents pass only when the user asked.
+- While the user is typing in the panel, a desktop window doesn't move the
+  selection or close the tab they type in (it goes back to the Workspace as
+  theirs), and no second pane is made.
+- The Workspace keeps which tabs the agent opened and the user's closes, and
+  the layout the agent set, across restarts. A tab the agent opened that the
+  user then closed (on any device) isn't reopened, and a layout setting the
+  user changed isn't changed back, unless the call passes `force: true`,
+  which agents pass only when the user asked.
 - A window of its own (`pane: "window"`, `workbench (op: tab)` action `pop_out`) is BB's "Open
   in new window": pages, whiteboards, designs, apps, conversations and other
   plugin tabs, and files pop out; terminals, browser tabs, Info, Diff, New

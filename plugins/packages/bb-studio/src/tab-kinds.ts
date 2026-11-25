@@ -227,6 +227,26 @@ export function tabKindEntry(id: TabKindId): TabKindEntry {
 
 export const isTabKindId = (value: unknown): value is TabKindId => typeof value === "string" && BY_ID.has(value as TabKindId);
 
+/** Every kind's id, in registry order. */
+export const TAB_KIND_IDS = TAB_KIND_REGISTRY.map((entry) => entry.id) as [TabKindId, ...TabKindId[]];
+
+/**
+ * How the phone shows a workbench tab of each kind (the Workspace sheet):
+ * native, a view of its own; web, the in-app BB web view; desktopOnly, a
+ * card that says to open it on the desktop. A Record, so a new kind can't be
+ * added without saying.
+ */
+export type MobileSupport = "native" | "web" | "desktopOnly";
+export const MOBILE_SUPPORT: Readonly<Record<TabKindId, MobileSupport>> = {
+  conversation: "native", worker: "native", bot: "web",
+  page: "native", whiteboard: "native", design: "native", app: "native", artifact: "native", recording: "web",
+  board: "web",
+  memory: "web", skills: "web", library: "web", automations: "web", todos: "web", archive: "web",
+  automation: "web", todo: "web", record: "web",
+  vscode: "desktopOnly",
+  file: "native", diff: "native", browser: "web", terminal: "native", workflow: "web",
+};
+
 /** The types workbench_open takes, in registry order. */
 export const AGENT_TYPES: readonly string[] = TAB_KIND_REGISTRY.flatMap((entry) => (entry.agentType ? [entry.agentType] : []));
 
