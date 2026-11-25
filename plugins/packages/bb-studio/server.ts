@@ -1,3 +1,7 @@
+import { registerBotSkillTools } from "./src/server/skill-tools";
+import { registerScheduleTools } from "./src/server/schedule-tools";
+import { registerCollectionTools } from "./src/server/collection-tools";
+import { registerStudioCli } from "./src/server/cli";
 import { registerWorkCards } from "./src/work/register";
 import { STRAND_NOTE_TOOL } from "./src/strands/contract";
 import { phoneActs, registerUserTasks } from "./src/tasks/user";
@@ -13,7 +17,6 @@ import { AreaStore } from "./src/areas/store";
 import { AREA_TOOLS, registerAreas } from "./src/areas/register";
 import { assertTasksReady, cardNeedsUser, TaskStore, taskTitle, tasksUnavailable } from "./src/tasks/store";
 import { withToolLabel } from "./src/tool-labels";
-import { opNeeds } from "./src/op-errors";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { registerLoops } from './src/loops/register';
 import { scheduledContract, scheduledItems } from "./src/loops/scheduled";
@@ -21,7 +24,6 @@ import { automationTable, bbFromFile, bbFromOverview, readImportedAt, readStudio
 import { arrangeRailOnce } from "./src/rail-arrangement";
 import { arrangeFooterOnce } from "./src/footer-arrangement";
 import { retireLegacyThemeOnce } from "./src/theme/legacy-theme";
-import { RunnerPreflightError } from "./src/runner-machines";
 import { indexItem } from "./src/kit/server/studio-index";
 import { CODE_TOOLS, registerCode } from "./src/code/server";
 import { registerWorkbenchAgent, WORKBENCH_TOOLS } from "./src/workbench-agent/server";
@@ -40,7 +42,7 @@ import { sessionTitlePrefix } from "./src/decisions/server/classifier";
 import { ON_DEMAND_EXTRAS, scopeEntries, scopeTools, trioInstructions, type Scope, type ScopeKind } from "./src/tool-scope";
 import { registerScopedTools, ScopeMemory } from "./src/tool-scope-tools";
 import { slim, slimmedIfSmaller } from "./src/slim-schema";
-import { callText, clipLine, nextLine, pageByKey, pageItems, pageSections, pageText, staleCursor } from "./src/paging";
+import { callText, nextLine, pageSections, staleCursor } from "./src/paging";
 import { ABSORB_FIELDS, INTERNAL_RENAMES, MERGES, mergedParameters, mergedTools, presentScope } from "./src/merged-tools";
 import { LeanStore, leanFor } from "./src/context-lean";
 import { contextLeanContract } from "./src/context-lean-contract";
@@ -66,7 +68,6 @@ import { kindsContract, type KindsState } from "./src/kinds-contract";
 import { openaiKey } from "./src/openai-key";
 import { registerSettings } from "./src/settings/register";
 import { loopTimeZone } from "./src/settings/constants";
-import { settingsCli, SETTINGS_USAGE } from "./src/settings/cli";
 import { STUDIO_SETTINGS } from "./src/settings/schema";
 import { VoiceLive } from "./src/voice/live/live";
 import { registerVoiceLive } from "./src/voice/live/register";
@@ -75,8 +76,6 @@ import { gatherSeed, type SeedMessage } from "./src/voice/live/identity";
 import { resolveTarget } from "./src/voice/live/targets";
 import { VOICE_LIVE_CHANNEL } from "./src/voice/live/shared";
 import { CANVAS_PLUGIN_ID, canvasVoiceOutput, canvasVoiceRunOutput, isCanvasThreadOrigin } from "./src/voice/live/canvas-plugin";
-import { subcommand, usage } from "./src/kit/cli";
-import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
 //
 // - Studio finds add-ons through RPC discovery (src/hub.ts) and fans the
@@ -92,8 +91,6 @@ import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { experimental_PluginRpcRefusal } from "@get-bb/plugin-sdk";
-import { studioCliName, studioCliRegistration } from "./src/cli-name";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, STUDIO_REALTIME_CHANNEL } from "./src/kit/contract";
 import { relativeTime, untitled } from "./src/kit/format";
@@ -118,22 +115,20 @@ import { registerMemory } from "./src/memory/register";
 import { recordLine } from "./src/memory/shared";
 import { BotPageState, registerGroupTool } from "./src/bot-page-state";
 import { BotCacheWarmer } from "./src/bot-cache";
-import { botControlRefusal, Bots, MAIN_HEAL_MS, SKILL_NAME } from "./src/bot";
+import { botControlRefusal, Bots, MAIN_HEAL_MS } from "./src/bot";
 import { ThemeStore } from "./src/theme/store";
 import { forestContract } from "./src/theme/forest/contract";
 import { ForestWeather } from "./src/theme/forest/weather";
 import { builtinOptionStores, readThemeOptions, themeOptionsContract, writeThemeOption } from "./src/theme/options-contract";
-import { readPreview, readView, tonightContract, writePreview, writeView } from "./src/theme/tonight/contract";
+import { readPreview, readView, tonightContract } from "./src/theme/tonight/contract";
 import { ThemeService } from "./src/theme/service";
 import { ThemeGpuRouter } from "./src/theme/gpu-server";
 import { THEME_GPU_CHANNEL } from "./src/theme/gpu";
 import { THEME_TOOLS, themeTools } from "./src/theme/agent-tools";
-import { runThemeCli } from "./src/theme/cli";
 import { PresenceStore } from "./src/presence/store";
 import { PresenceService } from "./src/presence/service";
 import { PRESENCE_CHECK_CHANNEL, PresenceCheckRouter } from "./src/presence/check-router";
 import { PRESENCE_TOOLS, presenceTools } from "./src/presence/agent-tools";
-import { runPresenceCli } from "./src/presence/cli";
 import { presenceAskText } from "./src/presence/contract";
 import { SideThreads } from "./src/bot-side-threads";
 import { alertBot, Runners } from "./src/runners";
@@ -161,17 +156,14 @@ import { studioInstructions } from "./src/agent-instructions";
 import { activityOf, conversationInstructions, conversationTitle, workerStatus } from "./src/bot-threads";
 import { registerStrands } from "./src/strands/register";
 import { STUDIO_KEY_SETTINGS } from "./src/settings/keys";
-import { STRANDS_USAGE } from "./src/strands/cli";
 import { newTabRecents, newTabSearch, VISUAL_CHAT_PLUGIN_ID, type EntryRow, type NewTabSearchSources, type NewTabSources } from "./src/newtab";
 import { automationRefId, parseAutomationRefId } from "./src/automation-table-contract";
 import { ITEM_KINDS, type TabKindId } from "./src/tab-kinds";
 import { Automations } from "./src/automations";
-import { lintSkill, patchText, REVIEW_TOOLS, SkillLearning } from "./src/skill-learning";
-import { parseDuration, type Schedule } from "./src/schedule";
+import { REVIEW_TOOLS, SkillLearning } from "./src/skill-learning";
 import { itemAtPath, TabStore } from "./src/tabs";
-import { formatWorkspace, openHrefs, WorkspacePresence, type WorkspaceCommand } from "./src/workspace-presence";
-import { WORKSPACE_CHANNEL } from "./src/ids";
-import { TagStore, type ItemRef, type Tag } from "./src/tags";
+import { WorkspacePresence } from "./src/workspace-presence";
+import { TagStore, type ItemRef } from "./src/tags";
 import { StarStore } from "./src/stars";
 import { planMove } from "./src/move-items";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
@@ -189,31 +181,20 @@ const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
 const MAX_LISTED = 100;
 
-/** A CLI argument as query text: the shell took the quotes off `project:"Q4 launch"`. */
-function queryArg(arg: string): string {
-  if (!/\s/.test(arg) || arg.includes('"')) return arg;
-  const filter = /^(-?[a-z]+:)(.*)$/i.exec(arg);
-  return filter ? `${filter[1]}"${filter[2]}"` : `"${arg}"`;
-}
-
 import { HEALTH_REALTIME_CHANNEL, healthSchemas } from "./src/kit/health";
 import { HealthMonitor } from "./src/health";
 import { healthContract } from "./src/health-contract";
 import { registerAuth } from "./src/auth/register";
-import { AUTH_USAGE, authCli } from "./src/auth/cli";
 import { createLiveBbPool, registerAccounts } from "./src/accounts/register";
 import { registerOnboarding } from "./src/onboarding-register";
-import { ACCOUNTS_USAGE, accountsCli } from "./src/accounts/cli";
-import { formatSetup, SetupService } from "./src/setup";
+import { SetupService } from "./src/setup";
 import { setupContract } from "./src/setup-contract";
-import { BackupService, formatBackup, formatRestore, restoreFailed } from "./src/backup/service";
+import { BackupService } from "./src/backup/service";
 import { studioDataBackup } from "./src/backup/studio-data";
-import { backupFileName, registerBackup } from "./src/backup/register";
-import { readFile as readTextFile, stat as statPath } from "node:fs/promises";
+import { registerBackup } from "./src/backup/register";
 import { claimFirstLoad, finishStudioImport } from "./src/studio-data/start";
 import { studioDataStatus } from "./src/studio-data/preview";
 import { studioDataContract } from "./src/studio-data/contract";
-import { isAbsolute, resolve as resolvePath } from "node:path";
 
 const WORKER_LEVELS_KEY = "push-levels:workers-input-only";
 
@@ -2358,428 +2339,25 @@ export default async function plugin(bb: BbPluginApi) {
     if (conversation && bots.stored(conversation)) return conversation;
     throw new Error("Only the user's Bot has its own skills and history.");
   };
-  /** The lint's advisory notes, after a tool's result line. */
-  const withNotes = (line: string, skill: { name: string; body: string }, botId: string) => {
-    const notes = lintSkill(skill, bots.skills(botId).filter((each) => each.state !== "archived").map((each) => each.name));
-    return notes.length ? `${line}\nNotes (advisory, nothing was blocked):\n${notes.map((note) => `- ${note}`).join("\n")}` : line;
-  };
-  const saveSkill = (input: { name: string; description: string; body: string }, botId: string, threadId: string | undefined, verb: string) => {
-    bots.writeSkill(input, botId);
-    learning.noteWrite(threadId, "saved");
-    return withNotes(`${verb === "patched" ? "Patched" : "Saved"} your skill ${input.name}.`, input, botId);
-  };
-  bb.agents.registerTool({
-    name: "bot_skill_lint", description: "Inspect saved skill versions and optionally attach advisory quality or safety warnings to an exact version. Never blocks or rolls back a save.",
-    parameters: z.object({ versionId: z.number().int().positive().optional(), warnings: z.array(z.string().min(1).max(2000)).max(20).optional() }),
-    execute: ({ versionId, warnings }, ctx) => {
-      const botId = ownBot(ctx.threadId);
-      if (versionId && warnings) bots.lintSkillVersion(versionId, warnings, botId);
-      return JSON.stringify(bots.skillHistory(botId).slice(0, 20));
-    },
-  });
-  bb.agents.registerTool({
-    name: "bot_skill_list",
-    description: "List or search your own skills (non-archived). Without query, lists all; with query, searches names, descriptions and full text (load one with bot_skill (op: view) before following it).",
-    parameters: z.object({ query: z.string().trim().min(1).max(200).optional(), limit: z.number().int().min(1).max(20).optional(), after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
-    execute: ({ query, limit, after }, ctx) => {
-      const botId = ownBot(ctx.threadId);
-      if (query) {
-        const hits = bots.searchSkills(query, limit ?? 5, botId);
-        if (!hits.length) return `No skill of yours matches "${query}".`;
-        return hits.map((hit, index) => `${index + 1}. ${hit.name}: ${clipLine(hit.description, 200)} (matched ${hit.fields.join(", ")})${hit.snippet ? `\n   ${clipLine(hit.snippet, 200)}` : ""}`).join("\n");
-      }
-      const list = bots.skills(botId).filter((skill) => skill.state !== "archived");
-      if (!list.length) return "No skills yet.";
-      // In parts (src/paging.ts), descriptions on one short line.
-      const rows = list.map((skill) => ({ id: skill.name, line: `- ${skill.name}${skill.pinned ? " (pinned)" : ""}${skill.state === "stale" ? " (stale)" : ""}: ${clipLine(skill.description, 200)}` }));
-      // By keyset on (pinned first, name): reading or using a skill between parts doesn't move it.
-      const keys = new Map(list.map((skill) => [skill.name, [skill.pinned ? 0 : 1, skill.name] as (string | number)[]]));
-      const part = pageByKey(rows, (each) => keys.get(each.id)!, (each) => each.line.length, { after });
-      if (part.missing) return staleCursor("That cursor", callText("bot_skill_list", {}));
-      const next = nextLine(part, (last) => callText("bot_skill_list", { after: last }), "skills");
-      return [`${list.length} skill${list.length === 1 ? "" : "s"}.`, ...(next ? [next] : []), ...part.items.map((each) => each.line)].join("\n");
-    },
-  });
-  /** A skill body's part (bot_skill view): measured bodies run a median 4,800 characters, p90 13,600. */
-  const SKILL_PART_CHARS = 8_000;
-  bb.agents.registerTool({
-    name: "bot_skill_view", description: "Load one of your own skills in full, in parts of about 8,000 characters (the next part with offset, as the reply says). Do it before you follow a skill: your instructions list only names and descriptions.",
-    parameters: z.object({ name: z.string().min(1).max(64), offset: z.number().int().min(0).optional().describe("Where the next part starts, as the last part's Next says") }),
-    execute: ({ name, offset }, ctx) => {
-      const botId = ownBot(ctx.threadId);
-      const skill = bots.skill(name, botId);
-      if (!skill || skill.state === "archived") return `No skill "${name}". Yours: ${bots.skills(botId).filter((each) => each.state !== "archived").map((each) => each.name).join(", ") || "none"}.`;
-      // A review reading skills isn't the Bot using them.
-      if (!learning.review(ctx.threadId) && !offset) bots.touchSkill(name, botId);
-      const part = pageText(skill.body, offset ?? 0, SKILL_PART_CHARS);
-      if (part.missing) return `The skill ${skill.name} is ${skill.body.length.toLocaleString("en-US")} characters now; ${offset} is past its end. Start again: ${callText("bot_skill_view", { name: skill.name })}.`;
-      const next = part.next === null ? null : `(Characters ${(offset ?? 0).toLocaleString("en-US")}–${part.next.toLocaleString("en-US")} of ${skill.body.length.toLocaleString("en-US")}. Next: ${callText("bot_skill_view", { name: skill.name, offset: part.next })}.)`;
-      return [`# ${skill.name}`, skill.description, ...(next ? [next] : []), "", part.text].join("\n");
-    },
-  });
-  bb.agents.registerTool({
-    name: "bot_skill_edit",
-    description: 'Create, patch or delete one of your own skills. op "write": name (lowercase-with-hyphens), description, body. op "patch": name, find (exact text from bot_skill (op: view)), replace, all?, description?. op "delete": name.',
-    parameters: z.object({
-      op: z.enum(["write", "patch", "delete"]),
-      name: z.string().min(1).max(64),
-      description: z.string().trim().min(1).max(500).optional().describe("One sentence: when to use it"),
-      body: z.string().min(1).max(20_000).optional().describe("write: Markdown instructions"),
-      find: z.string().min(1).max(20_000).optional().describe("patch: exact text to replace"),
-      replace: z.string().max(20_000).optional().describe("patch: replacement text (empty removes)"),
-      all: z.boolean().optional().describe("patch: replace every occurrence"),
-    }),
-    execute: ({ op, name, description, body, find, replace, all }, ctx) => {
-      const botId = ownBot(ctx.threadId);
-      if (op === "delete") {
-        const skill = bots.skill(name, botId);
-        if (!skill) return `No skill "${name}".`;
-        if (learning.review(ctx.threadId) && skill.pinned) return `${name} is pinned by the user; leave it.`;
-        bots.deleteSkill(name, botId);
-        learning.noteWrite(ctx.threadId, "saved");
-        return `Deleted ${name}.`;
-      }
-      if (op === "patch") {
-        const skill = bots.skill(name, botId);
-        if (!skill) return `No skill "${name}". Make it with bot_skill (op: edit, change: "write").`;
-        if (find === undefined || replace === undefined) return opNeeds("patch", ["name", "find", "replace"]);
-        return saveSkill({ name, description: description ?? skill.description, body: patchText(skill.body, find, replace, all) }, botId, ctx.threadId, "patched");
-      }
-      if (!description || !body) return opNeeds("write", ["name", "description", "body"]);
-      if (!SKILL_NAME.test(name)) return { content: [{ type: "text" as const, text: "Skill name must be lowercase-with-hyphens." }], isError: true as const };
-      return saveSkill({ name, description, body }, botId, ctx.threadId, bots.skill(name, botId) ? "rewritten" : "new");
-    },
-  });
-  // The Bot's runners: its tools (its thread only) and the runner's one report tool.
-  let machineCheckTimer: ReturnType<typeof setTimeout> | null = null;
-  bb.onDispose(() => { if (machineCheckTimer) clearTimeout(machineCheckTimer); });
-  runnerDispatch = async context => {
-    if (runners.isMovingThread(context.thread.id)) return { action: "reject", message: "Runner is moving to another machine; this run was skipped." };
-    const runner = runners.forThread(context.thread.id);
-    if (runner && !await runners.available(runner.id, false)) {
-      // Leave core's admission lock before pausing the automation or alerting the Bot.
-      if (!machineCheckTimer) machineCheckTimer = setTimeout(() => {
-        machineCheckTimer = null;
-        void runners.checkMachines().catch(error => bb.log.warn(`Runner machines: ${errorText(error)}`));
-      }, 0);
-      return { action: "reject", message: "Machine offline; this runner run was skipped." };
-    }
-    return null;
-  };
-  const describeRunner = (runner: Awaited<ReturnType<typeof runners.list>>[number]) =>
-    `- ${runner.name} (${runner.id}, ${runner.state}${runner.machineName ? `, ${runner.machineName}${runner.machineOffline ? " — machine offline" : ""}` : ""}${runner.adopted ? ", adopted" : ""}): ${runner.schedule.cadence}${runner.schedule.cadence === "custom" ? ` ${runner.schedule.cron}` : ` at ${runner.schedule.time}`}${runner.nextRunAt ? `, next ${new Date(runner.nextRunAt).toLocaleString()}` : ""}. Job: ${runner.job}${runner.lastReport ? `\n  Last report (${runner.lastLevel}): ${runner.lastReport}` : ""}${runner.threadId ? `\n  Thread: /threads/${runner.threadId}` : ""}`;
-  /** Schedule changes made in a conversation other than Main are noted in Main, quietly. */
-  const SCHEDULE_CHANGES = new Set(["runner_migrate", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_delete"]);
-  const noteScheduleChange = async (name: string, threadId: string | undefined, botId: string, result: string) => {
-    const main = bots.stored(botId)?.threadId;
-    const rec = threadId ? botThreads.store.get(threadId) : null;
-    if (!main || !threadId || threadId === main || rec?.kind !== "conversation") return;
-    const title = (rec.title ?? (await bb.sdk.threads.get({ threadId }).then((thread) => (thread as { title?: string | null }).title ?? null, () => null)) ?? "another conversation").replace(/[[\]]/g, "");
-    const first = result.split("\n").find((line) => line.trim() && !/^Made/.test(line)) ?? result;
-    await alertBot(bb.sdk, {
-      botThreadId: main,
-      line: `🗓 ${name.replace(/_/g, " ")} from [${title}](/threads/${threadId}): ${first.replace(/^- /, "").slice(0, 300)}`,
-      note: "A schedule change you made in another conversation, noted here so Main has every schedule change. Don't reply or act on it; reply exactly [PASS].",
-    }).catch((error) => bb.log.warn(`Noting a schedule change in Main failed: ${errorText(error)}`));
-  };
-  const runnerTool = (name: string, description: string, parameters: z.ZodObject, execute: (input: never, botId: string) => Promise<string>) =>
-    bb.agents.registerTool({ name, description, parameters, execute: async (input, ctx) => {
-      try {
-        const botId = ownBot(ctx.threadId);
-        const result = await execute(input as never, botId);
-        if (SCHEDULE_CHANGES.has(name) && !result.startsWith("{")) void noteScheduleChange(name, ctx.threadId, botId, result);
-        return result;
-      } catch (error) { if (error instanceof RunnerPreflightError) return JSON.stringify({ warnings: error.warnings, blocked: error.blocked, confirmRequired: !error.blocked }); throw error; }
-    } });
-  runnerTool("runner_migrate", "Move a runner to a machine (host id/name, or null for server). Review preflight warnings and retry with confirm: true.",
-    z.object({ id: z.string().min(1), machine: z.string().nullable(), confirm: z.boolean().optional() }),
-    async (input: { id: string; machine: string | null; confirm?: boolean }, botId) => describeRunner(await runners.migrate(input, botId)));
-  // The Bot's automations: check-ins, reminders, watchers and runners in one list (src/automations.ts).
-  const hhmm = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
-  const toolSchedule = z.object({
-    times: z.array(hhmm).max(24).optional().describe('HH:MM times, e.g. ["08:00"]'),
-    every: z.string().regex(/^\d+\s*(m|min|minutes?|h|hours?)$/).optional().describe("Interval, e.g. 15m or 2h"),
-    from: hhmm.optional(), to: hhmm.optional(),
-    days: z.array(z.number().int().min(0).max(6)).optional().describe("0=Sun..6=Sat"),
-    quiet: z.object({ from: hhmm, to: hhmm }).optional(),
-    until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-    cron: z.string().max(100).optional(),
-    timezone: z.string().max(100).optional(),
-    at: z.string().max(60).optional().describe("ISO date-time"), in: z.string().max(20).optional().describe("Delay, e.g. 30m, 2h"),
-  });
-  const toSchedule = (input: z.infer<typeof toolSchedule>): Schedule => {
-    if (input.at || input.in) {
-      const at = input.at ? Date.parse(input.at) : Date.now() + parseDuration(input.in!);
-      if (!Number.isFinite(at)) throw new Error(`"${input.at}" isn't a date-time.`);
-      return { type: "once", at };
-    }
-    const common = { ...(input.timezone ? { timezone: input.timezone } : {}), ...(input.quiet ? { quiet: input.quiet } : {}), ...(input.until ? { until: input.until } : {}) };
-    const days = (input.days ?? [0, 1, 2, 3, 4, 5, 6]) as (0 | 1 | 2 | 3 | 4 | 5 | 6)[];
-    if (input.cron) return { type: "cron", cron: input.cron, ...common };
-    if (input.every) {
-      const [, n, unit] = /^(\d+)\s*(\w+)$/.exec(input.every)!;
-      return { type: "interval", every: Number(n), unit: unit!.startsWith("h") ? "hours" : "minutes", days, ...(input.from ? { from: input.from } : {}), ...(input.to ? { to: input.to } : {}), ...common };
-    }
-    if (!input.times?.length) throw new Error("Give times, every, cron, at or in.");
-    return { type: "times", days, times: input.times, ...common };
-  };
-  const describeAutomation = (each: Awaited<ReturnType<typeof automations.list>>[number]) =>
-    `- ${each.name} (${each.kind}, ${each.id}, ${each.state}): ${each.scheduleText}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toLocaleString()}` : ""}${each.kind === "watcher" ? ` → wakes ${each.targetName}` : ""}. ${each.kind === "watcher" ? `Script (${each.script?.interpreter})` : each.instruction}${each.model?.model ? ` [${each.model.model}${each.model.reasoning ? `/${each.model.reasoning}` : ""}]` : ""}${each.lastOutcome ? `\n  Last: ${each.lastOutcome}` : ""}`;
-  const automationFields = {
-    instruction: z.string().trim().max(2000).optional(),
-    schedule: toolSchedule.optional(),
-    model: z.string().max(200).optional(),
-    reasoning: z.string().max(40).optional(),
-    script: z.string().max(262_144).optional().describe("Watcher script (stdout wakes you)"),
-    interpreter: z.enum(["bash", "sh", "node", "python3"]).optional(),
-    target: z.string().max(200).optional().describe('"main" or runner id/name'),
-    machine: z.string().nullable().optional().describe("Runner host id/name, or null for server"),
-    confirm: z.boolean().optional().describe("Runner preflight confirm"),
-  };
-  type AutomationToolInput = { name?: string; instruction?: string; schedule?: z.infer<typeof toolSchedule>; model?: string; reasoning?: string; script?: string; interpreter?: "bash" | "sh" | "node" | "python3"; target?: string; machine?: string | null; confirm?: boolean };
-  const automationChanges = (input: AutomationToolInput) => ({
-    ...(input.name ? { name: input.name } : {}), ...(input.instruction !== undefined ? { instruction: input.instruction } : {}),
-    ...(input.schedule ? { schedule: toSchedule(input.schedule) } : {}),
-    ...(input.model || input.reasoning ? { model: { model: input.model ?? null, reasoning: input.reasoning ?? null } } : {}),
-    ...(input.script ? { script: { body: input.script, interpreter: input.interpreter ?? "bash" } } : {}),
-    ...(input.target ? { target: input.target } : {}),
-    ...(input.machine !== undefined ? { machine: input.machine } : {}),
-    ...(input.confirm !== undefined ? { confirm: input.confirm } : {}),
-  });
-  runnerTool("automation_list", "List what you have scheduled: check-ins, reminders, watchers and runners, one short line each with schedule, state and next run; give id for one item in full (instruction or script, last outcome). The user sees them under Scheduled on the Strands page; call them scheduled items, never automations.",
-    z.object({ id: z.string().min(1).max(200).optional().describe("One item in full"), after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
-    async ({ id, after }: { id?: string; after?: string }, botId) => {
-      const items = await automations.list(botId);
-      if (id) {
-        const one = items.find((each) => each.id === id || each.name === id);
-        return one ? describeAutomation(one) : `No scheduled item ${id}. List them with ${callText("automation_list", {})}.`;
-      }
-      if (!items.length) return "Nothing scheduled yet.";
-      // One short line each (src/paging.ts); the full item with id.
-      const rows = items.map((each) => ({ id: each.id, line: `- ${each.name} (${each.kind}, ${each.id}, ${each.state}): ${each.scheduleText}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toLocaleString()}` : ""}${each.lastOutcome ? ` · last: ${clipLine(each.lastOutcome, 100)}` : ""}` }));
-      const part = pageItems(rows, (each) => each.id, (each) => each.line.length, { after });
-      if (part.missing) return staleCursor(`Scheduled item ${after}`, callText("automation_list", {}));
-      const next = nextLine(part, (last) => callText("automation_list", { after: last }), "scheduled items");
-      return [`${items.length} scheduled item${items.length === 1 ? "" : "s"}. Full details: ${callText("automation_list", { id: "<id>" })}.`, ...(next ? [next] : []), ...part.items.map((each) => each.line)].join("\n");
-    });
-  runnerTool("automation_create", "Create a scheduled item (checkin, reminder, watcher, or runner). Watchers run a script and wake only on stdout (trailing JSON line supports each/key/severity/clear). A runner may answer with preflight warnings: review them and retry with confirm: true. Call them scheduled items to the user.",
-    z.object({ kind: z.enum(["checkin", "reminder", "watcher", "runner"]), name: z.string().trim().min(1).max(60), ...automationFields, schedule: toolSchedule }),
-    async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => {
-      const schedule = toSchedule(input.schedule!);
-      return `Made:\n${describeAutomation(await automations.create({ kind: input.kind, name: input.name, schedule, ...automationChanges(input) } as never, botId))}`;
-    });
-  runnerTool("automation_update", "Update a scheduled item's name, instruction, schedule, model or watcher script.",
-    z.object({ id: z.string().min(1).describe("Automation id or name"), name: z.string().trim().min(1).max(60).optional(), ...automationFields }),
-    async (input: AutomationToolInput & { id: string }, botId) => describeAutomation(await automations.update({ id: input.id, ...automationChanges(input) } as never, botId)));
-  runnerTool("automation_pause", "Pause an automation.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeAutomation(await automations.setState(id, "paused", botId)));
-  runnerTool("automation_resume", "Resume a paused automation.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeAutomation(await automations.setState(id, "active", botId)));
-  runnerTool("automation_run_now", "Run an automation now, outside its schedule.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeAutomation(await automations.runNow(id, botId)));
-  runnerTool("automation_delete", "Delete an automation. Only when the user asks or it's no longer needed.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => { await automations.delete(id, botId); return "Deleted."; });
-  bb.agents.registerTool({
-    name: "runner_report",
-    description: "Report from this run. log: kept in this thread and the Bot's Activity. tell: one short line to the user in the Bot's chat. urgent: tell plus a phone push, and the Bot decides whether to bring it to the user; only when the user must act now. With nothing new, don't call it and finish without a final message.",
-    parameters: z.object({ level: z.enum(["log", "tell", "urgent"]), summary: z.string().trim().min(1).max(600).describe("One or two short sentences") }),
-    execute: async (input, ctx) => {
-      if (!ctx.threadId || !runners.forThread(ctx.threadId)) throw new Error("Only a runner's thread can report.");
-      return runners.report(ctx.threadId, input);
-    },
-  });
-  bb.agents.registerTool({
-    name: "bot_history_search", description: "Search your own past threads (your earlier threads and the threads you started) for words.",
-    parameters: z.object({ query: z.string().trim().min(1).max(200) }),
-    execute: async ({ query }, ctx) => {
-      const hits = await bots.historySearch(query, 10, ownBot(ctx.threadId));
-      return hits.length ? hits.map((hit) => `- [${hit.title}](/threads/${hit.threadId}): ${clipLine(hit.text.replace(/\s+/g, " "), 240)}`).join("\n") : "No matches in your threads.";
-    },
-  });
-
-  /** Finds items by link or `<plugin>:<id>`, as studio_list_items shows them. */
-  const resolveItems = async (refs: readonly string[]) => {
-    const { items } = await hub.overview();
-    const found: ItemRef[] = [];
-    const missing: string[] = [];
-    for (const ref of refs) {
-      const trimmed = ref.trim().replace(/^\((.*)\)$/, "$1");
-      const item = items.find((each) => each.href === trimmed || `${each.pluginId}:${each.id}` === trimmed);
-      if (item) found.push({ pluginId: item.pluginId, id: item.id });
-      else missing.push(ref);
-    }
-    return { found, missing };
-  };
-
-  /** A project by id or name; "global" is no project. */
-  const resolveProject = async (ref: string): Promise<string | null> => {
-    if (ref.trim().toLowerCase() === "global") return null;
-    const projects = (await bb.sdk.projects.list({ includePersonal: true })) as { id: string; name: string }[];
-    const found = projects.find((project) => project.id === ref) ?? projects.find((project) => project.name.toLowerCase() === ref.trim().toLowerCase());
-    if (!found) throw new Error(`No project called "${ref}".`);
-    return found.id;
-  };
-
-  /** Moves items by link and says what happened, a line each. */
-  const moveItemsReport = async (refs: readonly string[], target: Parameters<typeof moveItems>[1], label: string) => {
-    const { found, missing } = await resolveItems(refs);
-    const lines: string[] = [];
-    if (found.length) {
-      const { moved, unchanged, failed } = await moveItems(found, target);
-      lines.push(`${label}: moved ${moved.length} item${moved.length === 1 ? "" : "s"}${moved.length ? ` (${moved.map((item) => item.title).join(", ")})` : ""}.`);
-      if (unchanged.length) lines.push(`Already there: ${unchanged.map((item) => item.title).join(", ")}`);
-      if (failed.length) lines.push(`Failed: ${failed.map((item) => `${item.title} (${item.error})`).join(", ")}`);
-    }
-    if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
-    return lines;
-  };
-
-  bb.agents.registerTool({
-    name: "studio_tag_items",
-    description:
-      "Group the user's BB Studio items with tags. Tags work across pages, recordings, drawings, artifacts and other items; new tag names are created. Pass items as the links studio_list_items shows.",
-    parameters: z.object({
-      items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/studio/studio/pages/pg_x"),
-      add: z.array(z.string().max(100)).max(20).optional().describe("Tag names to add"),
-      remove: z.array(z.string().max(100)).max(20).optional().describe("Tag names to remove"),
-    }),
-    async execute({ items, add = [], remove = [] }) {
-      if (!add.length && !remove.length) return "Pass tag names to add or remove.";
-      const { found, missing } = await resolveItems(items);
-      const added: Tag[] = add.map((name) => tags.ensure(name));
-      const removed = remove.map((name) => tags.byName(name)).filter((tag): tag is Tag => tag !== null);
-      if (found.length) {
-        tags.apply(found, added.map((tag) => tag.id), removed.map((tag) => tag.id));
-        tagsChanged();
-      }
-      const lines = [`Updated ${found.length} item${found.length === 1 ? "" : "s"}.`];
-      if (added.length) lines.push(`Added: ${added.map((tag) => `#${tag.name}`).join(" ")}`);
-      if (removed.length) lines.push(`Removed: ${removed.map((tag) => `#${tag.name}`).join(" ")}`);
-      if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
-      return lines.join("\n");
-    },
-  });
-
-  bb.agents.registerTool({
-    name: "studio_delete_items",
-    description:
-      "Permanently delete the user's BB Studio items — pages (with their sub-pages), recordings, drawings, artifacts and other add-on items. Pass items as the links studio_list_items shows. Deletion can't be undone, so delete only what the user asked to remove.",
-    parameters: z.object({
-      items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/studio/studio/pages/pg_x"),
-    }),
-    async execute({ items: refs }) {
-      const { found, missing } = await resolveItems(refs);
-      const { items, providers } = await hub.overview();
-      const deletable = new Set(
-        providers.flatMap((provider) => provider.kinds.filter((kind) => kind.capabilities?.delete).map((kind) => `${provider.pluginId}:${kind.id}`)),
-      );
-      const titles = new Map(items.map((item) => [`${item.pluginId}:${item.id}`, untitled(item.title)]));
-      const kinds = new Map(items.map((item) => [`${item.pluginId}:${item.id}`, item.kind]));
-      const byPlugin = new Map<string, string[]>();
-      const refused: string[] = [];
-      for (const { pluginId, id } of found) {
-        if (pluginId === STUDIO_PLUGIN_ID || !deletable.has(`${pluginId}:${kinds.get(`${pluginId}:${id}`)}`)) refused.push(titles.get(`${pluginId}:${id}`) ?? id);
-        else byPlugin.set(pluginId, [...(byPlugin.get(pluginId) ?? []), id]);
-      }
-      const deleted: string[] = [];
-      const failed: string[] = [];
-      for (const [pluginId, ids] of byPlugin) {
-        try {
-          const result = await deleteItems(pluginId, ids);
-          deleted.push(...result.done.map((id) => titles.get(`${pluginId}:${id}`) ?? id));
-          failed.push(...result.failed.map(({ id, error }) => `${titles.get(`${pluginId}:${id}`) ?? id} (${error})`));
-        } catch (error) {
-          failed.push(...ids.map((id) => `${titles.get(`${pluginId}:${id}`) ?? id} (${errorText(error)})`));
-        }
-      }
-      const lines = [`Deleted ${deleted.length} item${deleted.length === 1 ? "" : "s"}${deleted.length ? `: ${deleted.join(", ")}` : ""}.`];
-      if (refused.length) lines.push(`Can't be deleted here: ${refused.join(", ")}`);
-      if (failed.length) lines.push(`Failed: ${failed.join(", ")}`);
-      if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
-      return lines.join("\n");
-    },
-  });
-
-  const sendToWorkspace = (command: WorkspaceCommand) => bb.realtime.publish(WORKSPACE_CHANNEL, command);
-  /** How long a window gets to report a command's result. */
-  const CONFIRM_MS = 3000;
-  bb.agents.registerTool({
-    name: "studio_workspace",
-    description:
-      "See what the user has open in BB Studio's workspace, the tabbed view of their pages, recordings, drawings and other items: each pane's tabs, which tab is in front, and whether they're looking at it. Use it when the user says \"this\", \"what I'm looking at\" or \"my tabs\". Open or close tabs with studio_open_items and studio_close_tabs.",
-    parameters: z.object({}),
-    async execute() {
-      return formatWorkspace(workspace.current(), Date.now());
-    },
-  });
-
-  bb.agents.registerTool({
-    name: "studio_open_items",
-    description:
-      "Open BB Studio items as tabs in the user's Studio workspace, in the BB window they're using, and show it to them. Pass items as the links studio_list_items shows. Open beside what they're looking at with placement right or down. Only open what the user asked to see, or what you made for them to look at.",
-    parameters: z.object({
-      items: z.array(z.string().max(500)).min(1).max(20).describe("Item links, e.g. /plugins/studio/studio/pages/pg_x"),
-      placement: z.enum(["tab", "right", "down"]).optional().describe("tab (default) adds tabs to the focused pane; right or down splits it and opens them there"),
-      show: z.boolean().optional().describe("Bring the workspace on screen (default true); false only adds the tabs"),
-    }),
-    async execute({ items: refs, placement = "tab", show = true }) {
-      const current = workspace.current();
-      if (!current) return "No BB window has Studio's workspace, so nothing was opened. The user may not have BB open.";
-      const { found, missing } = await resolveItems(refs);
-      const { items } = await hub.overview();
-      const matched = found.flatMap((ref) => items.filter((item) => item.pluginId === ref.pluginId && item.id === ref.id));
-      const opened = matched.map((item) => ({ href: item.href, title: untitled(item.title) }));
-      // The sidebar's Studio list shows them too, as it does items the user opens.
-      if (matched.map((item) => tabs.open(item)).some(Boolean)) tabsChanged();
-      const lines: string[] = [];
-      if (opened.length) {
-        const confirmed = await workspace.deliver(
-          (client) => sendToWorkspace({ client, action: "open", items: opened, placement: placement === "down" ? "bottom" : placement, show }),
-          (report) => opened.every((item) => openHrefs(report).has(item.href)),
-          CONFIRM_MS,
-        );
-        lines.push(confirmed
-          ? `Opened ${opened.map((item) => item.title).join(", ")} in the user's Studio workspace${placement === "tab" ? "" : `, split ${placement}`}.`
-          : `Sent ${opened.map((item) => item.title).join(", ")} to the user's BB windows, but none confirmed; BB may be closed. Don't assume they're open.`);
-      }
-      if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
-      return lines.join("\n") || "Nothing to open.";
-    },
-  });
-
-  bb.agents.registerTool({
-    name: "studio_close_tabs",
-    description:
-      "Close tabs in the user's Studio workspace. Closing a tab keeps the item. Pass the links studio_workspace shows. Close only tabs the user asked to close, or ones you opened for them.",
-    parameters: z.object({
-      items: z.array(z.string().max(2000)).min(1).max(100).describe("Tab links, e.g. /plugins/studio/studio/pages/pg_x"),
-    }),
-    async execute({ items: hrefs }) {
-      const current = workspace.current();
-      if (!current) return "No BB window has Studio's workspace open.";
-      // The last report can lag a tab just opened, so every one is sent.
-      const closing = [...new Set(hrefs.map((href) => href.trim()))];
-      const before = new Map(workspace.candidates().map((report) => [report.client, openHrefs(report)]));
-      const confirmed = await workspace.deliver(
-        (client) => sendToWorkspace({ client, action: "close", hrefs: closing }),
-        (report) => closing.every((href) => !openHrefs(report).has(href)),
-        CONFIRM_MS,
-      );
-      if (!confirmed) return "Sent the close to the user's BB windows, but none confirmed; BB may be closed.";
-      const wasOpen = before.get(confirmed) ?? new Set<string>();
-      const closed = closing.filter((href) => wasOpen.has(href));
-      return closed.length === closing.length ? `Closed ${closed.length} tab${closed.length === 1 ? "" : "s"}.` : `Closed what was open. Not open: ${closing.filter((href) => !wasOpen.has(href)).join(", ")}`;
-    },
-  });
-
-  bb.agents.registerTool({
-    name: "studio_move_items",
-    description:
-      "Move the user's BB Studio items to another BB project, or to Global (no project). Pass items as the links studio_list_items shows.",
-    parameters: z.object({
-      items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/studio/studio/pages/pg_x"),
-      project: z.string().min(1).max(200).describe('The project\'s id or name, or "global" for no project'),
-    }),
-    async execute({ items, project }) {
-      const projectId = await resolveProject(project);
-      return (await moveItemsReport(items, { projectId }, projectId ? `Project ${project}` : "Global")).join("\n");
-    },
+  registerBotSkillTools({ bb, bots, learning, ownBot });
+  ({ runnerDispatch } = registerScheduleTools({
+    bb,
+    bots,
+    runners,
+    automations,
+    getThreadRecord: (threadId) => botThreads.store.get(threadId),
+    ownBot,
+  }));
+  const { resolveProject, moveItemsReport } = registerCollectionTools({
+    bb,
+    hub,
+    tags,
+    tabs,
+    workspace,
+    tagsChanged,
+    tabsChanged,
+    moveItems,
+    deleteItems,
   });
 
   // Plugin health: the sidebar footer shows problems; see src/health.ts.
@@ -2900,159 +2478,38 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
   registerBackup(bb, backups, join(bb.server.experimental_dataDir, "plugins", STUDIO_PLUGIN_ID));
-  /** A CLI path, relative to where the command ran. */
-  const cliPath = (path: string, cwd: string | undefined) => (isAbsolute(path) ? path : resolvePath(cwd ?? homedir(), path));
-
-  bb.cli.register(studioCliRegistration({
-    name: "studio",
-    summary: "BB Studio: pages, recordings, drawings, designs, artifacts and other add-ons' items",
-    commands: [
-      { name: "settings", summary: "List, read and change Studio's settings (API keys: bb plugin config studio)", usage: SETTINGS_USAGE },
-      { name: "decisions", summary: "Jev, fallback model and Smart Queue", usage: "bb studio decisions <status|recent|classify|check|fallback>" },
-      { name: "list", summary: "List items in the current project and global ones", usage: "bb studio list [query…] [--all] [--json], e.g. bb studio list kind:page -tag:draft pricing, or family:app for every app" },
-      { name: "tags", summary: "List tags and how many items have each", usage: "bb studio tags" },
-      { name: "starred", summary: "List starred items, newest-starred first", usage: "bb studio starred [--json]" },
-      { name: "move", summary: "Move items to a project", usage: "bb studio move <item-link|plugin:id>… --project <name|id|global>" },
-      { name: "providers", summary: "Show which Studio add-ons are installed and ready", usage: "bb studio providers" },
-      { name: "health", summary: "Check every plugin for setup problems and failures", usage: "bb studio health [--json]" },
-      { name: "auth", summary: "Show signed-out providers and Account Pooler accounts, and sign in again", usage: AUTH_USAGE },
-      { name: "accounts", summary: "Every Account Pooler account (BB Studio's and bb's) and local login: status, quota, pinned threads and warnings", usage: ACCOUNTS_USAGE },
-      { name: "setup", summary: "Show which BB Studio add-ons are installed and working, and the commands to finish setup", usage: "bb studio setup [--json]" },
-      { name: "reindex", summary: "Rebuild the Studio search index", usage: "bb studio reindex" },
-      { name: "backup", summary: "Save every Studio item, from every add-on, into one .zip file", usage: "bb studio backup [--out <file|folder>]" },
-      { name: "restore", summary: "Restore a Studio backup; shows what would change first", usage: "bb studio restore <file> [--dry-run | --yes]" },
-      { name: "artifacts", summary: "Save and read artifacts: save, list, show, export, delete", usage: "bb studio artifacts <save|list|show|export|delete> …" },
-      { name: "whiteboards", summary: "Create, read and edit whiteboards (old name: drawings)", usage: "bb studio whiteboards <list|create|show|rename|delete|merge|remove-elements> …" },
-      { name: "designs", summary: "List and read designs: list, show, html, rename, delete", usage: "bb studio designs <list|show|html|rename|delete> …" },
-      { name: "recordings", summary: "Read Talk recordings and their transcripts: list, show, transcript, notes", usage: "bb studio recordings <list|show|transcript|notes> …" },
-      { name: "pages", summary: "Read and write pages: list, show, create, append; explore stats for the Next row", usage: "bb studio pages <list|show|create|append|explore> …" },
-      { name: "minis", summary: "List mini apps, read their records and state, and run their actions", usage: "bb studio minis <list|show|data|state|watch|actions|do> …" },
-      { name: "theme", summary: "List, show, check, create, update, apply and delete Bot themes", usage: "bb studio theme <list|show|create|update|apply|check|delete|template> …" },
-      { name: "presence", summary: "List, show, check, create, update, apply and delete Bot presences", usage: "bb studio presence <list|show|create|update|apply|check|delete|template> …" },
-      { name: "tool-gateway", summary: "Your MCP servers: list them, search and run their tools, and ask the user to add one", usage: "bb studio tool-gateway <list|tools|describe|call|request|status> …" },
-      { name: "strands", summary: "A conversation's strands (its lines of work), their live states, and how its newest messages were sorted", usage: STRANDS_USAGE },
-    ],
-    async run(argv, ctx) {
-      // Built-in kinds' commands (`bb artifacts …` before the merge).
-      if (argv[0] === "settings") return settingsCli(argv.slice(1), studioSettings);
-      if (argv[0] === "decisions") return decisions.cli(argv.slice(1));
-      if (argv[0] === "auth") return authCli(argv.slice(1), auth, { signal: ctx.signal });
-      if (argv[0] === "accounts") return accountsCli(argv.slice(1), { accounts: accounts.service, auth }, { signal: ctx.signal });
-      if (argv[0] === "artifacts") return artifacts.cli(argv.slice(1), ctx);
-      // `drawings` is the old name of `whiteboards`; both stay.
-      if (argv[0] === "whiteboards" || argv[0] === "drawings") return drawings.cli(argv.slice(1), ctx);
-      if (argv[0] === "designs") return designs.cli(argv.slice(1), ctx);
-      if (argv[0] === "minis") return minis.cli(argv.slice(1));
-      if (argv[0] === "recordings") return recordings.cli(argv.slice(1));
-      if (argv[0] === "presence") return runPresenceCli(argv.slice(1), { service: presenceService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)) });
-      if (argv[0] === "theme") return runThemeCli(argv.slice(1), { service: themeService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)), weather: { sky: () => forestWeather.sky(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), setCity: (city) => forestWeather.setCity(city) }, sky: { place: () => forestWeather.place(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), preview: () => readPreview(bb.storage.kv), setPreview: (at) => writePreview(bb.storage.kv, at), view: () => readView(bb.storage.kv), setView: (view) => writeView(bb.storage.kv, view), now: () => Date.now(), zoneOffsetMinutes: () => -new Date().getTimezoneOffset() } });
-      if (argv[0] === "strands") return strands.cli(argv.slice(1), ctx);
-      if (argv[0] === "tool-gateway") return toolGateway ? toolGateway.cli(argv.slice(1), { threadId: ctx.threadId ?? null }) : { exitCode: 1, stderr: "Tool Gateway isn't loaded.\n" };
-      if (argv[0] === "pages") return argv[1] === "explore" ? explore.cli(argv.slice(2), ctx) : pages.cli(argv.slice(1), ctx);
-      const { command, rest: raw } = subcommand(argv);
-      const USAGE: Record<string, string> = {
-        list: "bb studio list [query…] [--all] [--json] [--kind <kind>] [--tag <tag>] [--query <text>]",
-        move: "bb studio move <item-link|plugin:id>… --project <name|id|global>",
-        backup: "bb studio backup [--out <file|folder>]",
-        restore: "bb studio restore <file> [--dry-run | --yes]",
-      };
-      const SPECS: Record<string, CliSpec> = {
-        list: { flags: ["--json", "--all"], options: ["--kind", "--tag", "--query"] },
-        starred: { flags: ["--json"] },
-        health: { flags: ["--json"] },
-        setup: { flags: ["--json"] },
-        move: { options: ["--project"] },
-        backup: { options: ["--out"] },
-        restore: { flags: ["--dry-run", "--yes"] },
-      };
-      const parsed = parseCliArgs(raw, SPECS[command ?? ""] ?? {});
-      const known = ["list", "tags", "starred", "move", "providers", "health", "setup", "reindex", "backup", "restore"].includes(command ?? "");
-      if (!parsed.ok && known) return usage(`${USAGE[command!] ?? `bb studio ${command}`}\n${parsed.error}`);
-      const rest = parsed.ok ? parsed.positional : [];
-      const flag = (name: string) => parsed.ok && parsed.flags.has(name);
-      const option = (name: string) => (parsed.ok ? parsed.options.get(name) : undefined);
-      try {
-        switch (command) {
-          case "list": {
-            const json = flag("--json");
-            const options = { all: flag("--all"), kind: option("--kind"), tag: option("--tag"), query: option("--query") };
-            const query = [options.query, ...rest.map(queryArg)].filter(Boolean).join(" ");
-            const result = await listItems({ projectId: ctx.projectId ?? null, threadId: ctx.threadId ?? undefined, ...options, query });
-            if (json) return { exitCode: 0, stdout: `${JSON.stringify(result.picked.slice(0, MAX_LISTED), null, 2)}\n` };
-            return { exitCode: 0, stdout: `${formatList(result)}\n` };
-          }
-          case "tags": {
-            const { items, tags: allTags } = await overview();
-            if (!allTags.length) return { exitCode: 0, stdout: "No tags yet.\n" };
-            const lines = allTags.map((tag) => `#${tag.name}\t${items.filter((item) => item.tags.includes(tag.id)).length}`);
-            return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
-          }
-          case "starred": {
-            const starred = await starredItems();
-            if (flag("--json")) return { exitCode: 0, stdout: `${JSON.stringify(starred, null, 2)}\n` };
-            if (!starred.length) return { exitCode: 0, stdout: "No starred items. Star one from its header or its row's menu.\n" };
-            return { exitCode: 0, stdout: `${starred.map((item) => `${item.icon ? `${item.icon} ` : ""}${item.title} (${item.kind}, starred ${relativeTime(item.starredAt)}) ${item.href}`).join("\n")}\n` };
-          }
-          case "move": {
-            const project = option("--project");
-            if (!rest.length || !project) return usage(USAGE.move!);
-            const projectId = await resolveProject(project);
-            const lines = await moveItemsReport(rest, { projectId }, projectId ? `Project ${project}` : "Global");
-            return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
-          }
-          case "providers": {
-            const providers = await hub.providers();
-            if (!providers.length) return { exitCode: 0, stdout: `No Studio kinds are ready. Reload Studio: ${studioCliName()} plugin reload studio\n` };
-            const lines = providers.map(
-              (provider) =>
-                `${provider.pluginId}\t${provider.state}\t${provider.kinds.map((kind) => kind.id).join(",") || "-"}${provider.detail ? `\t${provider.detail}` : ""}`,
-            );
-            return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
-          }
-          case "health": {
-            const summary = await health.check();
-            if (flag("--json")) return { exitCode: 0, stdout: `${JSON.stringify(summary, null, 2)}\n` };
-            const lines = [
-              ...summary.problems.map((problem) => `${problem.status}\t${problem.pluginId}\t${problem.title}${problem.hidden ? " (hidden)" : ""}${problem.detail ? `\n\t\t${problem.detail}` : ""}`),
-              ...summary.unanswered.map((entry) => `unknown\t${entry.pluginId}\tIts health check didn't answer: ${entry.error}`),
-              ...summary.healthy.map((entry) => `ok\t${entry.pluginId}\t${entry.titles.join("; ")}`),
-            ];
-            return { exitCode: summary.problems.some((problem) => !problem.hidden) ? 1 : 0, stdout: `${lines.join("\n") || "No problems found."}\n` };
-          }
-          case "setup": {
-            const summary = await setup.summary(0);
-            return { exitCode: 0, stdout: flag("--json") ? `${JSON.stringify(summary, null, 2)}\n` : formatSetup(summary) };
-          }
-          case "backup": {
-            if (rest.length) return usage(USAGE.backup!);
-            const requested = option("--out");
-            let out = cliPath(requested ?? backupFileName(), ctx.cwd);
-            if (requested && (await statPath(out).catch(() => null))?.isDirectory()) out = join(out, backupFileName());
-            if (await statPath(out).catch(() => null)) return { exitCode: 1, stderr: `${out} already exists; choose another --out.\n` };
-            const summary = await backups.backup(out);
-            const failed = summary.manifest.sections.some((section) => section.status === "failed");
-            return { exitCode: failed ? 1 : 0, stdout: formatBackup(summary) };
-          }
-          case "restore": {
-            if (rest.length !== 1 || (flag("--dry-run") && flag("--yes"))) return usage(USAGE.restore!);
-            // Without --yes it only shows what would change.
-            const dryRun = !flag("--yes");
-            const summary = await backups.restore(cliPath(rest[0]!, ctx.cwd), { dryRun });
-            const text = formatRestore(summary) + (dryRun ? "Run again with --yes to restore.\n" : "");
-            return { exitCode: restoreFailed(summary) ? 1 : 0, stdout: text };
-          }
-          case "reindex": {
-            const count = await searchIndex.rebuild();
-            return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
-          }
-          default:
-            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|minis|theme|presence|decisions|tool-gateway> …");
-        }
-      } catch (error) {
-        return { exitCode: 1, stderr: `${errorText(error)}\n` };
-      }
-    },
-  }));
+  registerStudioCli({
+    bb,
+    hub,
+    studioSettings,
+    decisions,
+    auth,
+    accounts,
+    artifacts,
+    drawings,
+    designs,
+    minis,
+    recordings,
+    presenceService,
+    themeService,
+    forestWeather,
+    strands,
+    toolGateway,
+    explore,
+    pages,
+    health,
+    setup,
+    backups,
+    searchIndex,
+    selfBot,
+    themeBot,
+    listItems,
+    formatList: formatList as never,
+    overview,
+    starredItems,
+    resolveProject,
+    moveItemsReport,
+  });
   // Merged tools (src/merged-tools.ts), once every member tool is in the book. A merged op runs only when its old tool is in the thread's scope.
   mergedRegistration = true;
   for (const tool of mergedTools({ book: toolBook as never, allowed: async (ctx, oldName) => {
