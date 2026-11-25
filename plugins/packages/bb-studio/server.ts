@@ -1,6 +1,10 @@
 import { registerBotSkillTools } from "./src/server/skill-tools";
+import { registerBotTools } from "./src/server/bot-tools";
 import { registerScheduleTools } from "./src/server/schedule-tools";
 import { registerCollectionTools } from "./src/server/collection-tools";
+import { registerListTools } from "./src/server/list-tools";
+import { setupVoiceLive } from "./src/server/voice-live";
+import { registerPlatformRpcs } from "./src/server/platform-rpcs";
 import { registerStudioCli } from "./src/server/cli";
 import { registerWorkCards } from "./src/work/register";
 import { STRAND_NOTE_TOOL } from "./src/strands/contract";
@@ -42,7 +46,6 @@ import { sessionTitlePrefix } from "./src/decisions/server/classifier";
 import { ON_DEMAND_EXTRAS, scopeEntries, scopeTools, trioInstructions, type Scope, type ScopeKind } from "./src/tool-scope";
 import { registerScopedTools, ScopeMemory } from "./src/tool-scope-tools";
 import { slim, slimmedIfSmaller } from "./src/slim-schema";
-import { callText, nextLine, pageSections, staleCursor } from "./src/paging";
 import { ABSORB_FIELDS, INTERNAL_RENAMES, MERGES, mergedParameters, mergedTools, presentScope } from "./src/merged-tools";
 import { LeanStore, leanFor } from "./src/context-lean";
 import { contextLeanContract } from "./src/context-lean-contract";
@@ -60,22 +63,15 @@ import { FILE_KIND_LABELS, isArtifactId } from "./src/artifacts/shared";
 import { registerTalk, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/server";
 import { PAGE_TOOLS, registerPages } from "./src/pages/server";
 import { registerExploreBuiltin } from "./src/explore/server";
-import { importReactionsSettings, REACTIONS_PLUGIN_ID, REACTIONS_SETTINGS_IMPORTED } from "./src/reactions/server";
+import { importReactionsSettings } from "./src/reactions/server";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
-import { BUILTIN_KINDS, builtinOn, frontendState, kindRowViews, KindSettingsStore, resolveKinds, routeProviders, routingInstructions, rowKinds, type KindRoute } from "./src/kinds";
-import { kindsContract, type KindsState } from "./src/kinds-contract";
-import { openaiKey } from "./src/openai-key";
+import { BUILTIN_KINDS, builtinOn, KindSettingsStore, resolveKinds, routeProviders, routingInstructions, type KindRoute } from "./src/kinds";
 import { registerSettings } from "./src/settings/register";
 import { loopTimeZone } from "./src/settings/constants";
 import { STUDIO_SETTINGS } from "./src/settings/schema";
-import { VoiceLive } from "./src/voice/live/live";
-import { registerVoiceLive } from "./src/voice/live/register";
 import { registerWindowRelay } from "./src/windows/server";
-import { gatherSeed, type SeedMessage } from "./src/voice/live/identity";
-import { resolveTarget } from "./src/voice/live/targets";
-import { VOICE_LIVE_CHANNEL } from "./src/voice/live/shared";
-import { CANVAS_PLUGIN_ID, canvasVoiceOutput, canvasVoiceRunOutput, isCanvasThreadOrigin } from "./src/voice/live/canvas-plugin";
+import { isCanvasThreadOrigin } from "./src/voice/live/canvas-plugin";
 // bb-studio server: the hub every Studio add-on plugs into.
 //
 // - Studio finds add-ons through RPC discovery (src/hub.ts) and fans the
@@ -93,7 +89,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { experimental_PluginRpcRefusal } from "@get-bb/plugin-sdk";
 import { join } from "node:path";
 import { STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, STUDIO_REALTIME_CHANNEL } from "./src/kit/contract";
-import { relativeTime, untitled } from "./src/kit/format";
+import { untitled } from "./src/kit/format";
 import { z } from "zod";
 import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type StarredItemView, type ThreadOptionView, type TabView } from "./src/contract";
 import { errorText, StudioHub, type HubItem } from "./src/hub";
@@ -106,29 +102,24 @@ import { EngineScheduler, scheduleKey } from "./src/triggers/scheduler";
 import { moveToScheduler } from "./src/triggers/migrate";
 import { MIGRATIONS } from "./src/migrations";
 import { ItemIndex } from "./src/item-index";
-import { familyAndType, ITEM_FAMILIES, ITEM_TYPES, itemType, kindsNamed, typeOfId, type ItemType } from "./src/item-model";
+import { familyAndType, ITEM_TYPES, itemType, kindsNamed, typeOfId, type ItemType } from "./src/item-model";
 import { APP_TOOLS, appTools, familyTool, ToolBook, type AgentTool } from "./src/family-tools";
-import { registerBotProfileTools } from "./src/bot-profile-tools";
 import { MemoryStore } from "./src/memory/store";
 import { MEMORY_TOOLS, MemoryService, setBotMemoryPage, withMemory } from "./src/memory/service";
 import { registerMemory } from "./src/memory/register";
 import { recordLine } from "./src/memory/shared";
 import { BotPageState, registerGroupTool } from "./src/bot-page-state";
 import { BotCacheWarmer } from "./src/bot-cache";
-import { botControlRefusal, Bots, MAIN_HEAL_MS } from "./src/bot";
+import { Bots, MAIN_HEAL_MS } from "./src/bot";
 import { ThemeStore } from "./src/theme/store";
-import { forestContract } from "./src/theme/forest/contract";
-import { ForestWeather } from "./src/theme/forest/weather";
-import { builtinOptionStores, readThemeOptions, themeOptionsContract, writeThemeOption } from "./src/theme/options-contract";
-import { readPreview, readView, tonightContract } from "./src/theme/tonight/contract";
 import { ThemeService } from "./src/theme/service";
 import { ThemeGpuRouter } from "./src/theme/gpu-server";
 import { THEME_GPU_CHANNEL } from "./src/theme/gpu";
-import { THEME_TOOLS, themeTools } from "./src/theme/agent-tools";
+import { THEME_TOOLS } from "./src/theme/agent-tools";
 import { PresenceStore } from "./src/presence/store";
 import { PresenceService } from "./src/presence/service";
 import { PRESENCE_CHECK_CHANNEL, PresenceCheckRouter } from "./src/presence/check-router";
-import { PRESENCE_TOOLS, presenceTools } from "./src/presence/agent-tools";
+import { PRESENCE_TOOLS } from "./src/presence/agent-tools";
 import { presenceAskText } from "./src/presence/contract";
 import { SideThreads } from "./src/bot-side-threads";
 import { alertBot, Runners } from "./src/runners";
@@ -166,10 +157,10 @@ import { WorkspacePresence } from "./src/workspace-presence";
 import { TagStore, type ItemRef } from "./src/tags";
 import { StarStore } from "./src/stars";
 import { planMove } from "./src/move-items";
-import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
+import { backgroundKinds } from "./src/query";
 import { ThreadTitles } from "./src/thread-titles";
 import { withTagHint } from "./src/create-tag-hint";
-import { excerpt, SearchIndex, tokens, type SearchHit } from "./src/search-index";
+import { SearchIndex, type SearchHit } from "./src/search-index";
 import { externalResults } from "./src/search-external";
 import { StudioServices } from "./src/services";
 import { ProviderComments } from "./src/provider-comments";
@@ -179,7 +170,6 @@ import { PERSONAL_PROJECT_ID, ProjectLeads } from "./src/project-lead";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
-const MAX_LISTED = 100;
 
 import { HEALTH_REALTIME_CHANNEL, healthSchemas } from "./src/kit/health";
 import { HealthMonitor } from "./src/health";
@@ -187,11 +177,6 @@ import { healthContract } from "./src/health-contract";
 import { registerAuth } from "./src/auth/register";
 import { createLiveBbPool, registerAccounts } from "./src/accounts/register";
 import { registerOnboarding } from "./src/onboarding-register";
-import { SetupService } from "./src/setup";
-import { setupContract } from "./src/setup-contract";
-import { BackupService } from "./src/backup/service";
-import { studioDataBackup } from "./src/backup/studio-data";
-import { registerBackup } from "./src/backup/register";
 import { claimFirstLoad, finishStudioImport } from "./src/studio-data/start";
 import { studioDataStatus } from "./src/studio-data/preview";
 import { studioDataContract } from "./src/studio-data/contract";
@@ -2074,259 +2059,44 @@ export default async function plugin(bb: BbPluginApi) {
 
   // Agents --------------------------------------------------------------------
 
-  /** `snippet` is the content that matched a query, when the add-on gave it. */
-  type ListedItem = HubItem & { tags: string[]; snippet?: string };
-  const itemLine = (item: ListedItem, kindLabel: string, tagNames: Map<string, string>) =>
-    `- ${item.icon ? `${item.icon} ` : ""}${untitled(item.title)} — ${kindLabel}${item.archived ? ", archived" : ""}, ${
-      item.projectId ? "project" : "global"
-    }, updated ${relativeTime(item.updatedAt)}${item.tags.map((id) => ` #${tagNames.get(id) ?? id}`).join("")} (${item.href})${
-      item.snippet ? `\n  > ${item.snippet}` : ""
-    }`;
-
-  /** The values a query can name, with every field's names for an error. */
-  const vocabulary = async (data: Awaited<ReturnType<typeof overview>>) => ({
-    kinds: data.providers.flatMap((provider) => provider.kinds),
-    projects: (await bb.sdk.projects.list().catch(() => [])).map((project) => ({ id: project.id, name: project.name })),
-    tags: data.tags,
-  });
-  const unknownFilter = (filter: Filter, names: Awaited<ReturnType<typeof vocabulary>>) => {
-    const known = {
-      kind: names.kinds.map((kind) => kind.id),
-      family: ITEM_FAMILIES.map((family) => family.id as string),
-      type: ITEM_TYPES.map((type) => type.type as string),
-      project: ["global", ...names.projects.map((project) => project.name)],
-      tag: ["none", ...names.tags.map((tag) => tag.name)],
-      is: ["archived", "template", "starred"],
-    }[filter.field];
-    return new Error(`No ${filter.field} called "${filter.value}". Try: ${known.join(", ") || "none yet"}.`);
-  };
-
-  /**
-   * Lists items matching a query (src/query.ts). Without `all` or a project
-   * filter, it's the thread's project's items and global ones; the Chief of
-   * Staff sees every project.
-   */
-  const listItems = async (options: { projectId: string | null; threadId?: string; all: boolean; query?: string; kind?: string; tag?: string }) => {
-    const data = await overview();
-    const names = await vocabulary(data);
-    const parsed: Query = parseQuery(options.query ?? "");
-    for (const [field, value] of [["kind", options.kind], ["tag", options.tag]] as const) {
-      if (value) parsed.filters.push({ field, value });
-    }
-    const compiled = compileQuery(parsed, names);
-    if (compiled.unknown.length) throw unknownFilter(compiled.unknown[0]!, names);
-    const named = parsed.filters.some((filter) => !filter.negate && filter.field === "project");
-    const everything = named || options.all || (options.threadId !== undefined && (projectLeads.chiefThreadId() === options.threadId || !!bots.forThread(options.threadId) || !!botThreads.store.conversationBot(options.threadId)));
-    const inScope = (item: HubItem) => everything || item.projectId === null || item.projectId === options.projectId;
-    const labels = new Map(data.providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.label])));
-    const text = compiled.text.toLowerCase();
-    const eligible = data.items.filter((item) => inScope(item) && compiled.test(item));
-    const content = compiled.text ? await contentSearch(compiled.text, eligible.map((item) => `${item.pluginId}:${item.id}`)) : null;
-    const contentKeys = new Set(content?.keys);
-    const picked: ListedItem[] = eligible
-      .filter(
-        (item) =>
-          (!text || untitled(item.title).toLowerCase().includes(text) || contentKeys.has(`${item.pluginId}:${item.id}`)),
-      )
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .map((item) => {
-        const snippet = content?.snippets[`${item.pluginId}:${item.id}`];
-        return snippet ? { ...item, snippet } : item;
-      });
-    const problems = data.providers.filter((provider) => provider.state !== "ready").map((provider) => `${provider.name}: ${provider.detail}`);
-    const tagNames = new Map(data.tags.map((each) => [each.id, each.name]));
-    return { picked, labels, problems, tagNames };
-  };
-
-  const formatList = ({ picked, labels, problems, tagNames }: Awaited<ReturnType<typeof listItems>>) => {
-    const lines = picked.slice(0, MAX_LISTED).map((item) => itemLine(item, labels.get(`${item.pluginId}:${item.kind}`) ?? item.kind, tagNames));
-    if (picked.length > MAX_LISTED) lines.push(`…and ${picked.length - MAX_LISTED} more. Narrow the query.`);
-    if (!lines.length) lines.push("No Studio items match.");
-    if (problems.length) lines.push("", "Unavailable:", ...problems.map((problem) => `- ${problem}`));
-    return lines.join("\n");
-  };
-
-  bb.agents.registerTool({
-    name: "studio_list_items",
-    description:
-      "List the user's BB Studio items — pages (docs, designs, whiteboards), apps (mini apps, artifacts), Talk recordings and anything else a Studio add-on provides — newest first. It lists this thread's project's items and global ones (the user's Bot, the personal project's lead, sees every project); a project: filter or allProjects lists beyond that. Each line has a link and the item's #tags, and a content match shows the text that matched; open or mention it to work with the item.",
-    parameters: z.object({
-      query: z
-        .string()
-        .max(500)
-        .optional()
-        .describe('Words match titles and content. Filters: family:<page|app> type:<doc|design|whiteboard|mini|artifact> kind:<kind> project:<name|global> tag:<name|none> is:archived is:template is:starred; quote names with spaces, repeat a field for any of its values, prefix - to exclude. E.g. kind:page -tag:draft project:"Q4 launch" pricing'),
-      kind: z.string().max(100).optional().describe("Only this kind, e.g. page, recording, drawing; same as kind: in the query"),
-      allProjects: z.boolean().optional().describe("Include every project, not just this one"),
-      tag: z.string().max(100).optional().describe("Only items with this tag; same as tag: in the query"),
-    }),
-    async execute({ query, kind, allProjects, tag }, ctx) {
-      return formatList(await listItems({ projectId: ctx.projectId ?? null, threadId: ctx.threadId, all: allProjects === true, kind, query, tag }));
-    },
+  const { listItems, formatList } = registerListTools({
+    bb,
+    bots,
+    projectLeads,
+    conversationBot: (threadId) => botThreads.store.conversationBot(threadId),
+    overview,
+    contentSearch,
   });
 
-  // The Bot's tools (src/bot.ts), in every thread so the user can ask any agent about it.
-  const describeBot = ({ bot, run }: Awaited<ReturnType<typeof bots.get>>) => bot
-    ? `${bot.avatar} ${bot.name} is ${bot.state}. Thread: ${bot.threadId ? `/threads/${bot.threadId}` : "none"}. Check-ins: ${run?.enabled ? `${run.cadence}${run.cadence === "custom" ? ` (${run.cron})` : ` at ${run.time}`}` : "off"}.`
-    : "The user has no Bot yet. They can make one in Studio → Bot.";
-  // These act on the Bot the thread works for: its own thread (or handoff
-  // chain), one of its runners, or a thread it started; elsewhere the primary.
-  // A conversation of a Bot (src/bot-threads.ts) is that Bot's own thread, whichever conversation it is.
-  const acting = async (threadId: string | undefined): Promise<Awaited<ReturnType<typeof bots.actingFor>>> => {
-    const conversation = threadId ? botThreads.store.get(threadId) : null;
-    if (conversation?.kind === "conversation" && bots.stored(conversation.botId)) return { botId: conversation.botId, via: "own" };
-    return bots.actingFor(threadId, (id) => runners.forThread(id)?.bot_id);
-  };
-  const selfBot = async (threadId: string | undefined) => (await acting(threadId))?.botId;
-  for (const tool of themeTools({
-    service: themeService,
-    creator: async (threadId) => { const bot = themeBot(undefined, await selfBot(threadId)); return typeof bot === "string" ? { name: "Agent", botId: null } : { name: bot.name, botId: bot.id }; },
-    resolveBot: async (ref, threadId) => themeBot(ref, await selfBot(threadId)),
-  })) bb.agents.registerTool(tool as never);
-  for (const tool of presenceTools({
-    service: presenceService,
-    creator: async (threadId) => { const bot = themeBot(undefined, await selfBot(threadId)); return typeof bot === "string" ? { name: "Agent", botId: null } : { name: bot.name, botId: bot.id }; },
-    resolveBot: async (ref, threadId) => themeBot(ref, await selfBot(threadId)),
-  })) bb.agents.registerTool(tool as never);
-  // Pause and stop only from the Bot's own chat (botControlRefusal); no Bot resumes itself.
-  bb.agents.registerTool({ name: "bot_get", description: "Show the user's Bot (their always-on agent, formerly the Chief of Staff): name, avatar, state (active, paused, stopped), its thread and check-ins. In a Bot's own thread, that Bot.", parameters: z.object({}), execute: async (_input, ctx) => describeBot(await bots.get(await selfBot(ctx.threadId))) });
-  registerBotProfileTools(bb, { bots, acting });
+  const { acting, selfBot, registerStatusTools } = registerBotTools({
+    bb,
+    bots,
+    runners,
+    themeService,
+    presenceService,
+    getThreadRecord: (threadId) => botThreads.store.get(threadId),
+    themeBot,
+  });
+
   // Hands-free voice (src/voice/live): a speech-to-speech voice agent on the
   // phone whose tools run here, relaying visibly to the Bot and threads.
-  const voiceLive = new VoiceLive({
+  ({ voiceSearch } = setupVoiceLive({
+    bb,
     db,
-    key: () => openaiKey(settingValues),
-    settings: () => settingValues,
+    bots,
+    pages,
+    projectLeads,
+    runners,
+    automations,
+    ownedThreads,
+    getSettingValues: () => settingValues,
     // The composer menu's quick settings; the returned values are current at once (onChange follows).
     saveSettings: async (values) => { settingValues = await settings.experimental_set(values); },
-    cos: () => { const bot = bots.stored(); return bot ? { name: bot.name, threadId: bot.threadId ?? null } : null; },
-    // The session's identity seed (src/voice/live/identity.ts): cheap sources only, read once at start.
-    seed: async (threadId) => {
-      const projectNames = bb.sdk.projects.list({ includePersonal: true }).then((list) => new Map((list as { id: string; name: string }[]).map((project) => [project.id, project.name]))).catch(() => new Map<string, string>());
-      return gatherSeed(threadId, {
-        bots: () => bots.list().map((bot) => ({ name: bot.name, role: bot.role ?? null, threadId: bot.threadId, memoryPageId: bot.memoryPageId ?? null, primary: !!bot.primary })),
-        memory: (pageId) => pages.markdown(pageId) ?? null,
-        leadOf: async (id) => { const lead = projectLeads.list().find((each) => each.leadThreadId === id && each.projectId !== PERSONAL_PROJECT_ID); return lead ? (await projectNames).get(lead.projectId) ?? lead.projectId : null; },
-        runnerOf: (id) => { const runner = runners.forThread(id); return runner ? { name: runner.name, job: runner.job } : null; },
-        thread: async (id) => {
-          const thread = await bb.sdk.threads.get({ threadId: id }) as { title?: string | null; titleFallback?: string | null; projectId?: string | null };
-          const projectId = thread.projectId ?? null;
-          const project = projectId && projectId !== PERSONAL_PROJECT_ID ? (await projectNames).get(projectId) ?? null : null;
-          return { title: thread.title || thread.titleFallback || "this thread", project };
-        },
-        recent: async (id) => {
-          const page = await bb.sdk.threads.timeline({ threadId: id, segmentLimit: "4" } as never) as { rows?: { kind: string; role?: string; text?: string; children?: unknown[] }[] };
-          const messages: SeedMessage[] = [];
-          const visit = (rows: { kind: string; role?: string; text?: string; children?: unknown[] }[]) => {
-            for (const row of rows) {
-              if (row.kind === "conversation" && (row.role === "user" || row.role === "assistant") && row.text) messages.push({ role: row.role, text: row.text });
-              if (Array.isArray(row.children)) visit(row.children as never);
-            }
-          };
-          visit(page.rows ?? []);
-          return messages;
-        },
-      });
-    },
-    resolve: async (name) => {
-      const bot = bots.stored();
-      const projects = new Map(((await bb.sdk.projects.list({ includePersonal: true }).catch(() => [])) as { id: string; name: string }[]).map((project) => [project.id, project.name]));
-      const leads = projectLeads.list().filter((lead) => lead.projectId !== PERSONAL_PROJECT_ID && lead.leadThreadId).map((lead) => ({ project: projects.get(lead.projectId) ?? lead.projectId, threadId: lead.leadThreadId! }));
-      const threads = ((await bb.sdk.threads.list({ archived: false, limit: 100 }).catch(() => [])) as { id: string; title?: string | null; titleFallback?: string | null; latestAttentionAt?: number }[])
-        .sort((a, b) => (b.latestAttentionAt ?? 0) - (a.latestAttentionAt ?? 0)).map((thread) => ({ id: thread.id, title: thread.title || thread.titleFallback || "" })).filter((thread) => thread.title);
-      return resolveTarget(name, { cos: bot ? { name: bot.name, threadId: bot.threadId ?? null } : null, leads, threads });
-    },
-    latestReply: async (threadId) => {
-      const [thread, output] = await Promise.all([bb.sdk.threads.get({ threadId }), bb.sdk.threads.output({ threadId })]);
-      return { title: (thread as { title?: string | null }).title || threadId, text: output.output ?? "" };
-    },
-    threads: {
-      stop: async (threadId) => { await bb.sdk.threads.stop({ threadId }); },
-      archive: async (threadId) => { await bb.sdk.threads.archive({ threadId }); },
-    },
-    automations: {
-      list: async () => (await automations.list()).map((each) => ({ id: each.id, name: each.name, state: each.state })),
-      pause: async (id) => { await automations.setState(id, "paused"); },
-      remove: async (id) => { await automations.delete(id); },
-    },
-    openThread: async ({ title, text, note }) => (await bb.sdk.threads.spawn({
-      projectId: PERSONAL_PROJECT_ID, title,
-      // As the Bot's chat: the personal project's default environment (a host one needs a host id).
-      environment: { type: "project-default" },
-      pluginMetadata: { voiceLive: true },
-      input: [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }],
-    } as never)).id,
-    // Voice threads live under the Bot, like its other threads: hidden from BB's main list, in its Recent.
-    claim: async (threadId) => { const bot = bots.stored(); if (bot) await ownedThreads.claim(threadId, bot.id); },
-    send: ({ threadId, senderThreadId, text, note, mode }) => bb.sdk.threads.send({
-      threadId, mode, ...(senderThreadId ? { senderThreadId } : {}),
-      input: [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }],
-    } as never).then(() => undefined),
-    push: async ({ title, body, threadId, coalesceKey }) => {
-      await bb.sdk.plugins.callRpc({
-        pluginId: "mobile", method: "notify", outputSchema: z.unknown(),
-        input: { title, body: body.slice(0, 4000), kind: "turn-finished", threadId, projectId: PERSONAL_PROJECT_ID, coalesceKey, ...botPushIds(threadId) } as never,
-      });
-    },
-    publish: (signal) => bb.realtime.publish(VOICE_LIVE_CHANNEL, signal),
-    // Started from a Canvas plugin thread, the voice edits that canvas's board while it talks,
-    // through the plugin's RPCs (its own data; nothing of it lives in Studio).
-    canvas: {
-      tools: async (threadId) => {
-        const answer = await bb.sdk.plugins.callRpc({ pluginId: CANVAS_PLUGIN_ID, method: "canvas.voice", input: { threadId }, outputSchema: canvasVoiceOutput, signal: AbortSignal.timeout(5000) });
-        return { tools: answer.tools, note: answer.instructions };
-      },
-      run: async (threadId, name, args) => (await bb.sdk.plugins.callRpc({ pluginId: CANVAS_PLUGIN_ID, method: "canvas.voiceRun", input: { threadId, name, args: args as never }, outputSchema: canvasVoiceRunOutput, signal: AbortSignal.timeout(10_000) })).output,
-    },
-    // Staged BBs only: a scripted mock server stands in for OpenAI (scripts/voice-mock).
-    mockUrl: () => process.env.STUDIO_VOICE_MOCK_URL?.trim() || null,
-    warn: (message) => bb.log.warn(message),
-  });
-  registerVoiceLive(bb, voiceLive);
+    botPushIds,
+  }));
   registerWindowRelay(bb);
   registerGroupTool(bb, { state: pageState, acting, jobs: async (botId) => (await automations.list(botId)).map((job) => ({ id: job.id, name: job.name })) });
-  voiceSearch = (query, limit) => {
-    const words = tokens(query);
-    return voiceLive.search(query, limit).map((hit) => ({
-      ref: { pluginId: "__bb__", id: hit.threadId }, kind: "thread", title: hit.title, snippet: excerpt(hit.text, words),
-      href: `/threads/${hit.threadId}`, projectId: PERSONAL_PROJECT_ID, updatedAt: hit.at, score: 1,
-    }));
-  };
-  bb.agents.registerTool({
-    name: "bot_state",
-    description: 'Change the user\'s Bot state when they explicitly ask: action "pause" (stops check-ins; Bot\'s own chat only), "stop" (pauses Bot, stops spawned threads, pauses automations; Bot\'s own chat only), or "resume" (resumes paused/stopped Bot; cannot be called by the Bot itself).',
-    parameters: z.object({ action: z.enum(["pause", "resume", "stop"]) }),
-    execute: async ({ action }, ctx) => {
-      const self = await acting(ctx.threadId);
-      if (action === "resume") return self ? "Only the user can resume their Bot: Studio → Bot → Resume." : describeBot(await bots.resume());
-      const refused = botControlRefusal(self, action);
-      if (refused) return refused;
-      if (action === "pause") return describeBot(await bots.pause(self!.botId));
-      const result = await bots.stop(self!.botId);
-      return [describeBot(result), `Stopped ${result.stoppedThreadIds.length} thread(s); paused ${result.pausedAutomationIds.length} automation(s).`].join("\n");
-    },
-  });
-  // bot_conversations replaced bot_threads_list (src/bot-threads-server.ts): side threads are conversations.
-  bb.agents.registerTool({
-    name: "bot_activity", description: "What the user's Bot is doing: what waits on the user in its chat, threads in progress (and which wait on an answer), scheduled check-ins and automations, and recently completed threads it started.", parameters: z.object({ after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
-    execute: async ({ after }: { after?: string }, ctx) => {
-      const activity = await bots.activity(await selfBot(ctx.threadId));
-      // In parts (src/paging.ts), each section's heading again in a part that continues it.
-      const threadRows = (section: string, threads: { id: string; title: string; status: string }[]) => threads.map((thread) => ({ id: thread.id, section: `${section}:`, line: `- [${thread.title}](/threads/${thread.id}) (${thread.status})` }));
-      const rows = [
-        ...(activity.attention ? [{ id: "attention", section: "", line: `Waiting on the user in your chat: ${/^\d+$/.test(activity.attention.reason) ? `${activity.attention.count} (questions, todos and unread replies)` : activity.attention.reason}` }] : []),
-        ...threadRows("Waiting on an answer (yours to handle, or bring to the user)", activity.inProgress.filter((each) => each.waitingFor)),
-        ...threadRows("In progress", activity.inProgress.filter((each) => !each.waitingFor)),
-        ...activity.scheduled.map((each) => ({ id: `scheduled:${each.id}`, section: "Scheduled:", line: `- ${each.name}${each.enabled ? "" : " (off)"}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toISOString()}` : ""}` })),
-        ...threadRows("Completed", activity.completed),
-      ];
-      if (!rows.length) return "Nothing to show yet.";
-      const part = pageSections(rows, { after });
-      if (!part) return staleCursor(`${after}`, callText("bot_activity", {}));
-      const next = nextLine(part.page, (last) => callText("bot_activity", { after: last }), "lines");
-      return [...(next ? [next] : []), ...part.lines].join("\n");
-    },
-  });
+  registerStatusTools();
 
   // The Bot's own tools: given only to its thread and its skill review forks (agents.configure above).
   const ownBot = (threadId: string | undefined): string => {
@@ -2375,18 +2145,23 @@ export default async function plugin(bb: BbPluginApi) {
   const liveBb = createLiveBbPool(bb.server.experimental_dataDir, bb.server.loopbackBaseUrl);
   const auth = registerAuth(bb, undefined, liveBb.signIn());
   const accounts = registerAccounts(bb, db, auth, liveBb);
-  const forestWeather = new ForestWeather({ kv: bb.storage.kv });
-  bb.rpc.register(forestContract, {
-    "theme.weather": ({ timeZone }) => forestWeather.sky(timeZone),
-    "theme.weather.city": ({ city }) => forestWeather.setCity(city),
-  });
-  bb.rpc.register(tonightContract, {
-    "theme.sky": async ({ timeZone }) => ({ place: await forestWeather.place(timeZone), previewAt: await readPreview(bb.storage.kv), view: await readView(bb.storage.kv) }),
-  });
-  const themeOptionStores = builtinOptionStores(bb.storage.kv);
-  bb.rpc.register(themeOptionsContract, {
-    "theme.options": ({ themeId }) => readThemeOptions(themeOptionStores, themeId),
-    "theme.options.set": ({ themeId, id, value }) => writeThemeOption(themeOptionStores, themeId, id, value),
+  const { forestWeather, setup, backups } = registerPlatformRpcs({
+    bb,
+    db,
+    health,
+    changes,
+    itemIndex,
+    searchIndex,
+    kindSettings,
+    refreshRoutes,
+    reactionsImport,
+    pages,
+    artifacts,
+    drawings,
+    designs,
+    recordings,
+    dashboards,
+    minis,
   });
   triggers.every("plugin-health", HEALTH_INTERVAL_MS, () => health.check().then(() => {}).catch((error) => bb.log.warn(`Plugin health check failed: ${errorText(error)}`)));
   bb.onDispose(() => { health.dispose(); });
@@ -2403,81 +2178,6 @@ export default async function plugin(bb: BbPluginApi) {
       void leadsReady();
       void automations.tick().catch((error) => bb.log.warn(`Automations startup failed: ${errorText(error)}`));
     });
-  // BB Studio setup: add-ons, retired plugins and what to run; see src/setup.ts.
-  const setup = new SetupService({
-    sdk: bb.sdk,
-    health: (maxAgeMs) => (maxAgeMs ? health.summary(maxAgeMs) : health.check()),
-    // Setup's Retired plugins: Studio Reactions can go once its settings are copied.
-    settingsCopied: async (pluginId) => {
-      if (pluginId !== REACTIONS_PLUGIN_ID) return true;
-      await importReactionsSettings(reactionsImport).catch(() => null);
-      return Boolean(await bb.storage.kv.get(REACTIONS_SETTINGS_IMPORTED));
-    },
-  });
-  bb.rpc.register(setupContract, {
-    "setup.summary": ({ maxAgeMs }) => setup.summary(maxAgeMs),
-    "setup.install": ({ pluginIds }) => setup.install(pluginIds),
-    "setup.enable": ({ pluginId }) => setup.enable(pluginId),
-    "setup.remove": ({ pluginId }) => setup.remove(pluginId),
-  });
-
-  // Setup → Kinds (src/kinds.ts). Turning a kind off or on, or choosing its
-  // provider, applies to Studio's lists, search and New menus at once, to
-  // agents from their next session, and to thread tabs, composer entries and
-  // reply cards after a window reload.
-  const kindsState = async (): Promise<KindsState> => {
-    const routes = await refreshRoutes();
-    const settings = kindSettings.current;
-    return {
-      kinds: kindRowViews(routes, settings),
-      frontend: frontendState(routes, settings),
-    };
-  };
-  bb.rpc.register(kindsContract, {
-    "kinds.state": () => kindsState(),
-    "kinds.update": async ({ kind, on, use }) => {
-      const pluginIds = rowKinds(kind).map((each) => BUILTIN_KINDS.find((builtin) => builtin.kind === each)!.pluginId);
-      const before = pluginIds.map((pluginId) => builtinOn(kindSettings.current, pluginId));
-      await kindSettings.update(kind, { on, use });
-      for (const member of rowKinds(kind)) bb.log.info(`Studio kind ${member}: ${kindSettings.current.off.includes(member) ? "off" : "on"}, open and create with ${kindSettings.current.use[member] ?? "automatic"}.`);
-      // Search drops an off kind's hits and indexes it again when it's back on.
-      pluginIds.forEach((pluginId, index) => { if (before[index] !== builtinOn(kindSettings.current, pluginId)) void searchIndex.changed(pluginId).catch(() => {}); });
-      changes.append(null);
-      for (const pluginId of pluginIds) bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId });
-      return kindsState();
-    },
-  });
-
-  // Backup and restore of every Studio item (src/backup/, docs/backup.md).
-  const threadExists = (threadId: string) => bb.sdk.threads.get({ threadId }).then((thread) => thread.deletedAt == null);
-  const backups = new BackupService({
-    dataDir: bb.server.experimental_dataDir,
-    sdk: bb.sdk,
-    bbVersion: () => Promise.race([
-      bb.sdk.system.version().then((version) => version.currentVersion),
-      new Promise<null>((done) => setTimeout(() => done(null), 3000)),
-    ]),
-    studioData: studioDataBackup(db, {
-      threadExists,
-      changed: () => {
-        // A backup carries no item index: restored rows index themselves (the triggers), and this checks them.
-        try { itemIndex.heal(); } catch (error) { bb.log.warn(`Item index check after restore failed: ${errorText(error)}`); }
-        changes.append(null);
-        bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
-        void searchIndex.rebuild().catch((error) => bb.log.warn(`Reindex after restore failed: ${errorText(error)}`));
-      },
-    }),
-    builtins: {
-      pages: { name: "Studio Pages", handlers: pages.backup },
-      artifacts: { name: "Studio Artifacts", handlers: artifacts.backup },
-      excalidraw: { name: "Studio Draw", handlers: drawings.backup },
-      design: { name: "Studio Design", handlers: designs.backup },
-      talk: { name: "Studio Talk", handlers: recordings.backup },
-      dashboards: { name: "Studio Dashboards", handlers: dashboards.backup },
-      minis: { name: "Studio Apps", handlers: minis.backup },
-    },
-  });
-  registerBackup(bb, backups, join(bb.server.experimental_dataDir, "plugins", STUDIO_PLUGIN_ID));
   registerStudioCli({
     bb,
     hub,
