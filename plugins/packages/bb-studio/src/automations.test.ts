@@ -879,3 +879,29 @@ it("FM (review F5): setting up again a watcher deleted in bb tells the user once
   await x.auto.tick();
   expect(notify).toHaveBeenCalledTimes(1);
 });
+
+it("logs and skips rows with corrupted DB JSON instead of crashing list() or scheduled()", async () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const x = await setup();
+    const good = await x.auto.create({ kind: "checkin", name: "Good brief", instruction: "Say hi", schedule: { type: "cron", cron: "0 9 * * *" } });
+    const badSchedule = await x.auto.create({ kind: "checkin", name: "Broken schedule", instruction: "Never lists", schedule: { type: "cron", cron: "0 10 * * *" } });
+    const badMeta = await x.auto.create({ ...watcher, name: "Broken env", schedule: { type: "cron", cron: "0 11 * * *" } });
+
+    x.db.prepare("UPDATE bot_automations SET schedule_json = '{not-json' WHERE id = ?").run(badSchedule.id);
+    x.db.prepare("UPDATE bot_automations SET resources = '{bad', env_json = '{bad', seen_ids = '{bad' WHERE id = ?").run(badMeta.id);
+
+    const listed = await x.auto.list();
+    expect(listed.map((each) => each.id)).toContain(good.id);
+    expect(listed.map((each) => each.id)).not.toContain(badSchedule.id);
+    expect(listed.find((each) => each.id === badMeta.id)?.script?.envKeys).toEqual([]);
+
+    const sched = x.auto.scheduled("bot_main");
+    expect(sched.map((each) => each.name)).toContain("Dot · Good brief");
+    expect(sched.map((each) => each.name)).not.toContain("Dot · Broken schedule");
+    expect(warn.mock.calls.some(([msg]) => typeof msg === "string" && msg.includes(badSchedule.id))).toBe(true);
+    expect(warn.mock.calls.some(([msg]) => typeof msg === "string" && msg.includes(badMeta.id))).toBe(true);
+  } finally {
+    warn.mockRestore();
+  }
+});

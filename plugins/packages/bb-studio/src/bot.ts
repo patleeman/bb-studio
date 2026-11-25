@@ -1518,10 +1518,21 @@ export class Bots {
   skillHistory(botId?: string, before?: number, name?: string) {
     const bot = this.need(botId);
     const rows = this.deps.db.prepare("SELECT * FROM bot_skill_versions WHERE bot_id = ? AND (? IS NULL OR id < ?) AND (? IS NULL OR name = ?) ORDER BY id DESC LIMIT 50").all(bot.id, before ?? null, before ?? null, name ?? null, name ?? null) as { id: number; name: string; description: string | null; body: string | null; old_body: string; warnings: string; at: number }[];
-    return rows.map((row) => ({ id: row.id, name: row.name, description: row.description, body: row.body, at: row.at,
-      diff: lineDiff(row.old_body, row.body ?? ""),
-      warnings: [...JSON.parse(row.warnings) as string[], ...(this.deps.db.prepare("SELECT warning FROM bot_skill_lints WHERE version_id = ? ORDER BY id").all(row.id) as { warning: string }[]).map((lint) => lint.warning)],
-    }));
+    return rows.map((row) => {
+      let storedWarnings: string[] = [];
+      try {
+        const parsed: unknown = JSON.parse(row.warnings);
+        if (Array.isArray(parsed)) storedWarnings = parsed.filter((each): each is string => typeof each === "string");
+        else console.warn(`[studio] Ignoring malformed bot_skill_versions ${row.id} warnings: expected array`);
+      } catch (error) {
+        console.warn(`[studio] Ignoring malformed bot_skill_versions ${row.id} warnings: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      return {
+        id: row.id, name: row.name, description: row.description, body: row.body, at: row.at,
+        diff: lineDiff(row.old_body, row.body ?? ""),
+        warnings: [...storedWarnings, ...(this.deps.db.prepare("SELECT warning FROM bot_skill_lints WHERE version_id = ? ORDER BY id").all(row.id) as { warning: string }[]).map((lint) => lint.warning)],
+      };
+    });
   }
 
   revertSkill(versionId: number, botId?: string): void {
