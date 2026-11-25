@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fakeTransfer } from "./drag-testing";
 import {
   clearDragItem, currentDragItem, docDragItem, dragEndPoint, dragItemTarget, endedOutside, hasDragFiles, hasDragItem, ITEM_DRAG_TYPE, linkDragItem,
-  mentionTextFor, parseDragItem, peekDragItem, readDragItem, setHostDragHelpers, tabDragItem, threadDragItem, writeDragItem, type DragItem,
+  mentionTextFor, parseDragItem, peekDragItem, readDragItem, setHostDragHelpers, stopDragWatch, tabDragItem, threadDragItem, writeDragItem, type DragItem,
 } from "./item-drag";
 
 const PAGE = "pg_0123456789abcdef";
@@ -167,4 +167,17 @@ it("carries BB's open spec on a side panel tab through a parse, and drops it fro
   expect(tab?.open).toEqual(open);
   expect(parseDragItem({ kind: "thread", id: "thr_1", title: "T", open })?.open).toBeUndefined();
   expect(parseDragItem({ kind: "tab", id: "k", title: "Terminal" })).toEqual({ kind: "tab", id: "k", title: "Terminal" });
+});
+
+it("clears drag state on dragend and tears down window listeners via stopDragWatch", () => {
+  writeDragItem(fakeTransfer(), threadDragItem({ id: "thr_1", title: "Demo" }));
+  expect(currentDragItem()?.id).toBe("thr_1");
+  window.dispatchEvent(new Event("dragend"));
+  expect(currentDragItem()).toBeNull();
+
+  stopDragWatch();
+  writeDragItem(fakeTransfer(), threadDragItem({ id: "thr_2", title: "Demo 2" }));
+  stopDragWatch();
+  window.dispatchEvent(new Event("dragend"));
+  expect(currentDragItem()?.id).toBe("thr_2");
 });

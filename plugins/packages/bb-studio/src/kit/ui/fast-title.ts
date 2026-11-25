@@ -18,13 +18,21 @@ const SKIP_DELAY_MS = 400;
 const GAP = 4;
 const EDGE = 8;
 
-type FastTitleWindow = Window & { [INSTALLED]?: true };
+type FastTitleWindow = Window & { [INSTALLED]?: () => void };
 
-export function installFastTitles(doc: Document = document): void {
+export function installFastTitles(
+  doc: Document = document,
+  options?: { signal?: AbortSignal; replace?: boolean },
+): () => void {
   const win = doc.defaultView as FastTitleWindow | null;
-  if (!win || win[INSTALLED]) return;
-  win[INSTALLED] = true;
+  if (!win) return () => {};
+  if (win[INSTALLED]) {
+    if (!options?.replace) return win[INSTALLED];
+    win[INSTALLED]();
+  }
+  if (options?.signal?.aborted) return () => {};
 
+  const controller = new AbortController();
   let target: HTMLElement | null = null;
   let tip: HTMLDivElement | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -57,6 +65,7 @@ export function installFastTitles(doc: Document = document): void {
     place(tip, target, win);
   };
 
+  const captureSignal = { capture: true, signal: controller.signal } as const;
   doc.addEventListener(
     "pointerover",
     (event) => {
@@ -71,7 +80,7 @@ export function installFastTitles(doc: Document = document): void {
       const delay = Date.now() - lastHiddenAt < SKIP_DELAY_MS ? 0 : FAST_TITLE_DELAY_MS;
       timer = setTimeout(show, delay);
     },
-    true,
+    captureSignal,
   );
   doc.addEventListener(
     "pointerout",
@@ -81,14 +90,23 @@ export function installFastTitles(doc: Document = document): void {
       if (next instanceof Node && target.contains(next)) return;
       release();
     },
-    true,
+    captureSignal,
   );
   // Clicking, typing, scrolling, or leaving the window ends the tooltip, as
   // it does for a native one.
-  doc.addEventListener("pointerdown", release, true);
-  doc.addEventListener("keydown", release, true);
-  doc.addEventListener("scroll", release, true);
-  win.addEventListener("blur", release);
+  doc.addEventListener("pointerdown", release, captureSignal);
+  doc.addEventListener("keydown", release, captureSignal);
+  doc.addEventListener("scroll", release, captureSignal);
+  win.addEventListener("blur", release, { signal: controller.signal });
+
+  const dispose = () => {
+    controller.abort();
+    release();
+    if (win[INSTALLED] === dispose) delete win[INSTALLED];
+  };
+  win[INSTALLED] = dispose;
+  options?.signal?.addEventListener("abort", dispose, { once: true });
+  return dispose;
 }
 
 function titled(node: EventTarget | null): HTMLElement | null {
@@ -138,4 +156,4 @@ function place(tip: HTMLElement, anchor: HTMLElement, win: Window): void {
   tip.style.transform = `translate(${Math.round(left)}px, ${Math.round(Math.max(EDGE, top))}px)`;
 }
 
-if (typeof document !== "undefined") installFastTitles();
+if (typeof document !== "undefined") installFastTitles(document, { replace: true });

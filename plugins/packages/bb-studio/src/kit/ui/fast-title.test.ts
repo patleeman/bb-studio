@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FAST_TITLE_DELAY_MS } from "./fast-title";
+import { FAST_TITLE_DELAY_MS, installFastTitles } from "./fast-title";
 
 const tip = () => document.querySelector("[data-bb-fast-title-tip]");
 const over = (el: Element) => el.dispatchEvent(new MouseEvent("pointerover", { bubbles: true }));
@@ -72,5 +72,19 @@ describe("fast titles", () => {
     over(document.getElementById("frame")!);
     vi.advanceTimersByTime(FAST_TITLE_DELAY_MS);
     expect(tip()).toBeNull();
+  });
+
+  it("cleans up listeners and restores held titles on dispose/replace", () => {
+    const a = document.getElementById("a")!;
+    const dispose = installFastTitles(document, { replace: true });
+    over(a);
+    expect(a.hasAttribute("title")).toBe(false);
+    dispose();
+    expect(a.getAttribute("title")).toBe("Reload");
+    over(a);
+    vi.advanceTimersByTime(FAST_TITLE_DELAY_MS);
+    expect(tip()).toBeNull();
+    // Re-install for subsequent tests.
+    installFastTitles(document, { replace: true });
   });
 });

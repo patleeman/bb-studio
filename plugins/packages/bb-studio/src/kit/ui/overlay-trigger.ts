@@ -60,25 +60,45 @@ export function preventOverlayTriggerSelection(event: MouseEvent): void {
   event.preventDefault();
 }
 
-let lastInputModality: "pointer" | "keyboard" = "pointer";
+const MODALITY_KEY = Symbol.for("bb-studio.overlay-modality");
+type ModalityHost = Document & {
+  [MODALITY_KEY]?: { modality: "pointer" | "keyboard"; dispose: () => void };
+};
 
-if (typeof document !== "undefined") {
-  document.addEventListener(
+export function installOverlayModality(doc: Document = document, signal?: AbortSignal): () => void {
+  const host = doc as ModalityHost;
+  host[MODALITY_KEY]?.dispose();
+  if (signal?.aborted) return () => {};
+  const controller = new AbortController();
+  const state: { modality: "pointer" | "keyboard"; dispose: () => void } = {
+    modality: host[MODALITY_KEY]?.modality ?? "pointer",
+    dispose: () => {
+      controller.abort();
+      if (host[MODALITY_KEY] === state) delete host[MODALITY_KEY];
+    },
+  };
+  doc.addEventListener(
     "keydown",
     () => {
-      lastInputModality = "keyboard";
+      state.modality = "keyboard";
     },
-    { capture: true },
+    { capture: true, signal: controller.signal },
   );
-  document.addEventListener(
+  doc.addEventListener(
     "pointerdown",
     () => {
-      lastInputModality = "pointer";
+      state.modality = "pointer";
     },
-    { capture: true },
+    { capture: true, signal: controller.signal },
   );
+  host[MODALITY_KEY] = state;
+  signal?.addEventListener("abort", state.dispose, { once: true });
+  return state.dispose;
 }
 
+if (typeof document !== "undefined") installOverlayModality();
+
 export function isLastInputKeyboard(): boolean {
-  return lastInputModality === "keyboard";
+  if (typeof document === "undefined") return false;
+  return (document as ModalityHost)[MODALITY_KEY]?.modality === "keyboard";
 }

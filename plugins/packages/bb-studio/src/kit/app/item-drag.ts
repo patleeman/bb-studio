@@ -94,13 +94,32 @@ export function absoluteUrl(path: string, origin: string = typeof window === "un
   return `${origin}${path}`;
 }
 
+const DRAG_WATCH_KEY = Symbol.for("bb-studio.item-drag");
+type DragWatchWindow = Window & { [DRAG_WATCH_KEY]?: () => void };
+
 function watch(): void {
   if (watching || typeof window === "undefined") return;
+  const win = window as DragWatchWindow;
+  win[DRAG_WATCH_KEY]?.();
   watching = true;
+  const controller = new AbortController();
   // The drag is over when its source hears `dragend`, or this window takes the drop.
   const clear = () => { current = null; };
-  window.addEventListener("dragend", clear, true);
-  window.addEventListener("drop", () => { setTimeout(clear, 0); }, true);
+  const opts = { capture: true, signal: controller.signal } as const;
+  window.addEventListener("dragend", clear, opts);
+  window.addEventListener("drop", () => { setTimeout(clear, 0); }, opts);
+  const stop = () => {
+    controller.abort();
+    watching = false;
+    if (win[DRAG_WATCH_KEY] === stop) delete win[DRAG_WATCH_KEY];
+  };
+  win[DRAG_WATCH_KEY] = stop;
+}
+
+/** Stops the window-level drag cleanup listeners (tests and teardown). */
+export function stopDragWatch(): void {
+  if (typeof window === "undefined") return;
+  (window as DragWatchWindow)[DRAG_WATCH_KEY]?.();
 }
 
 /**
