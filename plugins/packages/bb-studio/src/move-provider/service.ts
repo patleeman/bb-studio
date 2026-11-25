@@ -248,7 +248,8 @@ export class MoveProviderService {
     if (!decision.ok) return finish(item("failed", { reason: decision.reason, detail: decision.detail }));
     if (RUNNING.has(thread.status)) return run.noDefer ? item("skipped", { reason: "running" }) : finish(item("deferred", { reason: "running" }));
 
-    const body: CoreMoveBody = { providerId: request.providerId, model: request.model, permissionMode: decision.mode, historyTokens: request.historyTokens };
+    // An archived thread is here only because it was asked for (by id or --include-archived).
+    const body: CoreMoveBody = { providerId: request.providerId, model: request.model, permissionMode: decision.mode, historyTokens: request.historyTokens, ...(thread.archived ? { includeArchived: true } : {}) };
     if (run.dryRun) {
       const outcome = coreOutcome(await this.deps.coreMove(thread.id, { ...body, dryRun: true }).catch((error) => ({ status: 0, body: { message: errorText(error) } })));
       if (outcome.kind === "busy") return item(run.noDefer ? "skipped" : "deferred", { reason: "busy" });

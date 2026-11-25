@@ -1,5 +1,5 @@
-// The move-provider service on the real SDK: BB threads, the core route on
-// BB's loopback, W2's handoff RPC, BB's automations plugin, Studio's tables,
+// The move-provider service on the real SDK: BB threads, core's move hook,
+// W2's handoff, BB's automations plugin, Studio's tables,
 // Bots and the router. The watcher listens to thread.idle.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
@@ -12,6 +12,15 @@ import { MoveProviderService, type BbAutomation, type BotRef, type MoveDeps, typ
 type Listed = { id: string; title?: string | null; titleFallback?: string | null; providerId?: string | null; status?: string; archivedAt?: number | null; projectId?: string | null };
 
 const PAGE = 200;
+
+/** W1's hook: refusals come back as { ok: false }, never thrown. */
+type MoveThreadProviderResult =
+  | { ok: true; status: "moved" | "already-moved" | "would-move"; threadId: string }
+  | { ok: false; threadId: string; httpStatus?: number; code?: string; message?: string; reason?: string };
+interface MoveHooks {
+  experimental_features?: { providerMove?: unknown };
+  experimental_moveThreadProvider?(threadId: string, input: { providerId: string; model?: string; permissionMode?: "accept-edits" | "auto" | "full"; historyTokens?: number; dryRun?: boolean; includeArchived?: boolean }): Promise<MoveThreadProviderResult>;
+}
 const PROBE_WAIT_MS = 10 * 60_000;
 
 export interface MoveRegisterDeps {
@@ -25,7 +34,6 @@ export interface MoveRegisterDeps {
   /** W2's handoff builder; through Studio's own RPC by default. */
   prepare?: MoveDeps["prepare"];
   handoffDelivered?: MoveDeps["handoffDelivered"];
-  fetchImpl?: typeof fetch;
 }
 
 const automationSchema = z.object({ id: z.string(), name: z.string(), execution: z.record(z.string(), z.unknown()) }).passthrough();
@@ -33,7 +41,6 @@ const automationSchema = z.object({ id: z.string(), name: z.string(), execution:
 export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService {
   const { bb, db } = deps;
   const sdk = bb.sdk;
-  const fetchImpl = deps.fetchImpl ?? fetch;
 
   const withOptions = async (threads: Listed[]): Promise<ThreadInfo[]> => mapPool(threads, 6, async (thread) => {
     const options = await sdk.threads.defaultExecutionOptions({ threadId: thread.id }).catch(() => null) as { model?: string | null; permissionMode?: string | null } | null;
@@ -106,11 +113,15 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
         permissionModes: modes?.length ? modes.filter(isPermissionMode) : null,
       };
     },
+    // Core's move (W1): bb.experimental_hooks.experimental_moveThreadProvider, never loopback HTTP.
     coreMove: async (threadId, body) => {
-      const base = bb.server.loopbackBaseUrl;
-      if (!base) return { status: 0, body: { message: "BB's loopback address is unknown" } };
-      const response = await fetchImpl(`${base}/api/v1/threads/${encodeURIComponent(threadId)}/move-provider`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      return { status: response.status, body: await response.json().catch(() => null) };
+      const hooks = (bb as { experimental_hooks?: MoveHooks }).experimental_hooks;
+      if (hooks?.experimental_features?.providerMove !== true || typeof hooks.experimental_moveThreadProvider !== "function") {
+        return { status: 501, body: { code: "core_unavailable", message: "this BB Studio build can't move providers; update the app" } };
+      }
+      const result = await hooks.experimental_moveThreadProvider(threadId, body);
+      if (result.ok) return { status: 200, body: { status: result.status } };
+      return { status: result.httpStatus ?? 0, body: { code: result.code, message: result.message, reason: result.reason } };
     },
     prepare: deps.prepare ?? (async (threadId, input) => await sdk.plugins.callRpc({ pluginId: "studio", method: "moveProvider.prepare", input: { threadId, ...input } as never, outputSchema: z.object({ ok: z.boolean(), transcriptPath: z.string().nullish(), verbatimTurns: z.number().optional(), outlinedTurns: z.number().optional(), bytes: z.number().optional(), error: z.string().optional() }).passthrough() })),
     bbAutomations: async () => {

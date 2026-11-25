@@ -3837,9 +3837,12 @@ Kv `studio.toolDelivery`.
 
 `bbs studio move-provider` moves threads to another provider with the same
 thread id and their history (`src/move-provider/`). Per thread it builds the
-handoff (`moveProvider.prepare`), then calls BB's
-`POST /api/v1/threads/:id/move-provider`, which clears the provider session
-and swaps provider and model. The thread's next turn gets the handoff.
+handoff (`moveProvider.prepare`), then calls core's move
+(`experimental_hooks.experimental_moveThreadProvider`, behind
+`experimental_features.providerMove`; BB's
+`POST /api/v1/threads/:id/move-provider`), which clears the provider session
+and swaps provider and model. A BB without it fails each thread with
+`core-unavailable`. The thread's next turn gets the handoff.
 
 - Selectors: thread ids, `--from <provider>`, `--project`, `--bot`,
   `--runners`, `--include-archived`. Target: `--to`, `--model` (the

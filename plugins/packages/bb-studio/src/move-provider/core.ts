@@ -103,7 +103,7 @@ export function exitCodeFor(report: { threads: readonly ThreadItem[]; automation
 // ---------------------------------------------------------------------------
 // The core route: POST /api/v1/threads/:id/move-provider
 
-export interface CoreMoveBody { providerId: string; model: string; permissionMode?: PermissionMode; historyTokens?: number; dryRun?: boolean }
+export interface CoreMoveBody { providerId: string; model: string; permissionMode?: PermissionMode; historyTokens?: number; dryRun?: boolean; includeArchived?: boolean }
 export interface CoreMoveResponse { status: number; body: unknown }
 
 export type CoreOutcome =
@@ -124,7 +124,14 @@ export function coreOutcome(response: CoreMoveResponse): CoreOutcome {
     if (body.status === "moved" || body.status === "already-moved" || body.status === "would-move") return { kind: "done", result: body.status };
     return { kind: "failed", reason: "core-error", detail: `unexpected answer ${JSON.stringify(body).slice(0, 200)}` };
   }
-  if (response.status === 409 && body.code === "thread_busy") return { kind: "busy" };
+  // Busy is worth waiting for; an archived or deleted thread isn't.
+  if (response.status === 409 && body.code === "thread_busy") {
+    const reason = (body as { reason?: unknown }).reason;
+    if (reason === "archived" || reason === "deleted") return { kind: "failed", reason: `thread-${reason}`, detail: words || `the thread is ${reason}` };
+    return { kind: "busy" };
+  }
+  if (response.status === 404 && body.code === "thread_not_found") return { kind: "failed", reason: "thread-not-found", detail: words || "no such thread" };
+  if (body.code === "not_implemented" || body.code === "core_unavailable") return { kind: "failed", reason: "core-unavailable", detail: words || "this BB Studio build can't move providers; update the app" };
   if (response.status === 422 && typeof body.code === "string" && REASONS[body.code]) return { kind: "failed", reason: REASONS[body.code]!, detail: words || body.code };
   if (response.status === 404 && !body.code) return { kind: "failed", reason: "core-unavailable", detail: "this BB has no move-provider route (update BB)" };
   return { kind: "failed", reason: "core-error", detail: `HTTP ${response.status}${words ? `: ${words}` : typeof body.code === "string" ? `: ${body.code}` : ""}` };
