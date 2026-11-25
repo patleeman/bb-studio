@@ -6,11 +6,8 @@
 import { useComposer, useRealtime, useRpc, type PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../../kit/ui/index";
+import { errorMessage as errorText } from "../../kit/format";
 import { ROUTER_CHANNEL, type Notice, type routerContract } from "../contract";
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 export function RouterNoticeBanner() {
   const composer = useComposer();

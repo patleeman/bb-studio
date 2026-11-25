@@ -3,6 +3,7 @@
 import { experimental_ProviderModelPicker as ProviderModelPicker, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Textarea } from "../../kit/ui/index";
+import { errorMessage as errorText } from "../../kit/format";
 import { toReasoningLevelOrNull } from "../../kit/reasoning";
 import { Card, Row, SubHeading, Switch } from "../../settings/ui/controls";
 import type { rpcContract as decisionsContract } from "../../decisions/contract";
@@ -12,10 +13,6 @@ import { AUTO_ID, MAX_RULES, type Decision, type Policy, type Rule, type Target,
 function unlabeled<T extends { label?: string }>(target: T): Omit<T, "label"> {
   const { label: _label, ...rest } = target;
   return rest;
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function newRuleId(rules: readonly Rule[]): string {

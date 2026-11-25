@@ -17,6 +17,7 @@ import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, expe
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
+import { errorMessage } from "../../kit/format";
 import type { BotActivityView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
@@ -205,7 +206,7 @@ function useThreadDrop(bot: BotSummary): { over: boolean; props: { onDragOver(ev
         event.preventDefault();
         call("bot_thread_adopt", { botId: bot.id, threadId }).then(
           () => toast.success(`Moved to ${bot.name}`),
-          (error: unknown) => toast.error(`Couldn't move it to ${bot.name}: ${error instanceof Error ? error.message : String(error)}`),
+          (error: unknown) => toast.error(`Couldn't move it to ${bot.name}: ${errorMessage(error)}`),
         );
       },
     },

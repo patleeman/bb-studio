@@ -1,6 +1,6 @@
 import { createStudioItem, Icon, ItemTile, cn, openAppPath, projectName, threadLinkId, useProjects } from "../kit/app/index";
 import { useStudioOpen } from "./studio-open";
-import { untitled } from "../kit/format";
+import { errorMessage, untitled } from "../kit/format";
 import { mentionPrompt } from "../kit/contract";
 import { Dialog, DialogContent, DialogTitle } from "../kit/ui/index";
 import { useBbContext, useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
@@ -104,7 +104,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
     setLoading(true);
     const timer = setTimeout(() => rpc.call("searchAll", { query: query.trim(), ...(threadOnly ? { kinds: ["thread"] } : {}), limit: 40 }).then(
       (hits) => { if (live) { setResults(hits); setError(null); setLoading(false); } },
-      (cause: unknown) => { if (live) { setError(cause instanceof Error ? cause.message : "Search failed."); setLoading(false); } },
+      (cause: unknown) => { if (live) { setError(errorMessage(cause) || "Search failed."); setLoading(false); } },
     ), query ? DEBOUNCE_MS : 0);
     return () => { live = false; clearTimeout(timer); };
   }, [rpc, query, threadOnly, freshness.revision]);

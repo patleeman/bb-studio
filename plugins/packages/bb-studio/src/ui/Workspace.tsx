@@ -3,6 +3,7 @@ import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { Icon, StudioBar, usePathname, hostPanes, isHostSidePane, subscribeHostPanes, registerWorkspaceCloser, setWorkspaceActive, canOpenWorkspaceItem, openAppPath, publishWorkspaceAnchor, registerWorkspaceOpener, studioTargetAt, subscribeWorkspace, workspaceRevision, WORKSPACE_DRAG, WORKSPACE_PATH, type WorkspaceItem, type WorkspacePlacement } from "../kit/app/index";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "../kit/ui/index";
 import { toast } from "sonner";
+import { errorMessage } from "../kit/format";
 import { hasHostNavigator } from "../kit/app/nav";
 import { requestThreadTab } from "../kit/app/thread-panel";
 import { workbenchReturn } from "./studio-open";
@@ -258,7 +259,7 @@ function TabRename({ tab, onDone }: { tab: Tab; onDone(): void }) {
     ended.current = true;
     onDone();
     const title = value.trim();
-    if (title && title !== tab.title) void renameTab(rpc, tab.href, title).catch((cause: unknown) => toast.error(`Couldn't rename: ${cause instanceof Error ? cause.message : String(cause)}`));
+    if (title && title !== tab.title) void renameTab(rpc, tab.href, title).catch((cause: unknown) => toast.error(`Couldn't rename: ${errorMessage(cause)}`));
   };
   return <input autoFocus defaultValue={tab.title} aria-label={`Rename ${tab.title}`} maxLength={200}
     className="h-full w-44 min-w-0 rounded-md bg-background px-2 text-[13px] outline outline-1 outline-ring"
