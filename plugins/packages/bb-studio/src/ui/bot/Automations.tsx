@@ -136,7 +136,7 @@ export function AutomationsSection({ botId, botName, onOpen, disabled, external 
       ) : !list.length ? (
         <p className="pt-1 text-xs text-muted-foreground">{data.loading ? "Loading…" : "No automations"}</p>
       ) : null}
-      {view === "list" && list.some((a) => a.state === "done" || a.state === "ended") ? <button className={GHOST_BUTTON} onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>Done</button> : null}
+      {view === "list" && list.some((a) => a.state === "done" || a.state === "ended") ? <button type="button" className={GHOST_BUTTON} onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>Done</button> : null}
       {editor.dialogs}
     </section>
   );

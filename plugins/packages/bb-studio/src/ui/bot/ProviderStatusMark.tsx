@@ -1,7 +1,8 @@
 import * as BbApp from "@get-bb/plugin-sdk/app";
-import { useEffect, useState } from "react";
+import { useNow } from "../../kit/app/visible-poll";
 import { Icon } from "../../kit/ui/index";
 import { ProviderLogo } from "./BotAvatar";
+export { useNow };
 
 export type ProviderStatusTone = "needs" | "running" | "waiting" | "failed" | "idle";
 export type ProviderRingState = "running" | "idle" | "waiting" | "failed";
@@ -56,18 +57,6 @@ function toneLabel(tone: ProviderStatusTone): string {
   if (tone === "needs") return "Waiting for you";
   if (tone === "waiting") return "Waiting to start";
   return tone === "running" ? "Running" : tone === "failed" ? "Failed" : "Idle";
-}
-
-/** Re-renders every `ms` while `enabled`, for ticking times. */
-export function useNow(ms: number, enabled = true): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!enabled) return;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(timer);
-  }, [ms, enabled]);
-  return now;
 }
 
 /** "0:42", "12:05", "1:02:10": how long a run has been going. */

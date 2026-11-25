@@ -3,7 +3,8 @@
 // conversation's open strands, needs you first (strands.overview, design 4b),
 // then the areas' cards. Scheduled: the Bot's automations.
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
+import { useNow } from "../../kit/app/visible-poll";
 import { Button } from "../../kit/ui/button";
 import { cn } from "../../kit/ui/utils";
 import type { BotView } from "../../contract";
@@ -48,8 +49,7 @@ export function StrandsPage({ view, tab: initialTab = "now" }: { view: BotView; 
   const editor = useAutomationEditor(bot.id, automationList.data?.automations ?? [], () => { automationList.refresh(); scheduledList.refresh(); });
   const [query, setQuery] = useBotPageQuery();
   const [unfolded, setUnfolded] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
+  const now = useNow(60_000);
   const searching = !!query.trim();
   const shownAreas = useMemo(() => {
     const all = areas.data?.areas ?? null;

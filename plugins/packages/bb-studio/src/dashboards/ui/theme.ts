@@ -1,23 +1,15 @@
 // BB's light or dark theme, as widgets see it: Dashboards' tiles and the
 // canvas's items (src/canvas) share it.
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { hostTheme, subscribeHostTheme } from "../../kit/app/host-theme";
+import { useDarkMode } from "../../kit/ui/dark-mode";
 import type { WidgetTheme } from "./custom-frame";
 
 export function useDark(): boolean {
-  const read = () => typeof document !== "undefined" && (document.documentElement.classList.contains("dark") || document.body.classList.contains("dark"));
-  const [dark, setDark] = useState(read);
   // BB's own word for its mode, where it gives one; else the document's classes.
   const host = useSyncExternalStore(subscribeHostTheme, hostTheme, () => null);
-  const hosted = host !== null;
-  useEffect(() => {
-    if (hosted) return;
-    const observer = new MutationObserver(() => setDark(read()));
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
-    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, [hosted]);
-  return host ? host.mode === "dark" : dark;
+  const domDark = useDarkMode();
+  return host ? host.mode === "dark" : domDark;
 }
 
 /** BB's theme as a custom widget sees it. */

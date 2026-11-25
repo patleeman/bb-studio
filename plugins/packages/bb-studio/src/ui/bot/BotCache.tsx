@@ -5,6 +5,7 @@
 // context ring under the composer), the details are a "Prompt cache" row
 // there and the chip only opens that card; Studio draws no popover of its own.
 import { GHOST_BUTTON } from "../../kit/app/index";
+import { useNow } from "../../kit/app/visible-poll";
 import { errorMessage } from "../../kit/format";
 import { Icon, Popover, PopoverContent, PopoverTrigger } from "../../kit/ui/index";
 import { useBbContext, useComposer } from "@get-bb/plugin-sdk/app";
@@ -19,8 +20,7 @@ const POLL_MS = 60_000;
 
 /** Re-renders each `ms`, for the minutes left. */
 function useTick(ms: number) {
-  const [, setNow] = useState(0);
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(timer); }, [ms]);
+  useNow(ms);
 }
 
 /** The label with minutes counted down between polls. */

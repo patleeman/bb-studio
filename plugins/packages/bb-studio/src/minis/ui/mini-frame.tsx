@@ -31,17 +31,8 @@ type FrameMessage =
   | { op: "size"; height: number }
   | { op: "error"; message: string };
 
-export function useDarkMode(): boolean {
-  const read = () => document.documentElement.classList.contains("dark") || document.body.classList.contains("dark");
-  const [dark, setDark] = useState(read);
-  useEffect(() => {
-    const observer = new MutationObserver(() => setDark(read()));
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-theme"] });
-    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
-  return dark;
-}
+import { useDarkMode } from "../../kit/ui/dark-mode";
+export { useDarkMode };
 
 /** BB's colors as the frame should use them, resolved here so the frame needs none of BB's CSS. */
 function themeTokens(): Record<string, string> {

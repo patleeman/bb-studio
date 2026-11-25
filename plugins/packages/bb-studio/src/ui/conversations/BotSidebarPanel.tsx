@@ -33,6 +33,7 @@ import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, expe
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type WheelEvent } from "react";
 import type { BotSpace } from "../../bot-threads-contract";
 import { Icon } from "../../kit/app/index";
+import { useNow } from "../../kit/app/visible-poll";
 import { noteBotThread } from "./bot-thread-owners";
 import { ContextMenu, ContextMenuCheckboxItem, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../../kit/ui/context-menu";
 import { dragSourceProps, refDragItem, threadDragItem, writeDragItem } from "../../kit/app/item-drag";
@@ -296,8 +297,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   if (welcome.data) welcomeSeen.current = welcome.data.pending;
   const [editing, setEditing] = useState<string | null>(null);
   const [pickingModel, setPickingModel] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
+  const now = useNow(60_000);
 
   // The server learns which Bot is shown, so the user's next thread is its conversation.
   useEffect(() => {

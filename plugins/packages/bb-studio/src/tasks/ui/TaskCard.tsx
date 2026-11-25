@@ -1,6 +1,7 @@
 import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { remember } from "../../kit/app/directive-card";
+import { useNow } from "../../kit/app/visible-poll";
 import { CHAT_CARD_BODY, CHAT_CARD_SKELETON, ChatCard, ChatCardHeader, ChatCardIconButton } from "../../kit/app/chat-card";
 import { relativeTime } from "../../kit/format";
 import { Icon, cn } from "../../kit/ui/index";
@@ -20,11 +21,7 @@ import { SEVERITY_LABEL, severityTone, historyLines, isMine, ownerLabel, ownerSh
 
 export const isTaskId = (id: string) => TODO_ID.test(id) || WORK_ID.test(id);
 
-function useNow(): number {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
-  return now;
-}
+const useCardNow = () => useNow(60_000);
 
 const TONE: Record<Tone, string> = { warning: "text-warning", destructive: "text-destructive", muted: "text-muted-foreground", default: "text-foreground", success: "text-success" };
 
@@ -121,7 +118,7 @@ export function linkedThread(task: Pick<Task, "owner" | "workers" | "conversatio
 export function TaskCardView({ view, people, chat = false, bare = false, detail = false, extra }: { view: TaskView; people: LoopPeople; refresh(): void; chat?: boolean; bare?: boolean; detail?: boolean; extra?: ReactNode }) {
   const { task, history, threads } = view;
   const navigate = useBbNavigate();
-  const now = useNow();
+  const now = useCardNow();
   const zone = useTodosZone();
   const onScreen = useCardOnScreen(task.id);
   const [showHistory, setShowHistory] = useState(false);
@@ -236,7 +233,7 @@ export function TaskCardView({ view, people, chat = false, bare = false, detail 
 export function TaskRow({ view, people, refresh }: { view: TaskView; people: LoopPeople; refresh(): void }) {
   const { task } = view;
   const [open, setOpen] = useState(false);
-  const now = useNow();
+  const now = useCardNow();
   const zone = useTodosZone();
   const closed = isClosed(task);
   const status = taskStatus(task);
