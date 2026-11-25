@@ -16,6 +16,7 @@ import { REPLY_OPEN_MS } from "./reply";
 import { isPingRequest } from "../bot-cache";
 import type { EventRow } from "./turns";
 import { USER_OWNER } from "../tasks/contract";
+import { mapPool } from "../kit/pool";
 
 export interface WorkerFact { threadId: string; title: string; status: WorkerStatus; createdAt: number; endedAt: number | null }
 
@@ -164,8 +165,10 @@ export class StrandService {
       this.deps.interactions(threadId).catch(() => []),
     ]);
     const runningStrandId = busy ? this.detector.runningStrand(threadId) : null;
-    const workers: WorkerSignal[] = [];
-    for (const worker of workerFacts) workers.push({ ...worker, strandId: await this.workerStrand(threadId, worker, busy) });
+    const workers: WorkerSignal[] = await mapPool(workerFacts, 6, async (worker) => ({
+      ...worker,
+      strandId: await this.workerStrand(threadId, worker, busy),
+    }));
     const turnStrand = (at: number) => (busy && this.detector.hasRunningTurn(threadId) ? runningStrandId : this.store.strandAt(threadId, at)?.strandId ?? null);
     // The turn an ask waits in: the running turn, else the newest sorted one at or before it.
     const turnOf = (at: number) => {
@@ -175,10 +178,12 @@ export class StrandService {
     };
     const asks: AskSignal[] = interactions.map((ask) => ({ ...askOf(ask, threadId, turnStrand(ask.createdAt ?? now)), turnId: turnOf(ask.createdAt ?? now) }));
     // A worker that needs the user: what it waits on, with its approval's choices.
-    for (const worker of workers.filter((each) => each.status === "needs-you")) {
+    const needsYouWorkers = workers.filter((each) => each.status === "needs-you");
+    const workerAsks = await mapPool(needsYouWorkers, 6, async (worker) => {
       const pending = await this.deps.interactions(worker.threadId).catch(() => []);
-      asks.push(...pending.map((ask) => ({ ...askOf(ask, worker.threadId, worker.strandId), label: `${worker.title}: ${askOf(ask, worker.threadId, null).label}` })));
-    }
+      return pending.map((ask) => ({ ...askOf(ask, worker.threadId, worker.strandId), label: `${worker.title}: ${askOf(ask, worker.threadId, null).label}` }));
+    });
+    for (const group of workerAsks) asks.push(...group);
     for (const request of this.gatewayRequests()) {
       const worker = workers.find((each) => each.threadId === request.threadId);
       const label = `Add MCP server: ${request.input?.label ?? request.input?.name ?? "a server"}`;
@@ -195,7 +200,7 @@ export class StrandService {
       const strand = this.store.byTask(task.id);
       return strand ? [{ id: task.id, strandId: strand.id, waitingOn: task.waitingOn ?? null }] : [];
     });
-    return { now, runningStrandId, workers, asks, tasks };
+    return { now, busy, runningStrandId, workers, asks, tasks };
   }
 
   /**
@@ -290,7 +295,7 @@ export class StrandService {
     const ordered = byState(rows);
     return {
       ...base,
-      sortingTurn: (await this.deps.busy(threadId).catch(() => false)) && this.detector.hasRunningTurn(threadId) && !this.detector.runningStrand(threadId),
+      sortingTurn: !!signals.busy && this.detector.hasRunningTurn(threadId) && !this.detector.runningStrand(threadId),
       strands: ordered.filter((row) => !row.live.earlier).map(view),
       earlier: ordered.filter((row) => row.live.earlier).map(view),
       strayWorkers,
@@ -387,10 +392,11 @@ export class StrandService {
     const candidates = (await this.deps.conversationsOf(botId))
       .filter((conversation) => conversation.lastActiveAt >= since && this.store.list(conversation.threadId).some(open))
       .sort((a, b) => b.lastActiveAt - a.lastActiveAt);
+    const lists = await mapPool(candidates, 6, (conversation) => this.list(conversation.threadId));
     const conversations: OverviewConversation[] = [];
-    for (const conversation of candidates) {
-      const list = await this.list(conversation.threadId);
-      if (list.strands.length) conversations.push({ ...conversation, strands: list.strands });
+    for (let i = 0; i < candidates.length; i += 1) {
+      const list = lists[i]!;
+      if (list.strands.length) conversations.push({ ...candidates[i]!, strands: list.strands });
     }
     return { conversations, checked: candidates.map((conversation) => conversation.threadId) };
   }

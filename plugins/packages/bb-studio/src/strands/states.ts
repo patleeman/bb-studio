@@ -45,6 +45,8 @@ export interface TaskSignal { id: string; strandId: string; waitingOn: { kind: s
 
 export interface Signals {
   now: number;
+  /** Whether the conversation thread itself is currently busy (reused by list() to avoid a second busy() RPC). */
+  busy?: boolean;
   /** The conversation's running turn, once it is sorted (an unsorted turn names no strand). */
   runningStrandId: string | null;
   workers: readonly WorkerSignal[];
