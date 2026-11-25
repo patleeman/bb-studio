@@ -178,15 +178,43 @@ describe("the tools, with no window on screen", () => {
     const call = (name: string, input: object) => (list.find((tool) => tool.name === name)!.execute as (input: object, ctx: { threadId: string }) => Promise<string>)(input, { threadId: "thr_1" });
     return { ...parts, published, call };
   }
-  const NOT_SHOWN = "No BB window shows this conversation now: it appears when the conversation is shown, and in the phone's Workspace.";
+  const NOT_SHOWN = "No BB window or phone shows this conversation now: it appears when the conversation is shown.";
 
   it("R5: says a change was saved to the Workspace, not shown, when no window shows the conversation", async () => {
     const { call, published } = tools();
     expect(await call("workbench_open", { type: "page", id: "pg_plan" })).toBe(`Saved "Plan" to this conversation's Workspace (key "wt_1") as the selected tab. ${NOT_SHOWN}`);
     expect(await call("workbench_open", { type: "page", id: "pg_plan" })).toBe(`"Plan" is already in this conversation's Workspace (key "wt_1"); it is the selected tab. ${NOT_SHOWN}`);
-    expect(await call("workbench_tab", { action: "close", key: "wt_1" })).toBe('Closed "Plan" in this conversation\'s Workspace. No BB window shows this conversation now.');
+    expect(await call("workbench_tab", { action: "close", key: "wt_1" })).toBe('Closed "Plan" in this conversation\'s Workspace. No BB window or phone shows this conversation now.');
     expect(await call("workbench_tab", { action: "focus", key: "wt_1" })).toBe('No tab has key "wt_1". Call workbench (op: list) for the current keys.');
     expect(published).toEqual([]);
+  });
+
+  it("says \"shown on the phone\" when only the phone shows the conversation, and drops it once a window does", async () => {
+    const { call, workspace } = tools();
+    workspace.markShown(["thr_1"], "phone:dev_1");
+    expect(await call("workbench_open", { type: "page", id: "pg_plan" })).toBe('Opened "Plan" (key "wt_1") and selected it (shown on the phone).');
+    expect(await call("workbench_open", { type: "conversation", id: "thr_other", focus: false })).toBe('Opened "Release notes" (key "wt_2") behind the selected tab (shown on the phone).');
+    expect(await call("workbench_tab", { action: "focus", key: "wt_2" })).toBe('Selected "Release notes" (shown on the phone).');
+    workspace.markShown(["thr_1"], "desktop:w1");
+    expect(await call("workbench_tab", { action: "close", key: "wt_2" })).toBe('Closed "Release notes".');
+  });
+
+  it("forgets a conversation a client stopped reporting after 12 seconds", () => {
+    let now = 0;
+    const db = memoryDb();
+    const workspace = new WorkspaceService(new WorkspaceStore(db), () => {}, undefined, undefined, () => now);
+    workspace.markShown(["thr_1"], "phone:dev_1");
+    expect(workspace.shownOn("thr_1")).toBe("phone");
+    now = 12_000;
+    workspace.markShown(["thr_2"], "desktop:w1");
+    expect([workspace.shownOn("thr_1"), workspace.shownOn("thr_2")]).toEqual(["phone", "desktop"]);
+    now = 12_001;
+    expect(workspace.shownOn("thr_1")).toBeNull();
+    // The window stopped reporting; the phone still does.
+    now = 25_000;
+    workspace.markShown(["thr_2"], "phone:dev_1");
+    now = 30_000;
+    expect(workspace.shownOn("thr_2")).toBe("phone");
   });
 
   it("opens, lists, focuses and closes in the Workspace without asking a window", async () => {
@@ -259,7 +287,10 @@ describe("the contract", () => {
     expect(db.prepare("SELECT COUNT(*) AS n FROM thread_workbench_state WHERE thread_id = 'thr_gone'").get()).toEqual({ n: 0 });
     const signals = harness.realtimeSignals.filter((signal) => signal.channel === WORKSPACE_CHANGED_CHANNEL).map((signal) => signal.payload);
     expect(signals).toEqual([{ threadId: "thr_1", version: 1, origin: "phone:dev_1", tabCount: 1 }]);
-    expect(Object.keys(workspaceRpcContract)).toEqual(["threadWorkbenchGet", "threadWorkbenchMutate"]);
+    expect(Object.keys(workspaceRpcContract)).toEqual(["threadWorkbenchGet", "threadWorkbenchMutate", "threadWorkbenchShown"]);
+    // The phone reports what it shows through the public contract.
+    expect(workspaceContract.threadWorkbenchShown.output.parse(await call("threadWorkbenchShown", workspaceContract.threadWorkbenchShown.input.parse({ threadIds: ["thr_1"], origin: "phone:dev_1" })))).toEqual({ ok: true });
+    await expect(call("threadWorkbenchShown", { threadIds: ["thr_1"] })).rejects.toThrow();
   });
 
   it("gives every tab kind a mobileSupport, and the view carries it", () => {

@@ -304,7 +304,9 @@ export function workbenchTools(deps: WorkbenchToolDeps) {
     workspace.store.setLayout(threadId, { layoutSet: outcome.record.layoutSet, userLayout: outcome.record.userLayout });
     return outcome.message;
   };
-  const NOT_SHOWN = "No BB window shows this conversation now: it appears when the conversation is shown, and in the phone's Workspace.";
+  const NOT_SHOWN = "No BB window or phone shows this conversation now: it appears when the conversation is shown.";
+  /** " (shown on the phone)" when only the phone shows the conversation, so the answer says where. */
+  const where = (threadId: string) => (workspace.shownOn(threadId) === "phone" ? " (shown on the phone)" : "");
   const storeOpen = async (threadId: string, op: Extract<WorkbenchOp, { type: "open" }>): Promise<string> => {
     const outcome = await workspace.mutate(threadId, { op: "open", tab: refOfSpec(op.spec), title: op.title, focus: op.focus, force: op.force, ...(op.index !== undefined ? { position: op.index } : {}) }, "agent");
     const name = JSON.stringify(op.title);
@@ -314,8 +316,9 @@ export function workbenchTools(deps: WorkbenchToolDeps) {
       const selected = op.focus ? " as the selected tab" : "";
       return outcome.created ? `Saved ${name} to this conversation's Workspace (${key})${selected}. ${NOT_SHOWN}` : `${name} is already in this conversation's Workspace (${key})${op.focus ? "; it is the selected tab" : ""}. ${NOT_SHOWN}`;
     }
-    if (!outcome.created) return op.focus ? `${name} was already open (${key}); selected it.` : `${name} was already open (${key}); left it where it is.`;
-    return `Opened ${name} (${key}) ${op.focus ? "and selected it" : "behind the selected tab"}.`;
+    const on = where(threadId);
+    if (!outcome.created) return op.focus ? `${name} was already open (${key}); selected it${on}.` : `${name} was already open (${key}); left it where it is${on}.`;
+    return `Opened ${name} (${key}) ${op.focus ? "and selected it" : "behind the selected tab"}${on}.`;
   };
   const run = async (name: ToolName, input: object, threadId: string): Promise<string> => {
     const op = await toolOp(name, input, threadId, deps);
@@ -339,8 +342,8 @@ export function workbenchTools(deps: WorkbenchToolDeps) {
         if (outcome.result === "notFound") return unknownTab(op.key);
         if (outcome.result !== "ok" && outcome.result !== "unchanged") return outcome.message ?? `${JSON.stringify(tab.title)} didn't change.`;
         const title = JSON.stringify(tab.title);
-        if (!workspace.isShown(threadId)) return op.type === "close" ? `Closed ${title} in this conversation's Workspace. No BB window shows this conversation now.` : `${title} is the selected tab in this conversation's Workspace. ${NOT_SHOWN}`;
-        return op.type === "close" ? `Closed ${title}.` : `Selected ${title}.`;
+        if (!workspace.isShown(threadId)) return op.type === "close" ? `Closed ${title} in this conversation's Workspace. No BB window or phone shows this conversation now.` : `${title} is the selected tab in this conversation's Workspace. ${NOT_SHOWN}`;
+        return op.type === "close" ? `Closed ${title}${where(threadId)}.` : `Selected ${title}${where(threadId)}.`;
       }
       case "popOut": {
         const tab = workspace.get(threadId).tabs.find((each) => each.tabId === op.key);
@@ -423,7 +426,6 @@ export function registerWorkbenchAgent(bb: BbPluginApi, db: Database.Database, d
   bb.rpc.register(workbenchContract, {
     "workbench.claim": ({ requestId }) => ({ go: router.claim(requestId) }),
     "workbench.reply": ({ requestId, message, record }) => ({ ok: router.reply(requestId, message, record) }),
-    "workbench.shown": ({ threadIds }) => { workspace.markShown(threadIds); return { ok: true }; },
     "workbench.import": async ({ threadId, tabs, activeIndex, panelOpen, origin }) => {
       const result = await workspace.importOnce(threadId, tabs as { ref: WorkspaceTabRef; title: string }[], activeIndex, panelOpen, origin ?? null);
       return { imported: result.imported, state: stateView(result.state) };
@@ -432,6 +434,7 @@ export function registerWorkbenchAgent(bb: BbPluginApi, db: Database.Database, d
   bb.rpc.register(workspaceRpcContract, {
     threadWorkbenchGet: ({ threadId }) => stateView(workspace.get(threadId)),
     threadWorkbenchMutate: (input) => workspace.rpcMutate(input),
+    threadWorkbenchShown: ({ threadIds, origin }) => { workspace.markShown(threadIds, origin); return { ok: true }; },
   });
   const lookups = {
     itemTitle: deps.itemTitle,

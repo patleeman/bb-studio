@@ -73,6 +73,16 @@ export const workspaceContract = {
       message: z.string().nullable(),
     }),
   },
+  /**
+   * The conversations a client shows now, sent every few seconds while it
+   * shows them (the server forgets one after 12 s without). `origin`
+   * "phone:<device id>" counts as the phone, "desktop:<window id>" as a BB
+   * window. The agent tools use it to say whether a change is on screen.
+   */
+  threadWorkbenchShown: {
+    input: z.object({ threadIds: z.array(threadId).max(50), origin }),
+    output: z.object({ ok: z.boolean() }),
+  },
 };
 
 export type WorkspaceStateView = z.infer<typeof workspaceState>;

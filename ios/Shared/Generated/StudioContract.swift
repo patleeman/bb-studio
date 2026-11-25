@@ -397,6 +397,7 @@ public enum Studio {
     public static let router_handoff = "router.handoff"
     public static let threadWorkbenchGet = "threadWorkbenchGet"
     public static let threadWorkbenchMutate = "threadWorkbenchMutate"
+    public static let threadWorkbenchShown = "threadWorkbenchShown"
   }
 
   public enum Channel {
@@ -1269,6 +1270,8 @@ public enum Studio {
   public typealias ThreadWorkbenchGet = ThreadWorkbenchGetOutput
 
   public typealias ThreadWorkbenchMutate = ThreadWorkbenchMutateOutput
+
+  public typealias ThreadWorkbenchShown = ThreadWorkbenchShownOutput
 
   public struct LoopsListInput: Sendable, Hashable, Codable {
     public var area: String?
@@ -43101,6 +43104,24 @@ public enum Studio {
       self.result = result
       self.tabId = tabId
       self.message = message
+    }
+  }
+
+  public struct ThreadWorkbenchShownInput: Sendable, Hashable, Codable {
+    public var threadIds: [String]?
+    public var origin: String?
+
+    public init(threadIds: [String]? = nil, origin: String? = nil) {
+      self.threadIds = threadIds
+      self.origin = origin
+    }
+  }
+
+  public struct ThreadWorkbenchShownOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
     }
   }
 

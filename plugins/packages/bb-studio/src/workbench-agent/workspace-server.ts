@@ -32,21 +32,32 @@ export class WorkspaceService {
     private readonly now: () => number = Date.now,
   ) {}
 
-  /** When a desktop window last said it shows each conversation. */
-  private readonly shown = new Map<string, number>();
+  /** When a desktop window, and when a phone, last said it shows each conversation. */
+  private readonly shown = new Map<string, { desktop: number | null; phone: number | null }>();
   static readonly SHOWN_MS = 12_000;
 
-  /** A window reports the conversations whose workbench it shows. */
-  markShown(threadIds: readonly string[]): void {
+  /** A window or a phone reports the conversations it shows: `origin` "phone:<device id>" counts as the phone, any other as a desktop window. */
+  markShown(threadIds: readonly string[], origin: string | null = null): void {
     const at = this.now();
-    for (const threadId of threadIds.slice(0, 50)) { this.shown.delete(threadId); this.shown.set(threadId, at); }
+    const phone = origin?.startsWith("phone:") ?? false;
+    for (const threadId of threadIds.slice(0, 50)) {
+      const was = this.shown.get(threadId) ?? { desktop: null, phone: null };
+      this.shown.delete(threadId);
+      this.shown.set(threadId, phone ? { ...was, phone: at } : { ...was, desktop: at });
+    }
     while (this.shown.size > 500) this.shown.delete(this.shown.keys().next().value!);
   }
 
-  /** Whether a desktop window showed the conversation in the last few seconds. */
+  /** Where the conversation was shown in the last few seconds: a desktop window first, else the phone, else null. */
+  shownOn(threadId: string): "desktop" | "phone" | null {
+    const seen = this.shown.get(threadId);
+    const recent = (at: number | null) => at !== null && this.now() - at <= WorkspaceService.SHOWN_MS;
+    return recent(seen?.desktop ?? null) ? "desktop" : recent(seen?.phone ?? null) ? "phone" : null;
+  }
+
+  /** Whether a desktop window or the phone showed the conversation in the last few seconds. */
   isShown(threadId: string): boolean {
-    const at = this.shown.get(threadId);
-    return at !== undefined && this.now() - at <= WorkspaceService.SHOWN_MS;
+    return this.shownOn(threadId) !== null;
   }
 
   forget(threadId: string): void {

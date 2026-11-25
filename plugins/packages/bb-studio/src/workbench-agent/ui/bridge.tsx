@@ -148,7 +148,7 @@ export function WorkbenchAgentBridge() {
       }
       // Every few seconds: which conversations this window shows, so the agent tools can say whether a change is on screen.
       const shown = [...seen].filter((threadId) => !threadId.startsWith("page:")).slice(0, 50);
-      if (shown.length && tick % SHOWN_EVERY === 1) void latest.current.rpc.call("workbench.shown", { threadIds: shown }).catch(() => {});
+      if (shown.length && tick % SHOWN_EVERY === 1) void latest.current.rpc.call("threadWorkbenchShown", { threadIds: shown, origin: WINDOW_ORIGIN }).catch(() => {});
     }, MARK_CHECK_MS);
     return () => clearInterval(timer);
   }, []);

@@ -1242,10 +1242,12 @@ plugin details stay local to the window.
 
 **Agent tools.** The agent works the workbench of its own conversation
 (`src/workbench-agent`). List, open, close and focus act on the Workspace
-on the server, with or without a window on screen; each window reports the
-conversations it shows (`workbench.shown`, every few seconds), and when none
-does, the answer says the change was saved to the Workspace and appears
-when the conversation is shown. What only a desktop
+on the server, with or without a window on screen. Each window and the
+phone report the conversations they show (`threadWorkbenchShown`, every few
+seconds, with origin `desktop:<window id>` or `phone:<device id>`). When
+only the phone shows the conversation, the answer says "(shown on the
+phone)"; when nothing does, it says the change was saved to the Workspace
+and appears when the conversation is shown. What only a desktop
 window can do (`pop_out`, `arrange`, an open into pane 2 or a window of its
 own) needs the fork's `experimental_workbench` and that conversation on
 screen in BB: the tool publishes the call on the `studio-workbench` realtime
