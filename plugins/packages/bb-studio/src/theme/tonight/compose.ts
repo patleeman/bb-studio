@@ -1,5 +1,5 @@
 import { constellationCatalog, equatorialVector, starCatalog, type Vec3 } from "./catalog";
-import { skyInk, skyLight, type SkyInk } from "./daylight";
+import { NIGHT_INK, type SkyInk } from "./daylight";
 import { rotate, type NightSky, type SkyBody } from "./ephemeris";
 import { cameraVector, project, type Camera } from "./projection";
 
@@ -106,7 +106,7 @@ export function composeSky(sky: NightSky, camera: Camera): SkyPicture {
     const point = project(camera, sky.moon.vector);
     if (inFrame(point, aspect, 0)) labels.push({ kind: "event", x: point.x, y: point.y - MOON_RADIUS - 0.022, text: `${eclipse.phase === "total" ? "Total" : "Partial"} lunar eclipse` });
   }
-  return { aspect, ink: skyInk(skyLight(sky.sun.altitude).daylight), stars, planets, segments, labels };
+  return { aspect, ink: NIGHT_INK, stars, planets, segments, labels };
 }
 
 function normalize(vector: Vec3): Vec3 {
@@ -132,7 +132,6 @@ export function tonightUniforms(sky: NightSky, camera: Camera): TonightUniforms 
   const sine = Math.sin(moon.phaseAngle * RAD), cosine = Math.cos(moon.phaseAngle * RAD);
   const shower = sky.showers.find((each) => each.visible > 0);
   const radiant = shower ? project(camera, shower.radiant) : null;
-  const light = skyLight(sky.sun.altitude);
   return {
     u_view: [round(camera.scale), round(camera.anchorY), round(Math.sin(pitch)), round(Math.cos(pitch))],
     u_center: round(camera.anchorX),
@@ -143,6 +142,6 @@ export function tonightUniforms(sky: NightSky, camera: Camera): TonightUniforms 
     u_meteors: sky.meteorLevel,
     u_radiant: radiant && radiant.depth > -0.2 ? [round(radiant.x), round(radiant.y), 1] : [0, 0, 0],
     u_sun: cameraVector(camera, sky.sun.vector).map(round) as [number, number, number],
-    u_light: [light.day, light.glow, light.lit],
+    u_light: [0, 0, 0],
   };
 }

@@ -165,20 +165,20 @@ describe("the Tonight's Sky scene's driver", () => {
     expect(bare.published[0]!.uniforms.u_view).toHaveLength(4);
   });
 
-  it("publishes the variant: dark at night, light by day, and the Sun and daylight as uniforms", async () => {
+  it("always publishes dark mode and night u_light [0, 0, 0] at both night and noon", async () => {
     const night = harness();
     expect(night.published[0]!.mode).toBe("dark");
     expect(night.published[0]!.uniforms.u_light).toEqual([0, 0, 0]);
     const noon = harness({ settings: [at(Date.parse("2026-11-12T17:00:00Z"))] });
     await noon.settle();
     expect(noon.published).toHaveLength(2);
-    expect(noon.published[1]!.mode).toBe("light");
-    expect((noon.published[1]!.uniforms.u_light as number[])[0]).toBe(1);
+    expect(noon.published[1]!.mode).toBe("dark");
+    expect(noon.published[1]!.uniforms.u_light).toEqual([0, 0, 0]);
     expect(noon.fake.drawn.texts).toContain("OPHIUCHUS");
     expect(noon.timers).toHaveLength(2);
   });
 
-  it("goes to a preview time as a two-second time-lapse: the camera eases, the light changes a little each step, the variant switches once", async () => {
+  it("goes to a preview time as a two-second time-lapse: the camera eases while staying in dark mode and night lighting", async () => {
     const noon = Date.parse("2026-11-12T17:00:00Z");
     const run = harness({ settings: [at(null), at(noon)] });
     await run.settle();
@@ -191,21 +191,16 @@ describe("the Tonight's Sky scene's driver", () => {
     expect(run.timers).toHaveLength(2);
     expect(steps.length).toBeGreaterThanOrEqual(Math.ceil((LAPSE_SECONDS * 1000) / MOTION_STEP_MS));
     expect(steps.length).toBeLessThan(200);
-    const day = steps.map((step) => (step.uniforms.u_light as number[])[0]!);
     const view = steps.map((step) => step.uniforms.u_view as number[]);
     const center = steps.map((step) => step.uniforms.u_center as number);
     const pole = steps.map((step) => step.uniforms.u_galPole as number[]);
     for (let index = 1; index < steps.length; index += 1) {
-      expect(day[index]! - day[index - 1]!, String(index)).toBeGreaterThanOrEqual(0);
-      expect(day[index]! - day[index - 1]!, String(index)).toBeLessThan(0.25);
+      expect(steps[index]!.uniforms.u_light, String(index)).toEqual([0, 0, 0]);
       expect(Math.abs(view[index]![0]! - view[index - 1]![0]!), String(index)).toBeLessThan(0.01);
       expect(Math.abs(center[index]! - center[index - 1]!), String(index)).toBeLessThan(0.02);
       expect(Math.hypot(pole[index]![0]! - pole[index - 1]![0]!, pole[index]![1]! - pole[index - 1]![1]!, pole[index]![2]! - pole[index - 1]![2]!), String(index)).toBeLessThan(0.16);
     }
-    const modes = steps.map((step) => step.mode);
-    expect(modes[0]).toBe("dark");
-    expect(modes.at(-1)).toBe("light");
-    expect(modes.filter((mode, index) => index > 0 && mode !== modes[index - 1])).toHaveLength(1);
+    expect(steps.every((step) => step.mode === "dark")).toBe(true);
     expect(before.uniforms.u_light).toEqual([0, 0, 0]);
 
     const direct = harness({ settings: [at(noon)] });
@@ -281,7 +276,7 @@ describe("the Tonight's Sky scene's driver", () => {
     run.poll();
     await run.settle();
     expect(run.published).toHaveLength(count + 1);
-    expect(run.published.at(-1)!.mode).toBe("light");
+    expect(run.published.at(-1)!.mode).toBe("dark");
     expect(run.timers).toHaveLength(2);
   });
 });

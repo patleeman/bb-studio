@@ -199,12 +199,12 @@ describe("bb studio theme sky", () => {
     const at = (iso: string) => run([], sky({ now: () => Date.parse(iso) }).deps).then((result) => result.stdout!.split("\n"));
     const noon = await at("2026-11-12T17:00:00Z");
     expect(noon[1]).toMatch(/^Showing: 2026-11-1[12] \d\d:00 \(the clock\)$/);
-    expect(noon.slice(2, 6)).toEqual(["Sun: 31° up in the S, azimuth 186°", "Sky: day", "Looking: ESE, view Follow the sun, Sun in view", "Variant: light"]);
+    expect(noon.slice(2, 6)).toEqual(["Sun: 31° up in the S, azimuth 186°", "Sky: day", "Looking: ESE, view Follow the sun, Sun in view", "Variant: dark"]);
     const golden = await at("2026-11-12T21:10:00Z");
-    expect(golden.slice(2, 6)).toEqual(["Sun: 4° up in the WSW, azimuth 242°", "Sky: golden hour", "Looking: S, view Follow the sun, Sun in view", "Variant: light"]);
+    expect(golden.slice(2, 6)).toEqual(["Sun: 4° up in the WSW, azimuth 242°", "Sky: golden hour", "Looking: S, view Follow the sun, Sun in view", "Variant: dark"]);
     const dusk = await at("2026-11-12T22:10:00Z");
     expect(dusk.slice(2, 6)).toEqual(["Sun: 6° below the horizon in the WSW, azimuth 252°", "Sky: nautical twilight", "Looking: SSW, view Follow the sun, Sun in view", "Variant: dark"]);
-    expect((await at("2026-11-12T21:50:00Z")).slice(3, 6)).toEqual(["Sky: civil twilight", expect.stringContaining("Sun in view"), "Variant: light"]);
+    expect((await at("2026-11-12T21:50:00Z")).slice(3, 6)).toEqual(["Sky: civil twilight", expect.stringContaining("Sun in view"), "Variant: dark"]);
   });
 
   it("stores the view, prints it, and looks that way; follow is the default", async () => {

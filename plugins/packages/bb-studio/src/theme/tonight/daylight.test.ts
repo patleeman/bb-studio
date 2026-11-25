@@ -41,50 +41,24 @@ describe("the sky by day", () => {
     for (const [altitude, phase] of cases) expect(skyPhase(altitude), String(altitude)).toBe(phase);
   });
 
-  it("chooses the light variant by day and the dark one by night, and holds the last choice between -4.5° and -3.5°", () => {
+  it("always chooses the dark variant at any Sun altitude", () => {
     expect([DARK_BELOW, LIGHT_ABOVE]).toEqual([-4.5, -3.5]);
-    expect(skyVariant(31, null)).toBe("light");
-    expect(skyVariant(-66, null)).toBe("dark");
-    expect(skyVariant(-4, null)).toBe("light");
-    expect(skyVariant(-4.01, null)).toBe("dark");
-    expect(skyVariant(-4.4, "light")).toBe("light");
-    expect(skyVariant(-4.51, "light")).toBe("dark");
-    expect(skyVariant(-3.6, "dark")).toBe("dark");
-    expect(skyVariant(-3.49, "dark")).toBe("light");
-    let mode = skyVariant(4, null);
-    const seen: string[] = [];
-    for (const altitude of [4, 0, -3.9, -4.2, -3.9, -4.6, -4.2, -3.7, -3.4, -4.2]) { mode = skyVariant(altitude, mode); seen.push(mode); }
-    expect(seen).toEqual(["light", "light", "light", "light", "light", "dark", "dark", "dark", "light", "light"]);
-  });
-
-  it("lights the sky with the Sun: dark at night, a glow through twilight that fades by day, full blue once the Sun is well up", () => {
-    expect(skyLight(-66)).toEqual({ day: 0, glow: 0, lit: 0, daylight: 0 });
-    expect(skyLight(31)).toMatchObject({ day: 1, lit: 1, daylight: 1 });
-    expect(skyLight(31).glow).toBeLessThan(0.15);
-    const dusk = skyLight(-6.3);
-    expect(dusk.lit).toBeGreaterThan(0.9);
-    expect(dusk.day).toBeLessThan(0.05);
-    expect(dusk.glow).toBeGreaterThan(0.8);
-    expect(skyLight(4).glow).toBeGreaterThan(0.8);
-    let last = skyLight(-20);
-    for (let altitude = -19.5; altitude <= 40; altitude += 0.5) {
-      const next = skyLight(altitude);
-      expect(next.day, String(altitude)).toBeGreaterThanOrEqual(last.day);
-      expect(next.lit).toBeGreaterThanOrEqual(last.lit);
-      expect(next.daylight).toBeGreaterThanOrEqual(last.daylight);
-      expect(Math.abs(next.glow - last.glow)).toBeLessThan(0.1);
-      last = next;
+    for (const altitude of [-66, -18, -4.51, -4.4, -4, -3.6, -3.49, 0, 4, 31]) {
+      expect(skyVariant(altitude, null), String(altitude)).toBe("dark");
+      expect(skyVariant(altitude, "light"), String(altitude)).toBe("dark");
+      expect(skyVariant(altitude, "dark"), String(altitude)).toBe("dark");
     }
   });
 
-  it("keeps the constellations by day as faint thin white lines, dim stars and faint names, at full strength at night", () => {
+  it("keeps the sky at night lighting at every Sun altitude (no daytime brightening)", () => {
+    for (const altitude of [-66, -18, -6.3, 0, 4, 31]) {
+      expect(skyLight(altitude), String(altitude)).toEqual({ day: 0, glow: 0, lit: 0, daylight: 0 });
+    }
+  });
+
+  it("keeps night ink at full strength at both noon and midnight", () => {
     expect(skyInk(0)).toEqual(NIGHT_INK);
     expect(skyInk(1)).toEqual(DAY_INK);
-    expect(DAY_INK.line).toBeGreaterThanOrEqual(0.15);
-    expect(DAY_INK.line).toBeLessThan(NIGHT_INK.line);
-    expect(DAY_INK.lineWidth).toBeLessThan(NIGHT_INK.lineWidth);
-    expect(DAY_INK.star).toBe(0.5);
-    expect(DAY_INK.label).toBeLessThan(NIGHT_INK.label);
     expect(skyInk(0.5).line).toBeCloseTo(0.25, 5);
 
     const draw = (iso: string) => {
@@ -97,28 +71,26 @@ describe("the sky by day", () => {
     };
     const noon = draw("2026-11-12T17:00:00Z");
     const night = draw("2026-11-12T05:00:00Z");
-    expect(noon.picture.ink).toEqual(DAY_INK);
+    expect(noon.picture.ink).toEqual(NIGHT_INK);
     expect(night.picture.ink).toEqual(NIGHT_INK);
     expect(noon.strokes.length).toBeGreaterThan(40);
-    expect(noon.strokes.every((stroke) => stroke.style.startsWith("rgba(255,255,255,") && stroke.width === 0.75)).toBe(true);
-    expect(Math.max(...noon.strokes.map((stroke) => alphaOf(stroke.style)))).toBeCloseTo(0.2, 2);
+    expect(noon.strokes.every((stroke) => stroke.style.startsWith("rgba(150,178,238,") && stroke.width === 1)).toBe(true);
+    expect(Math.max(...noon.strokes.map((stroke) => alphaOf(stroke.style)))).toBeCloseTo(0.3, 2);
     expect(Math.max(...night.strokes.map((stroke) => alphaOf(stroke.style)))).toBeCloseTo(0.3, 2);
     expect(night.strokes.every((stroke) => stroke.style.startsWith("rgba(150,178,238,") && stroke.width === 1)).toBe(true);
     const name = (drawn: typeof noon) => drawn.texts.find((text) => text.text === text.text.toUpperCase() && /^[A-Z ]+$/.test(text.text))!;
-    expect(name(noon).style).toBe("rgba(255,255,255,0.34)");
+    expect(name(noon).style).toBe("rgba(168,190,238,0.52)");
     expect(name(night).style).toBe("rgba(168,190,238,0.52)");
-    expect(Math.max(...noon.fills.map(alphaOf))).toBeLessThanOrEqual(0.5);
-    expect(noon.fills.length).toBeLessThan(night.fills.length / 2);
   });
 
-  it("gives the shader the Sun's direction and the light: the Sun in the open strip at noon, behind the camera's floor at midnight", () => {
+  it("gives the shader the Sun's direction and keeps u_light at [0, 0, 0] at both noon and midnight", () => {
     const at = (iso: string) => {
       const sky = nightSky(new Date(iso), WHITE_PLAINS);
       const camera = frameAim(aimSky(sky, "follow"), WHITE_PLAINS.latitude, VIEW);
       return { camera, uniforms: tonightUniforms(sky, camera) };
     };
     const noon = at("2026-11-12T17:00:00Z");
-    expect(noon.uniforms.u_light).toEqual([1, skyLight(30.94).glow, 1]);
+    expect(noon.uniforms.u_light).toEqual([0, 0, 0]);
     const [x, y, z] = noon.uniforms.u_sun;
     expect(Math.hypot(x, y, z)).toBeCloseTo(1, 3);
     const screenX = noon.camera.anchorX + (noon.camera.scale * 2 * x) / (1 + z);
