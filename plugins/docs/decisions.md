@@ -47,15 +47,25 @@ Every provider serves the same Jev model through TypeSafe's
 
 | Provider | Key setting | Environment fallback | Model |
 | --- | --- | --- | --- |
+| [OpenCode Go](https://opencode.ai) | `decisions_zenApiKey` | `OPENCODE_API_KEY` | `jev-1.14` |
 | [TypeSafe](https://typesafe.ai) (canonical) | `decisions_typesafeApiKey` | `TYPESAFE_API_KEY` | `jev-latest` (`STUDIO_TYPESAFE_MODEL` on the host overrides it) |
 | Vercel AI Gateway | `decisions_vercelApiKey` | `AI_GATEWAY_API_KEY` | `typesafe-ai/jev` |
 | OpenRouter | `decisions_openRouterApiKey` | `OPENROUTER_API_KEY` | `typesafe/jev-1.13` |
-| OpenCode Zen | `decisions_zenApiKey` | `OPENCODE_API_KEY` | `jev-1.13` |
 | Custom | `decisions_customJevApiKey` (optional) | — | `decisions_customJevModel` |
 
 `decisions_jevProvider` chooses where to call Jev. `auto`, the default, tries the
 providers in the order above, uses each one that has a key, and moves to the
 next when one fails. Name one provider to use only that one.
+
+OpenCode Go comes first because its calls
+(`https://opencode.ai/inference/go/v1/systemone`) are billed to an OpenCode Go
+plan. OpenCode Zen and OpenCode's other inference routes bill the account's
+cash balance, so Studio no longer offers them. A saved `opencode-zen` choice
+now means `opencode-go`, with the same OpenCode key.
+
+`bbs studio decisions providers` lists every provider in that order, whether it
+is configured, where its key comes from (Studio settings, the environment or a
+key command), its endpoint and its model. It never prints a key.
 
 **Bring your own provider.** Set `decisions_customJevEndpoint` to the full URL of any
 endpoint that accepts System One requests, such as a company gateway or a
@@ -123,8 +133,8 @@ Open **Settings → Plugins → Studio**. The keys are in the **API keys** secti
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `decisions_enabled` | `true` | Turn Smart Queue on or off. Other plugins' calls are unaffected. |
-| `decisions_jevProvider` | `auto` | `auto`, `typesafe`, `vercel`, `openrouter`, `opencode-zen`, or `custom`. |
-| `decisions_typesafeApiKey`, `decisions_vercelApiKey`, `decisions_openRouterApiKey`, `decisions_zenApiKey` | — | Provider keys (secret). See [Jev providers](#jev-providers). |
+| `decisions_jevProvider` | `auto` | `auto`, `opencode-go`, `typesafe`, `vercel`, `openrouter`, or `custom` (`opencode-zen` is read as `opencode-go`). |
+| `decisions_zenApiKey` (OpenCode), `decisions_typesafeApiKey`, `decisions_vercelApiKey`, `decisions_openRouterApiKey` | — | Provider keys (secret). See [Jev providers](#jev-providers). |
 | `decisions_customJevEndpoint`, `decisions_customJevApiKey`, `decisions_customJevApiKeyCommand`, `decisions_customJevHeaders`, `decisions_customJevModel` | — | Your own System One endpoint. See [Jev providers](#jev-providers). |
 | `decisions_batchConfidence` | `0.5` | Smart Queue's minimum Jev confidence to send a follow-up in the same turn as the next one. `1` sends each on its own. |
 
@@ -150,6 +160,7 @@ bbs studio decisions status              # Jev routes, problems, and the fallbac
 bbs studio decisions recent [--limit n]  # Recent decisions, newest first
 bbs studio decisions classify <thread-id> <message>  # Dry run; sends nothing
 bbs studio decisions check               # Test the Jev connection with a sample message
+bbs studio decisions providers           # Each provider: configured or not, endpoint, model (never a key)
 bbs studio decisions fallback [thread | off | <provider-id> <model> [<reasoning>]]
 ```
 

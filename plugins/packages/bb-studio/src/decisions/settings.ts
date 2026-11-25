@@ -11,7 +11,7 @@ export const DECISIONS_KEY_SETTINGS = {
     type: "string",
     label: "TypeSafe API key",
     secret: true,
-    description: "Smart Queue’s decision model, through TypeSafe. Tried first. Create a key at https://console.typesafe.ai/keys. If empty, Studio uses the TYPESAFE_API_KEY environment variable.",
+    description: "Smart Queue’s decision model, through TypeSafe. Tried after OpenCode Go. Create a key at https://console.typesafe.ai/keys. If empty, Studio uses the TYPESAFE_API_KEY environment variable.",
   },
   decisions_vercelApiKey: {
     type: "string",
@@ -27,9 +27,9 @@ export const DECISIONS_KEY_SETTINGS = {
   },
   decisions_zenApiKey: {
     type: "string",
-    label: "OpenCode Zen API key",
+    label: "OpenCode API key",
     secret: true,
-    description: "Smart Queue’s decision model, through OpenCode Zen. Tried last. If empty, Studio uses the OPENCODE_API_KEY environment variable.",
+    description: "Smart Queue’s decision model, through OpenCode Go, billed to your Go plan. Tried first. If empty, Studio uses the OPENCODE_API_KEY environment variable.",
   },
   decisions_customJevApiKey: {
     type: "string",

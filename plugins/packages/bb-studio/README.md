@@ -219,7 +219,7 @@ areas, and older phone builds reading an old card.
 
 **Settings → Plugins → Studio** starts with Studio's API keys, which BB keeps
 in its secret files: OpenAI (hands-free voice), xAI, and the keys Smart Queue's
-model (Jev) runs on: TypeSafe, Vercel AI Gateway, OpenRouter, OpenCode Zen and
+model (Jev) runs on: OpenCode (billed to an OpenCode Go plan), TypeSafe, Vercel AI Gateway, OpenRouter and
 your own endpoint's. Every other setting is Studio's
 own, in grouped sections below them: **Voice** (dictation and hands-free:
 model, voice, backend model and monthly limit), **Recordings and calls**,

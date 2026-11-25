@@ -72,11 +72,11 @@ test("auto moves to the next provider when one fails", async () => {
   const urls: string[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation(async (url: string | URL | Request) => {
     urls.push(String(url));
-    return String(url).includes("typesafe.ai") ? new Response("busy", { status: 529 }) : Response.json(jevAnswer("followup", 0.9));
+    return String(url).includes("opencode.ai") ? new Response("busy", { status: 529 }) : Response.json(jevAnswer("followup", 0.9));
   });
   const verdict = await askJev({ typesafeApiKey: "a", zenApiKey: "b" }, situation, signal(), env);
-  assert.deepEqual(urls, ["https://api.typesafe.ai/v1/systemone", "https://opencode.ai/zen/v1/systemone"]);
-  assert.equal(verdict.via, "OpenCode Zen");
+  assert.deepEqual(urls, ["https://opencode.ai/inference/go/v1/systemone", "https://api.typesafe.ai/v1/systemone"]);
+  assert.equal(verdict.via, "TypeSafe");
 });
 
 test("Jev reports every failed provider, and rejects unknown options", async () => {

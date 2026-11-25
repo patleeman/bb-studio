@@ -21,7 +21,7 @@ import {
   type Situation,
 } from "./server/classifier";
 import { defaultFallback, fallbackSchema, type Fallback, type ModelSelection, type Questions } from "./contract";
-import { jevRoutes } from "./server/jev-providers";
+import { jevProviders, jevRoutes } from "./server/jev-providers";
 import { askSystemOne } from "./server/system-one";
 import { RouteFailed, SmartQueue, describeVerdict, rowText, type DecisionRecord, type ThreadInfo } from "./server/queue";
 import { toReasoningLevel } from "../kit/reasoning";
@@ -107,7 +107,7 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
         id: "jev-route",
         status: "broken",
         title: "No Jev provider is set up",
-        detail: "The fallback model is off too, so other plugins' decisions fail and Smart Queue sends each message the way BB does. Add a TypeSafe, Vercel AI Gateway, OpenRouter or OpenCode Zen key.",
+        detail: "The fallback model is off too, so other plugins' decisions fail and Smart Queue sends each message the way BB does. Add an OpenCode, TypeSafe, Vercel AI Gateway or OpenRouter key.",
         fix: { label: "Add a key", path: pluginSettingsPath(bb.pluginId) },
       });
     } else if (!routes.length) {
@@ -434,6 +434,7 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     "  bb studio decisions recent [--limit <n>] [--json]",
     "  bb studio decisions classify <thread-id> <message> [--json]",
     "  bb studio decisions check [--json]",
+    "  bb studio decisions providers [--json]",
     "  bb studio decisions fallback [thread | off | <provider-id> <model> [<reasoning-level>]] [--json]",
   ].join("\n");
   const cli = async (argv: string[]) => {
@@ -475,6 +476,17 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
               `Fallback model: ${describeFallback(fallbackNow)}`,
               `Deciding now: ${status.holding}`,
             ].join("\n"),
+          );
+        }
+        case "providers": {
+          // Presence and source only; keys never leave the server.
+          const providers = jevProviders(await config());
+          const labels = { setting: "key in Studio settings", environment: "key from the environment", command: "key command" } as const;
+          return reply(
+            providers,
+            providers
+              .map((provider) => `${provider.name} (${provider.id}): ${provider.configured ? "configured" : "not configured"}${provider.keyFrom ? `, ${labels[provider.keyFrom]}` : ""} · ${provider.endpoint ?? "no endpoint"} · ${provider.model ?? "no model"}`)
+              .join("\n"),
           );
         }
         case "check": {

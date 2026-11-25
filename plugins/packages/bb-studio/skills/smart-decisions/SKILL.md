@@ -23,11 +23,14 @@ bb studio decisions status [--json]
 bb studio decisions recent [--limit <n>] [--json]
 bb studio decisions classify <thread-id> <message> [--json]
 bb studio decisions check [--json]
+bb studio decisions providers [--json]
 bb studio decisions fallback [thread | off | <provider-id> <model> [<reasoning-level>]] [--json]
 ```
 
 - `status` shows whether Smart Queue is on or paused, the Jev providers it will try in
   order, configuration problems, and the fallback model.
+- `providers` lists every Jev provider, whether it is configured, where its key
+  comes from, and its endpoint and model. It never prints a key.
 - `recent` lists up to 30 decisions with the action, the classifier that
   decided and through which provider (`Jev 86% via TypeSafe`,
   `fallback model via pi/…`, or `no classifier answered`), the
@@ -45,11 +48,13 @@ bb studio decisions fallback [thread | off | <provider-id> <model> [<reasoning-l
 
 Change settings with `bb studio settings set decisions_<key> <value>` (`bb studio settings list` shows them). The provider keys are under **API keys** on Studio's settings page, or in their environment variables.
 
-- `jevProvider`: `auto` (default), `typesafe`, `vercel`, `openrouter`,
-  `opencode-zen`, or `custom`. `auto` tries each configured provider in that
-  order and moves on when one fails.
-- Provider keys are secrets: `typesafeApiKey`, `vercelApiKey`,
-  `openRouterApiKey`, `zenApiKey`, and `customJevApiKey`. Have the owner enter them in Studio settings; never request or print their contents. Environment fallbacks are `TYPESAFE_API_KEY`,
+- `jevProvider`: `auto` (default), `opencode-go`, `typesafe`, `vercel`,
+  `openrouter`, or `custom`. `auto` tries each configured provider in that
+  order and moves on when one fails. OpenCode Go bills the owner's Go plan, not
+  their OpenCode balance; the retired `opencode-zen` choice now means
+  `opencode-go`.
+- Provider keys are secrets: `zenApiKey` (the OpenCode key, used by OpenCode
+  Go), `typesafeApiKey`, `vercelApiKey`, `openRouterApiKey`, and `customJevApiKey`. Have the owner enter them in Studio settings; never request or print their contents. Environment fallbacks are `TYPESAFE_API_KEY`,
   `AI_GATEWAY_API_KEY`, `OPENROUTER_API_KEY`, and `OPENCODE_API_KEY`.
 - The TypeSafe model is `jev-latest`, a constant; the host can set `STUDIO_TYPESAFE_MODEL`.
 - A custom provider needs `customJevEndpoint` (full HTTPS URL of a System One

@@ -27,7 +27,7 @@ test("a caller's questions and state reach Jev unchanged, and every answer comes
     return Response.json({ answers: { ...answers, extra: { type: "noul", noul: 1 } } });
   });
   const result = await askSystemOne({ zenApiKey: "k" }, { state: { message: "hi" }, questions }, signal(), env);
-  assert.equal(result.via, "OpenCode Zen");
+  assert.equal(result.via, "OpenCode Go");
   assert.deepEqual(result.answers, answers, "only the questions asked are returned");
   assert.deepEqual(bodies[0]!.questions, questions);
   assert.deepEqual(JSON.parse(bodies[0]!.state), { message: "hi" });
@@ -41,7 +41,7 @@ test("an answer outside a choice's options, or a missing one, moves to the next 
   vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json(replies.shift()));
   await assert.rejects(
     askSystemOne({ typesafeApiKey: "a", zenApiKey: "b" }, { state: {}, questions }, signal(), env),
-    /TypeSafe returned an unknown decision option\. OpenCode Zen omitted a required decision\./,
+    /OpenCode Go returned an unknown decision option\. TypeSafe omitted a required decision\./,
   );
 });
 
