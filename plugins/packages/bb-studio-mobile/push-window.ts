@@ -35,15 +35,25 @@ export class PushWindows {
   private readonly windows = new Map<string, Window>();
   private readonly windowMs: number;
   private readonly now: () => number;
+  private disposed = false;
 
   constructor(private readonly flush: WindowFlush, options: { windowMs?: number; now?: () => number } = {}) {
     this.windowMs = options.windowMs ?? PUSH_WINDOW_MS;
     this.now = options.now ?? Date.now;
   }
 
+  /** Number of tracked window entries (active or recently opened). */
+  get size(): number {
+    return this.windows.size;
+  }
+
   /** True: send now, and a window opens. False: held until the window ends. */
   offer(key: string, messages: ExpoMessage[]): boolean {
+    if (this.disposed) return true;
     const now = this.now();
+    for (const [k, win] of this.windows) {
+      if (k !== key && win.until <= now && !win.held && !win.timer) this.windows.delete(k);
+    }
     const open = this.windows.get(key);
     if (!open || open.until <= now) {
       if (open?.timer) clearTimeout(open.timer);
@@ -65,6 +75,7 @@ export class PushWindows {
   }
 
   async release(key: string): Promise<void> {
+    if (this.disposed) return;
     const open = this.windows.get(key);
     if (!open) return;
     if (open.timer) clearTimeout(open.timer);
@@ -73,12 +84,23 @@ export class PushWindows {
     if (!held) { this.windows.delete(key); return; }
     const shown = open.shown + open.heldCount;
     const now = this.now();
-    this.windows.set(key, { openedAt: now, until: now + this.windowMs, shown, held: null, heldCount: 0, timer: null });
+    const next: Window = { openedAt: now, until: now + this.windowMs, shown, held: null, heldCount: 0, timer: null };
+    this.windows.set(key, next);
     const sent = await this.flush({ key, messages: held, shown, held: open.heldCount, since: open.openedAt }).catch(() => false);
-    if (!sent) this.windows.delete(key);
+    if (this.disposed) return;
+    if (!sent && this.windows.get(key) === next) {
+      if (!next.held) {
+        if (next.timer) clearTimeout(next.timer);
+        this.windows.delete(key);
+      } else {
+        // Intended: the previous flush did not go out, so the newly held push(es) start a fresh count rather than counting unsent pushes.
+        next.shown = 0;
+      }
+    }
   }
 
   dispose(): void {
+    this.disposed = true;
     for (const open of this.windows.values()) if (open.timer) clearTimeout(open.timer);
     this.windows.clear();
   }
