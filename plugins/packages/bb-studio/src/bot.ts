@@ -129,6 +129,7 @@ import { BotSkillStore } from "./bot-skills";
 import { BOT_RUN_PREFIX, heartbeatCron, PERSONAL_PROJECT_ID } from "./project-lead";
 import { readyProvider, type OnboardingProviderState } from "./onboarding";
 import { rpcErrorStatus } from "./kit/server/index";
+import { mapPool } from "./kit/pool";
 import { threadModel } from "./thread-model";
 import { ensureColumns } from "./schema-columns";
 import { turnStartedAt } from "./turn-started";
@@ -1071,13 +1072,16 @@ export class Bots {
     const rows = this.deps.db.prepare("SELECT kind, item_id, project_id FROM bot_stop_paused WHERE bot_id = ? ORDER BY rowid").all(botId) as { kind: string; item_id: string; project_id: string | null }[];
     const forget = this.deps.db.prepare("DELETE FROM bot_stop_paused WHERE bot_id = ? AND kind = ? AND item_id = ?");
     const listed = new Map<string, Promise<Map<string, boolean>>>();
-    const failures: unknown[] = [];
-    for (const each of rows) {
+    const outcomes = await mapPool(rows, 6, async (each) => {
       try {
         if (each.kind === "automation") {
           const projectId = each.project_id ?? PERSONAL_PROJECT_ID;
-          if (!listed.has(projectId)) listed.set(projectId, this.automationStates(projectId));
-          const enabled = (await listed.get(projectId)!).get(each.item_id);
+          let states = listed.get(projectId);
+          if (!states) {
+            states = this.automationStates(projectId);
+            listed.set(projectId, states);
+          }
+          const enabled = (await states).get(each.item_id);
           if (enabled === false) await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_resume", input: { projectId, automationId: each.item_id } as never, outputSchema: z.unknown() });
         } else if (each.kind === "runner") {
           await this.deps.runners?.restore(each.item_id);
@@ -1085,11 +1089,13 @@ export class Bots {
           await this.deps.automations?.restore(each.item_id);
         }
         forget.run(botId, each.kind, each.item_id);
+        return null;
       } catch (error) {
-        failures.push(error);
+        return error;
       }
-    }
-    if (failures.length) throw failures[0];
+    });
+    const firstFailure = outcomes.find((error) => error !== null);
+    if (firstFailure) throw firstFailure;
   }
 
   /** Every automation in a project and whether it's on. Throws when the list fails, so nothing is taken for deleted. */
@@ -1113,19 +1119,24 @@ export class Bots {
     const bot = this.stored(id);
     if (bot?.threadId) {
       const chain = new Set(this.threadChain(bot.threadId));
-      for (const thread of await this.startedThreads(bot.threadId)) {
+      const seenStop = new Set<string>();
+      const toStop = (await this.startedThreads(bot.threadId)).filter((thread) => {
         // startedThreads merges overlapping lists: stop each thread once.
-        if (thread.id === bot.threadId || stoppedThreadIds.includes(thread.id) || thread.archivedAt || !RUNNING.has(thread.status) || !spawnedBy(thread, chain)) continue;
+        if (thread.id === bot.threadId || seenStop.has(thread.id) || thread.archivedAt || !RUNNING.has(thread.status) || !spawnedBy(thread, chain)) return false;
+        seenStop.add(thread.id);
+        return true;
+      });
+      stoppedThreadIds.push(...await mapPool(toStop, 6, async (thread) => {
         await this.deps.sdk.threads.stop({ threadId: thread.id });
-        stoppedThreadIds.push(thread.id);
-      }
+        return thread.id;
+      }));
       const { projectId, rows } = await this.automations(bot.threadId);
-      for (const automation of rows) {
-        if (!automation.enabled) continue;
+      const toPause = rows.filter((automation) => automation.enabled);
+      pausedAutomationIds.push(...await mapPool(toPause, 6, async (automation) => {
         await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_pause", input: { projectId, automationId: automation.id } as never, outputSchema: z.unknown() });
         this.rememberPaused(id, "automation", automation.id, projectId);
-        pausedAutomationIds.push(automation.id);
-      }
+        return automation.id;
+      }));
     }
     await this.deps.runners?.pauseAll(id, (runnerId) => this.rememberPaused(id, "runner", runnerId));
     this.update(this.need(id), { state: "stopped" });

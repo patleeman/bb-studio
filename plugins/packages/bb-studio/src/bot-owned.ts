@@ -1,3 +1,4 @@
+import { mapPool } from "./kit/pool";
 // Bot-owned threads: every thread a Bot uses lives under that Bot in Studio
 // (Bots panel, Activity), not in BB's main thread list. That is the Bot's
 // own chain (its chat and the threads it handed off from) and the work it
@@ -240,13 +241,13 @@ export class BotOwnedThreads {
   async claimChains(): Promise<number> {
     const chains = this.chains();
     const recorded = this.recorded();
-    let hid = 0;
-    for (const [threadId, botId] of chains) {
-      if (recorded.has(threadId)) continue;
+    const candidates = [...chains].filter(([threadId]) => !recorded.has(threadId));
+    const results = await mapPool(candidates, 6, async ([threadId, botId]) => {
       const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null);
-      if (!thread || !this.eligible(thread as ThreadLike, recorded)) continue;
-      if (await this.hide(threadId, botId, "chain")) hid++;
-    }
+      if (!thread || !this.eligible(thread as ThreadLike, recorded)) return false;
+      return this.hide(threadId, botId, "chain");
+    });
+    const hid = results.filter(Boolean).length;
     if (hid) this.deps.changed?.();
     return hid;
   }
