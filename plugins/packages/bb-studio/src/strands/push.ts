@@ -108,20 +108,26 @@ export class StrandPushes {
   async check(): Promise<void> {
     if (this.disposed) return;
     if (this.running) { this.again = true; return this.running; }
-    this.running = this.run().catch((error: unknown) => this.deps.log?.(`Strands push: ${error instanceof Error ? error.message : String(error)}`)).finally(() => { this.running = null; });
+    this.running = this.run().catch((error: unknown) => {
+      if (!this.disposed) this.deps.log?.(`Strands push: ${error instanceof Error ? error.message : String(error)}`);
+    }).finally(() => { this.running = null; });
     await this.running;
     if (this.again && !this.disposed) { this.again = false; await this.check(); }
   }
 
   private async run(): Promise<void> {
+    if (this.disposed) return;
     const before = await this.deps.load();
+    if (this.disposed) return;
     const seen = new Set(before ?? []);
     const now = new Set<string>();
     const sends: { botId: string; strand: StrandView; conversation: OverviewConversation }[] = [];
     const checked = new Set<string>();
     let knowsChecked = true;
     for (const bot of this.deps.bots()) {
+      if (this.disposed) return;
       const { conversations, checked: read } = await this.deps.overview(bot.id);
+      if (this.disposed) return;
       if (!read) knowsChecked = false;
       for (const threadId of read ?? []) checked.add(threadId);
       for (const conversation of conversations) {
@@ -140,17 +146,21 @@ export class StrandPushes {
         if (thread && !checked.has(thread)) now.add(id);
       }
     }
+    if (this.disposed) return;
     await this.deps.save([...now]);
+    // Once saved, finish sending every claimed push even if dispose() lands mid-flight
+    // (a reloaded instance reads the saved list and would otherwise skip them).
     // The first check only learns what already needs the user.
     if (before === null) return;
     for (const { botId, strand, conversation } of sends) {
       const push = await pushFor(strand, conversation, this.deps);
       if (!push) continue;
       try {
+        const projectId = (await this.deps.projectOf(conversation.threadId).catch(() => null)) || this.deps.defaultProjectId;
         await this.deps.notify({
           title: `${strand.title} · ${conversation.title}`.slice(0, 120), body: push.body, kind: "needs-you",
           threadId: push.threadId, conversationId: conversation.threadId, botId,
-          projectId: (await this.deps.projectOf(conversation.threadId).catch(() => null)) || this.deps.defaultProjectId,
+          projectId,
         });
         this.deps.pushed?.(botId);
       } catch (error) {
