@@ -65,3 +65,59 @@ describe("scrubber: ordinary text stays", () => {
     expect(scrub("Authorization: Basic dXNl12345\nnext line stays")).toBe("Authorization: [redacted]\nnext line stays");
   });
 });
+
+describe("scrubber: a secret after an ordinary pair in the same word goes", () => {
+  it.each([
+    ["url https://api.x.com/v1?api_key=abcd1234efgh&x=1", "api_key=[redacted]"],
+    ["https://api.x.com/v1?access_token=abcd1234efgh", "access_token=[redacted]"],
+    ["https://api.x.com/v1?token=abcd1234efgh", "token=[redacted]"],
+    ["https://api.x.com/v1?foo=1&token=abcd1234efgh", "token=[redacted]"],
+    ["https://x.com/callback?code=x&access_token=abcd1234efgh", "access_token=[redacted]"],
+    ["ws://host/socket?token=abcd1234efgh", "token=[redacted]"],
+    ["jdbc:postgresql://db/app?user=app&password=hunter2hunter2", "password=[redacted]"],
+    ["env: OPENAI_API_KEY=abcd1234efgh5678", "OPENAI_API_KEY=[redacted]"],
+    ["env:API_KEY=abcd1234efgh5678", "API_KEY=[redacted]"],
+    ["user=admin:password=hunter2hunter2", "password=[redacted]"],
+    ["a=b&password=hunter2hunter2", "password=[redacted]"],
+    ["x:y:token=abcd1234efgh", "token=[redacted]"],
+    ["Note:token=abcd1234efgh", "token=[redacted]"],
+    ["--header=Authorization:Bearer_abcd1234efgh5678", "Authorization:[redacted]"],
+  ])("%s", (input, kept) => {
+    const out = scrub(input);
+    expect(out).toContain(kept);
+    expect(out).not.toMatch(/abcd1234efgh|hunter2hunter2/u);
+  });
+});
+
+describe("scrubber: cheap extra shapes go", () => {
+  it.each([
+    ["redis://:p4ss1234@cache:6379", "redis://:[redacted]@cache:6379"],
+    ["DB_PASS=hunter2hunter2", "DB_PASS=[redacted]"],
+    ["tool --token plainvalue1 --verbose", "tool --token [redacted] --verbose"],
+    ["mysqldump --password hunter2pass db", "mysqldump --password [redacted] db"],
+    ["curl -u admin:hunter2pass https://x", "curl -u admin:[redacted] https://x"],
+    ["https://hooks.slack.com/services/T000/B000/XXXXyyyyZZZZ", "https://hooks.slack.com/services/[redacted]"],
+  ])("%s", (input, expected) => {
+    expect(scrub(input)).toBe(expected);
+  });
+});
+
+describe("scrubber: sizes, rules and code stay", () => {
+  it.each([
+    "token_count: 512",
+    "token_budget: 150000",
+    "password_min_length: 12",
+    "PasswordReset: component",
+    "sort key: created_at",
+    "const SECRET_WORD = /x/;",
+    "const sessionId = crypto.randomUUID();",
+    "sessionId: thread.id,",
+    "sessionKey: makeKey(thread),",
+    "token: z.string()",
+    "authToken: getToken()",
+    "pass: 3",
+    "--token-file ./t.txt",
+  ])("%s", (text) => {
+    expect(scrub(text)).toBe(text);
+  });
+});
