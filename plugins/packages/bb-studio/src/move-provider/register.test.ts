@@ -1,0 +1,81 @@
+import Database from "better-sqlite3";
+import { describe, expect, it } from "vitest";
+import { createMoveProvider } from "./register";
+
+const TO = "acp-antigravity-acp";
+
+function fakeBb(options: { events?: unknown[]; automationsOn?: boolean } = {}) {
+  const kv = new Map<string, unknown>();
+  const rpc: { pluginId: string; method: string; input: unknown }[] = [];
+  const thread = { id: "thr_a", title: "A", providerId: "claude-code", status: "idle", archivedAt: null, projectId: "proj_a" };
+  const bb = {
+    server: { loopbackBaseUrl: "http://127.0.0.1:9999" },
+    storage: { kv: { get: async (key: string) => kv.get(key), set: async (key: string, value: unknown) => { kv.set(key, value); } } },
+    events: { on: () => {} },
+    log: { info: () => {}, warn: () => {} },
+    sdk: {
+      threads: {
+        list: async (args: { threadIds?: string[]; archived?: boolean }) => (args.archived ? [] : args.threadIds && !args.threadIds.includes("thr_a") ? [] : [thread]),
+        defaultExecutionOptions: async () => ({ model: "opus", permissionMode: "auto" }),
+        events: { list: async () => options.events ?? [] },
+      },
+      providers: {
+        catalog: async () => [{ id: "claude-code" }, { id: TO }],
+        list: async () => [{ id: TO, capabilities: { permissionModes: ["accept-edits", "full"] } }],
+        models: async () => ({ models: [{ model: "gemini-3-pro", isDefault: true }] }),
+      },
+      projects: { list: async () => [{ id: "proj_a" }] },
+      plugins: {
+        list: async () => ({ plugins: options.automationsOn ? [{ id: "automations", enabled: true }] : [] }),
+        callRpc: async (call: { pluginId: string; method: string; input: unknown }) => {
+          rpc.push(call);
+          if (call.method === "moveProvider.prepare") return { ok: true, transcriptPath: "/tmp/t.md", verbatimTurns: 1, outlinedTurns: 0, bytes: 10 };
+          if (call.method === "automations_list") return [{ id: "aut_1", name: "Daily", execution: { mode: "agent", targetThreadId: "thr_a", providerId: "claude-code", model: "opus", permissionMode: "auto" } }];
+          return {};
+        },
+      },
+    },
+  };
+  return { bb, kv, rpc };
+}
+
+function deps(bb: unknown, fetchImpl: typeof fetch) {
+  const db = new Database(":memory:");
+  db.exec("CREATE TABLE bot_runners (id TEXT, bot_id TEXT, name TEXT, thread_id TEXT, cleanup_pending INTEGER DEFAULT 0); CREATE TABLE bot_automations (id TEXT, name TEXT, target_thread_id TEXT, provider_id TEXT, model TEXT, cleanup_pending INTEGER DEFAULT 0, updated_at INTEGER)");
+  return { bb: bb as never, db, bots: () => [], botThreads: async () => [], setBotDefault: async () => {}, leadThreads: () => [], fetchImpl };
+}
+
+describe("createMoveProvider wiring", () => {
+  it("prepares through Studio's RPC with the same historyTokens, then posts the move to BB's loopback", async () => {
+    const { bb, rpc } = fakeBb();
+    const posts: { url: string; body: unknown }[] = [];
+    const fetchImpl = (async (url: string, init: { body: string }) => { posts.push({ url, body: JSON.parse(init.body) }); return { status: 200, json: async () => ({ status: "moved" }) }; }) as unknown as typeof fetch;
+    const service = createMoveProvider(deps(bb, fetchImpl));
+    const report = await service.move({ ids: ["thr_a"], includeArchived: false, runners: false }, { to: TO, dryRun: false, automations: false, botDefaults: false, routerRules: false, historyTokens: 40000 });
+    expect(report.threads[0]).toMatchObject({ result: "moved", from: { permission: "auto" }, to: { model: "gemini-3-pro", permission: "accept-edits" } });
+    expect(rpc[0]).toMatchObject({ pluginId: "studio", method: "moveProvider.prepare", input: { threadId: "thr_a", from: { providerId: "claude-code", model: "opus" }, to: { providerId: TO, model: "gemini-3-pro" }, historyTokens: 40000 } });
+    expect(posts).toEqual([{ url: "http://127.0.0.1:9999/api/v1/threads/thr_a/move-provider", body: { providerId: TO, model: "gemini-3-pro", permissionMode: "accept-edits", historyTokens: 40000 } }]);
+  });
+
+  it("patches BB automations only when BB's automations plugin is on", async () => {
+    const ok = (async () => ({ status: 200, json: async () => ({ status: "moved" }) })) as unknown as typeof fetch;
+    const off = fakeBb();
+    await createMoveProvider(deps(off.bb, ok)).move({ ids: ["thr_a"], includeArchived: false, runners: false }, { to: TO, dryRun: false, automations: true, botDefaults: false, routerRules: false });
+    expect(off.rpc.map((call) => call.method)).toEqual(["moveProvider.prepare"]);
+    const on = fakeBb({ automationsOn: true });
+    const report = await createMoveProvider(deps(on.bb, ok)).move({ ids: ["thr_a"], includeArchived: false, runners: false }, { to: TO, dryRun: false, automations: true, botDefaults: false, routerRules: false });
+    expect(report.automations[0]).toMatchObject({ automationId: "aut_1", result: "patched", to: { permission: "accept-edits" } });
+    expect(on.rpc.find((call) => call.method === "automations_update")?.input).toMatchObject({ projectId: "proj_a", automationId: "aut_1", execution: { providerId: TO, model: "gemini-3-pro", permissionMode: "accept-edits", targetThreadId: "thr_a" } });
+  });
+
+  it("reads the move from a system/operation event and a turn after it", async () => {
+    const move = { seq: 5, type: "system/operation", createdAt: 1, data: { operation: "thread/provider-move", metadata: { to: { providerId: TO, model: "gemini-3-pro" }, at: 2 } } };
+    const other = { seq: 4, type: "system/operation", data: { operation: "thread/context-clear" } };
+    const pending = createMoveProvider(deps(fakeBb({ events: [move, other] }).bb, fetch));
+    expect((await pending.verify(["thr_a"], { all: false }))[0]).toMatchObject({ moveEvent: true, turnStarted: false, verdict: "pending", movedTo: { providerId: TO } });
+    const started = createMoveProvider(deps(fakeBb({ events: [{ seq: 6, type: "turn/started" }, move] }).bb, fetch));
+    expect((await started.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "ok", turnStarted: true, handoffDelivered: null });
+    const none = createMoveProvider(deps(fakeBb({ events: [{ seq: 6, type: "turn/started" }, other] }).bb, fetch));
+    expect((await none.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "no-move-event" });
+  });
+});

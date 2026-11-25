@@ -50,6 +50,8 @@ import { registerScopedTools, ScopeMemory } from "./src/tool-scope-tools";
 import { slim, slimmedIfSmaller } from "./src/slim-schema";
 import { createMergedShownCache, INTERNAL_RENAMES, mergedTools, presentScope } from "./src/merged-tools";
 import { LeanStore, leanFor } from "./src/context-lean";
+import { ToolDeliveryStore } from "./src/tool-delivery";
+import { createMoveProvider } from "./src/move-provider/register";
 import { contextLeanContract } from "./src/context-lean-contract";
 import { requireAppWindow } from "./src/tool-gateway/server/caller";
 import { registerRouter } from "./src/router/register";
@@ -309,7 +311,7 @@ export default async function plugin(bb: BbPluginApi) {
   // The model router (src/router): Auto in the pickers, rules picked by Jev, the usage-limit notice.
   // Auto reports whether its pick runs lean (Settings › Agent context); the lean settings load further down.
   const leanRef: { store: LeanStore | null } = { store: null };
-  await registerRouter(bb, { systemOne: decisions.ask.systemOne }, { lean: (providerId, model) => leanFor(leanRef.store?.current ?? {}, providerId, model) });
+  const modelRouter = await registerRouter(bb, { systemOne: decisions.ask.systemOne }, { lean: (providerId, model) => leanFor(leanRef.store?.current ?? {}, providerId, model) });
   let settingValues: Record<string, unknown> = await settings.get();
   appCards = settingValues.appCards === true;
   const explore = registerExploreBuiltin(bb, db, settingValues);
@@ -436,6 +438,9 @@ export default async function plugin(bb: BbPluginApi) {
   const leanModes = new LeanStore(bb.storage.kv as never);
   leanRef.store = leanModes;
   await leanModes.load().catch((error) => bb.log.warn(`Lean context settings unreadable; using Auto: ${errorText(error)}`));
+  // Tool delivery per provider (src/tool-delivery.ts): `bbs studio tool-delivery <provider> <mode>`.
+  const toolDelivery = new ToolDeliveryStore(bb.storage.kv as never);
+  await toolDelivery.load().catch((error) => bb.log.warn(`Tool delivery settings unreadable; using the defaults: ${errorText(error)}`));
   const scopes = new ScopeMemory();
   const deferSupported = (bb as { experimental_hooks?: { experimental_features?: { deferredAgentTools?: unknown } } }).experimental_hooks?.experimental_features?.deferredAgentTools === true;
   const slimCache = new Map<string, Record<string, unknown> | null>();
@@ -528,7 +533,7 @@ export default async function plugin(bb: BbPluginApi) {
     });
     // `extra`: the memory tools, when withMemory gives this session a profile (src/memory/service.ts).
     const build = (extra: readonly string[]) => {
-      const scope = scopeTools({ kind, full: [...full, ...extra], providerId: context.provider.id, lean, deferSupported, extras: kind === "runner" ? [] : ON_DEMAND_EXTRAS });
+      const scope = scopeTools({ kind, full: [...full, ...extra], providerId: context.provider.id, lean, deferSupported, extras: kind === "runner" ? [] : ON_DEMAND_EXTRAS, delivery: toolDelivery.modeFor(context.provider.id) });
       scopes.remember(context.thread.id, scope, { providerId: context.provider.id, model: context.provider.model });
       const presented = presentedEntries(scope);
       const trio = scope.delivery === "trio" ? trioInstructions(presented.onDemand, scope.gateway) : "";
@@ -554,7 +559,7 @@ export default async function plugin(bb: BbPluginApi) {
     return [...names].map(([id, name]) => {
       const full = conversationFull();
       const leanScope = scopeTools({ kind: "conversation", full, providerId: id, lean: true, deferSupported, extras: ON_DEMAND_EXTRAS });
-      const fullScope = scopeTools({ kind: "conversation", full, providerId: id, lean: false, deferSupported, extras: ON_DEMAND_EXTRAS });
+      const fullScope = scopeTools({ kind: "conversation", full, providerId: id, lean: false, deferSupported, extras: ON_DEMAND_EXTRAS, delivery: toolDelivery.modeFor(id) });
       const fullDelivery = fullScope.delivery === "all" ? "native" as const : fullScope.delivery === "defer" ? "defer" as const : "search" as const;
       return { id, name, acp: id.startsWith("acp-"), mode: leanModes.current[id] ?? "auto", tools: { lean: count(leanScope), full: count(fullScope) }, fullDelivery };
     }).sort((a, b) => Number(a.acp) - Number(b.acp) || a.name.localeCompare(b.name));
@@ -1734,9 +1739,21 @@ export default async function plugin(bb: BbPluginApi) {
       void leadsReady();
       void automations.tick().catch((error) => bb.log.warn(`Automations startup failed: ${errorText(error)}`));
     });
+  // Move threads to another provider (src/move-provider): `bbs studio move-provider`, and its watcher.
+  const moveProvider = createMoveProvider({
+    bb, db,
+    bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, defaultModel: bot.defaultModel ? { providerId: bot.defaultModel.providerId, model: bot.defaultModel.model } : null })),
+    botThreads: async (botId) => [...new Set([...bots.chain(botId), ...(await bots.started(botId)).map((thread) => thread.id)])],
+    setBotDefault: async (botId, providerId, model) => { await bots.setDefaultModel({ botId, providerId, model }); },
+    leadThreads: () => projectLeads.list().flatMap((lead) => (lead.leadThreadId ? [lead.leadThreadId] : [])),
+    router: { get: async () => modelRouter.current(), set: async (policy) => { await modelRouter.setPolicy(policy as never); } },
+  });
+  bb.onDispose(() => moveProvider.dispose());
   registerStudioCli({
     bb,
     hub,
+    moveProvider,
+    toolDelivery,
     studioSettings,
     decisions,
     auth,

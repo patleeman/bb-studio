@@ -3827,6 +3827,44 @@ RPCs: `contextLean.get`, `contextLean.set` (BB Studio's app window only, as
 Tool Gateway's changes; any other caller is refused, and the section is
 read-only there); kv `context:lean`.
 
+**Tool delivery per provider** (`src/tool-delivery.ts`): the list above is the
+default. `bbs studio tool-delivery <provider> all|defer|trio|default` changes
+it for one provider (`defer` falls back to the trio where BB can't defer; lean
+context always gets the trio); `bbs studio tool-delivery` lists the changes.
+Kv `studio.toolDelivery`.
+
+## Moving threads to another provider
+
+`bbs studio move-provider` moves threads to another provider with the same
+thread id and their history (`src/move-provider/`). Per thread it builds the
+handoff (`moveProvider.prepare`), then calls BB's
+`POST /api/v1/threads/:id/move-provider`, which clears the provider session
+and swaps provider and model. The thread's next turn gets the handoff.
+
+- Selectors: thread ids, `--from <provider>`, `--project`, `--bot`,
+  `--runners`, `--include-archived`. Target: `--to`, `--model` (the
+  provider's default when left out), `--permission`, `--history-tokens`
+  (150000 by default).
+- `--automations` moves BB and Studio automations that target moved threads;
+  `--bot-defaults` sets Bots' default models; `--router-rules` points router
+  chain targets at the new provider.
+- The permission is never wider than the thread's now: `full` steps down to
+  `auto` unless `--permission full` is given, and `auto` becomes
+  `accept-edits` on an ACP agent.
+- `--dry-run` lists the same threads and results the real run gives
+  (`would-move`). `--json` on every command; exit codes 0 (done), 2
+  (something skipped, deferred or failed), 1 (bad input). Nothing prompts.
+- A running thread is deferred and moved when it goes idle (`thread.idle`,
+  plus a sweep at start). The ledger (kv `studio.moveProvider.ledger`) makes a
+  re-run safe: moved threads come back `already-moved`, failed and deferred
+  ones are tried again, matching patches are left alone.
+- `status` (ledger and event log: `pending` until the first turn on the new
+  provider starts, then `rebuilt`) and `verify` (move event, first turn,
+  handoff; `--probe "<question>"` asks the thread, and `--all` never probes a
+  Main). Also `bbs studio bot set-model` and `bbs studio runner move-provider`.
+- The command never moves the thread it runs in. The runbook for an agent
+  doing a migration is the `move-provider` skill.
+
 ## Memory
 
 Each Studio Bot has one memory, shared by all its conversations and workers
