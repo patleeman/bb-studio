@@ -169,7 +169,7 @@ it("carries BB's open spec on a side panel tab through a parse, and drops it fro
   expect(parseDragItem({ kind: "tab", id: "k", title: "Terminal" })).toEqual({ kind: "tab", id: "k", title: "Terminal" });
 });
 
-it("clears drag state on dragend and tears down window listeners via stopDragWatch", () => {
+it("clears drag state on dragend, tears down via stopDragWatch, and tolerates a legacy `true` marker", async () => {
   writeDragItem(fakeTransfer(), threadDragItem({ id: "thr_1", title: "Demo" }));
   expect(currentDragItem()?.id).toBe("thr_1");
   window.dispatchEvent(new Event("dragend"));
@@ -180,4 +180,16 @@ it("clears drag state on dragend and tears down window listeners via stopDragWat
   stopDragWatch();
   window.dispatchEvent(new Event("dragend"));
   expect(currentDragItem()?.id).toBe("thr_2");
+
+  // Legacy `true` marker from an older bundle must not throw on import or writeDragItem.
+  const key = Symbol.for("bb-studio.item-drag");
+  (window as unknown as Record<symbol, unknown>)[key] = true;
+  try {
+    vi.resetModules();
+    const fresh = await import("./item-drag");
+    expect(() => fresh.writeDragItem(fakeTransfer(), threadDragItem({ id: "thr_3", title: "Demo 3" }))).not.toThrow();
+    expect((window as unknown as Record<symbol, unknown>)[key]).toBe(true);
+  } finally {
+    delete (window as unknown as Record<symbol, unknown>)[key];
+  }
 });

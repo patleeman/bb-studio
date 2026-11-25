@@ -3,12 +3,16 @@
 // Inside plugin surfaces this shows the title as a styled tooltip after a
 // short delay instead, so a `title` on a button works like a real tooltip.
 //
-// One document listener serves every Studio plugin: the first bundle to load
-// installs it. While the pointer is over an element, its `title` moves to
-// `data-bb-fast-title` so the native tooltip stays hidden, and it comes back
-// when the pointer leaves. React never sees the change.
+// One window-global document listener serves every Studio plugin: first bundle
+// to load wins across plugins, and a same-plugin reload replaces only its own
+// listeners (never tied to a single plugin's unload). Older bundles stored
+// `true` at the symbol; if present, those listeners are kept as-is. While the
+// pointer is over an element, its `title` moves to `data-bb-fast-title` so the
+// native tooltip stays hidden, and it comes back when the pointer leaves.
+// React never sees the change.
 
 const INSTALLED = Symbol.for("bb-studio.fast-title");
+const DEFAULT_OWNER = "studio";
 const SCOPE = "[data-bb-plugin-root]";
 const HELD = "data-bb-fast-title";
 export const FAST_TITLE_DELAY_MS = 300;
@@ -18,17 +22,28 @@ const SKIP_DELAY_MS = 400;
 const GAP = 4;
 const EDGE = 8;
 
-type FastTitleWindow = Window & { [INSTALLED]?: () => void };
+type FastTitleEntry = { owner: string; dispose: () => void };
+type FastTitleWindow = Window & { [INSTALLED]?: true | FastTitleEntry };
+
+function isFastTitleEntry(value: unknown): value is FastTitleEntry {
+  return !!value && typeof value === "object"
+    && typeof (value as { owner?: unknown }).owner === "string"
+    && typeof (value as { dispose?: unknown }).dispose === "function";
+}
 
 export function installFastTitles(
   doc: Document = document,
-  options?: { signal?: AbortSignal; replace?: boolean },
+  options?: { signal?: AbortSignal; replace?: boolean; owner?: string },
 ): () => void {
   const win = doc.defaultView as FastTitleWindow | null;
   if (!win) return () => {};
-  if (win[INSTALLED]) {
-    if (!options?.replace) return win[INSTALLED];
-    win[INSTALLED]();
+  const owner = options?.owner ?? DEFAULT_OWNER;
+  const existing = win[INSTALLED];
+  if (existing) {
+    // Legacy bundle stored `true` or another plugin owns the window-global listeners: first wins.
+    if (!isFastTitleEntry(existing) || existing.owner !== owner) return () => {};
+    if (!options?.replace) return existing.dispose;
+    existing.dispose();
   }
   if (options?.signal?.aborted) return () => {};
 
@@ -99,14 +114,17 @@ export function installFastTitles(
   doc.addEventListener("scroll", release, captureSignal);
   win.addEventListener("blur", release, { signal: controller.signal });
 
-  const dispose = () => {
-    controller.abort();
-    release();
-    if (win[INSTALLED] === dispose) delete win[INSTALLED];
+  const entry: FastTitleEntry = {
+    owner,
+    dispose: () => {
+      controller.abort();
+      release();
+      if (win[INSTALLED] === entry) delete win[INSTALLED];
+    },
   };
-  win[INSTALLED] = dispose;
-  options?.signal?.addEventListener("abort", dispose, { once: true });
-  return dispose;
+  win[INSTALLED] = entry;
+  options?.signal?.addEventListener("abort", entry.dispose, { once: true });
+  return entry.dispose;
 }
 
 function titled(node: EventTarget | null): HTMLElement | null {
