@@ -22,7 +22,7 @@ export const DEFAULT_BOT_AVATAR = "🤖";
 export const heartbeatName = (key: string) => `Studio project heartbeat ${key}`;
 export const RUNNING = new Set(["active", "starting", "pending", "stopping"]);
 /** Running now; a "pending" thread is waiting to start. */
-export const WORKING = new Set(["active", "starting", "stopping"]);
+const WORKING = new Set(["active", "starting", "stopping"]);
 
 /** The Bot's check-in prompt. What to look at lives on its Memory page, not here. */
 export function botHeartbeat(name: string): string {

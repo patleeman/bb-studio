@@ -95,7 +95,9 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   }, []);
 
   useEffect(() => {
-    rpc.call("overview", null).then(({ providers }) => setProviders(providers), () => {});
+    let live = true;
+    rpc.call("overview", null).then(({ providers }) => { if (live) setProviders(providers); }, () => {});
+    return () => { live = false; };
   }, [rpc]);
   useEffect(() => {
     let live = true;

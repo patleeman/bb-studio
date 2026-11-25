@@ -75,12 +75,19 @@ export async function setupHubWiring({
       };
     });
   };
+  let disposed = false;
   const workspace = new WorkspacePresence();
-  const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
-  bb.onDispose(() => searchIndex.dispose());
+  const searchIndex = new SearchIndex(db, hub, () => { if (!disposed) bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }); });
+  bb.onDispose(() => {
+    disposed = true;
+    searchIndex.dispose();
+  });
   async function studioChanged({ pluginId, ids, removed }: { pluginId: string; ids?: string[]; removed?: string[] }): Promise<{ ok: true }> {
+    if (disposed) return { ok: true };
     await searchIndex.changed(pluginId, ids, removed);
+    if (disposed) return { ok: true };
     await recordProviderChanges(hub, changes, pluginId, ids, removed);
+    if (disposed) return { ok: true };
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
     return { ok: true };
   }
@@ -98,11 +105,13 @@ export async function setupHubWiring({
   let reconcilingThreads: Promise<void> | null = null;
   const reconcileThreads = (): Promise<void> => reconcilingThreads ??= (async () => {
     for (const threadId of pendingThreadChecks) {
+      if (disposed) break;
       const complete = await services.reconcileThread(
         threadId,
         () => bb.sdk.threads.get({ threadId }),
-        (error) => bb.log.warn(`Thread ${threadId} unavailable: ${errorText(error)}`),
+        (error) => { if (!disposed) bb.log.warn(`Thread ${threadId} unavailable: ${errorText(error)}`); },
       );
+      if (disposed) break;
       if (complete) pendingThreadChecks.delete(threadId);
     }
   })().finally(() => { reconcilingThreads = null; });
@@ -110,9 +119,14 @@ export async function setupHubWiring({
   let lastReconcile = Date.now();
   // Thread events keep linked threads current; this pass only catches what was missed, so it is rare where BB reports interruptions itself.
   const hostEvents = { listening: false };
-  triggers.every("thread-reconcile", 60_000, () => (hostEvents.listening && Date.now() - lastReconcile < 30 * 60_000 ? undefined : (lastReconcile = Date.now(), reconcileThreads().catch((error) => bb.log.warn(`Thread reconciliation failed: ${errorText(error)}`)))));
-  bb.onDispose(async () => { await reconcilingThreads; });
+  triggers.every("thread-reconcile", 60_000, () => (disposed || (hostEvents.listening && Date.now() - lastReconcile < 30 * 60_000) ? undefined : (lastReconcile = Date.now(), reconcileThreads().catch((error) => { if (!disposed) bb.log.warn(`Thread reconciliation failed: ${errorText(error)}`); }))));
+  bb.onDispose(async () => {
+    disposed = true;
+    pendingThreads.clear();
+    await reconcilingThreads;
+  });
   const updateThread = (threadId: string, state: string) => {
+    if (disposed) return;
     pendingThreadChecks.delete(threadId);
     for (const found of services.threadsForThread(threadId)) services.linkThread({ ...found, state, updatedAt: Date.now() });
     changes.append(null);
@@ -133,12 +147,14 @@ export async function setupHubWiring({
   const checkingThreads = new Set<string>();
   const pendingThreads = new Map<string, { id: string; createdAt: number; status: string }>();
   const linkComposerThread = async (thread: { id: string; createdAt: number; status: string }) => {
-    if (checkedThreads.has(thread.id) || services.threadsForThread(thread.id).length) return;
+    if (disposed || checkedThreads.has(thread.id) || services.threadsForThread(thread.id).length) return;
     if (checkingThreads.has(thread.id)) { pendingThreads.set(thread.id, thread); return; }
     checkingThreads.add(thread.id);
     try {
       const events = await bb.sdk.threads.events.list({ threadId: thread.id, order: "asc", limit: "50", types: ["client/thread/start", "client/turn/requested", "client/turn/start"] });
+      if (disposed) return;
       const providers = await mentionProviders(firstThreadMentionPlugins(events));
+      if (disposed) return;
       const refs = firstThreadItemRefs(events, { providers });
       if (refs === null) return;
       for (const ref of refs) {
@@ -154,11 +170,12 @@ export async function setupHubWiring({
       const pending = pendingThreads.get(thread.id);
       if (pending) {
         pendingThreads.delete(thread.id);
-        queueMicrotask(() => { void linkComposerThread(pending).catch(() => {}); });
+        if (!disposed) queueMicrotask(() => { void linkComposerThread(pending).catch(() => {}); });
       }
     }
   };
   const tryLinkComposerThread = (thread: { id: string; createdAt: number; status: string }) => {
+    if (disposed) return;
     void linkComposerThread(thread).catch(() => { /* The first input may not be saved yet. */ });
   };
   bb.events.on("thread.created", ({ thread }) => tryLinkComposerThread(thread));
@@ -166,9 +183,11 @@ export async function setupHubWiring({
   bb.events.on("thread.active", ({ thread }) => tryLinkComposerThread(thread));
   bb.events.on("thread.idle", ({ thread }) => tryLinkComposerThread(thread));
   void bb.sdk.threads.list({ limit: 200 }).then((threads) => {
+    if (disposed) return;
     for (const thread of threads) tryLinkComposerThread(thread);
   }).catch(() => {});
   bb.events.on("interaction.pending", () => {
+    if (disposed) return;
     changes.append(null);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   });
