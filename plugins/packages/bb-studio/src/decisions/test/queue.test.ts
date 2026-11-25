@@ -726,3 +726,42 @@ test("the decision budget starts when the hook held the message", async () => {
   await settle();
   assert.deepEqual(calls.steered, ["q_1"], "only ~10 ms of budget was left");
 });
+
+test("gone() bounds departed map, forget() clears releaseWarnedAt, and dispose() clears all tracking maps", async () => {
+  let at = 1_000;
+  const { queue } = harness(new Promise<Verdict>(() => {}), { now: () => at });
+  const internal = queue as unknown as {
+    departed: Map<string, number>;
+    releaseWarnedAt: Map<string, number>;
+    heldAt: Map<string, number>;
+  };
+
+  // Bound departed map to maxDeparted even when sync() is never called.
+  for (let i = 0; i < 550; i += 1) {
+    queue.routed.add(`r_${i}`);
+    queue.gone({ id: `r_${i}` });
+  }
+  assert.equal(internal.departed.size, 500);
+
+  // Evict expired departed entries by TTL.
+  at += 6 * 60_000;
+  queue.routed.add("r_fresh");
+  queue.gone({ id: "r_fresh" });
+  assert.equal(internal.departed.size, 1);
+
+  // forget() clears releaseWarnedAt for forgotten thread rows.
+  queue.queued(row({ id: "q_warn", threadId: "thr_1" }));
+  internal.releaseWarnedAt.set("q_warn", at);
+  queue.forget("thr_1");
+  assert.equal(internal.releaseWarnedAt.has("q_warn"), false);
+
+  // dispose() clears departed, releaseWarnedAt, heldAt, and routed.
+  queue.routed.add("r_keep");
+  internal.heldAt.set("thr_1\0hi", at);
+  internal.releaseWarnedAt.set("q_other", at);
+  queue.dispose();
+  assert.equal(internal.departed.size, 0);
+  assert.equal(internal.releaseWarnedAt.size, 0);
+  assert.equal(internal.heldAt.size, 0);
+  assert.equal(queue.routed.size, 0);
+});

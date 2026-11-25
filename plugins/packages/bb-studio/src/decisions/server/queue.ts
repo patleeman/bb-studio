@@ -83,6 +83,9 @@ export const decideBudgetMs = 1_500;
 export const reroutedTtlMs = 5_000;
 /** A release that keeps failing warns at most this often per row. */
 export const releaseWarnEveryMs = 60_000;
+/** Max remembered departed row ids (evicted by TTL and FIFO cap even if sync() isn't called). */
+export const maxDeparted = 500;
+export const departedTtlMs = 5 * 60_000;
 export const decidingReason = "Smart Queue is deciding whether to steer or follow up.";
 export const batchingReason = "Smart Queue is grouping related follow-ups into one turn.";
 /** How many follow-ups one batching decision weighs. */
@@ -587,7 +590,13 @@ export class SmartQueue {
 
   /** `message.dispatched` and `message.cancelled`. */
   gone(row: Pick<QueuedRow, "id">) {
-    if (this.entries.has(row.id) || this.routed.has(row.id)) this.departed.set(row.id, this.now());
+    if (this.entries.has(row.id) || this.routed.has(row.id)) {
+      const now = this.now();
+      for (const [id, at] of this.departed) if (now - at >= departedTtlMs) this.departed.delete(id);
+      this.departed.delete(row.id);
+      this.departed.set(row.id, now);
+      while (this.departed.size > maxDeparted) this.departed.delete(this.departed.keys().next().value!);
+    }
     this.drop(row.id);
   }
 
@@ -611,21 +620,23 @@ export class SmartQueue {
     this.batching.get(threadId)?.abort();
     this.batching.delete(threadId);
     this.batched.delete(threadId);
-    for (const [id, entry] of this.entries)
-      if (entry.threadId === threadId) {
-        if (entry.state === "pending") entry.controller.abort();
-        entry.finish();
-        this.entries.delete(id);
-      }
+    for (const [id, entry] of [...this.entries])
+      if (entry.threadId === threadId) this.drop(id);
   }
 
   dispose() {
     for (const controller of this.batching.values()) controller.abort();
     this.batching.clear();
+    this.batched.clear();
     for (const entry of this.entries.values()) {
       if (entry.state === "pending") entry.controller.abort();
       entry.finish();
     }
     this.entries.clear();
+    this.routed.clear();
+    this.rerouted.clear();
+    this.heldAt.clear();
+    this.releaseWarnedAt.clear();
+    this.departed.clear();
   }
 }
