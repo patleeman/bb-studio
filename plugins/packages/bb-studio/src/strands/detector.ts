@@ -44,8 +44,8 @@ export const JEV_TOTAL_DAILY_CAP = 3_000;
 export const MODEL_TOTAL_DAILY_CAP = 300;
 /** Jev gets this long per call before it counts as a failure. */
 export const JEV_TIMEOUT_MS = 15_000;
-/** Small-model and completeText calls get this long before falling back so a hung call can't stall a conversation's queue. */
-export const MODEL_TIMEOUT_MS = 30_000;
+/** Small-model and completeText calls get this long before aborting and falling back so a hung call can't stall a conversation's queue (above Decisions' 60 s inner budget). */
+export const MODEL_TIMEOUT_MS = 65_000;
 /** After this many Jev failures in a row (errors, timeouts), back off: twice as long each time, up to an hour. */
 export const JEV_FAILURES_BEFORE_BACKOFF = 2;
 export const JEV_BACKOFF_MS = 5 * 60 * 1000;
@@ -80,13 +80,13 @@ export interface DetectorDeps {
   /** The thread's events of strands' types, or of `types` when given. */
   events(input: { threadId: string; afterSeq?: number; beforeSeq?: number; order: "asc" | "desc"; limit: number; types?: readonly string[] }): Promise<EventRow[]>;
   jev(input: { caller: string; state: unknown; questions: Record<string, unknown> }): Promise<JevResult>;
-  model(input: { threadId: string; requestId: string; prompt: string }): Promise<ModelResult>;
+  model(input: { threadId: string; requestId: string; prompt: string; signal?: AbortSignal }): Promise<ModelResult>;
   /**
    * BB's one-line model call (experimental_completeText: the AI service the
    * user picked for thread titles, no tools, no thread), when this BB has it.
    * Naming and summaries try it first and fall back to `model`.
    */
-  completeText?(input: { prompt: string }): Promise<{ ok: true; text: string } | { ok: false; error: string }>;
+  completeText?(input: { prompt: string; signal?: AbortSignal }): Promise<{ ok: true; text: string } | { ok: false; error: string }>;
   /** Open agent tasks linked to the conversation (not the user's own to-dos, not automation runs). */
   openTasks(threadId: string): OpenTask[];
   changed(threadId: string): void;
@@ -546,10 +546,14 @@ export class StrandDetector {
     const timeoutMs = this.deps.modelTimeoutMs ?? MODEL_TIMEOUT_MS;
     if (this.deps.completeText) {
       if (!this.store.takeCall(threadId, "model", dayOf(this.now()), MODEL_DAILY_CAP, MODEL_TOTAL_DAILY_CAP)) return null;
+      const controller = new AbortController();
       const quick = await this.withDeadline(
-        this.deps.completeText({ prompt }).catch((error) => ({ ok: false as const, error: message(error) })),
+        this.deps.completeText({ prompt, signal: controller.signal }).catch((error) => ({ ok: false as const, error: message(error) })),
         timeoutMs,
-        () => ({ ok: false as const, error: `no answer in ${timeoutMs / 1000} s` }),
+        () => {
+          controller.abort(new Error(`no answer in ${timeoutMs / 1000} s`));
+          return { ok: false as const, error: `no answer in ${timeoutMs / 1000} s` };
+        },
       );
       if (this.disposed) return null;
       const json = quick.ok ? jsonIn(quick.text) : null;
@@ -562,10 +566,14 @@ export class StrandDetector {
   private async askModel(threadId: string, requestId: string, prompt: string): Promise<ModelResult | null> {
     if (!this.store.takeCall(threadId, "model", dayOf(this.now()), MODEL_DAILY_CAP, MODEL_TOTAL_DAILY_CAP)) return null;
     const timeoutMs = this.deps.modelTimeoutMs ?? MODEL_TIMEOUT_MS;
+    const controller = new AbortController();
     return this.withDeadline(
-      this.deps.model({ threadId, requestId, prompt }).catch((error): ModelResult => ({ ok: false, unavailable: false, error: message(error) })),
+      this.deps.model({ threadId, requestId, prompt, signal: controller.signal }).catch((error): ModelResult => ({ ok: false, unavailable: false, error: message(error) })),
       timeoutMs,
-      () => ({ ok: false as const, unavailable: false, error: `no answer in ${timeoutMs / 1000} s` }),
+      () => {
+        controller.abort(new Error(`no answer in ${timeoutMs / 1000} s`));
+        return { ok: false as const, unavailable: false, error: `no answer in ${timeoutMs / 1000} s` };
+      },
     );
   }
 
@@ -618,6 +626,7 @@ export class StrandDetector {
       refresh: refresh.map((strand, index) => ({ key: `r${index + 1}`, title: strand.title, messages: lines(strand, true) })),
     });
     const result = await this.askNaming(threadId, `${threadId} name ${now}`, prompt) ?? { ok: false as const, unavailable: true, error: "daily cap" };
+    if (this.disposed) return;
     // A refresh is tried at most once a day, whatever the model answers.
     const refreshed = (summaries: ReadonlyMap<string, string>) => refresh.forEach((strand, index) => { const summary = summaries.get(`r${index + 1}`); if (summary) this.store.summarized(strand.id, summary); else this.store.summaryTried(strand.id); });
     if (!result.ok) {
@@ -658,6 +667,7 @@ export class StrandDetector {
     const previous = this.store.previous(threadId, pending[0]!.seq);
     const open = this.openStrands(threadId, previous);
     const result = await this.askModel(threadId, `${threadId} sort ${now}`, sortPrompt(pending.map((item) => ({ text: item.line ?? "", reply: "" })), open)) ?? { ok: false as const, unavailable: true, error: "daily cap" };
+    if (this.disposed) return;
     const choices = result.ok ? readSort(result.text, pending.length, open) : [];
     for (const [index, item] of pending.entries()) {
       const put = (strandId: string | null, by: ItemBy, confidence: number | null, unsure = false, also: readonly string[] = []) => {
@@ -746,6 +756,7 @@ export class StrandDetector {
       const jevUp = this.now() >= this.jevDownUntil && this.now() >= this.jevBackoffUntil && this.store.takeCall(threadId, "jev", dayOf(this.now()), JEV_DAILY_CAP, JEV_TOTAL_DAILY_CAP);
       const asked = jevUp ? batchQuestions(messages, open) : null;
       const result: JevResult | null = asked ? await this.askJev({ caller: STRANDS_CALLER, state: asked.state, questions: asked.questions }) : null;
+      if (this.disposed) return null;
       if (asked && result) report.jevCalls++;
       if (asked && result?.ok) {
         // Each answer reads against the strand of the message before it, as sorted.
@@ -760,6 +771,7 @@ export class StrandDetector {
       // The small model sorts only when Jev isn't set up; when Jev fails or backs off, the rest stays unsorted.
       if (this.now() >= this.jevDownUntil) { report.unsorted += batch.length; continue; }
       const sorted = await this.askModel(threadId, `${threadId} backfill ${start}`, sortPrompt(messages, open));
+      if (this.disposed) return null;
       if (!sorted) { report.unsorted += batch.length; continue; }
       report.modelCalls++;
       const choices = sorted.ok ? readSort(sorted.text, batch.length, open) : [];

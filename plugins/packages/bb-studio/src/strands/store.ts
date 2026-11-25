@@ -213,7 +213,7 @@ export class StrandStore {
   }
 
   named(id: string, title: string, summary: string | null): void {
-    this.db.prepare("UPDATE strands SET title = ?, summary = COALESCE(?, summary), summary_at = CASE WHEN ? IS NULL THEN summary_at ELSE ? END, named = 1 WHERE id = ?")
+    this.db.prepare("UPDATE strands SET title = ?, summary = COALESCE(?, summary), summary_at = CASE WHEN ? IS NULL THEN summary_at ELSE ? END, named = 1 WHERE id = ? AND named = 0")
       .run(title, summary, summary, this.now(), id);
   }
 

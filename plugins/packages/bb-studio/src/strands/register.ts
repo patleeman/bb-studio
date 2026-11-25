@@ -69,17 +69,17 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
     secrets: deps.secrets,
     richSorting: deps.richSorting,
     ...(completeText ? {
-      completeText: async ({ prompt }: { prompt: string }) => {
-        const result = await completeText({ prompt, timeoutMs: 8_000 });
+      completeText: async ({ prompt, signal }: { prompt: string; signal?: AbortSignal }) => {
+        const result = await completeText({ prompt, timeoutMs: 8_000, ...(signal ? { signal } : {}) });
         return result.ok ? { ok: true as const, text: result.text } : { ok: false as const, error: result.message ?? result.reason ?? "no answer" };
       },
     } : {}),
-    model: async ({ threadId, requestId, prompt }) => {
+    model: async ({ threadId, requestId, prompt, signal }) => {
       const hostId = await primaryHostId(bb).catch(() => null);
       if (!hostId) return { ok: false, unavailable: true, error: "BB has no primary host to run the model on." };
       // In Decisions' "thread" mode the model follows the conversation's provider.
       const providerId = (await threadOf(threadId))?.providerId ?? null;
-      return deps.decisions.model({ caller: STRANDS_CALLER, requestId, hostId, prompt, providerId });
+      return deps.decisions.model({ caller: STRANDS_CALLER, requestId, hostId, prompt, providerId }, signal);
     },
     workers: deps.workers,
     interactions: async (threadId) => {
