@@ -171,6 +171,8 @@ export interface LedgerEntry {
   request: MoveRequest;
   /** Automation patches for this thread that failed; a re-run to the same target tries them again. */
   patchErrors?: string[];
+  /** Where the thread was when this request was deferred; the watcher moves it only if it is still there. (`from` is where the first move started, for rollback.) */
+  deferredFrom?: { providerId: string; model: string | null };
 }
 
 export type Ledger = Record<string, LedgerEntry>;
@@ -211,6 +213,7 @@ export function parseLedger(value: unknown): Ledger {
       from: each.from && typeof each.from.providerId === "string" ? { providerId: each.from.providerId, model: each.from.model ?? null } : null,
       request: { providerId: request.providerId, model: request.model, permission: isPermissionMode(request.permission) ? request.permission : null, historyTokens: Number(request.historyTokens) || DEFAULT_HISTORY_TOKENS, patchAutomations: !!request.patchAutomations, ...(request.includeArchived ? { includeArchived: true } : {}) },
       ...(Array.isArray(each.patchErrors) && each.patchErrors.length ? { patchErrors: each.patchErrors.filter((line): line is string => typeof line === "string") } : {}),
+      ...(each.deferredFrom && typeof each.deferredFrom.providerId === "string" ? { deferredFrom: { providerId: each.deferredFrom.providerId, model: each.deferredFrom.model ?? null } } : {}),
     };
   }
   return out;

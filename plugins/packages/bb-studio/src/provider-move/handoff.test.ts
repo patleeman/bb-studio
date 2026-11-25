@@ -160,7 +160,7 @@ it("prepare stores the handoff; it survives hook calls with the move (failed dis
   expect(existsSync(stored.transcriptPath)).toBe(true);
 });
 
-it("without a prepared handoff the hook builds it lazily; past its time it gives the header and transcript path", async () => {
+it("without a prepared handoff the hook builds it lazily; past its time it answers null (core holds the turn) and the next try gets it", async () => {
   const quick = new MoveHandoffs(deps(history(5)).d);
   expect(await quick.forTurn("thr_q", { from: FROM, to: TO })).toContain("Question 5:");
 
@@ -170,10 +170,8 @@ it("without a prepared handoff the hook builds it lazily; past its time it gives
   const listEvents = slow.d.listEvents;
   slow.d.listEvents = async (query) => { await gate; return listEvents(query); };
   const moves = new MoveHandoffs(slow.d);
-  const text = await moves.forTurn("thr_s", { from: FROM, to: TO, historyTokens: 150_000 });
-  expect(text).toContain("# This thread was moved to a new provider");
-  expect(text).toContain(join(root, "thr_s", "transcript.md"));
-  expect(text).toContain("still being written");
+  expect(await moves.forTurn("thr_s", { from: FROM, to: TO, historyTokens: 150_000 })).toBeNull();
+  expect(await moves.delivered("thr_s")).toBeNull();
   release();
   await vi.waitFor(() => expect(slow.kv.has(`${HANDOFF_KV_PREFIX}thr_s`)).toBe(true));
   expect(await moves.forTurn("thr_s", { from: FROM, to: TO, historyTokens: 150_000 })).toContain("Question 5:");
@@ -196,8 +194,8 @@ it("notes what the first turn got, for verify; the note outlives settled() and b
   const listEvents = slow.d.listEvents;
   slow.d.listEvents = async (query) => { await gate; return listEvents(query); };
   const late = new MoveHandoffs(slow.d);
-  await late.forTurn("thr_h", { from: FROM, to: TO, at });
-  expect(await late.delivered("thr_h", at)).toMatchObject({ kind: "header" });
+  expect(await late.forTurn("thr_h", { from: FROM, to: TO, at })).toBeNull();
+  expect(await late.delivered("thr_h", at)).toBeNull();
   release();
 });
 
@@ -292,4 +290,16 @@ it("a move turn with no handoff answers null, never the digest alone (core would
   expect(await turnText("thr_n", { threadId: "thr_n", providerMove: move }, () => "Elsewhere: digest", moves as never)).toBeNull();
   // A turn without a move gets the digest as always.
   expect(await turnText("thr_n", { threadId: "thr_n" }, () => "Elsewhere: digest", moves as never)).toBe("Elsewhere: digest");
+});
+
+
+it("an internal error answers null, not a header (core would count a header as delivered)", async () => {
+  const moves = new MoveHandoffs(deps(history(2), { dirFor: async () => { throw new Error("disk gone"); }, kv: { get: async () => { throw new Error("kv gone"); }, set: async () => { throw new Error("kv gone"); }, delete: async () => undefined } }).d);
+  expect(await moves.forTurn("thr_e", { from: FROM, to: TO })).toBeNull();
+});
+
+it("history tokens below 1 count as 1 (close to core's budget for 0), not as the default", () => {
+  expect(moveMaxChars(0)).toBe(8_004);
+  expect(budgetChars(0)).toBe(4);
+  expect(moveMaxChars(undefined)).toBe(coreMoveMax(DEFAULT_HISTORY_TOKENS));
 });

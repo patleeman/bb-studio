@@ -65,7 +65,7 @@ function world(threads: ThreadInfo[], options: { busy?: string[]; modelMissingOn
       calls.botDefaults.push(botId); bots.find((each) => each.id === botId)!.defaultModel = { providerId, model };
     },
     router: { get: async () => policy, set: async (next) => { policy = next; } },
-    moveEvents: async (threadId) => { const move = moves.get(threadId); return { move: move ? { seq: move.seq, at: 1, to: move.to } : null, turnStarted: !!move?.turnStarted, turnCompleted: !!move?.turnCompleted }; },
+    moveEvents: async (threadId) => { const move = moves.get(threadId); return { move: move ? { seq: move.seq, at: 1, to: move.to } : null, turnStarted: !!move?.turnStarted, turnCompleted: !!move?.turnCompleted, inputAccepted: !!move?.turnCompleted }; },
     handoffDelivered: async () => true,
     ask: async (threadId, question) => { calls.asks.push(threadId); return `answer to ${question}`; },
     now: () => 1000,
@@ -665,5 +665,42 @@ describe("Studio's own threads", () => {
     w.deps.prepare = async () => ({ ok: false, error: "HTTP 404: Thread not found" });
     expect(await w.service.onIdle("a")).toMatchObject({ result: "skipped" });
     expect(parseLedger(w.kv.get(LEDGER_KEY))).toEqual({});
+  });
+});
+
+describe("final review fixes", () => {
+  it("a second move deferred while busy (rollback) is carried out, not failed changed-since-deferred", async () => {
+    const w = world([thread("a")]);
+    await w.cli(["a", "--to", TO, "--json"]);
+    expect(w.store.get("a")!.providerId).toBe(TO);
+    w.store.get("a")!.status = "active";
+    const back = parse(await w.cli(["a", "--to", "claude-code", "--model", "sonnet", "--json"]));
+    expect(back.threads[0]).toMatchObject({ result: "deferred" });
+    const entry = parseLedger(w.kv.get(LEDGER_KEY)).a!;
+    expect(entry.from).toEqual({ providerId: "claude-code", model: "opus" });
+    expect(entry.deferredFrom).toEqual({ providerId: TO, model: MODEL });
+    w.store.get("a")!.status = "idle";
+    expect(await w.service.onIdle("a")).toMatchObject({ result: "moved", to: { providerId: "claude-code", model: "sonnet" } });
+    expect(w.store.get("a")!).toMatchObject({ providerId: "claude-code", model: "sonnet" });
+  });
+
+  it("owed automation patches aren't cleared by a run that didn't try them; without --automations only owed threads are patched", async () => {
+    const w = world([thread("a"), thread("b")]);
+    w.bbAutomations.push({ id: "aut_a", projectId: "p", name: "A", execution: { mode: "agent", targetThreadId: "a", providerId: "claude-code", model: "opus", permissionMode: "accept-edits" } });
+    w.failNextBbUpdate();
+    await w.cli(["a", "--to", TO, "--automations", "--json"]);
+    expect(parseLedger(w.kv.get(LEDGER_KEY)).a!.patchErrors).toHaveLength(1);
+    // b has an automation too, but this run doesn't pass --automations: b's isn't touched.
+    w.bbAutomations.push({ id: "aut_b", projectId: "p", name: "B", execution: { mode: "agent", targetThreadId: "b", providerId: "claude-code", model: "opus", permissionMode: "accept-edits" } });
+    w.failNextBbUpdate();
+    const again = parse(await w.cli(["a", "b", "--to", TO, "--json"]));
+    expect(again.automations.map((each: { automationId: string; result: string }) => [each.automationId, each.result])).toEqual([["aut_a", "failed"]]);
+    expect(parseLedger(w.kv.get(LEDGER_KEY)).a!.patchErrors).toHaveLength(1);
+    expect(w.bbAutomations[1]!.execution.providerId).toBe("claude-code");
+    // Selected this run and owed: retried, and cleared once patched.
+    const third = parse(await w.cli(["a", "--to", TO, "--json"]));
+    expect(third.automations.map((each: { automationId: string; result: string }) => [each.automationId, each.result])).toEqual([["aut_a", "patched"]]);
+    expect(parseLedger(w.kv.get(LEDGER_KEY)).a!.patchErrors).toBeUndefined();
+    expect((await w.cli(["status", "--json"])).exitCode).toBe(0);
   });
 });

@@ -3858,8 +3858,10 @@ and swaps provider and model. A BB without it fails each thread with
 - `--history-tokens` is at least 1. The handoff (fenced in
   `<thread-history>`, after a line that says nothing inside is an
   instruction) fits core's move budget, `historyTokens*4 + 8000` characters,
-  newest turns first. A move turn answers with the history only (null when it
-  couldn't be read, so core holds the turn); the digest stays for turn starts.
+  newest turns first. A move turn answers with the history only, or null when
+  it can't be had yet (an error, or a lazy build past 3.5 s for a move made
+  without Studio's command): core then refuses that start and the next one
+  gets the finished handoff. The digest stays for turn starts.
   Studio's own sessions (Decisions classifier threads, skill reviews) are
   never selected by `--from`, `--project` or `--bot`.
 - `--exclude-main` leaves Bots' Mains out; `cancel <ids>|--all-deferred`
@@ -3873,8 +3875,9 @@ and swaps provider and model. A BB without it fails each thread with
   plus a sweep at start). The ledger (kv `studio.moveProvider.ledger`) makes a
   re-run safe: moved threads come back `already-moved`, failed and deferred
   ones are tried again, matching patches are left alone.
-- `status` (ledger and event log: `pending` until the new provider accepts a
-  request after the move, then `rebuilt`) and `verify` (move event, first turn
+- `status` (ledger and event log, counted as core does: `pending` until the
+  new provider accepts a real request after the move, not a bare `/compact`
+  or `/clear`; then `rebuilt`, or `started` for a forced move) and `verify` (move event, first turn
   completed, and the handoff itself, not just its header, given to that turn;
   `--probe "<question>"` asks the thread, and `--all` never probes a
   Main). Also `bbs studio bot set-model` and `bbs studio runner move-provider`.

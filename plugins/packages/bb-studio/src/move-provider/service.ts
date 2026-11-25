@@ -56,7 +56,7 @@ export interface TargetCheck { known: boolean; ready: boolean; models: string[];
 
 export interface MoveEventStatus {
   /** The newest thread/provider-move operation, or null when the thread has none. */
-  move: { seq: number; at: number; to: { providerId: string; model: string | null } } | null;
+  move: { seq: number; at: number; to: { providerId: string; model: string | null }; handoff?: string | null } | null;
   /** A turn started after it. */
   turnStarted: boolean;
   /** A turn after it completed (successfully). */
@@ -65,8 +65,15 @@ export interface MoveEventStatus {
   inputAccepted?: boolean;
 }
 
-/** Core's "rebuilt": the new provider accepted a request after the move (a completed turn counts too). */
-const rebuilt = (events: MoveEventStatus) => !!events.inputAccepted || events.turnCompleted;
+/**
+ * Core's state after a move: pending until the new provider accepts a real request made after it; then
+ * rebuilt, or started for a forced move (handoff "none": nothing was delivered).
+ */
+function moveState(events: MoveEventStatus): "pending" | "rebuilt" | "started" {
+  if (!events.inputAccepted) return "pending";
+  return events.move?.handoff === "none" ? "started" : "rebuilt";
+}
+const rebuilt = (events: MoveEventStatus) => moveState(events) === "rebuilt";
 
 export interface Kv { get(key: string): Promise<unknown> | unknown; set(key: string, value: unknown): Promise<void> | void }
 
@@ -241,9 +248,11 @@ export class MoveProviderService {
     // patches failed before for this target (a re-run picks them up even when the selectors no longer do).
     const onTarget = items.filter((item) => item.result === "moved" || item.result === "already-moved" || item.result === "would-move").map((item) => item.threadId);
     const ledger = await this.ledger();
-    const owed = Object.entries(ledger).filter(([id, entry]) => entry.patchErrors?.length && entry.request.providerId === options.to && entry.request.model === model && !onTarget.includes(id)).map(([id]) => id);
-    const patchThreads = [...onTarget, ...(request.patchAutomations || owed.length ? owed : [])];
-    const automations = request.patchAutomations || owed.length ? await this.patchAutomations(patchThreads, request, options.dryRun, target.permissionModes) : [];
+    // Owed: every thread with failed automation patches for this target, selected this run or not.
+    const owed = Object.entries(ledger).filter(([, entry]) => entry.patchErrors?.length && entry.request.providerId === options.to && entry.request.model === model).map(([id]) => id);
+    // With --automations, the selected threads' automations and the owed ones; without, only the owed ones.
+    const patchThreads = request.patchAutomations ? [...new Set([...onTarget, ...owed])] : owed;
+    const automations = patchThreads.length ? await this.patchAutomations(patchThreads, request, options.dryRun, target.permissionModes) : [];
     for (const item of items) item.automationsPatched = automations.filter((each) => each.threadId === item.threadId && (each.result === "patched" || each.result === "would-patch")).map((each) => each.automationId);
     if (!options.dryRun) await this.recordPatchErrors(patchThreads, automations);
     const patches = await this.patchLedger();
@@ -335,7 +344,8 @@ export class MoveProviderService {
         const previous = (await this.ledger())[thread.id];
         // A re-run of a thread this ledger moved keeps "moved".
         if (state === "already-moved" && previous?.state === "moved") state = "moved";
-        await this.record(thread.id, { state, error: done.reason ? `${done.reason}${done.detail ? `: ${done.detail}` : ""}` : null, at: this.now(), attempts: (previous?.attempts ?? 0) + (state === "already-moved" ? 0 : 1), from: previous?.from ?? (thread.providerId ? { providerId: thread.providerId, model: thread.model } : null), request, ...(previous?.patchErrors ? { patchErrors: previous.patchErrors } : {}) });
+        await this.record(thread.id, { state, error: done.reason ? `${done.reason}${done.detail ? `: ${done.detail}` : ""}` : null, at: this.now(), attempts: (previous?.attempts ?? 0) + (state === "already-moved" ? 0 : 1), from: previous?.from ?? (thread.providerId ? { providerId: thread.providerId, model: thread.model } : null), request, ...(previous?.patchErrors ? { patchErrors: previous.patchErrors } : {}),
+          ...(state === "deferred" && thread.providerId ? { deferredFrom: { providerId: thread.providerId, model: thread.model } } : {}) });
       }
       return done;
     };
@@ -536,8 +546,9 @@ export class MoveProviderService {
       return null;
     }
     // Someone changed its provider or model since it was deferred: the old request no longer applies.
-    if (entry.from && (thread.providerId !== entry.from.providerId || thread.model !== entry.from.model)) {
-      const detail = `it is on ${thread.providerId ?? "?"}/${thread.model ?? "?"} now, not ${entry.from.providerId}/${entry.from.model ?? "?"} as when deferred`;
+    const was = entry.deferredFrom ?? entry.from;
+    if (was && (thread.providerId !== was.providerId || thread.model !== was.model)) {
+      const detail = `it is on ${thread.providerId ?? "?"}/${thread.model ?? "?"} now, not ${was.providerId}/${was.model ?? "?"} as when deferred`;
       await this.record(threadId, { ...entry, state: "failed", error: `changed-since-deferred: ${detail}`, at: this.now(), attempts: entry.attempts + 1 });
       this.deps.log?.(`Move provider: ${threadId} not moved (changed since deferred)`);
       return { threadId, title: thread.title, role: "other", from: { providerId: thread.providerId ?? "", model: thread.model, permission: thread.permission }, to: { providerId: entry.request.providerId, model: entry.request.model, permission: null }, result: "failed", reason: "changed-since-deferred", detail, automationsPatched: [] };
@@ -576,7 +587,7 @@ export class MoveProviderService {
       const entry = ledger[id] ?? null;
       const thread = threads.get(id) ?? null;
       const events = await this.deps.moveEvents(id).catch(() => null);
-      const core = !events ? "unknown" : !events.move ? "none" : rebuilt(events) ? "rebuilt" : "pending";
+      const core = !events ? "unknown" : !events.move ? "none" : moveState(events);
       rows.push({
         threadId: id, title: thread?.title ?? null, ledger: entry?.state ?? null, error: entry?.error ?? null, attempts: entry?.attempts ?? 0, at: entry?.at ?? null,
         provider: thread ? { providerId: thread.providerId, model: thread.model, permission: thread.permission } : null,
@@ -633,7 +644,7 @@ export interface StatusRow {
   provider: { providerId: string | null; model: string | null; permission: PermissionMode | null } | null;
   target: { providerId: string; model: string } | null;
   /** From the event log: none (no move), pending (moved, not rebuilt yet), rebuilt (the new provider accepted a request after it). */
-  core: "none" | "pending" | "rebuilt" | "unknown";
+  core: "none" | "pending" | "rebuilt" | "started" | "unknown";
   /** Automation patches that failed for it; a re-run to the same target tries them again. */
   patchErrors: string[];
 }

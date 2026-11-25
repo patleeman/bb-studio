@@ -83,11 +83,10 @@ const MOVE_RESERVE_CHARS = 64;
 /**
  * The most a move turn's whole answer may be, as core counts it
  * (turnContextMoveMaxChars): historyTokens*4 + 8000, at least 8000, at most
- * 1.2M characters. History tokens below 1 aren't valid anywhere (the CLI and
- * the RPC refuse them); here they count as the default.
+ * 1.2M characters.
  */
 export function moveMaxChars(historyTokens: number | undefined): number {
-  const tokens = typeof historyTokens === "number" && Number.isFinite(historyTokens) && historyTokens >= 1 ? historyTokens : DEFAULT_HISTORY_TOKENS;
+  const tokens = historyTokensOf(historyTokens);
   return Math.min(Math.max(CORE_BASE_CHARS, Math.ceil(tokens * CHARS_PER_TOKEN) + CORE_BASE_CHARS), HANDOFF_MAX_CHARS);
 }
 
@@ -100,9 +99,19 @@ export function neutralize(text: string): string {
     .replace(/^([ \t]{0,3})(#{1,6})(?=[ \t]*Turn\b)/gimu, "$1\\$2");
 }
 
+/**
+ * History tokens as every layer reads them: the default when not given, and
+ * at least 1 (Studio's CLI and RPC refuse 0; a 0 from a core-direct move is
+ * read as 1, close to core's 8000-character budget for 0, not the default).
+ */
+function historyTokensOf(historyTokens: number | undefined): number {
+  if (typeof historyTokens !== "number" || !Number.isFinite(historyTokens)) return DEFAULT_HISTORY_TOKENS;
+  return Math.max(1, historyTokens);
+}
+
 /** The budget for the verbatim turns, in characters. */
 export function budgetChars(historyTokens: number | undefined): number {
-  const tokens = typeof historyTokens === "number" && Number.isFinite(historyTokens) && historyTokens >= 1 ? historyTokens : DEFAULT_HISTORY_TOKENS;
+  const tokens = historyTokensOf(historyTokens);
   return Math.min(Math.floor(tokens * CHARS_PER_TOKEN), HANDOFF_MAX_CHARS);
 }
 
@@ -410,7 +419,7 @@ export class MoveHandoffs {
     return stored;
   }
 
-  /** The text for the first turn after a move. Never throws; never deletes. */
+  /** The text for the first turn after a move, or null when it can't be had now (core then holds the turn). Never throws; never deletes. */
   async forTurn(threadId: string, move: ProviderMoveInput): Promise<string | null> {
     const at = typeof move.at === "string" ? Date.parse(move.at) || undefined : move.at;
     try {
@@ -427,16 +436,16 @@ export class MoveHandoffs {
         const text = await readFile(built.handoffPath, "utf8").catch(() => null);
         if (text) { await this.noteDelivered(threadId, move, "handoff"); return text; }
       }
-      const dir = await this.deps.dirFor(threadId).catch(() => null);
-      await this.noteDelivered(threadId, move, "header");
-      return header({ from: move.from, to: move.to, at: at ?? move.at, transcriptPath: dir ? join(dir, "transcript.md") : null, pending: true });
+      // Not ready in time (the move didn't go through Studio's command, so nothing was prepared): null, not a
+      // header alone. Core takes any text as "history delivered" for good; null makes it refuse this start
+      // (503), and the next one gets the handoff the build is still writing.
+      return null;
     } catch (error) {
       this.deps.log?.(`Move handoff for ${threadId}: ${error instanceof Error ? error.message : String(error)}`);
-      return header({ from: move.from, to: move.to, at: move.at, transcriptPath: null });
+      return null;
     }
   }
 
-  /** A turn started on the new provider (the hook came without `providerMove`): the handoff is delivered. The transcript stays. */
   /** The thread was deleted: its handoff, its delivery note and its transcript folder go. */
   async forget(threadId: string): Promise<void> {
     await this.building.get(threadId)?.catch(() => null);
@@ -447,6 +456,7 @@ export class MoveHandoffs {
     if (dir && basename(dir) === threadId) await rm(dir, { recursive: true, force: true }).catch(() => undefined);
   }
 
+  /** A turn started on the new provider (the hook came without `providerMove`): the handoff is delivered. The transcript stays. */
   async settled(threadId: string): Promise<void> {
     if (this.building.has(threadId)) return;
     const stored = await this.deps.kv.get<StoredHandoff>(this.key(threadId)).catch(() => undefined);

@@ -84,28 +84,37 @@ describe("createMoveProvider wiring", () => {
     expect(on.rpc.find((call) => call.method === "automations_update")?.input).toMatchObject({ projectId: "proj_a", automationId: "aut_1", execution: { providerId: TO, model: "gemini-3-pro", permissionMode: "accept-edits", targetThreadId: "thr_a" } });
   });
 
-  it("reads the move from a system/operation event and a turn after it", async () => {
+  it("reads the move from a system/operation event; rebuilt is core's: a real request after it, accepted", async () => {
     const move = { seq: 5, type: "system/operation", createdAt: 1, data: { operation: "thread/provider-move", metadata: { to: { providerId: TO, model: "gemini-3-pro" }, at: "2026-11-25T20:54:24.685Z" } } };
     const other = { seq: 4, type: "system/operation", data: { operation: "thread/context-clear" } };
-    const pending = createMoveProvider(deps(fakeBb({ events: [move, other] }).bb));
-    expect((await pending.verify(["thr_a"], { all: false }))[0]).toMatchObject({ moveEvent: true, turnStarted: false, verdict: "pending", movedTo: { providerId: TO } });
-    const started = createMoveProvider(deps(fakeBb({ events: [{ seq: 6, type: "turn/started" }, move] }).bb));
-    expect((await started.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "pending", turnStarted: true, turnCompleted: false });
-    const failed = createMoveProvider(deps(fakeBb({ events: [{ seq: 7, type: "turn/completed", data: { status: "failed" } }, { seq: 6, type: "turn/started" }, move] }).bb));
-    expect((await failed.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "pending", turnCompleted: false });
-    const done = createMoveProvider(deps(fakeBb({ events: [{ seq: 9, type: "turn/completed", data: { status: "completed" } }, { seq: 8, type: "turn/started" }, { seq: 7, type: "turn/completed", data: { status: "failed" } }, { seq: 6, type: "turn/started" }, move] }).bb));
-    expect((await done.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "ok", turnStarted: true, turnCompleted: true, handoffDelivered: null });
-    const none = createMoveProvider(deps(fakeBb({ events: [{ seq: 6, type: "turn/started" }, other] }).bb));
-    expect((await none.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "no-move-event" });
+    const verdict = async (events: unknown[]) => (await createMoveProvider(deps(fakeBb({ events }).bb)).verify(["thr_a"], { all: false }))[0];
+    expect(await verdict([move, other])).toMatchObject({ moveEvent: true, turnStarted: false, verdict: "pending", movedTo: { providerId: TO } });
+    // Started, not yet accepted: pending.
+    expect(await verdict([{ seq: 7, type: "turn/started" }, { seq: 6, type: "client/turn/requested", data: { requestId: "r1", input: [{ type: "text", text: "hi" }] } }, move])).toMatchObject({ verdict: "pending", turnStarted: true });
+    // A bare /compact accepted doesn't count.
+    expect(await verdict([{ seq: 8, type: "turn/input/accepted", data: { clientRequestId: "r1" } }, { seq: 6, type: "client/turn/requested", data: { requestId: "r1", input: [{ type: "text", text: "/compact" }] } }, move])).toMatchObject({ verdict: "pending" });
+    // A real request accepted (even if its turn then failed): rebuilt.
+    const real = [{ seq: 9, type: "turn/completed", data: { status: "failed" } }, { seq: 8, type: "turn/input/accepted", data: { clientRequestId: "r1" } }, { seq: 7, type: "turn/started" }, { seq: 6, type: "client/turn/requested", data: { requestId: "r1", input: [{ type: "text", text: "hi" }] } }, move];
+    expect(await verdict(real)).toMatchObject({ verdict: "ok", rebuilt: true, turnCompleted: false, handoffDelivered: null });
+    expect(await verdict([{ seq: 4, type: "turn/started" }, other])).toMatchObject({ verdict: "no-move-event" });
+    // A forced move (handoff "none") reads started, not rebuilt.
+    const forced = { ...move, data: { ...move.data, metadata: { ...move.data.metadata, handoff: "none" } } };
+    const service = createMoveProvider(deps(fakeBb({ events: [real[1], real[3], forced] }).bb));
+    expect((await service.status(["thr_a"]))[0]!.core).toBe("started");
   });
+;
 });
 
 describe("verify --probe wiring", () => {
-  it("waits for the turn that started after the probe was sent, not the one already running", async () => {
+  it("waits for the root turn that started after the probe was sent, not the running one or a subagent's", async () => {
     const before = [{ seq: 1, type: "turn/started" }, { seq: 2, type: "item/completed", data: { item: { type: "userMessage", text: "earlier" } } }];
     const after = [
       { seq: 3, type: "item/completed", data: { item: { type: "agentMessage", text: "the running turn's answer" } } },
       { seq: 4, type: "turn/completed", data: { status: "completed" } },
+      // A subagent's turn inside the running turn: not the probe's.
+      { seq: 4.2, type: "turn/started", parentToolCallId: "call_sub" },
+      { seq: 4.4, type: "item/completed", data: { item: { type: "agentMessage", text: "a subagent's note", parentToolCallId: "call_sub" } } },
+      { seq: 4.6, type: "turn/completed", parentToolCallId: "call_sub", data: { status: "completed" } },
       { seq: 5, type: "turn/started" },
       { seq: 6, type: "item/completed", data: { item: { type: "agentMessage", text: "the probe's answer" } } },
       { seq: 7, type: "turn/completed", data: { status: "completed" } },

@@ -39,6 +39,13 @@ export interface MoveRegisterDeps {
   handoffDelivered?: MoveDeps["handoffDelivered"];
 }
 
+/** Core's isRealTurnInput: anything but a bare /compact or /clear. */
+export function realTurnInput(input: unknown): boolean {
+  if (!Array.isArray(input)) return true;
+  const texts = input.filter((item) => (item as { type?: string }).type === "text").map((item) => String((item as { text?: unknown }).text ?? "").trim());
+  return !(input.length === 1 && texts.length === 1 && (texts[0] === "/compact" || texts[0] === "/clear"));
+}
+
 const automationSchema = z.object({ id: z.string(), name: z.string(), execution: z.record(z.string(), z.unknown()) }).passthrough();
 
 export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService {
@@ -76,23 +83,25 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
   const moveEvents = async (threadId: string): Promise<MoveEventStatus> => {
     // The move is a system/operation event with data.operation "thread/provider-move" (W1). Newest first,
     // 100 a page (BB's cap): turns after it say the first turn on the new provider started, and completed.
-    type Row = { seq: number | string; type: string; createdAt?: number; data?: { operation?: string; status?: string; metadata?: { to?: { providerId?: string; model?: string | null }; at?: number | string } } };
+    type Row = { seq: number | string; type: string; createdAt?: number; data?: { operation?: string; status?: string; requestId?: string; clientRequestId?: string; input?: unknown; metadata?: { to?: { providerId?: string; model?: string | null }; at?: number | string; handoff?: string } } };
     let turnStarted = false;
     let turnCompleted = false;
-    let inputAccepted = false;
+    // As core counts it: a real request (not a bare /compact or /clear) made after the move, accepted by the provider.
+    const accepted = new Set<string>();
+    const real = new Set<string>();
     let before: string | undefined;
     for (let page = 0; page < EVENT_PAGES; page++) {
-      const rows = await sdk.threads.events.list({ threadId, order: "desc", limit: "100", types: ["system/operation", "turn/started", "turn/completed", "turn/input/accepted"], ...(before ? { beforeSeq: before } : {}) } as never) as Row[];
+      const rows = await sdk.threads.events.list({ threadId, order: "desc", limit: "100", types: ["system/operation", "turn/started", "turn/completed", "turn/input/accepted", "client/turn/requested", "client/thread/start"], ...(before ? { beforeSeq: before } : {}) } as never) as Row[];
       for (const row of rows) {
         if (row.type === "turn/started") { turnStarted = true; continue; }
-        // Core's "rebuilt": the new provider accepted a real request after the move.
-        if (row.type === "turn/input/accepted") { inputAccepted = true; continue; }
+        if (row.type === "turn/input/accepted") { if (row.data?.clientRequestId) accepted.add(row.data.clientRequestId); continue; }
+        if (row.type === "client/turn/requested" || row.type === "client/thread/start") { if (row.data?.requestId && realTurnInput(row.data.input)) real.add(row.data.requestId); continue; }
         // Only a turn that completed well counts, as core's status says: a failed first turn leaves the move pending.
         if (row.type === "turn/completed") { if (row.data?.status === "completed") turnCompleted = true; continue; }
         if (row.type === "system/operation" && row.data?.operation === "thread/provider-move") {
           const meta = row.data.metadata;
           const at = typeof meta?.at === "string" ? Date.parse(meta.at) || row.createdAt || 0 : meta?.at ?? row.createdAt ?? 0;
-          return { move: { seq: Number(row.seq), at, to: { providerId: meta?.to?.providerId ?? "", model: meta?.to?.model ?? null } }, turnStarted, turnCompleted, inputAccepted };
+          return { move: { seq: Number(row.seq), at, to: { providerId: meta?.to?.providerId ?? "", model: meta?.to?.model ?? null }, handoff: meta?.handoff ?? null }, turnStarted, turnCompleted, inputAccepted: [...real].some((id) => accepted.has(id)) };
         }
       }
       if (rows.length < 100) break;
@@ -164,15 +173,20 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
     moveEvents,
     ...(deps.handoffDelivered ? { handoffDelivered: deps.handoffDelivered } : {}),
     ask: async (threadId, question) => {
-      type Ev = { seq: number | string; type: string; data?: { item?: { type?: string; text?: string } } };
+      type Ev = { seq: number | string; type: string; parentToolCallId?: string | null; data?: { parentToolCallId?: string | null; item?: { type?: string; text?: string; parentToolCallId?: string | null } } };
+      /** A root turn's event: not a subagent's (core's isRootTurnStartedEventData). */
+      const root = (event: Ev) => !event.parentToolCallId && !event.data?.parentToolCallId && !event.data?.item?.parentToolCallId;
       const newest = await sdk.threads.events.list({ threadId, order: "desc", limit: "1" }).catch(() => []) as { seq: number | string }[];
       const sentAfter = newest[0] ? String(newest[0].seq) : undefined;
       await sdk.threads.send({ threadId, mode: "queue-if-active", input: [{ type: "text", text: `Verification question from the provider move (answer in one or two lines, from this conversation's history; don't use tools): ${question}`, mentions: [], visibility: "agent-only" }] } as never);
       const until = Date.now() + PROBE_WAIT_MS;
       const waitFor = async (type: string, afterSeq: string | undefined): Promise<Ev> => {
+        let cursor = afterSeq;
         for (;;) {
-          const seen = await sdk.threads.events.wait({ threadId, type, waitMs: "30000", ...(afterSeq ? { afterSeq } : {}) }).catch(() => null) as Ev | null;
-          if (seen) return seen;
+          const seen = await sdk.threads.events.wait({ threadId, type, waitMs: "30000", ...(cursor ? { afterSeq: cursor } : {}) }).catch(() => null) as Ev | null;
+          if (seen && root(seen)) return seen;
+          // A subagent's turn: keep waiting past it for the root one.
+          if (seen) cursor = String(seen.seq);
           if (Date.now() > until) throw new Error("no answer within 10 minutes");
         }
       };
@@ -180,7 +194,7 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
       const started = await waitFor("turn/started", sentAfter);
       const completed = await waitFor("turn/completed", String(started.seq));
       const events = await sdk.threads.events.list({ threadId, order: "asc", limit: "100", types: ["item/completed"], afterSeq: String(started.seq) } as never) as Ev[];
-      const inTurn = events.filter((event) => Number(event.seq) < Number(completed.seq));
+      const inTurn = events.filter((event) => Number(event.seq) < Number(completed.seq) && root(event));
       return inTurn.map((event) => event.data?.item).filter((item) => item?.type === "agentMessage" && item.text).at(-1)?.text ?? "";
     },
     log: (line) => bb.log.info(line),

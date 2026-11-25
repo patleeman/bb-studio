@@ -40,7 +40,7 @@ bbs studio move-provider [<thread-id>…] [--from <provider>] [--project <id>] [
   [--include-archived] [--runners] [--exclude-main] --to <provider> [--model <model>] [--permission <mode>] \
   [--history-tokens <n>] [--automations] [--bot-defaults] [--router-rules] [--no-defer] [--dry-run] [--json]
 
-bbs studio move-provider status [<thread-id>…] [--json]   # ledger + event log: pending until a turn after the move completes, then rebuilt
+bbs studio move-provider status [<thread-id>…] [--json]   # ledger + event log, as core counts it: pending until the new provider accepts a real request after the move, then rebuilt (started for a forced move)
 bbs studio move-provider verify <thread-id>…|--all [--probe "<question>"] [--json]
 bbs studio move-provider cancel <thread-id>…|--all-deferred [--json]   # the watcher won't move these
 bbs studio bot set-model <bot> --provider <provider> [--model <model>] [--dry-run] [--json]
