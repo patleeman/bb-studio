@@ -63,6 +63,19 @@ final class LookTests: XCTestCase {
         }
     }
 
+    /// Tonight's Sky is night at every hour: dark even when its driver chose the
+    /// light variant by day. Kyoto Garden still follows its driver.
+    func testTonightsSkyStaysNight() {
+        let store = LookStore(defaults: UserDefaults(suiteName: "LookTests-\(UUID())")!)
+        let sky = LookCatalog.shared.theme("tonights-sky"), garden = LookCatalog.shared.theme("kyoto-garden")
+        store.sceneModes = [sky.id: .light, garden.id: .light]
+        XCTAssertEqual(LookRoot.fixedScheme(sky, store: store), .dark)
+        XCTAssertEqual(LookRoot.look(sky, store: store, scheme: .light).mode, .dark)
+        XCTAssertEqual(LookRoot.fixedScheme(garden, store: store), .light)
+        SceneStills.chose(.light, theme: sky.id, key: "LookTests-\(UUID())")
+        XCTAssertNotEqual(LookStore.shared.sceneModes[sky.id], .light, "its driver's day is ignored")
+    }
+
     func testLiveSceneNeedsOptInForegroundAndHeadroom() {
         let defaults = UserDefaults(suiteName: "LookTests-\(UUID())")!
         let store = LookStore(defaults: defaults)

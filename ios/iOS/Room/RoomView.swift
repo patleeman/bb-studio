@@ -362,6 +362,9 @@ struct RoomView: View {
         // tokens too, not a light canvas under a dark transcript.
         .environment(\.look, Look(theme: look.theme, scheme: .dark, showsScene: look.showsScene))
         .environment(\.colorScheme, .dark)
+        // The navigation bar's glass buttons (voice, more) too: the bar takes
+        // its scheme from the window, not from the environment above.
+        .toolbarColorScheme(.dark, for: .navigationBar)
     }
 
     /// A sideways drag on the open conversation's messages: it follows the

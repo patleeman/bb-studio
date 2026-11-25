@@ -42,6 +42,31 @@ struct PhoneSceneLayout: Equatable {
     }
 }
 
+/// Tonight's Sky stays night at every hour: its day is too bright behind the
+/// room. Its look is the dark variant (`LookRoot.fixedScheme`), and its scene's
+/// page reads a clock set to tonight, so the sky driver draws the night and
+/// never asks for the light variant.
+enum SceneNight {
+    static let themes: Set<String> = ["tonights-sky"]
+
+    /// 23:00 local today, moving on from there and back every four hours, before dawn.
+    static let clock = """
+    if (!Date.bbNight) {
+        const real = Date.now.bind(Date), start = real(), base = new Date();
+        base.setHours(23, 0, 0, 0);
+        const night = base.getTime();
+        Date.now = () => night + ((real() - start) % 14400000);
+        Date.bbNight = true;
+    }
+    """
+
+    /// Sets the night clock on a scene's page before the scene starts, for these themes.
+    static func prepare(_ host: LookWebView, theme: String) async {
+        guard themes.contains(theme) else { return }
+        _ = try? await host.call(clock)
+    }
+}
+
 /// Desktop's scene signals from a Bot's threads view: workers and conversations.
 enum SceneSignals {
     static func payload(botId: String?, view: BotThreadsView?) -> [String: Any] {
@@ -101,6 +126,7 @@ final class SceneStills {
 
     /// Remembers a driver's chosen mode with its still, and hands it to the look.
     static func chose(_ mode: LookTheme.Mode, theme: String, key: String) {
+        guard !SceneNight.themes.contains(theme) else { return }
         UserDefaults.standard.set(mode.rawValue, forKey: "look.sceneMode." + key)
         if LookStore.shared.sceneModes[theme] != mode { LookStore.shared.sceneModes[theme] = mode }
     }
@@ -137,6 +163,7 @@ final class SceneStills {
             guard message["kind"] as? String == "scene-mode", let raw = message["mode"] as? String, let mode = LookTheme.Mode(rawValue: raw) else { return }
             Self.chose(mode, theme: theme.id, key: key)
         }
+        await SceneNight.prepare(host, theme: theme.id)
         do {
             let layout = PhoneSceneLayout(size: size, light: light)
             let started = try await host.call("return BBLook.scene.start(options)",
@@ -332,6 +359,7 @@ struct LiveSceneView: UIViewRepresentable {
             let paused = paused
             coordinator.paused = paused
             Task {
+                await SceneNight.prepare(host, theme: theme)
                 _ = try? await host.call("return BBLook.scene.start(options)", ["options": options])
                 if paused { _ = try? await host.call("BBLook.scene.pause()") }
             }
