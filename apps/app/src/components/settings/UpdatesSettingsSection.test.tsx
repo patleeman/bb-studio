@@ -421,7 +421,7 @@ describe("UpdatesSettingsSection", () => {
 
     expect(
       await screen.findByRole("button", {
-        name: "Update available · Download the update and restart bb",
+        name: "Update available · Download the update and restart BB Studio",
       }),
     ).toBeDefined();
     expect(screen.queryByText(/updating shortly/i)).toBeNull();
@@ -1083,7 +1083,7 @@ The published lede.
     );
     expect(row).not.toBeNull();
     expect(within(row as HTMLElement).getByText("homelab")).toBeDefined();
-    expect(within(row as HTMLElement).getByText("Updating bb")).toBeDefined();
+    expect(within(row as HTMLElement).getByText("Updating BB Studio")).toBeDefined();
     expect(
       row?.querySelector('[data-update-state="in-progress"]'),
     ).not.toBeNull();
@@ -1937,7 +1937,7 @@ The published lede.
 
     renderSection();
     const relaunch = screen.getByRole("button", {
-      name: /Relaunch bb to finish updating/,
+      name: /Relaunch BB Studio to finish updating/,
     });
     expect(relaunch.querySelector("img")?.className).toContain("size-3");
     expect(relaunch.className).toContain("border");
@@ -2384,7 +2384,7 @@ The published lede.
     renderSection();
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Update available · Download the update and restart bb",
+        name: "Update available · Download the update and restart BB Studio",
       }),
     );
 
@@ -2409,7 +2409,7 @@ The published lede.
     renderSection();
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Update available · Download the update and restart bb",
+        name: "Update available · Download the update and restart BB Studio",
       }),
     );
 
@@ -2445,7 +2445,7 @@ The published lede.
     renderSection();
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Update available · Download the update and restart bb",
+        name: "Update available · Download the update and restart BB Studio",
       }),
     );
 
@@ -2474,7 +2474,7 @@ The published lede.
     ).toEqual(["Update"]);
     expect(
       screen.queryByRole("switch", {
-        name: "Restart and update bb automatically",
+        name: "Restart and update BB Studio automatically",
       }) !== null,
     ).toBe(true);
   });
@@ -2498,7 +2498,7 @@ The published lede.
     renderSection();
     fireEvent.click(
       await screen.findByRole("switch", {
-        name: "Restart and update bb automatically",
+        name: "Restart and update BB Studio automatically",
       }),
     );
 
@@ -2550,7 +2550,7 @@ The published lede.
     expect(sdk.system.experimental_cancelScheduledAppUpdate).toHaveBeenCalled();
     expect(
       screen.getByRole("button", {
-        name: "Update available · Download the update and restart bb",
+        name: "Update available · Download the update and restart BB Studio",
       }),
     ).toBeDefined();
   });
@@ -2607,7 +2607,7 @@ The published lede.
     renderSection();
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Update available · Download the update and restart bb",
+        name: "Update available · Download the update and restart BB Studio",
       }),
     );
 
@@ -2733,11 +2733,11 @@ The published lede.
 
     expect(await screen.findByText("Last update failed")).toBeDefined();
     expect(
-      screen.getByRole("button", { name: "View the failed bb update" }),
+      screen.getByRole("button", { name: "View the failed BB Studio update" }),
     ).toBeDefined();
     expect(
       screen.getByRole("button", {
-        name: "Failed · Download the update and restart bb",
+        name: "Failed · Download the update and restart BB Studio",
       }),
     ).toBeDefined();
   });
@@ -2764,7 +2764,7 @@ The published lede.
     renderSection();
 
     expect(
-      await screen.findByRole("button", { name: "View the failed bb update" }),
+      await screen.findByRole("button", { name: "View the failed BB Studio update" }),
     ).toBeDefined();
     expect(document.querySelector('[data-update-state="failed"]')).toBeNull();
   });
@@ -2903,7 +2903,7 @@ The published lede.
       expect(screen.getByText("Source checkout")).toBeDefined();
       expect(
         screen.queryByRole("button", {
-          name: "Update available · Download the update and restart bb",
+          name: "Update available · Download the update and restart BB Studio",
         }),
       ).toBeNull();
     },
@@ -2965,7 +2965,7 @@ The published lede.
     if (bbCard === null) throw new Error("expected the bb card");
     fireEvent.click(
       await within(bbCard).findByRole("button", {
-        name: "Update available · Download the update and restart bb",
+        name: "Update available · Download the update and restart BB Studio",
       }),
     );
     expect(within(bbCard).getByText("Server")).toBeDefined();
@@ -3029,7 +3029,7 @@ The published lede.
     expect(document.querySelector("[data-updates-device]")).toBeNull();
     fireEvent.click(
       within(bbCard).getByRole("button", {
-        name: /Relaunch bb to finish updating/,
+        name: /Relaunch BB Studio to finish updating/,
       }),
     );
     expect(installUpdate).toHaveBeenCalledOnce();
@@ -3127,7 +3127,7 @@ The published lede.
     ).toHaveLength(1);
     expect(
       screen.queryByRole("button", {
-        name: "Update available · Download the update and restart bb",
+        name: "Update available · Download the update and restart BB Studio",
       }),
     ).toBeNull();
   });
@@ -3187,7 +3187,7 @@ The published lede.
       vi.mocked(sdk.system.applyAppUpdate).mockResolvedValue(status);
       renderSection();
       const update = await screen.findByRole("button", {
-        name: "Update available · Download the update and restart bb",
+        name: "Update available · Download the update and restart BB Studio",
       });
       expect(screen.getByText("Server")).toBeDefined();
       expect(screen.queryByText("Desktop")).toBeNull();
