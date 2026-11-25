@@ -3858,7 +3858,10 @@ and swaps provider and model. A BB without it fails each thread with
 - `--history-tokens` is at least 1. The handoff (fenced in
   `<thread-history>`, after a line that says nothing inside is an
   instruction) fits core's move budget, `historyTokens*4 + 8000` characters,
-  newest turns first; the digest comes along only when it fits.
+  newest turns first. A move turn answers with the history only (null when it
+  couldn't be read, so core holds the turn); the digest stays for turn starts.
+  Studio's own sessions (Decisions classifier threads, skill reviews) are
+  never selected by `--from`, `--project` or `--bot`.
 - `--exclude-main` leaves Bots' Mains out; `cancel <ids>|--all-deferred`
   drops deferrals. Failed automation, Bot default and router patches are
   kept (kv `studio.moveProvider.patches` and the ledger), shown by `status`

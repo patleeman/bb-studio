@@ -81,6 +81,8 @@ export interface MoveDeps {
   botThreads(botId: string): Promise<string[]>;
   /** Runner threads, a Bot's or every Bot's. */
   runnerThreads(botId?: string): { id: string; threadId: string; name: string; botId: string }[];
+  /** Threads Studio runs for itself (classifier sessions, skill reviews): never selected by --from, --project or --bot. */
+  internal?(thread: ThreadInfo): boolean;
   /** Project leads' threads, for the role column. */
   leadThreads(): Promise<string[]>;
   target(providerId: string): Promise<TargetCheck>;
@@ -205,6 +207,7 @@ export class MoveProviderService {
     const threads = pool.filter((thread) => {
       if (seen.has(thread.id)) return false;
       seen.add(thread.id);
+      if (!explicit.has(thread.id) && this.deps.internal?.(thread)) return false;
       return explicit.has(thread.id) || selection.includeArchived || !thread.archived;
     });
     for (const thread of threads) roles.set(thread.id, roleOf(thread.id));
@@ -543,7 +546,8 @@ export class MoveProviderService {
     const roles = (await this.select({ ids: [threadId], includeArchived: true, runners: false })).roles;
     const item = await this.moveOne(thread, roles.get(threadId) ?? "other", entry.request, { dryRun: false, noDefer: false, callerThreadId: null, supported: target?.permissionModes ?? null });
     // Deleted or archived while it moved (core's answer): dropped, not kept as a failure nobody can fix.
-    if (item.result === "failed" && (item.reason === "thread-not-found" || (item.reason === "thread-archived" && !entry.request.includeArchived))) {
+    const gone = item.reason === "thread-not-found" || (item.reason === "handoff-failed" && /not found/i.test(item.detail ?? ""));
+    if (item.result === "failed" && (gone || (item.reason === "thread-archived" && !entry.request.includeArchived))) {
       await this.forgetThread(threadId);
       return { ...item, result: "skipped" };
     }

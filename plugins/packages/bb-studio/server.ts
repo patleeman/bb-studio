@@ -1766,6 +1766,8 @@ export default async function plugin(bb: BbPluginApi) {
   // Move threads to another provider (src/move-provider): `bbs studio move-provider`, and its watcher.
   const moveProvider = createMoveProvider({
     bb, db,
+    // Studio's own sessions (Decisions classifier threads, skill reviews) aren't the user's to move.
+    internal: (thread) => isClassifier(thread.title) || !!learning.review(thread.id),
     bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, defaultModel: bot.defaultModel ? { providerId: bot.defaultModel.providerId, model: bot.defaultModel.model } : null })),
     botThreads: async (botId) => [...new Set([...bots.chain(botId), ...(await bots.started(botId)).map((thread) => thread.id)])],
     setBotDefault: async (botId, providerId, model) => { await bots.setDefaultModel({ botId, providerId, model }); },

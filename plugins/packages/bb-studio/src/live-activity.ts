@@ -32,7 +32,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { turnContext, type ThreadSeeds } from "./thread-seeds";
-import { moveMaxChars, type ProviderMoveInput } from "./provider-move/handoff";
+import type { ProviderMoveInput } from "./provider-move/handoff";
 import { taskTitle } from "./tasks/store";
 import { latestLine, repoTag, threadRunning, type BotThreads, type ThreadFacts, type WorkerStatus } from "./bot-threads";
 
@@ -380,17 +380,10 @@ export function turnText(threadId: string, context: TurnContextInput, base: () =
     return base();
   }
   const move = context.providerMove;
-  // A move turn answers with the handoff, or null when there is none: core takes any text as "history
-  // delivered", so the digest never goes alone (null makes core hold the turn and try again).
-  // Core counts the whole answer against the move budget and cuts the end when it is over: the digest
-  // comes along only when it fits after the handoff (which is built to fit on its own).
-  const limit = moveMaxChars(move.historyTokens);
-  return moves.forTurn(threadId, move).catch(() => null)
-    .then((handoff) => {
-      if (handoff === null) return null;
-      const digest = base();
-      return digest && handoff.length + 2 + digest.length <= limit ? `${handoff}\n\n${digest}` : handoff;
-    });
+  // A move turn answers with the history only (core asks move-history plugins alone on a move turn; the
+  // digest stays for turn starts), or null when it couldn't be read: core takes any text as "history
+  // delivered", and null makes it hold the turn and ask again. The handoff is built to fit core's budget.
+  return moves.forTurn(threadId, move).catch(() => null);
 }
 
 /**

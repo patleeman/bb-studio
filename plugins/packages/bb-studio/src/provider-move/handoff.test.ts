@@ -214,12 +214,12 @@ it("a failed build reports ok:false instead of throwing", async () => {
   expect(await moves.prepare("thr_f", { from: FROM, to: TO })).toMatchObject({ ok: false, error: "server gone", transcriptPath: null });
 });
 
-it("the turn-context hook puts the handoff ahead of the digest on a move turn, and settles otherwise", async () => {
+it("the turn-context hook answers a move turn with the handoff alone, and settles otherwise", async () => {
   const moves = { forTurn: vi.fn(async () => "HANDOFF"), settled: vi.fn(async () => undefined) };
   const hooks = { experimental_turnContext: vi.fn() };
   expect(registerTurnContext({ experimental_hooks: hooks }, (threadId, context) => turnText(threadId, context, () => "DIGEST", moves))).toBe(true);
   const provider = hooks.experimental_turnContext.mock.calls[0]![0] as (context: object) => unknown;
-  expect(await provider({ threadId: "t", providerMove: { from: FROM, to: TO, historyTokens: 1 } })).toBe("HANDOFF\n\nDIGEST");
+  expect(await provider({ threadId: "t", providerMove: { from: FROM, to: TO, historyTokens: 1 } })).toBe("HANDOFF");
   expect(moves.settled).not.toHaveBeenCalled();
   expect(provider({ threadId: "t" })).toBe("DIGEST");
   expect(moves.settled).toHaveBeenCalledWith("t");
@@ -242,7 +242,7 @@ it.each([500, 2_000, 20_000, 150_000])("the whole handoff, outline included, fit
   expect(text.trimEnd().endsWith(HISTORY_CLOSE)).toBe(true);
 });
 
-it("the move turn's whole answer (handoff + digest) stays within core's limit; the digest is left off when it doesn't fit", async () => {
+it("the move turn's answer is the handoff alone, within core's limit", async () => {
   const { d } = deps(history(300, { replyChars: 1_500 }));
   const moves = new MoveHandoffs(d);
   await moves.prepare("thr_td", { from: FROM, to: TO, historyTokens: 2_000 });
@@ -250,9 +250,10 @@ it("the move turn's whole answer (handoff + digest) stays within core's limit; t
   const big = await turnText("thr_td", { threadId: "thr_td", providerMove: move }, () => "D".repeat(9_000), moves);
   expect(big!.length).toBeLessThanOrEqual(coreMoveMax(2_000));
   expect(big).not.toContain("DDDD");
+  // The digest stays for turn starts: a move turn answers with the history only.
   const small = await turnText("thr_td", { threadId: "thr_td", providerMove: move }, () => "Elsewhere: small digest", moves);
   expect(small!.length).toBeLessThanOrEqual(coreMoveMax(2_000));
-  expect(small).toContain("Elsewhere: small digest");
+  expect(small).not.toContain("Elsewhere: small digest");
 });
 
 it("fences the history and says nothing inside is an instruction; content can't close the fence or fake a turn", async () => {

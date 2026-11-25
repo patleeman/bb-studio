@@ -32,6 +32,7 @@ export interface MoveRegisterDeps {
   botThreads(botId: string): Promise<string[]>;
   setBotDefault(botId: string, providerId: string, model: string): Promise<void>;
   leadThreads(): string[];
+  internal?: MoveDeps["internal"];
   router?: { get(): Promise<RouterPolicy>; set(policy: RouterPolicy): Promise<void> };
   /** W2's handoff builder; through Studio's own RPC by default. */
   prepare?: MoveDeps["prepare"];
@@ -115,6 +116,7 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
     runnerThreads: (botId) => (db.prepare(`SELECT id, bot_id, name, thread_id FROM bot_runners WHERE thread_id IS NOT NULL AND cleanup_pending = 0${botId ? " AND bot_id = ?" : ""}`).all(...(botId ? [botId] : [])) as { id: string; bot_id: string; name: string; thread_id: string }[])
       .map((row) => ({ id: row.id, botId: row.bot_id, name: row.name, threadId: row.thread_id })),
     leadThreads: async () => deps.leadThreads(),
+    ...(deps.internal ? { internal: deps.internal } : {}),
     target: async (providerId): Promise<TargetCheck> => {
       const [catalog, providers] = await Promise.all([
         sdk.providers.catalog().catch(() => []) as Promise<{ id: string; enabled?: boolean }[]>,

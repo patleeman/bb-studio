@@ -651,3 +651,19 @@ describe("deferred threads that went away", () => {
     expect(await w.service.onIdle("old")).toMatchObject({ result: "moved" });
   });
 });
+
+
+describe("Studio's own threads", () => {
+  it("are never selected by --from (only by id); a deferral whose handoff says not found is dropped", async () => {
+    const w = world([thread("a"), thread("cls", { title: "Studio Decisions · strands backfill" })]);
+    w.deps.internal = (each) => each.title.startsWith("Studio Decisions");
+    expect((await w.service.select({ ids: [], from: "claude-code", includeArchived: false, runners: false })).threads.map((each) => each.id)).toEqual(["a"]);
+    expect((await w.service.select({ ids: ["cls"], includeArchived: false, runners: false })).threads.map((each) => each.id)).toEqual(["cls"]);
+    w.store.get("a")!.status = "active";
+    await w.cli(["a", "--to", TO, "--json"]);
+    w.store.get("a")!.status = "idle";
+    w.deps.prepare = async () => ({ ok: false, error: "HTTP 404: Thread not found" });
+    expect(await w.service.onIdle("a")).toMatchObject({ result: "skipped" });
+    expect(parseLedger(w.kv.get(LEDGER_KEY))).toEqual({});
+  });
+});
