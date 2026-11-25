@@ -1810,7 +1810,7 @@ extension ThreadView {
         // Over a home indicator alone (the folded Duo, a phone's thread),
         // the card rests on its inset: its own 8 pt padding goes inside it.
         chrome.composerRestDrop = 8
-        chrome.restingBackdrop = .systemBackground
+        chrome.restingBackdrop = look.showsScene ? UIColor(look.canvas) : .systemBackground
         chrome.stackBand = look.showsScene ? UIColor(look.canvas) : .systemBackground
         chrome.composerIgnoresTrailingSafeArea = duoLayout.twoPages
         chrome.rows.margin = Self.margin
@@ -1859,7 +1859,19 @@ extension ThreadView {
                         FoldedChatTitle(avatar: nil, title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread", status: nil)
                     }
                 }
-                    .background(.bar)
+                    .background(roomChat == nil ? AnyShapeStyle(.bar) : AnyShapeStyle(.clear))
+                    .background {
+                        if roomChat != nil {
+                            // In the room, the frost's own tone fading out below
+                            // the title: the rows pass under it, not under a box.
+                            LinearGradient(stops: [.init(color: look.canvas.opacity(0.85), location: 0),
+                                                   .init(color: look.canvas.opacity(0.85), location: 0.55),
+                                                   .init(color: look.canvas.opacity(0), location: 1)],
+                                           startPoint: .top, endPoint: .bottom)
+                                .padding(.bottom, -18)
+                                .ignoresSafeArea(edges: .top)
+                        }
+                    }
                     .opacity(lying ? 0 : 1)
                     .accessibilityHidden(lying)
             }
