@@ -2068,7 +2068,7 @@ export default async function plugin(bb: BbPluginApi) {
     contentSearch,
   });
 
-  const { acting, selfBot } = registerBotTools({
+  const { acting, selfBot, registerStatusTools } = registerBotTools({
     bb,
     bots,
     runners,
@@ -2090,11 +2090,13 @@ export default async function plugin(bb: BbPluginApi) {
     automations,
     ownedThreads,
     getSettingValues: () => settingValues,
+    // The composer menu's quick settings; the returned values are current at once (onChange follows).
     saveSettings: async (values) => { settingValues = await settings.experimental_set(values); },
     botPushIds,
   }));
   registerWindowRelay(bb);
   registerGroupTool(bb, { state: pageState, acting, jobs: async (botId) => (await automations.list(botId)).map((job) => ({ id: job.id, name: job.name })) });
+  registerStatusTools();
 
   // The Bot's own tools: given only to its thread and its skill review forks (agents.configure above).
   const ownBot = (threadId: string | undefined): string => {

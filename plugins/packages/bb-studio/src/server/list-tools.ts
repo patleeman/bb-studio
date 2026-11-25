@@ -1,28 +1,23 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { Bots } from "../bot";
-import type { HubItem } from "../hub";
+import type { HubItem, StudioHub } from "../hub";
 import { ITEM_FAMILIES, ITEM_TYPES } from "../item-model";
 import { relativeTime, untitled } from "../kit/format";
 import type { ProjectLeads } from "../project-lead";
 import { compileQuery, parseQuery, type Filter, type Query } from "../query";
+import type { Tag } from "../tags";
 
 const MAX_LISTED = 100;
 
 /** `snippet` is the content that matched a query, when the add-on gave it. */
 export type ListedItem = HubItem & { tags: string[]; snippet?: string };
 
-export interface OverviewData {
-  items: (HubItem & { tags: string[]; starredAt?: number | null })[];
-  providers: {
-    pluginId: string;
-    name: string;
-    state: string;
-    detail?: string | null;
-    kinds: { id: string; label: string; plural: string; background?: boolean }[];
-  }[];
-  tags: { id: string; name: string }[];
-}
+type HubOverview = Awaited<ReturnType<StudioHub["overview"]>>;
+export type OverviewData = Omit<HubOverview, "items" | "truncated" | "discoveryComplete"> & {
+  items: (HubOverview["items"][number] & { tags: string[]; starredAt?: number | null })[];
+  tags: Tag[];
+};
 
 export interface ListToolsDeps {
   bb: BbPluginApi;
