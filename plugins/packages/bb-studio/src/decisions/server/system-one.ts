@@ -71,6 +71,21 @@ function checkedAnswers(route: JevRoute, questions: Questions, answers: Answers)
   return result;
 }
 
+function raceAbort<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    work.catch(() => {});
+    return Promise.reject(signal.reason);
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (value) => { signal.removeEventListener("abort", onAbort); resolve(value); },
+      (error) => { signal.removeEventListener("abort", onAbort); reject(error); },
+    );
+  });
+}
+
 async function askRoute(
   route: JevRoute,
   state: string,
@@ -80,7 +95,7 @@ async function askRoute(
   retried = false,
 ): Promise<Answers> {
   const reused = !!route.apiKeyCommand && hasCommandToken(route.apiKeyCommand);
-  const bearer = route.apiKeyCommand ? await commandToken(route.apiKeyCommand) : route.apiKey;
+  const bearer = route.apiKeyCommand ? await raceAbort(commandToken(route.apiKeyCommand), signal) : route.apiKey;
   signal.throwIfAborted();
   // Node 20's AbortSignal.any() holds its sources weakly, so a bare
   // AbortSignal.timeout() there can be collected before it fires. Own the timer.

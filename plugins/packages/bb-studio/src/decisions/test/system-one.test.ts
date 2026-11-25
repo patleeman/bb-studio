@@ -64,3 +64,19 @@ test("the public contract bounds what other plugins can send", () => {
   assert.equal(model.safeParse({ ...request, prompt: "" }).success, false);
   assert.equal(model.safeParse({ ...request, projectId: "proj_1" }).success, false);
 });
+
+test("askSystemOne aborts promptly if the caller signal aborts while apiKeyCommand is running", async () => {
+  const controller = new AbortController();
+  const started = Date.now();
+  setTimeout(() => controller.abort(new Error("caller gave up")), 40);
+  await assert.rejects(
+    askSystemOne(
+      { jevProvider: "custom", customJevEndpoint: "http://localhost:9999/v1/systemone", customJevModel: "jev-local", customJevApiKeyCommand: "sleep 5 && echo tok" },
+      { state: {}, questions },
+      controller.signal,
+      env,
+    ),
+    /caller gave up/,
+  );
+  assert.ok(Date.now() - started < 1000, `expected prompt abort, took ${Date.now() - started}ms`);
+});

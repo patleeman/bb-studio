@@ -12,6 +12,7 @@ import {
   discardSession,
   modelPrompt,
   parseModelVerdict,
+  runModel,
   situationState,
   type Situation,
   type Verdict,
@@ -253,4 +254,73 @@ test("a hidden fallback session is deleted even when stopping it fails", async (
   assert.deepEqual(removed, ["thr_hidden"]);
   assert.equal(sessions.has("thr_hidden"), false);
   assert.equal(warnings.length, 1, "the failed stop is logged");
+});
+
+test("runModel does not spawn a hidden thread if aborted while listing providers", async () => {
+  const controller = new AbortController();
+  const spawned: string[] = [];
+  const bb = {
+    sdk: {
+      providers: {
+        list: async () => {
+          controller.abort(new Error("timed out"));
+          return [{ id: "codex", available: true, capabilities: { permissionModes: ["auto"] } }];
+        },
+      },
+      threads: {
+        spawn: async () => { spawned.push("spawned"); return { id: "thr_never" }; },
+      },
+    },
+    log: { warn: () => {} },
+  };
+  await assert.rejects(
+    runModel(
+      bb as never,
+      { mode: "thread" },
+      { projectId: "prj_1", hostId: "h_1", requestId: "r_1", defaultProviderId: "codex" },
+      "prompt",
+      controller.signal,
+      new Set(),
+    ),
+    /timed out/,
+  );
+  assert.deepEqual(spawned, []);
+});
+
+test("runModel discards a spawned hidden thread immediately if aborted during spawn", async () => {
+  const controller = new AbortController();
+  const waited: string[] = [];
+  const deleted: string[] = [];
+  const bb = {
+    sdk: {
+      providers: {
+        list: async () => [{ id: "codex", available: true, capabilities: { permissionModes: ["auto"] } }],
+      },
+      threads: {
+        spawn: async () => {
+          controller.abort(new Error("aborted during spawn"));
+          return { id: "thr_orphan" };
+        },
+        wait: async () => { waited.push("wait"); },
+        stop: async () => {},
+        delete: async ({ threadId }: { threadId: string }) => { deleted.push(threadId); },
+      },
+    },
+    log: { warn: () => {} },
+  };
+  const sessions = new Set<string>();
+  await assert.rejects(
+    runModel(
+      bb as never,
+      { mode: "thread" },
+      { projectId: "prj_1", hostId: "h_1", requestId: "r_2", defaultProviderId: "codex" },
+      "prompt",
+      controller.signal,
+      sessions,
+    ),
+    /aborted during spawn/,
+  );
+  assert.deepEqual(waited, []);
+  assert.deepEqual(deleted, ["thr_orphan"]);
+  assert.equal(sessions.size, 0);
 });
