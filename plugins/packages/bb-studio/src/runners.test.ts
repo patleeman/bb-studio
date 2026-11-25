@@ -70,7 +70,7 @@ async function setup(extra: Partial<RunnerDeps> = {}) {
   const clock = { now: Date.now() };
   const { engine, scheduler } = testScheduler(db, bb.sdk, clock);
   const runners = new Runners({ db, sdk: bb.sdk, scheduler, changed, bot: (botId) => botId === second.id ? second : !botId || botId === bot.id ? bot : null, startedThreads: async () => started, chain: () => ["bot1"], ...extra });
-  return { clock, engine, scheduler, timeline, hosts, cli, providerStates, pathsExist, installProviderCli, environmentProviders, changed, harness, runners, threads, add, spawn, send, update, archive, automations, calls, callRpc, bot, started, db, sdk: bb.sdk };
+  return { clock, engine, scheduler, timeline, hosts, cli, providerStates, pathsExist, installProviderCli, environmentProviders, changed, harness, runners, threads, add, spawn, get, send, update, archive, automations, calls, callRpc, bot, started, db, sdk: bb.sdk };
 }
 
 const schedule = { cadence: "every15minutes" as const, time: "09:00" };
@@ -802,4 +802,44 @@ it("FM (#9): making a runner when the Main is gone or has no model says so with 
   x.add({ id: "bot1", title: "Jarvis", providerId: null as never });
   await expect(x.runners.create({ name: "Inbox", job: "Check mail.", schedule })).rejects.toThrow("Jarvis's Main conversation has no model yet. Choose one in it");
   expect(await x.runners.list()).toEqual([]);
+});
+
+it("bounds concurrency in list() and hideThreads() while preserving order and counts", async () => {
+  const x = await setup();
+  for (let i = 0; i < 10; i += 1) {
+    await x.runners.create({ name: `R${String(i).padStart(2, "0")}`, job: `Job ${i}`, schedule });
+  }
+  // Reset hidden = 0 so hideThreads() hides all 10 concurrently (bounded to 6).
+  x.db.prepare("UPDATE bot_runners SET hidden = 0").run();
+  let inFlightHide = 0;
+  let maxHide = 0;
+  const origUpdate = x.update.getMockImplementation()!;
+  x.update.mockImplementation(async (args) => {
+    inFlightHide += 1;
+    maxHide = Math.max(maxHide, inFlightHide);
+    await new Promise((r) => setTimeout(r, 15));
+    inFlightHide -= 1;
+    return origUpdate(args);
+  });
+  expect(await x.runners.hideThreads()).toBe(10);
+  expect(maxHide).toBeGreaterThanOrEqual(2);
+  expect(maxHide).toBeLessThanOrEqual(6);
+
+  // list() bounds concurrent threads.get() calls to <= 6 and preserves order.
+  let inFlightGet = 0;
+  let maxGet = 0;
+  const origGet = x.get.getMockImplementation()!;
+  x.get.mockImplementation(async (args) => {
+    inFlightGet += 1;
+    maxGet = Math.max(maxGet, inFlightGet);
+    await new Promise((r) => setTimeout(r, 15));
+    inFlightGet -= 1;
+    return origGet(args);
+  });
+
+  const listed = await x.runners.list();
+  expect(listed).toHaveLength(10);
+  expect(maxGet).toBeGreaterThanOrEqual(2);
+  expect(maxGet).toBeLessThanOrEqual(6);
+  expect(listed.map((r) => r.name)).toEqual(Array.from({ length: 10 }, (_, i) => `R${String(i).padStart(2, "0")}`));
 });

@@ -54,6 +54,7 @@ import { isScheduleId, type EngineScheduler } from "./triggers/scheduler";
 import { turnStartedAt } from "./turn-started";
 import { threadModel } from "./thread-model";
 import { rpcErrorStatus } from "./kit/server/index";
+import { mapPool } from "./kit/pool";
 
 type Sdk = BbPluginApi["sdk"];
 /** SDK 0.6.104 overloads timeline (a delta read too); a full read has `rows`. */
@@ -401,9 +402,8 @@ export class Runners {
    */
   async hideThreads(): Promise<number> {
     const rows = this.deps.db.prepare("SELECT * FROM bot_runners WHERE thread_id IS NOT NULL AND hidden = 0").all() as RunnerRow[];
-    let hid = 0;
-    for (const row of rows) if (await this.hide(row)) hid++;
-    return hid;
+    const results = await mapPool(rows, 6, (row) => this.hide(row));
+    return results.filter(Boolean).length;
   }
 
   instructions(row: RunnerRow): string {
@@ -453,12 +453,12 @@ export class Runners {
     const rows = this.rows(botId);
     // Only adopted runners are read from BB's automations; the rest are Studio's own.
     const automations = await this.automations(rows.flatMap((row) => row.adopted && row.automation_project_id ? [row.automation_project_id] : []));
-    return Promise.all(rows.map(async (row) => {
+    return mapPool(rows, 6, async (row) => {
       const runner = this.view(row, row.adopted ? liveOf(automations.find((each) => each.id === row.automation_id)) : await this.live(row));
       if (!runner.threadId) return runner;
       const thread = await this.deps.sdk.threads.get({ threadId: runner.threadId }).catch(() => null);
       return { ...runner, providerId: thread?.providerId ?? null, ...await this.runState(runner.threadId, thread?.status) };
-    }));
+    });
   }
 
   private bot(botId?: string): RunnerBot & { threadId: string } {
