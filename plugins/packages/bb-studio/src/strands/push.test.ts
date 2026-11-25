@@ -170,29 +170,44 @@ describe("the needs-you push", () => {
     expect(pushed).not.toHaveBeenCalled();
   });
 
-  it("stops run() before notify() when disposed while pushFor() is in flight", async () => {
+  it("finishes sending a saved push when disposed during pushFor() across a two-instance reload (exactly one notify)", async () => {
     let releaseAsk!: () => void;
+    let kept: string[] | null = [];
+    const rows = [conversation("thr_main", [strand("s1", "needs-you", [ask("thr_main")])])];
     const notify = vi.fn(async () => {});
-    const pushed = vi.fn();
-    const h = harness({
-      load: async () => [],
+    const shared = {
+      bots: () => [{ id: "bot_main", name: "Chief of Staff" }],
+      overview: async () => ({ conversations: rows }),
+      startedByAnotherThread: async () => false,
+      projectOf: async () => "proj_1",
+      notify,
+      load: async () => kept,
+      save: async (ids: string[]) => { kept = ids; },
+      defaultProjectId: "proj_personal",
+      delayMs: 0,
+    };
+    const first = new StrandPushes({
+      ...shared,
       bbPushesAsks: async () => {
         await new Promise<void>((resolve) => { releaseAsk = resolve; });
         return false;
       },
-      notify,
-      pushed,
     });
-    h.set([conversation("thr_main", [strand("s1", "needs-you", [ask("thr_main")])])]);
+    const second = new StrandPushes({
+      ...shared,
+      bbPushesAsks: async () => false,
+    });
 
-    const checking = h.pushes.check();
+    const firstCheck = first.check();
     await new Promise((r) => setTimeout(r, 0));
 
-    h.pushes.dispose();
+    // Reload: first instance is disposed after save() already recorded s1, and the new instance runs.
+    first.dispose();
+    await second.check();
     releaseAsk();
-    await checking;
+    await firstCheck;
 
-    expect(notify).not.toHaveBeenCalled();
-    expect(pushed).not.toHaveBeenCalled();
+    expect(kept).toEqual(["s1"]);
+    expect(notify).toHaveBeenCalledTimes(1);
   });
 });

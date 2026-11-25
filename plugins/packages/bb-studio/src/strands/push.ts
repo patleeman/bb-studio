@@ -148,26 +148,23 @@ export class StrandPushes {
     }
     if (this.disposed) return;
     await this.deps.save([...now]);
-    if (this.disposed) return;
+    // Once saved, finish sending every claimed push even if dispose() lands mid-flight
+    // (a reloaded instance reads the saved list and would otherwise skip them).
     // The first check only learns what already needs the user.
     if (before === null) return;
     for (const { botId, strand, conversation } of sends) {
-      if (this.disposed) return;
       const push = await pushFor(strand, conversation, this.deps);
-      if (this.disposed) return;
       if (!push) continue;
       try {
         const projectId = (await this.deps.projectOf(conversation.threadId).catch(() => null)) || this.deps.defaultProjectId;
-        if (this.disposed) return;
         await this.deps.notify({
           title: `${strand.title} · ${conversation.title}`.slice(0, 120), body: push.body, kind: "needs-you",
           threadId: push.threadId, conversationId: conversation.threadId, botId,
           projectId,
         });
-        if (this.disposed) return;
         this.deps.pushed?.(botId);
       } catch (error) {
-        if (!this.disposed) this.deps.log?.(`Strands push for ${strand.id} failed: ${error instanceof Error ? error.message : String(error)}`);
+        this.deps.log?.(`Strands push for ${strand.id} failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }
