@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useStudioSettings } from "../../settings/ui/use-settings";
 import { openAppPath } from "../../kit/app/index";
+import { useNow } from "../../kit/app/visible-poll";
 import { useStudioOpen } from "../../ui/studio-open";
 import { errorMessage } from "../../kit/format";
 import { Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, cn } from "../../kit/ui/index";
@@ -42,16 +43,6 @@ export function useCallLive(): { live: CallLive | null; consented: boolean | nul
   return { live, consented, refresh };
 }
 
-function useNow(active: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(timer);
-  }, [active]);
-  return now;
-}
-
 function Level({ value, label }: { value: number; label: string }) {
   return (
     <span aria-hidden title={label} className="flex h-3.5 items-end gap-[2px]">
@@ -71,7 +62,7 @@ function modelText(model: NonNullable<CallLive["model"]>): string {
 /** The bar: always on top, on every screen, while a call is recorded. */
 export function CallBar({ live, onStop }: { live: CallLive; onStop(): void }) {
   const open = useStudioOpen("route");
-  const now = useNow(true);
+  const now = useNow(500);
   const viewing = typeof location !== "undefined" && location.pathname.endsWith(recordingHref(live.recordingId));
   const note = live.error ?? (live.model ? modelText(live.model) : live.fallback ? "Local transcription failed; using BB's voice service." : null);
   return (

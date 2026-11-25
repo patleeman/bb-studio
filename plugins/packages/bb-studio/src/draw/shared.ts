@@ -11,8 +11,6 @@ export const DRAW_ICON = "studio/draw";
 /** Realtime channel: the server pushes scene updates to open editors. */
 export const REALTIME_CHANNEL = "excalidraw";
 export const DRAWING_UPDATE_TYPE = "drawing:updated";
-/** The Drawings workbench tab's action id; reply cards open it with `{ drawingId }`. */
-export const DRAWINGS_TAB = "excalidraw";
 
 export function drawingHref(id: string): string {
   return `/plugins/studio/studio/${ROUTE_SEGMENT}/${encodeURIComponent(id)}`;

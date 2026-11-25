@@ -26,8 +26,6 @@ const SESSION_TTL = 45_000;
 const ACTION_TIMEOUT = 20_000;
 const MAX_WAIT_SECONDS = 60;
 
-export const LIVE_TOOLS = ["artifacts_live"];
-
 export const LIVE_USAGE = [
   "  state <id> [--set <json>]                             Print a live HTML artifact's state, or replace it",
   "  watch <id> [--since <seq>] [--wait <seconds>]         Print its events after seq as JSON lines (0: wait for new ones)",

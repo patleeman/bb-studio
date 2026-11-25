@@ -51,10 +51,6 @@ export function paletteFromColor(main: Rgb, light = false): Palette {
     : [main, fromHsl(h - 42, sat, clamp(l * 0.78, 0.36, 0.6)), fromHsl(h + 48, Math.min(1, sat * 1.05), clamp(l * 1.25, 0.62, 0.8))];
 }
 
-export function isLightGround(ground: string): boolean {
-  return luminance(hexToTriple(ground)) > 0.4;
-}
-
 export function paletteFromTheme(themePalette: readonly string[]): Palette {
   const ground = hexToTriple(themePalette[0] ?? "#000000"), light = luminance(ground) > 0.4;
   const usable = [...new Set(themePalette.slice(1).map((hex) => hex.toLowerCase()))].map(hexToTriple).filter((color) => contrast(color, ground) >= 2 && toHsl(color)[1] >= 0.12);

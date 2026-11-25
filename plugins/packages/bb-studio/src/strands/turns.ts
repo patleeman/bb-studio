@@ -49,11 +49,6 @@ export function quietReport(turn: Turn): boolean {
 
 interface Open { request: { seq: number; at: number; kind: "user" | "report" | "hidden"; text: string }; turn: Turn | null }
 
-/** The turns among `rows` (see turnsOf). */
-export function readTurns(rows: readonly EventRow[]): Turn[] {
-  return turnsOf(rows).turns;
-}
-
 /**
  * The turns among `rows` (in seq order). A request with no turn yet waits
  * for the next turn to start; a steer (a second message in a running turn)

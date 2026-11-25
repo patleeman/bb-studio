@@ -14,8 +14,6 @@ export const REALTIME_CHANNEL = "design";
 export const DESIGN_UPDATE_TYPE = "design:updated";
 /** The question form's renderer: a pendingInteraction slot the design_ask tool opens. */
 export const QUESTIONS_RENDERER = "design-questions";
-/** The Design workbench tab's action id; reply cards open it with `{ designId }`. */
-export const DESIGN_TAB = "design";
 
 export function designHref(id: string): string {
   return `/plugins/studio/studio/${ROUTE_SEGMENT}/${encodeURIComponent(id)}`;

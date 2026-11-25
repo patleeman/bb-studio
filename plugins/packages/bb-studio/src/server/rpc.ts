@@ -161,7 +161,7 @@ export function registerStudioRpc({
   recordActivity,
 }: StudioRpcDeps): void {
   bb.rpc.register(rpcContract, {
-    overview: () => overview() as never,
+    overview: () => overview(),
     search: ({ query }) => contentSearch(query),
     searchStatus: () => searchIndex.status(),
     searchRetry: () => searchIndex.retry(),

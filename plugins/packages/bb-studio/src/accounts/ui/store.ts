@@ -36,10 +36,6 @@ export function toggleAccounts(): void {
   if (footer) footer.toggle();
 }
 
-export function closeAccounts(): void {
-  footer?.close();
-}
-
 export function useSigningIn(): string | null {
   return useSyncExternalStore((listener) => {
     listeners.add(listener);

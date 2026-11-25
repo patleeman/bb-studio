@@ -13,11 +13,6 @@ export function useUnifiedSidebarShown(): boolean {
 
 const CHOSEN_KEY = "studio.sidebar.unified";
 
-/** Whether the unified sidebar was the list last shown in this browser. */
-export function unifiedSidebarChosen(): boolean {
-  try { return localStorage.getItem(CHOSEN_KEY) === "1"; } catch { return false; }
-}
-
 /** Notes that BB's own list (with the Bots section under it) is the one in use. */
 export function forgetUnifiedSidebar(): void {
   try { localStorage.removeItem(CHOSEN_KEY); } catch { /* private mode */ }
