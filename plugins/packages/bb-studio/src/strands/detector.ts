@@ -44,6 +44,8 @@ export const JEV_TOTAL_DAILY_CAP = 3_000;
 export const MODEL_TOTAL_DAILY_CAP = 300;
 /** Jev gets this long per call before it counts as a failure. */
 export const JEV_TIMEOUT_MS = 15_000;
+/** Small-model and completeText calls get this long before falling back so a hung call can't stall a conversation's queue. */
+export const MODEL_TIMEOUT_MS = 30_000;
 /** After this many Jev failures in a row (errors, timeouts), back off: twice as long each time, up to an hour. */
 export const JEV_FAILURES_BEFORE_BACKOFF = 2;
 export const JEV_BACKOFF_MS = 5 * 60 * 1000;
@@ -96,6 +98,8 @@ export interface DetectorDeps {
   /** The strand of one of the conversation's workers (the turn it started in); undefined when it isn't one. */
   workerStrand?(threadId: string, workerThreadId: string): Promise<string | null | undefined>;
   now?(): number;
+  /** Override for MODEL_TIMEOUT_MS in tests. */
+  modelTimeoutMs?: number;
   /** Timers, so tests can run them. */
   setTimer?(run: () => void, ms: number): unknown;
   clearTimer?(handle: unknown): void;
@@ -505,11 +509,23 @@ export class StrandDetector {
       .map((reply) => ({ seq: reply.seq, ask: reply.ask, strand: reply.strandId ? this.store.get(reply.strandId)?.title ?? null : null }));
   }
 
+  private withDeadline<T>(work: Promise<T>, ms: number, onTimeout: () => T): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<T>((resolve) => {
+      timer = setTimeout(() => resolve(onTimeout()), ms);
+      (timer as { unref?: () => void }).unref?.();
+    });
+    return Promise.race([work, late]).finally(() => clearTimeout(timer));
+  }
+
   /** One Jev call with its own deadline. Errors and timeouts count toward the back-off; a success resets it. */
   private async askJev(input: { caller: string; state: unknown; questions: Record<string, unknown> }): Promise<JevResult> {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const late = new Promise<JevResult>((resolve) => { timer = setTimeout(() => resolve({ ok: false, unavailable: false, error: `no answer in ${JEV_TIMEOUT_MS / 1000} s` }), JEV_TIMEOUT_MS); });
-    const result = await Promise.race([this.deps.jev(input).catch((error): JevResult => ({ ok: false, unavailable: false, error: message(error) })), late]).finally(() => clearTimeout(timer));
+    const result = await this.withDeadline(
+      this.deps.jev(input).catch((error): JevResult => ({ ok: false, unavailable: false, error: message(error) })),
+      JEV_TIMEOUT_MS,
+      () => ({ ok: false as const, unavailable: false, error: `no answer in ${JEV_TIMEOUT_MS / 1000} s` }),
+    );
+    if (this.disposed) return result;
     if (result.ok) { this.jevFailures = 0; return result; }
     if (result.unavailable) return result;
     this.jevFailures++;
@@ -527,9 +543,15 @@ export class StrandDetector {
    * Both count against the daily cap; null when the cap is reached.
    */
   private async askNaming(threadId: string, requestId: string, prompt: string): Promise<ModelResult | null> {
+    const timeoutMs = this.deps.modelTimeoutMs ?? MODEL_TIMEOUT_MS;
     if (this.deps.completeText) {
       if (!this.store.takeCall(threadId, "model", dayOf(this.now()), MODEL_DAILY_CAP, MODEL_TOTAL_DAILY_CAP)) return null;
-      const quick = await this.deps.completeText({ prompt }).catch((error) => ({ ok: false as const, error: message(error) }));
+      const quick = await this.withDeadline(
+        this.deps.completeText({ prompt }).catch((error) => ({ ok: false as const, error: message(error) })),
+        timeoutMs,
+        () => ({ ok: false as const, error: `no answer in ${timeoutMs / 1000} s` }),
+      );
+      if (this.disposed) return null;
       const json = quick.ok ? jsonIn(quick.text) : null;
       if (quick.ok && json && typeof json === "object") return { ok: true, text: quick.text };
     }
@@ -539,7 +561,12 @@ export class StrandDetector {
   /** One small-model call, counted against the conversation's daily cap; null when the cap is reached. */
   private async askModel(threadId: string, requestId: string, prompt: string): Promise<ModelResult | null> {
     if (!this.store.takeCall(threadId, "model", dayOf(this.now()), MODEL_DAILY_CAP, MODEL_TOTAL_DAILY_CAP)) return null;
-    return this.deps.model({ threadId, requestId, prompt }).catch((error): ModelResult => ({ ok: false, unavailable: false, error: message(error) }));
+    const timeoutMs = this.deps.modelTimeoutMs ?? MODEL_TIMEOUT_MS;
+    return this.withDeadline(
+      this.deps.model({ threadId, requestId, prompt }).catch((error): ModelResult => ({ ok: false, unavailable: false, error: message(error) })),
+      timeoutMs,
+      () => ({ ok: false as const, unavailable: false, error: `no answer in ${timeoutMs / 1000} s` }),
+    );
   }
 
   private apply(threadId: string, choice: Choice, turn: Pick<Turn, "seq" | "at" | "text">, by: "jev" | "model", put: (strandId: string | null, by: ItemBy, confidence: number | null, unsure?: boolean, also?: readonly string[]) => string | null): string | null {
@@ -663,16 +690,20 @@ export class StrandDetector {
     let before: number | undefined;
     let users = 0;
     for (let page = 0; page < BACKFILL_PAGES && users <= BACKFILL_MESSAGES; page++) {
+      if (this.disposed) return null;
       const got = await this.deps.events({ threadId, ...(before !== undefined ? { beforeSeq: before } : {}), order: "desc", limit: EVENT_PAGE });
+      if (this.disposed) return null;
       rows.push(...got);
       users += got.filter((row) => row.type === "client/turn/requested").length;
       const oldest = got.reduce((min, row) => Math.min(min, row.seq ?? min), before ?? Number.MAX_SAFE_INTEGER);
       if (got.length < EVENT_PAGE || oldest === before) break;
       before = oldest;
     }
+    if (this.disposed) return null;
     rows.sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
     const read = turnsOf(rows, { staleBefore: this.now() - UNFINISHED_MAX_MS });
     const turns = await this.clean(read.turns);
+    if (this.disposed) return null;
     const restFrom = read.restFrom;
     const last = rows.reduce((max, row) => Math.max(max, row.seq ?? 0), 0);
     const done = turns.filter((turn) => turn.done && turn.kind === "user").slice(-BACKFILL_MESSAGES);
@@ -686,6 +717,7 @@ export class StrandDetector {
       const keys = tasks.map((_, index) => `t${index + 1}`);
       const result = await this.askModel(threadId, `${threadId} backfill`, proposePrompt(done.map((turn) => turn.text.split("\n").find((line) => line.trim()) ?? turn.text), tasks.map((task, index) => ({ key: keys[index]!, title: task.title }))))
         ?? { ok: false as const, unavailable: true, error: "daily cap" };
+      if (this.disposed) return null;
       report.modelCalls++;
       const proposal = result.ok ? readProposal(result.text, keys) : { strands: [], tasks: new Map() };
       tasks.forEach((task, index) => {
@@ -738,6 +770,7 @@ export class StrandDetector {
         report.sorted++;
       }
     }
+    if (this.disposed) return null;
     // Proposed strands no message went to aren't kept.
     this.store.db.prepare("DELETE FROM strands WHERE thread_id = ? AND origin = 'backfill' AND last_at = 0 AND NOT EXISTS (SELECT 1 FROM strand_items i WHERE i.thread_id = strands.thread_id AND i.strand_id = strands.id)").run(threadId);
     this.store.saveRead(threadId, { seenSeq: restFrom !== null ? restFrom - 1 : last, backfill: JSON.stringify({ at: this.now(), ...report }) });

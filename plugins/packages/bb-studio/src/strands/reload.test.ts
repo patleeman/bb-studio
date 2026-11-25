@@ -3,9 +3,11 @@
 // waiting on BB's events, a queued job, a timer. None of it may touch the
 // closed database afterwards or reject unhandled ("The database connection
 // is not open", reported as an uncaught error on the plugin).
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { EventRow } from "./turns";
+import { StrandDetector } from "./detector";
 import { StrandService } from "./service";
+import { StrandStore } from "./store";
 import { database, FakeThread, fakeJev, fakeModel } from "./test/fixture";
 
 const NOW = Date.parse("2026-11-20T12:00:00Z");
@@ -89,4 +91,59 @@ it("clears its timers on reload, and a timer that fires anyway does nothing", as
   for (const timer of x.timers) timer.run();
   await flush();
   expect(unhandled).toEqual([]);
+});
+
+it("times out a hung small-model call in batchNow(), falls back to previous strand, and unblocks the queue", async () => {
+  const db = database();
+  const store = new StrandStore(db);
+  const thread = new FakeThread();
+  const logs: string[] = [];
+  const detector = new StrandDetector({
+    store,
+    events: thread.events,
+    jev: async () => ({ ok: false, unavailable: true, error: "off" }),
+    model: () => new Promise(() => {}), // hangs forever
+    openTasks: () => [],
+    changed: () => {},
+    log: (line) => logs.push(line),
+    now: () => NOW,
+    modelTimeoutMs: 30,
+  });
+  const s1 = store.create({ threadId: thread.id, title: "Router work", origin: "user", seq: 1, at: NOW - HOUR });
+  store.put({ threadId: thread.id, seq: 1, kind: "user", turnId: "t1", at: NOW - HOUR, line: "First", strandId: s1.id, confidence: null, by: "user" });
+  store.put({ threadId: thread.id, seq: 2, kind: "user", turnId: "t2", at: NOW, line: "Pending turn", strandId: s1.id, confidence: null, by: "pending" });
+
+  await detector.batchNow(thread.id);
+  expect(store.item(thread.id, "user", 2)?.by).toBe("fallback");
+  expect(store.item(thread.id, "user", 2)?.strandId).toBe(s1.id);
+  expect(logs.some((line) => /batch sort failed.*no answer/.test(line))).toBe(true);
+});
+
+it("stops backfillNow() mid-page-loop when disposed without fetching further pages", async () => {
+  const db = database();
+  const store = new StrandStore(db);
+  const gate = deferred<void>();
+  const events = vi.fn(async () => {
+    await gate.promise;
+    // Return a full page (100 rows) so an unguarded loop would immediately fetch page 2.
+    return Array.from({ length: 100 }, (_, i) => ({ seq: 200 - i, type: "item/completed", createdAt: NOW - i }));
+  });
+  const detector = new StrandDetector({
+    store,
+    events,
+    jev: fakeJev(),
+    model: fakeModel(),
+    openTasks: () => [],
+    changed: () => {},
+    log: () => {},
+    now: () => NOW,
+  });
+
+  const running = detector.backfill("thr_1");
+  await flush();
+  expect(events).toHaveBeenCalledTimes(1);
+  detector.dispose();
+  gate.resolve();
+  expect(await running).toBeNull();
+  expect(events).toHaveBeenCalledTimes(1);
 });
