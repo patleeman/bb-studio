@@ -242,6 +242,8 @@ export class Automations {
   private readonly remade = new Set<string>();
   /** The last tick failure logged per row, so one reason is logged once. */
   private readonly tickWarned = new Map<string, string>();
+  /** Row+column keys already warned for malformed JSON, so each logs once. */
+  private readonly jsonWarned = new Set<string>();
   private readonly automationsOff: () => Promise<boolean>;
   constructor(private readonly deps: AutomationDeps) {
     this.automationsOff = deps.automationsOff ?? automationsPluginOff(deps.sdk);
@@ -285,31 +287,47 @@ export class Automations {
     return row;
   }
 
-  private parseJson<T>(raw: string | null | undefined, label: string, valid: (value: unknown) => value is T): T | null {
+  private warnJsonOnce(rowId: string, column: string, message: string): void {
+    const key = `${rowId}:${column}`;
+    if (this.jsonWarned.has(key)) return;
+    this.jsonWarned.add(key);
+    console.warn(message);
+  }
+
+  private parseJson<T>(
+    rowId: string,
+    column: string,
+    raw: string | null | undefined,
+    valid: (value: unknown) => value is T,
+    detail?: string,
+  ): T | null {
     if (!raw) return null;
+    const suffix = detail ? ` (${detail})` : "";
     try {
       const value: unknown = JSON.parse(raw);
       if (valid(value)) return value;
-      console.warn(`[studio] Ignoring malformed ${label}: unexpected JSON shape`);
+      this.warnJsonOnce(rowId, column, `[studio] Malformed automation ${rowId} ${column}: unexpected JSON shape${suffix}`);
       return null;
     } catch (error) {
-      console.warn(`[studio] Ignoring malformed ${label}: ${plainReason(error)}`);
+      this.warnJsonOnce(rowId, column, `[studio] Malformed automation ${rowId} ${column}: ${plainReason(error)}${suffix}`);
       return null;
     }
   }
 
   private parseSchedule(row: Row): Schedule | null {
     return this.parseJson(
+      row.id,
+      "schedule_json",
       row.schedule_json,
-      `automation ${row.id} schedule_json`,
       (value): value is Schedule => !!value && typeof value === "object" && !Array.isArray(value) && typeof (value as { type?: unknown }).type === "string",
     );
   }
 
   private parseEnv(row: Row): Record<string, string> {
     return this.parseJson(
+      row.id,
+      "env_json",
       row.env_json,
-      `automation ${row.id} env_json`,
       (value): value is Record<string, string> => !!value && typeof value === "object" && !Array.isArray(value),
     ) ?? {};
   }
@@ -317,15 +335,17 @@ export class Automations {
   private resources(row: Row): { id: string; projectId: string }[] {
     if (row.resources) {
       return this.parseJson(
+        row.id,
+        "resources",
         row.resources,
-        `automation ${row.id} resources`,
         (value): value is { id: string; projectId: string }[] =>
           Array.isArray(value) && value.every((each) => !!each && typeof each === "object" && typeof (each as { id?: unknown }).id === "string" && typeof (each as { projectId?: unknown }).projectId === "string"),
       ) ?? [];
     }
     const ids = this.parseJson(
+      row.id,
+      "bb_ids",
       row.bb_ids,
-      `automation ${row.id} bb_ids`,
       (value): value is string[] => Array.isArray(value) && value.every((each) => typeof each === "string"),
     ) ?? [];
     return ids.map((id) => ({ id, projectId: row.project_id }));
@@ -1095,11 +1115,18 @@ export class Automations {
       const current = this.deps.db.prepare("SELECT * FROM bot_automations WHERE id = ?").get(row.id) as Row | undefined;
       if (!current || current.state !== "active") return 0;
       row = current;
-      const seen = new Set<string>(this.parseJson(
+      const seenIds = this.parseJson(
+        row.id,
+        "seen_ids",
         row.seen_ids,
-        `automation ${row.id} seen_ids`,
         (value): value is string[] => Array.isArray(value) && value.every((each) => typeof each === "string"),
-      ) ?? []);
+        "skipping watcher for this tick",
+      );
+      if (!seenIds) {
+        if (!row.seen_ids) this.warnJsonOnce(row.id, "seen_ids", `[studio] Malformed automation ${row.id} seen_ids: empty value (skipping watcher for this tick)`);
+        return 0;
+      }
+      const seen = new Set<string>(seenIds);
       const runs: BbRun[] = [];
       for (const { id, projectId } of this.resources(row).filter((resource) => !isScheduleId(resource.id))) {
         let cursor: string | undefined;

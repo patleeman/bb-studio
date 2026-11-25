@@ -1607,7 +1607,12 @@ it("logs and tolerates corrupted warnings JSON in bot_skill_versions without cra
     const history = x.bots.skillHistory(BOT_ID);
     expect(history).toHaveLength(1);
     expect(history[0]?.warnings).toEqual([]);
-    expect(warn.mock.calls.some(([msg]) => typeof msg === "string" && msg.includes("bot_skill_versions"))).toBe(true);
+    const matching = () => warn.mock.calls.filter(([msg]) => typeof msg === "string" && msg.includes("bot_skill_versions"));
+    expect(matching()).toHaveLength(1);
+
+    // Repeated reads warn at most once per version row.
+    x.bots.skillHistory(BOT_ID);
+    expect(matching()).toHaveLength(1);
   } finally {
     warn.mockRestore();
   }

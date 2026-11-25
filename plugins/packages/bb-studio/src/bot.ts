@@ -444,6 +444,9 @@ export function newMainNote(name: string, gone: "deleted" | "archived"): string 
 }
 
 export class Bots {
+  /** Row+column keys already warned for malformed JSON, so each logs once. */
+  private readonly jsonWarned = new Set<string>();
+
   constructor(private readonly deps: BotDeps) {
     // Its main_* columns are added by checking (src/schema-columns.ts); the server does it too, after the migrations.
     try { ensureColumns(deps.db); } catch { /* A database without the bots table yet: saveMainModel tolerates it. */ }
@@ -1520,12 +1523,18 @@ export class Bots {
     const rows = this.deps.db.prepare("SELECT * FROM bot_skill_versions WHERE bot_id = ? AND (? IS NULL OR id < ?) AND (? IS NULL OR name = ?) ORDER BY id DESC LIMIT 50").all(bot.id, before ?? null, before ?? null, name ?? null, name ?? null) as { id: number; name: string; description: string | null; body: string | null; old_body: string; warnings: string; at: number }[];
     return rows.map((row) => {
       let storedWarnings: string[] = [];
+      const warnOnce = (reason: string) => {
+        const key = `${row.id}:warnings`;
+        if (this.jsonWarned.has(key)) return;
+        this.jsonWarned.add(key);
+        console.warn(`[studio] Ignoring malformed bot_skill_versions ${row.id} warnings: ${reason}`);
+      };
       try {
         const parsed: unknown = JSON.parse(row.warnings);
         if (Array.isArray(parsed)) storedWarnings = parsed.filter((each): each is string => typeof each === "string");
-        else console.warn(`[studio] Ignoring malformed bot_skill_versions ${row.id} warnings: expected array`);
+        else warnOnce("expected array");
       } catch (error) {
-        console.warn(`[studio] Ignoring malformed bot_skill_versions ${row.id} warnings: ${error instanceof Error ? error.message : String(error)}`);
+        warnOnce(error instanceof Error ? error.message : String(error));
       }
       return {
         id: row.id, name: row.name, description: row.description, body: row.body, at: row.at,
