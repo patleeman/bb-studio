@@ -264,6 +264,20 @@ public enum StrandsBoxModel {
     }
 
     /// The closed line's words: "2 need you · Plumber quote", or the current strand's title.
+    /// The strands line above a Bot conversation's composer says what runs,
+    /// never how many need you: the first running strand, else the newest.
+    public static func lineStrand(_ list: StrandList?) -> Strand? {
+        let strands = list?.strands ?? []
+        if let running = strands.first(where: { $0.state == .running }) { return running }
+        return strands.filter { $0.latestSeq != nil }.max { ($0.latestSeq ?? -1) < ($1.latestSeq ?? -1) } ?? strands.first
+    }
+
+    public static func line(_ list: StrandList?) -> String {
+        if let strand = lineStrand(list) { return strand.title }
+        if let stray = list?.strayWorkers.first { return stray.title.isEmpty ? "A worker" : stray.title }
+        return "Strands"
+    }
+
     public static func headline(_ list: StrandList?) -> String {
         let counts = counts(list)
         let current = current(list)

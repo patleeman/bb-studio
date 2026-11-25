@@ -35,11 +35,14 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
         shot("2-paused-list")
         app.closeRoomSheet()
         XCTAssertTrue(any("RoomSheet-conversations").waitForNonExistence(timeout: 10), "the list closes")
-        let banner = any("botPausedBanner")
-        XCTAssertTrue(banner.waitForExistence(timeout: 15), "the conversation says the Bot is paused")
-        shot("3-paused-banner")
-        app.buttons["botPausedResume"].tap()
-        XCTAssertTrue(banner.waitForNonExistence(timeout: 15), "Resume brings it back")
+        // Round 5: a lasting state is a chip in the composer's top row, not a banner.
+        let chip = app.buttons["chip-paused"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 15), "the composer says the Bot is paused")
+        XCTAssertTrue(chip.label.contains("Resume"), chip.label)
+        XCTAssertFalse(any("botPausedBanner").exists, "no banner above the composer")
+        shot("3-paused-chip")
+        chip.tap()
+        XCTAssertTrue(chip.waitForNonExistence(timeout: 15), "Resume brings it back")
     }
 
     func testMakeThisTheMainFromAConversation() {

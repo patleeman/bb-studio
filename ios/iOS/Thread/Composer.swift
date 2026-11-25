@@ -198,6 +198,8 @@ struct ComposerBar<Settings: View, Send: View>: View {
     var prominentMic = false
     var micTint: Color?
     var attaches = true
+    /// A row pinned at the composer's top: a Bot conversation's lasting states (`ComposerChipsRow`).
+    var top: AnyView? = nil
     @ViewBuilder let settings: () -> Settings
     @ViewBuilder let send: () -> Send
 
@@ -206,6 +208,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if let top { top.padding(.top, 2) }
             AttachmentStrip(items: $attachments)
                 .padding([.horizontal, .top], 10)
             if compact {

@@ -34,7 +34,7 @@ struct MarkdownText: View {
             }
         }
         .overlay(alignment: .topLeading) {
-            if let mark, !marked.isEmpty {
+            if let mark, mark.flash, !marked.isEmpty {
                 // For VoiceOver and the UI tests: the reply asks something, here.
                 Color.clear.frame(width: 1, height: 1)
                     .accessibilityElement()
@@ -76,11 +76,12 @@ struct MarkdownText: View {
 
     /// The block's text with the mark's faint amber (brighter while it flashes) over `range`.
     private func highlighted(_ text: AttributedString, _ range: Range<Int>?) -> AttributedString {
-        guard let range, let mark, range.upperBound <= text.characters.count else { return text }
+        // No standing highlight: only Jump to reply's brief flash marks the asking sentence.
+        guard let range, let mark, mark.flash, range.upperBound <= text.characters.count else { return text }
         var out = text
         let start = out.characters.index(out.characters.startIndex, offsetBy: range.lowerBound)
         let end = out.characters.index(start, offsetBy: range.count)
-        out[start..<end].backgroundColor = look.needsYou.opacity(mark.flash ? 0.5 : 0.22)
+        out[start..<end].backgroundColor = look.needsYou.opacity(0.5)
         return out
     }
 

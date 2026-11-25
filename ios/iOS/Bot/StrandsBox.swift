@@ -146,8 +146,10 @@ struct StrandsBox: View {
 
     private func header(_ list: StrandList) -> some View {
         let counts = StrandsBoxModel.counts(list)
-        let headline = StrandsBoxModel.headline(list)
-        let current = StrandsBoxModel.current(list)
+        // What runs, never a needs-you count: approvals take the slot, and
+        // replies that ask are ordinary messages.
+        let headline = StrandsBoxModel.line(list)
+        let current = StrandsBoxModel.lineStrand(list)
         return Button {
             if typing {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -157,14 +159,10 @@ struct StrandsBox: View {
             withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { open.toggle() }
         } label: {
             HStack(spacing: 7) {
-                if counts.needs > 0 {
-                    Circle().fill(look.needsYou).frame(width: 7, height: 7)
-                } else if let current {
-                    StrandMark(state: current.state)
+                if let current {
+                    StrandMark(state: current.state == .needsYou ? .active : current.state)
                 }
                 Text(headline)
-                    .fontWeight(counts.needs > 0 ? .semibold : .regular)
-                    .foregroundStyle(counts.needs > 0 ? AnyShapeStyle(look.needsYou) : AnyShapeStyle(.primary))
                     .lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 4)
                 if counts.running > 0 {
@@ -181,7 +179,7 @@ struct StrandsBox: View {
             }
             .font(.footnote)
             .padding(.horizontal, 12)
-            .frame(minHeight: typing ? 34 : 40)
+            .frame(minHeight: 44)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -295,6 +293,29 @@ struct StrandsBox: View {
     }
 
     @ViewBuilder private func decisionAsk(_ ask: Strand.Ask) -> some View {
+        if let cardId = ApprovalSlots.shared.cardId(for: ask, in: threadId) {
+            // The card above the composer answers it; here it only brings the card up.
+            Button {
+                if !panel { withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { open = false } }
+                ApprovalSlots.shared.bringUp(cardId, in: threadId)
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(ask.label.isEmpty ? "An approval" : ask.label).font(.footnote).multilineTextAlignment(.leading)
+                    Spacer(minLength: 4)
+                    Text("Show").font(.footnote.weight(.semibold)).foregroundStyle(.tint)
+                }
+                .frame(minHeight: 44)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Brings up the approval above the composer")
+            .accessibilityIdentifier("strand-show-\(ask.id)")
+        } else {
+            decisionButtons(ask)
+        }
+    }
+
+    @ViewBuilder private func decisionButtons(_ ask: Strand.Ask) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if !ask.label.isEmpty { Text(ask.label).font(.footnote) }
             if ask.kind == .approval, !ask.details.isEmpty {
