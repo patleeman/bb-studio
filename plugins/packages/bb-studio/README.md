@@ -3862,8 +3862,9 @@ and swaps provider and model. A BB without it fails each thread with
   re-run safe: moved threads come back `already-moved`, failed and deferred
   ones are tried again, matching patches are left alone.
 - `status` (ledger and event log: `pending` until the first turn on the new
-  provider starts, then `rebuilt`) and `verify` (move event, first turn,
-  handoff; `--probe "<question>"` asks the thread, and `--all` never probes a
+  provider completes, then `rebuilt`) and `verify` (move event, first turn
+  completed, and the handoff itself, not just its header, given to that turn;
+  `--probe "<question>"` asks the thread, and `--all` never probes a
   Main). Also `bbs studio bot set-model` and `bbs studio runner move-provider`.
 - The command never moves the thread it runs in. The runbook for an agent
   doing a migration is the `move-provider` skill.

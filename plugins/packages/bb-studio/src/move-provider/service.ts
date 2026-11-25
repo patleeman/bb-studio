@@ -55,8 +55,10 @@ export interface TargetCheck { known: boolean; ready: boolean; models: string[];
 export interface MoveEventStatus {
   /** The newest thread/provider-move operation, or null when the thread has none. */
   move: { seq: number; at: number; to: { providerId: string; model: string | null } } | null;
-  /** A turn started after it: the first turn on the new provider ran. */
+  /** A turn started after it. */
   turnStarted: boolean;
+  /** A turn after it completed: the move is rebuilt (W1's meaning), and the handoff can be forgotten. */
+  turnCompleted: boolean;
 }
 
 export interface Kv { get(key: string): Promise<unknown> | unknown; set(key: string, value: unknown): Promise<void> | void }
@@ -85,7 +87,7 @@ export interface MoveDeps {
   router?: { get(): Promise<RouterPolicy>; set(policy: RouterPolicy): Promise<void> };
   moveEvents(threadId: string): Promise<MoveEventStatus>;
   /** W2: whether the stored handoff was delivered to the first turn; null when it can't say. */
-  handoffDelivered?(threadId: string): Promise<boolean | null>;
+  handoffDelivered?(threadId: string, moveAt: number | null): Promise<boolean | null>;
   /** Asks a thread one quiet question and returns its answer (verify --probe). */
   ask?(threadId: string, question: string): Promise<string>;
   now?(): number;
@@ -431,7 +433,7 @@ export class MoveProviderService {
       const entry = ledger[id] ?? null;
       const thread = threads.get(id) ?? null;
       const events = await this.deps.moveEvents(id).catch(() => null);
-      const core = !events ? "unknown" : !events.move ? "none" : events.turnStarted ? "rebuilt" : "pending";
+      const core = !events ? "unknown" : !events.move ? "none" : events.turnCompleted ? "rebuilt" : "pending";
       rows.push({
         threadId: id, title: thread?.title ?? null, ledger: entry?.state ?? null, error: entry?.error ?? null, attempts: entry?.attempts ?? 0, at: entry?.at ?? null,
         provider: thread ? { providerId: thread.providerId, model: thread.model, permission: thread.permission } : null,
@@ -455,11 +457,12 @@ export class MoveProviderService {
     const rows: VerifyRow[] = [];
     for (const id of wanted) {
       const events = await this.deps.moveEvents(id).catch(() => null);
-      const delivered = events?.turnStarted && this.deps.handoffDelivered ? await this.deps.handoffDelivered(id).catch(() => null) : null;
+      const delivered = events?.turnStarted && this.deps.handoffDelivered ? await this.deps.handoffDelivered(id, events.move?.at ?? null).catch(() => null) : null;
       const moveEvent = !!events?.move;
       const turnStarted = !!events?.turnStarted;
-      const verdict: VerifyRow["verdict"] = !events ? "unknown" : !moveEvent ? "no-move-event" : !turnStarted ? "pending" : delivered === false ? "handoff-missing" : "ok";
-      const row: VerifyRow = { threadId: id, moveEvent, movedTo: events?.move?.to ?? null, turnStarted, handoffDelivered: delivered, verdict };
+      const turnCompleted = !!events?.turnCompleted;
+      const verdict: VerifyRow["verdict"] = !events ? "unknown" : !moveEvent ? "no-move-event" : !turnCompleted ? "pending" : delivered === false ? "handoff-missing" : "ok";
+      const row: VerifyRow = { threadId: id, moveEvent, movedTo: events?.move?.to ?? null, turnStarted, turnCompleted, handoffDelivered: delivered, verdict };
       if (options.probe) {
         if (mains.has(id) && !explicit.has(id)) row.probe = { skipped: "a Main is probed only by its id" };
         else if (!this.deps.ask) row.probe = { skipped: "probing isn't available" };
@@ -482,7 +485,7 @@ export interface StatusRow {
   at: number | null;
   provider: { providerId: string | null; model: string | null; permission: PermissionMode | null } | null;
   target: { providerId: string; model: string } | null;
-  /** From the event log: none (no move), pending (moved, no turn since), rebuilt (a turn started after it). */
+  /** From the event log: none (no move), pending (moved, no completed turn since), rebuilt (a turn after it completed). */
   core: "none" | "pending" | "rebuilt" | "unknown";
 }
 
@@ -491,6 +494,7 @@ export interface VerifyRow {
   moveEvent: boolean;
   movedTo: { providerId: string; model: string | null } | null;
   turnStarted: boolean;
+  turnCompleted: boolean;
   handoffDelivered: boolean | null;
   verdict: "ok" | "pending" | "no-move-event" | "handoff-missing" | "unknown";
   probe?: { answer?: string; error?: string; skipped?: string };

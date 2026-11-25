@@ -22,6 +22,8 @@ interface MoveHooks {
   experimental_moveThreadProvider?(threadId: string, input: { providerId: string; model?: string; permissionMode?: "accept-edits" | "auto" | "full"; historyTokens?: number; dryRun?: boolean; includeArchived?: boolean }): Promise<MoveThreadProviderResult>;
 }
 const PROBE_WAIT_MS = 10 * 60_000;
+/** How far back status and verify look for the move: 20 pages of 100 operations and turn starts. */
+const EVENT_PAGES = 20;
 
 export interface MoveRegisterDeps {
   bb: BbPluginApi;
@@ -71,17 +73,27 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
   };
 
   const moveEvents = async (threadId: string): Promise<MoveEventStatus> => {
-    // The move is a system/operation event with data.operation "thread/provider-move" (W1).
-    const rows = await sdk.threads.events.list({ threadId, order: "desc", limit: "200", types: ["system/operation", "turn/started"] } as never) as { seq: number | string; type: string; createdAt?: number; data?: { operation?: string; metadata?: { to?: { providerId?: string; model?: string | null }; at?: number } } }[];
+    // The move is a system/operation event with data.operation "thread/provider-move" (W1). Newest first,
+    // 100 a page (BB's cap): turns after it say the first turn on the new provider started, and completed.
+    type Row = { seq: number | string; type: string; createdAt?: number; data?: { operation?: string; metadata?: { to?: { providerId?: string; model?: string | null }; at?: number | string } } };
     let turnStarted = false;
-    for (const row of rows) {
-      if (row.type === "turn/started") { turnStarted = true; continue; }
-      if (row.type === "system/operation" && row.data?.operation === "thread/provider-move") {
-        const to = row.data.metadata?.to;
-        return { move: { seq: Number(row.seq), at: row.data.metadata?.at ?? row.createdAt ?? 0, to: { providerId: to?.providerId ?? "", model: to?.model ?? null } }, turnStarted };
+    let turnCompleted = false;
+    let before: string | undefined;
+    for (let page = 0; page < EVENT_PAGES; page++) {
+      const rows = await sdk.threads.events.list({ threadId, order: "desc", limit: "100", types: ["system/operation", "turn/started", "turn/completed"], ...(before ? { beforeSeq: before } : {}) } as never) as Row[];
+      for (const row of rows) {
+        if (row.type === "turn/started") { turnStarted = true; continue; }
+        if (row.type === "turn/completed") { turnCompleted = true; continue; }
+        if (row.type === "system/operation" && row.data?.operation === "thread/provider-move") {
+          const meta = row.data.metadata;
+          const at = typeof meta?.at === "string" ? Date.parse(meta.at) || row.createdAt || 0 : meta?.at ?? row.createdAt ?? 0;
+          return { move: { seq: Number(row.seq), at, to: { providerId: meta?.to?.providerId ?? "", model: meta?.to?.model ?? null } }, turnStarted, turnCompleted };
+        }
       }
+      if (rows.length < 100) break;
+      before = String(rows.at(-1)!.seq);
     }
-    return { move: null, turnStarted: false };
+    return { move: null, turnStarted: false, turnCompleted: false };
   };
 
   const automationsOff = automationsPluginOff(sdk);
@@ -146,8 +158,8 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
     moveEvents,
     ...(deps.handoffDelivered ? { handoffDelivered: deps.handoffDelivered } : {}),
     ask: async (threadId, question) => {
-      const before = await sdk.threads.events.list({ threadId, order: "desc", limit: "1" }).catch(() => []) as { seq: number | string }[];
-      const after = before[0] ? String(before[0].seq) : undefined;
+      const newest = await sdk.threads.events.list({ threadId, order: "desc", limit: "1" }).catch(() => []) as { seq: number | string }[];
+      const after = newest[0] ? String(newest[0].seq) : undefined;
       await sdk.threads.send({ threadId, mode: "queue-if-active", input: [{ type: "text", text: `Verification question from the provider move (answer in one or two lines, from this conversation's history; don't use tools): ${question}`, mentions: [], visibility: "agent-only" }] } as never);
       const until = Date.now() + PROBE_WAIT_MS;
       // Queued behind a running turn, the question's own turn comes later: wait until the thread is idle.

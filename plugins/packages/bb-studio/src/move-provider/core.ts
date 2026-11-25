@@ -115,6 +115,8 @@ const REASONS: Record<string, string> = {
   provider_unavailable: "provider-unavailable-on-machine",
   model_unavailable: "model-unavailable",
   permission_widening: "permission-widening",
+  // No turn-context plugin opted in to carry the handoff: moving would lose the history.
+  no_handoff_handler: "no-handoff-handler",
 };
 
 export function coreOutcome(response: CoreMoveResponse): CoreOutcome {

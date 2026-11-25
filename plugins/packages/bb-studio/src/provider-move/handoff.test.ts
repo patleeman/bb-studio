@@ -179,6 +179,28 @@ it("without a prepared handoff the hook builds it lazily; past its time it gives
   expect(await moves.forTurn("thr_s", { from: FROM, to: TO, historyTokens: 150_000 })).toContain("Question 5:");
 });
 
+it("notes what the first turn got, for verify; the note outlives settled() and belongs to its move", async () => {
+  const { d } = deps(history(4));
+  const moves = new MoveHandoffs(d);
+  const at = Date.UTC(2026, 10, 25);
+  expect(await moves.delivered("thr_d", at)).toBeNull();
+  await moves.prepare("thr_d", { from: FROM, to: TO });
+  await moves.forTurn("thr_d", { from: FROM, to: TO, at: new Date(at).toISOString() });
+  await moves.settled("thr_d");
+  expect(await moves.delivered("thr_d", at)).toMatchObject({ kind: "handoff", moveAt: at });
+  expect(await moves.delivered("thr_d", at + 60_000)).toBeNull();
+
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const slow = deps(history(2), { limits: { lazyMs: 10 } });
+  const listEvents = slow.d.listEvents;
+  slow.d.listEvents = async (query) => { await gate; return listEvents(query); };
+  const late = new MoveHandoffs(slow.d);
+  await late.forTurn("thr_h", { from: FROM, to: TO, at });
+  expect(await late.delivered("thr_h", at)).toMatchObject({ kind: "header" });
+  release();
+});
+
 it("a handoff prepared for another target isn't used", async () => {
   const { d } = deps(history(3));
   const moves = new MoveHandoffs(d);

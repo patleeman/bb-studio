@@ -309,6 +309,25 @@ export class MoveHandoffs {
   constructor(private readonly deps: HandoffDeps) {}
 
   private key(threadId: string) { return `${HANDOFF_KV_PREFIX}${threadId}`; }
+  private deliveredKey(threadId: string) { return `${HANDOFF_KV_PREFIX}delivered:${threadId}`; }
+
+  /**
+   * Notes what the first turn after a move got (verify reads it): the stored
+   * or just-built handoff, or only the header (the build wasn't ready). Kept
+   * after settled() forgets the handoff itself; best effort.
+   */
+  private async noteDelivered(threadId: string, move: ProviderMoveInput, kind: "handoff" | "header"): Promise<void> {
+    const moveAt = typeof move.at === "string" ? Date.parse(move.at) || null : move.at ?? null;
+    await this.deps.kv.set(this.deliveredKey(threadId), { kind, moveAt, at: (this.deps.now ?? Date.now)() }).catch(() => undefined);
+  }
+
+  /** What the first turn after the move at `moveAt` got, or null when no turn got anything for it. */
+  async delivered(threadId: string, moveAt?: number | null): Promise<{ kind: "handoff" | "header"; moveAt: number | null; at: number } | null> {
+    const note = await this.deps.kv.get<{ kind: "handoff" | "header"; moveAt: number | null; at: number }>(this.deliveredKey(threadId)).catch(() => undefined);
+    if (!note) return null;
+    if (moveAt != null && note.moveAt != null && Math.abs(note.moveAt - moveAt) > 1000) return null;
+    return note;
+  }
 
   private build(input: BuildInput): Promise<StoredHandoff> {
     const running = this.building.get(input.threadId);
@@ -349,7 +368,7 @@ export class MoveHandoffs {
       const stored = await this.stored(threadId, move);
       if (stored) {
         const text = await readFile(stored.handoffPath, "utf8").catch(() => null);
-        if (text) return text;
+        if (text) { await this.noteDelivered(threadId, move, "handoff"); return text; }
       }
       const lazyMs = this.deps.limits?.lazyMs ?? LAZY_BUILD_MS;
       const work = this.build({ threadId, from: move.from, to: move.to, historyTokens: move.historyTokens, at });
@@ -357,9 +376,10 @@ export class MoveHandoffs {
       const built = await Promise.race([work.catch(() => null), new Promise<null>((resolve) => { setTimeout(() => resolve(null), lazyMs); })]);
       if (built) {
         const text = await readFile(built.handoffPath, "utf8").catch(() => null);
-        if (text) return text;
+        if (text) { await this.noteDelivered(threadId, move, "handoff"); return text; }
       }
       const dir = await this.deps.dirFor(threadId).catch(() => null);
+      await this.noteDelivered(threadId, move, "header");
       return header({ from: move.from, to: move.to, at: at ?? move.at, transcriptPath: dir ? join(dir, "transcript.md") : null, pending: true });
     } catch (error) {
       this.deps.log?.(`Move handoff for ${threadId}: ${error instanceof Error ? error.message : String(error)}`);

@@ -17,7 +17,7 @@ function world(threads: ThreadInfo[], options: { busy?: string[]; modelMissingOn
   const store = new Map(threads.map((each) => [each.id, { ...each }]));
   const kv = new Map<string, unknown>();
   const calls = { core: [] as { threadId: string; body: CoreMoveBody }[], prepare: [] as string[], bbUpdates: [] as string[], studioUpdates: [] as string[], botDefaults: [] as string[], asks: [] as string[] };
-  const moves = new Map<string, { seq: number; turnStarted: boolean; to: { providerId: string; model: string } }>();
+  const moves = new Map<string, { seq: number; turnStarted: boolean; turnCompleted?: boolean; to: { providerId: string; model: string } }>();
   const busy = new Set(options.busy ?? []);
   const bbAutomations: BbAutomation[] = [];
   const studioAutomations: StudioAutomation[] = [];
@@ -61,7 +61,7 @@ function world(threads: ThreadInfo[], options: { busy?: string[]; modelMissingOn
     setStudioAutomationModel: (id, providerId, model) => { calls.studioUpdates.push(id); Object.assign(studioAutomations.find((each) => each.id === id)!, { providerId, model }); },
     setBotDefault: async (botId, providerId, model) => { calls.botDefaults.push(botId); bots.find((each) => each.id === botId)!.defaultModel = { providerId, model }; },
     router: { get: async () => policy, set: async (next) => { policy = next; } },
-    moveEvents: async (threadId) => { const move = moves.get(threadId); return { move: move ? { seq: move.seq, at: 1, to: move.to } : null, turnStarted: !!move?.turnStarted }; },
+    moveEvents: async (threadId) => { const move = moves.get(threadId); return { move: move ? { seq: move.seq, at: 1, to: move.to } : null, turnStarted: !!move?.turnStarted, turnCompleted: !!move?.turnCompleted }; },
     handoffDelivered: async () => true,
     ask: async (threadId, question) => { calls.asks.push(threadId); return `answer to ${question}`; },
     now: () => 1000,
@@ -105,6 +105,7 @@ describe("coreOutcome", () => {
     expect(coreOutcome({ status: 409, body: { code: "thread_busy" } })).toEqual({ kind: "busy" });
     expect(coreOutcome({ status: 422, body: { code: "provider_unavailable" } })).toMatchObject({ kind: "failed", reason: "provider-unavailable-on-machine" });
     expect(coreOutcome({ status: 422, body: { code: "permission_widening" } })).toMatchObject({ kind: "failed", reason: "permission-widening" });
+    expect(coreOutcome({ status: 422, body: { code: "no_handoff_handler", message: "no plugin carries the handoff" } })).toEqual({ kind: "failed", reason: "no-handoff-handler", detail: "no plugin carries the handoff" });
     expect(coreOutcome({ status: 404, body: null })).toMatchObject({ kind: "failed", reason: "core-unavailable" });
     expect(coreOutcome({ status: 500, body: { message: "boom" } })).toMatchObject({ kind: "failed", reason: "core-error", detail: "HTTP 500: boom" });
   });
@@ -377,6 +378,8 @@ describe("status and verify", () => {
     expect(body.counts).toEqual({ moved: 1, deferred: 1 });
     expect(body.threads.find((each: { threadId: string }) => each.threadId === "a")).toMatchObject({ ledger: "moved", core: "pending", provider: { providerId: TO, model: MODEL } });
     w.moves.get("a")!.turnStarted = true;
+    expect(parse(await w.cli(["status", "a", "--json"])).threads[0].core).toBe("pending");
+    w.moves.get("a")!.turnCompleted = true;
     expect(parse(await w.cli(["status", "a", "--json"])).threads[0].core).toBe("rebuilt");
   });
 
@@ -386,10 +389,13 @@ describe("status and verify", () => {
     let out = parse(await w.cli(["verify", "a", "b", "--json"]));
     expect(out.threads.map((each: { verdict: string }) => each.verdict)).toEqual(["pending", "no-move-event"]);
     w.moves.get("a")!.turnStarted = true;
+    expect(parse(await w.cli(["verify", "a", "--json"])).threads[0].verdict).toBe("pending");
+    w.moves.get("a")!.turnCompleted = true;
     w.moves.get("main")!.turnStarted = true;
+    w.moves.get("main")!.turnCompleted = true;
     const ok = await w.cli(["verify", "a", "--json"]);
     expect(ok.exitCode).toBe(0);
-    expect(parse(ok).threads[0]).toMatchObject({ verdict: "ok", moveEvent: true, turnStarted: true, handoffDelivered: true, movedTo: { providerId: TO, model: MODEL } });
+    expect(parse(ok).threads[0]).toMatchObject({ verdict: "ok", moveEvent: true, turnStarted: true, turnCompleted: true, handoffDelivered: true, movedTo: { providerId: TO, model: MODEL } });
     // A probe asks only when asked, and never Main from --all.
     out = parse(await w.cli(["verify", "--all", "--probe", "first words?", "--json"]));
     expect(out.threads.find((each: { threadId: string }) => each.threadId === "a").probe).toEqual({ answer: "answer to first words?" });

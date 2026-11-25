@@ -27,7 +27,7 @@ function fakeBb(options: { events?: unknown[]; automationsOn?: boolean; noHook?:
       threads: {
         list: async (args: { threadIds?: string[]; archived?: boolean }) => (args.archived ? [] : args.threadIds && !args.threadIds.includes("thr_a") ? [] : [thread]),
         defaultExecutionOptions: async () => ({ model: "opus", permissionMode: "auto" }),
-        events: { list: async () => options.events ?? [] },
+        events: { list: async (args: { limit?: string }) => { if (Number(args.limit) > 100) throw new Error("Thread event limit cannot exceed 100"); return options.events ?? []; } },
       },
       providers: {
         catalog: async () => [{ id: "claude-code" }, { id: TO }],
@@ -85,12 +85,14 @@ describe("createMoveProvider wiring", () => {
   });
 
   it("reads the move from a system/operation event and a turn after it", async () => {
-    const move = { seq: 5, type: "system/operation", createdAt: 1, data: { operation: "thread/provider-move", metadata: { to: { providerId: TO, model: "gemini-3-pro" }, at: 2 } } };
+    const move = { seq: 5, type: "system/operation", createdAt: 1, data: { operation: "thread/provider-move", metadata: { to: { providerId: TO, model: "gemini-3-pro" }, at: "2026-11-25T20:54:24.685Z" } } };
     const other = { seq: 4, type: "system/operation", data: { operation: "thread/context-clear" } };
     const pending = createMoveProvider(deps(fakeBb({ events: [move, other] }).bb));
     expect((await pending.verify(["thr_a"], { all: false }))[0]).toMatchObject({ moveEvent: true, turnStarted: false, verdict: "pending", movedTo: { providerId: TO } });
     const started = createMoveProvider(deps(fakeBb({ events: [{ seq: 6, type: "turn/started" }, move] }).bb));
-    expect((await started.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "ok", turnStarted: true, handoffDelivered: null });
+    expect((await started.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "pending", turnStarted: true, turnCompleted: false });
+    const done = createMoveProvider(deps(fakeBb({ events: [{ seq: 7, type: "turn/completed" }, { seq: 6, type: "turn/started" }, move] }).bb));
+    expect((await done.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "ok", turnStarted: true, turnCompleted: true, handoffDelivered: null });
     const none = createMoveProvider(deps(fakeBb({ events: [{ seq: 6, type: "turn/started" }, other] }).bb));
     expect((await none.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "no-move-event" });
   });

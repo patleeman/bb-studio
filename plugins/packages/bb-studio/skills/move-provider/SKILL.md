@@ -37,7 +37,7 @@ bbs studio move-provider [<thread-id>…] [--from <provider>] [--project <id>] [
   [--include-archived] [--runners] --to <provider> [--model <model>] [--permission <mode>] \
   [--history-tokens <n>] [--automations] [--bot-defaults] [--router-rules] [--no-defer] [--dry-run] [--json]
 
-bbs studio move-provider status [<thread-id>…] [--json]   # ledger + event log: pending / rebuilt
+bbs studio move-provider status [<thread-id>…] [--json]   # ledger + event log: pending until a turn after the move completes, then rebuilt
 bbs studio move-provider verify <thread-id>…|--all [--probe "<question>"] [--json]
 bbs studio bot set-model <bot> --provider <provider> [--model <model>] [--dry-run] [--json]
 bbs studio runner move-provider <runner>…|--all [--bot <bot>] --to <provider> [--model …] [--dry-run] [--json]
@@ -57,7 +57,8 @@ bbs studio tool-delivery [<provider> default|all|defer|trio] [--json]
 Per-thread results: `moved`, `already-moved`, `would-move` (dry run),
 `deferred` (`running` or `busy`), `skipped` (`current-thread`, `running`),
 `failed` (`permission-widening`, `model-unavailable`,
-`provider-unavailable-on-machine`, `handoff-failed`, `core-unavailable`, …).
+`provider-unavailable-on-machine`, `no-handoff-handler`, `handoff-failed`,
+`core-unavailable`, …).
 
 The ledger (KV `studio.moveProvider.ledger`) records each thread's outcome.
 Running the same command again is safe: moved threads come back
