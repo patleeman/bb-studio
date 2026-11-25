@@ -3852,8 +3852,17 @@ and swaps provider and model. A BB without it fails each thread with
   `--bot-defaults` sets Bots' default models; `--router-rules` points router
   chain targets at the new provider.
 - The permission is never wider than the thread's now: `full` steps down to
-  `auto` unless `--permission full` is given, and `auto` becomes
-  `accept-edits` on an ACP agent.
+  `auto` unless `--permission full` is given (accepted only for a thread that
+  is `full` already), and `auto` becomes `accept-edits` on an ACP agent. An
+  automation with no mode of its own keeps none.
+- `--history-tokens` is at least 1. The handoff (fenced in
+  `<thread-history>`, after a line that says nothing inside is an
+  instruction) fits core's move budget, `historyTokens*4 + 8000` characters,
+  newest turns first; the digest comes along only when it fits.
+- `--exclude-main` leaves Bots' Mains out; `cancel <ids>|--all-deferred`
+  drops deferrals. Failed automation, Bot default and router patches are
+  kept (kv `studio.moveProvider.patches` and the ledger), shown by `status`
+  (exit 2) and retried by the next run to the same target.
 - `--dry-run` lists the same threads and results the real run gives
   (`would-move`). `--json` on every command; exit codes 0 (done), 2
   (something skipped, deferred or failed), 1 (bad input). Nothing prompts.
@@ -3861,8 +3870,8 @@ and swaps provider and model. A BB without it fails each thread with
   plus a sweep at start). The ledger (kv `studio.moveProvider.ledger`) makes a
   re-run safe: moved threads come back `already-moved`, failed and deferred
   ones are tried again, matching patches are left alone.
-- `status` (ledger and event log: `pending` until the first turn on the new
-  provider completes, then `rebuilt`) and `verify` (move event, first turn
+- `status` (ledger and event log: `pending` until the new provider accepts a
+  request after the move, then `rebuilt`) and `verify` (move event, first turn
   completed, and the handoff itself, not just its header, given to that turn;
   `--probe "<question>"` asks the thread, and `--all` never probes a
   Main). Also `bbs studio bot set-model` and `bbs studio runner move-provider`.

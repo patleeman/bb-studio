@@ -78,17 +78,20 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
     type Row = { seq: number | string; type: string; createdAt?: number; data?: { operation?: string; status?: string; metadata?: { to?: { providerId?: string; model?: string | null }; at?: number | string } } };
     let turnStarted = false;
     let turnCompleted = false;
+    let inputAccepted = false;
     let before: string | undefined;
     for (let page = 0; page < EVENT_PAGES; page++) {
-      const rows = await sdk.threads.events.list({ threadId, order: "desc", limit: "100", types: ["system/operation", "turn/started", "turn/completed"], ...(before ? { beforeSeq: before } : {}) } as never) as Row[];
+      const rows = await sdk.threads.events.list({ threadId, order: "desc", limit: "100", types: ["system/operation", "turn/started", "turn/completed", "turn/input/accepted"], ...(before ? { beforeSeq: before } : {}) } as never) as Row[];
       for (const row of rows) {
         if (row.type === "turn/started") { turnStarted = true; continue; }
+        // Core's "rebuilt": the new provider accepted a real request after the move.
+        if (row.type === "turn/input/accepted") { inputAccepted = true; continue; }
         // Only a turn that completed well counts, as core's status says: a failed first turn leaves the move pending.
         if (row.type === "turn/completed") { if (row.data?.status === "completed") turnCompleted = true; continue; }
         if (row.type === "system/operation" && row.data?.operation === "thread/provider-move") {
           const meta = row.data.metadata;
           const at = typeof meta?.at === "string" ? Date.parse(meta.at) || row.createdAt || 0 : meta?.at ?? row.createdAt ?? 0;
-          return { move: { seq: Number(row.seq), at, to: { providerId: meta?.to?.providerId ?? "", model: meta?.to?.model ?? null } }, turnStarted, turnCompleted };
+          return { move: { seq: Number(row.seq), at, to: { providerId: meta?.to?.providerId ?? "", model: meta?.to?.model ?? null } }, turnStarted, turnCompleted, inputAccepted };
         }
       }
       if (rows.length < 100) break;
@@ -159,26 +162,30 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
     moveEvents,
     ...(deps.handoffDelivered ? { handoffDelivered: deps.handoffDelivered } : {}),
     ask: async (threadId, question) => {
+      type Ev = { seq: number | string; type: string; data?: { item?: { type?: string; text?: string } } };
       const newest = await sdk.threads.events.list({ threadId, order: "desc", limit: "1" }).catch(() => []) as { seq: number | string }[];
-      const after = newest[0] ? String(newest[0].seq) : undefined;
+      const sentAfter = newest[0] ? String(newest[0].seq) : undefined;
       await sdk.threads.send({ threadId, mode: "queue-if-active", input: [{ type: "text", text: `Verification question from the provider move (answer in one or two lines, from this conversation's history; don't use tools): ${question}`, mentions: [], visibility: "agent-only" }] } as never);
       const until = Date.now() + PROBE_WAIT_MS;
-      // Queued behind a running turn, the question's own turn comes later: wait until the thread is idle.
-      let cursor = after;
-      for (;;) {
-        const seen = await sdk.threads.events.wait({ threadId, type: "turn/completed", waitMs: "30000", ...(cursor ? { afterSeq: cursor } : {}) }).catch(() => null) as { seq?: number | string } | null;
-        if (seen?.seq !== undefined) cursor = String(seen.seq);
-        const now = await sdk.threads.get({ threadId }).catch(() => null) as { status?: string } | null;
-        if (now && !["starting", "active", "stopping"].includes(now.status ?? "")) break;
-        if (Date.now() > until) throw new Error("no answer within 10 minutes");
-      }
-      const events = await sdk.threads.events.list({ threadId, order: "desc", limit: "40", types: ["item/completed"], ...(after ? { afterSeq: after } : {}) } as never) as { data?: { item?: { type?: string; text?: string } } }[];
-      return events.map((event) => event.data?.item).find((item) => item?.type === "agentMessage" && item.text)?.text ?? "";
+      const waitFor = async (type: string, afterSeq: string | undefined): Promise<Ev> => {
+        for (;;) {
+          const seen = await sdk.threads.events.wait({ threadId, type, waitMs: "30000", ...(afterSeq ? { afterSeq } : {}) }).catch(() => null) as Ev | null;
+          if (seen) return seen;
+          if (Date.now() > until) throw new Error("no answer within 10 minutes");
+        }
+      };
+      // The probe's own turn: the first that started after it was sent (a running turn started before), then its end.
+      const started = await waitFor("turn/started", sentAfter);
+      const completed = await waitFor("turn/completed", String(started.seq));
+      const events = await sdk.threads.events.list({ threadId, order: "asc", limit: "100", types: ["item/completed"], afterSeq: String(started.seq) } as never) as Ev[];
+      const inTurn = events.filter((event) => Number(event.seq) < Number(completed.seq));
+      return inTurn.map((event) => event.data?.item).filter((item) => item?.type === "agentMessage" && item.text).at(-1)?.text ?? "";
     },
     log: (line) => bb.log.info(line),
   });
 
   // Deferred threads move once idle. A sweep at start finds those that went idle while Studio was down.
+  bb.events.on("thread.deleted", ({ thread }) => void service.forgetThread(thread.id).catch(() => {}));
   bb.events.on("thread.idle", ({ thread }) => void service.onIdle(thread.id).catch((error) => bb.log.warn(`Move provider: ${error instanceof Error ? error.message : String(error)}`)));
   setTimeout(() => void service.sweep().catch(() => {}), 30_000).unref?.();
   return service;

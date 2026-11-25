@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { scopeTools } from "../tool-scope";
 import { ToolDeliveryStore, TOOL_DELIVERY_KEY } from "../tool-delivery";
 import { botCli, moveProviderCli, runnerCli, toolDeliveryCli } from "./cli";
@@ -25,6 +25,7 @@ function world(threads: ThreadInfo[], options: { busy?: string[]; modelMissingOn
   const runners = [{ id: "run_1", botId: "bot_1", name: "Comms", threadId: "r1" }];
   let policy: RouterPolicy = { rules: [{ id: "code", chain: [{ providerId: "claude-code", model: "opus", reasoningLevel: null }, { providerId: "codex", model: "gpt", reasoningLevel: null }] }], defaultChain: [{ providerId: "claude-code", model: "sonnet", reasoningLevel: null }] };
   let failNextBbUpdate = false;
+  let failNextBotDefault = false;
   const deps: MoveDeps = {
     kv: { get: (key) => kv.get(key), set: (key, value) => { kv.set(key, JSON.parse(JSON.stringify(value))); } },
     listThreads: async ({ providerId, projectId, includeArchived }) => [...store.values()].filter((each) => (!providerId || each.providerId === providerId) && (!projectId || each.projectId === projectId) && (includeArchived || !each.archived)).map((each) => ({ ...each })),
@@ -59,7 +60,10 @@ function world(threads: ThreadInfo[], options: { busy?: string[]; modelMissingOn
     },
     studioAutomations: (ids) => studioAutomations.filter((each) => ids.includes(each.threadId)),
     setStudioAutomationModel: (id, providerId, model) => { calls.studioUpdates.push(id); Object.assign(studioAutomations.find((each) => each.id === id)!, { providerId, model }); },
-    setBotDefault: async (botId, providerId, model) => { calls.botDefaults.push(botId); bots.find((each) => each.id === botId)!.defaultModel = { providerId, model }; },
+    setBotDefault: async (botId, providerId, model) => {
+      if (failNextBotDefault) { failNextBotDefault = false; throw new Error("bots table locked"); }
+      calls.botDefaults.push(botId); bots.find((each) => each.id === botId)!.defaultModel = { providerId, model };
+    },
     router: { get: async () => policy, set: async (next) => { policy = next; } },
     moveEvents: async (threadId) => { const move = moves.get(threadId); return { move: move ? { seq: move.seq, at: 1, to: move.to } : null, turnStarted: !!move?.turnStarted, turnCompleted: !!move?.turnCompleted }; },
     handoffDelivered: async () => true,
@@ -71,6 +75,7 @@ function world(threads: ThreadInfo[], options: { busy?: string[]; modelMissingOn
     service, store, kv, calls, moves, busy, bbAutomations, studioAutomations, bots, runners, deps,
     get policy() { return policy; },
     failNextBbUpdate: () => { failNextBbUpdate = true; },
+    failNextBotDefault: () => { failNextBotDefault = true; },
     cli: (argv: string[], callerThreadId: string | null = null) => moveProviderCli(argv, { service, toolDelivery: new ToolDeliveryStore({ get: () => undefined, set: () => {} }), callerThreadId }),
   };
 }
@@ -494,5 +499,125 @@ describe("router rules without --from", () => {
     expect(out.exitCode).toBe(0);
     expect(parse(out).router).toMatchObject({ result: "skipped-info", targetsChanged: 0 });
     expect(w.policy.rules[0]!.chain[0]!.providerId).toBe("claude-code");
+  });
+});
+
+
+describe("review fixes", () => {
+  it("a deferred thread whose provider changed since is failed, not moved (changed-since-deferred)", async () => {
+    const w = world([thread("a", { status: "active" })]);
+    await w.cli(["a", "--to", TO, "--json"]);
+    Object.assign(w.store.get("a")!, { status: "idle", providerId: "codex", model: "gpt" });
+    expect(await w.service.onIdle("a")).toMatchObject({ result: "failed", reason: "changed-since-deferred" });
+    expect(w.calls.core).toEqual([]);
+    expect(parseLedger(w.kv.get(LEDGER_KEY)).a).toMatchObject({ state: "failed" });
+  });
+
+  it("cancel drops deferred entries by id or all; a deleted thread's entry goes; --no-defer drops an earlier deferral", async () => {
+    const w = world([thread("a", { status: "active" }), thread("b", { status: "active" }), thread("c", { status: "active" }), thread("d", { status: "active" })]);
+    await w.cli(["a", "b", "c", "d", "--to", TO, "--json"]);
+    expect(parse(await w.cli(["cancel", "a", "--json"]))).toEqual({ cancelled: ["a"] });
+    await w.service.forgetThread("b");
+    await w.cli(["c", "--to", TO, "--no-defer", "--json"]);
+    expect(Object.keys(parseLedger(w.kv.get(LEDGER_KEY)))).toEqual(["d"]);
+    expect(parse(await w.cli(["cancel", "--all-deferred", "--json"]))).toEqual({ cancelled: ["d"] });
+    w.store.get("d")!.status = "idle";
+    expect(await w.service.onIdle("d")).toBeNull();
+    expect((await w.cli(["cancel"])).exitCode).toBe(1);
+  });
+
+  it("claims before awaiting: two idles at once move the thread once; a CLI run meanwhile leaves it to the watcher", async () => {
+    const w = world([thread("a", { status: "active" })]);
+    await w.cli(["a", "--to", TO, "--json"]);
+    w.store.get("a")!.status = "idle";
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const prepare = w.deps.prepare;
+    w.deps.prepare = async (threadId, input) => { await gate; return prepare(threadId, input); };
+    const first = w.service.onIdle("a");
+    const second = w.service.onIdle("a");
+    const viaCli = await w.service.move({ ids: ["a"], includeArchived: false, runners: false }, { ...base, to: TO });
+    expect(viaCli.threads[0]).toMatchObject({ result: "deferred", reason: "busy" });
+    release();
+    expect([(await first)?.result, await second]).toEqual(["moved", null]);
+    expect(w.calls.prepare).toEqual(["a"]);
+    expect(w.calls.core.length).toBe(1);
+  });
+
+  it("an automation with no permission mode keeps none: it follows its thread", async () => {
+    const w = world([thread("a", { permission: "auto" })]);
+    w.bbAutomations.push({ id: "aut_n", projectId: "p", name: "No mode", execution: { mode: "agent", targetThreadId: "a", providerId: "claude-code", model: "opus" } });
+    const report = await w.service.move({ ids: ["a"], includeArchived: false, runners: false }, { ...base, to: "codex-like" as never }).catch(() => null);
+    expect(report).toBeNull(); // unknown provider: bad input
+    await w.service.move({ ids: ["a"], includeArchived: false, runners: false }, { ...base, to: TO });
+    expect(w.bbAutomations[0]!.execution).toEqual({ mode: "agent", targetThreadId: "a", providerId: TO, model: MODEL });
+  });
+
+  it("failed automation and Bot default patches are in the ledger and status (exit 2), and a re-run to the target retries them", async () => {
+    const w = world([thread("a")]);
+    w.bbAutomations.push({ id: "aut_1", projectId: "p", name: "Daily", execution: { mode: "agent", targetThreadId: "a", providerId: "claude-code", model: "opus", permissionMode: "accept-edits" } });
+    w.failNextBbUpdate();
+    w.failNextBotDefault();
+    const first = await w.cli(["--from", "claude-code", "--to", TO, "--automations", "--bot-defaults", "--json"]);
+    expect(first.exitCode).toBe(2);
+    expect(parseLedger(w.kv.get(LEDGER_KEY)).a!.patchErrors).toEqual(["bb automation aut_1 (Daily): automations plugin went away"]);
+    const status = await w.cli(["status", "--json"]);
+    expect(status.exitCode).toBe(2);
+    expect(parse(status).patches.failures).toBe(2);
+    expect(parse(status).threads[0].patchErrors).toHaveLength(1);
+    // --from claude-code now selects nothing (a moved), yet the owed patches are tried again.
+    const again = await w.cli(["--from", "claude-code", "--to", TO, "--json"]);
+    expect(again.exitCode).toBe(0);
+    expect(parse(again).automations.map((each: { result: string }) => each.result)).toEqual(["patched"]);
+    expect(parse(again).botDefaults.map((each: { result: string }) => each.result)).toEqual(["patched"]);
+    expect((await w.cli(["status", "--json"])).exitCode).toBe(0);
+  });
+
+  it("verify --probe never asks the thread running the command", async () => {
+    const w = world([thread("a"), thread("me")]);
+    await w.cli(["a", "me", "--to", TO, "--json"]);
+    w.moves.get("a")!.turnCompleted = true;
+    const out = parse(await w.cli(["verify", "a", "me", "--probe", "q", "--json"], "me"));
+    expect(out.threads.find((each: { threadId: string }) => each.threadId === "me").probe).toEqual({ skipped: "the thread running this command" });
+    expect(w.calls.asks).toEqual(["a"]);
+  });
+
+  it("rebuilt follows core: the new provider accepted a request after the move", async () => {
+    const w = world([thread("a")]);
+    await w.cli(["a", "--to", TO, "--json"]);
+    const events = w.deps.moveEvents;
+    w.deps.moveEvents = async (id) => ({ ...(await events(id)), inputAccepted: true });
+    expect(parse(await w.cli(["status", "a", "--json"])).threads[0].core).toBe("rebuilt");
+    expect(parse(await w.cli(["verify", "a", "--json"])).threads[0]).toMatchObject({ rebuilt: true, verdict: "ok" });
+  });
+
+  it("bot set-model refuses a model the provider doesn't offer", async () => {
+    const w = world([]);
+    const deps = { service: w.service, toolDelivery: new ToolDeliveryStore({ get: () => undefined, set: () => {} }), callerThreadId: null };
+    expect(await botCli(["set-model", "Chief", "--provider", TO, "--model", "gemini-typo"], deps)).toMatchObject({ exitCode: 1 });
+    expect(w.calls.botDefaults).toEqual([]);
+  });
+
+  it("--exclude-main leaves Main out unless it is named", async () => {
+    const w = world([thread("a"), thread("main")]);
+    expect((await w.service.select({ ids: [], from: "claude-code", includeArchived: false, runners: false, excludeMain: true })).threads.map((each) => each.id)).toEqual(["a"]);
+    expect((await w.service.select({ ids: ["main"], from: "claude-code", includeArchived: false, runners: false, excludeMain: true })).threads.map((each) => each.id)).toEqual(["a", "main"]);
+  });
+
+  it("the watcher moves a deferred Main last", async () => {
+    const w = world([thread("a", { status: "active" }), thread("main", { status: "active" })]);
+    await w.cli(["a", "main", "--to", TO, "--json"]);
+    w.store.get("a")!.status = "idle";
+    w.store.get("main")!.status = "idle";
+    expect(await w.service.onIdle("main")).toBeNull();
+    expect(await w.service.onIdle("a")).toMatchObject({ result: "moved" });
+    await vi.waitFor(() => expect(parseLedger(w.kv.get(LEDGER_KEY)).main!.state).toBe("moved"));
+    expect(w.calls.core.map((each) => each.threadId)).toEqual(["a", "main"]);
+  });
+
+  it("the dry run shows the most the handoff can be", async () => {
+    const w = world([thread("a")]);
+    const out = parse(await w.cli(["a", "--to", TO, "--history-tokens", "2000", "--dry-run", "--json"]));
+    expect(out.threads[0].handoffEstimate).toEqual({ maxChars: 16_000, historyTokens: 2000 });
   });
 });

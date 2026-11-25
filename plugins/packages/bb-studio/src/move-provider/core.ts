@@ -62,6 +62,8 @@ export interface ThreadItem {
   reason?: string;
   detail?: string;
   handoff?: { bytes: number; transcriptPath: string; verbatimTurns: number; outlinedTurns: number };
+  /** Dry run: the most the handoff can be (core's move budget for the history tokens). */
+  handoffEstimate?: { maxChars: number; historyTokens: number };
   automationsPatched: string[];
 }
 
@@ -165,9 +167,32 @@ export interface LedgerEntry {
   attempts: number;
   from: { providerId: string; model: string | null } | null;
   request: MoveRequest;
+  /** Automation patches for this thread that failed; a re-run to the same target tries them again. */
+  patchErrors?: string[];
 }
 
 export type Ledger = Record<string, LedgerEntry>;
+
+/** Failed Bot default and router patches (KV `studio.moveProvider.patches`), tried again by a re-run to the same target. */
+export const PATCHES_KEY = "studio.moveProvider.patches";
+export interface PatchFailure { providerId: string; model: string; error: string; at: number }
+export interface PatchLedger {
+  botDefaults: Record<string, PatchFailure>;
+  router: (PatchFailure & { fromProviderId: string }) | null;
+}
+
+export function parsePatchLedger(value: unknown): PatchLedger {
+  const raw = (typeof value === "string" ? safeJson(value) : value) as Partial<PatchLedger> | null;
+  const failure = (each: unknown): PatchFailure | null => {
+    const f = each as Partial<PatchFailure> | null;
+    return f && typeof f.providerId === "string" && typeof f.model === "string" ? { providerId: f.providerId, model: f.model, error: String(f.error ?? ""), at: Number(f.at) || 0 } : null;
+  };
+  const botDefaults: Record<string, PatchFailure> = {};
+  for (const [id, each] of Object.entries(raw?.botDefaults ?? {})) { const f = failure(each); if (f) botDefaults[id] = f; }
+  const router = failure(raw?.router);
+  const from = (raw?.router as { fromProviderId?: unknown } | null | undefined)?.fromProviderId;
+  return { botDefaults, router: router && typeof from === "string" ? { ...router, fromProviderId: from } : null };
+}
 
 export function parseLedger(value: unknown): Ledger {
   const raw = typeof value === "string" ? safeJson(value) : value;
@@ -183,6 +208,7 @@ export function parseLedger(value: unknown): Ledger {
       state: each.state, error: typeof each.error === "string" ? each.error : null, at: Number(each.at) || 0, attempts: Number(each.attempts) || 0,
       from: each.from && typeof each.from.providerId === "string" ? { providerId: each.from.providerId, model: each.from.model ?? null } : null,
       request: { providerId: request.providerId, model: request.model, permission: isPermissionMode(request.permission) ? request.permission : null, historyTokens: Number(request.historyTokens) || DEFAULT_HISTORY_TOKENS, patchAutomations: !!request.patchAutomations },
+      ...(Array.isArray(each.patchErrors) && each.patchErrors.length ? { patchErrors: each.patchErrors.filter((line): line is string => typeof line === "string") } : {}),
     };
   }
   return out;

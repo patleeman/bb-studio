@@ -18,8 +18,10 @@
 //
 // The dry run is the same code with the side effects swapped for "would":
 // the same threads in the same order with the same reasons.
+import { moveMaxChars } from "../provider-move/handoff";
 import {
-  coreOutcome, DEFAULT_HISTORY_TOKENS, ledgerStateFor, LEDGER_KEY, parseLedger, rewriteRouterPolicy, summarize, targetPermission,
+  coreOutcome, DEFAULT_HISTORY_TOKENS, ledgerStateFor, LEDGER_KEY, parseLedger, parsePatchLedger, PATCHES_KEY, rewriteRouterPolicy, summarize, targetPermission,
+  type PatchLedger,
   type AutomationItem, type BotDefaultItem, type CoreMoveBody, type CoreMoveResponse, type Ledger, type LedgerEntry, type MoveRequest,
   type PermissionMode, type Role, type RouterItem, type RouterPolicy, type Summary, type ThreadItem,
 } from "./core";
@@ -57,9 +59,14 @@ export interface MoveEventStatus {
   move: { seq: number; at: number; to: { providerId: string; model: string | null } } | null;
   /** A turn started after it. */
   turnStarted: boolean;
-  /** A turn after it completed: the move is rebuilt (W1's meaning), and the handoff can be forgotten. */
+  /** A turn after it completed (successfully). */
   turnCompleted: boolean;
+  /** The new provider accepted a real request after it (turn/input/accepted): core calls the move rebuilt. */
+  inputAccepted?: boolean;
 }
+
+/** Core's "rebuilt": the new provider accepted a request after the move (a completed turn counts too). */
+const rebuilt = (events: MoveEventStatus) => !!events.inputAccepted || events.turnCompleted;
 
 export interface Kv { get(key: string): Promise<unknown> | unknown; set(key: string, value: unknown): Promise<void> | void }
 
@@ -101,6 +108,8 @@ export interface Selection {
   bot?: string;
   includeArchived: boolean;
   runners: boolean;
+  /** Leave Bots' Main threads out (unless named by id): move them last, separately. */
+  excludeMain?: boolean;
 }
 
 export interface MoveOptions {
@@ -199,6 +208,7 @@ export class MoveProviderService {
       return explicit.has(thread.id) || selection.includeArchived || !thread.archived;
     });
     for (const thread of threads) roles.set(thread.id, roleOf(thread.id));
+    if (selection.excludeMain) for (let i = threads.length - 1; i >= 0; i--) if (roles.get(threads[i]!.id) === "main" && !explicit.has(threads[i]!.id)) threads.splice(i, 1);
     threads.sort((a, b) => Number(roles.get(a.id) === "main") - Number(roles.get(b.id) === "main") || a.id.localeCompare(b.id));
     const botIds = bot ? [bot.id] : selection.from ? bots.filter((each) => each.defaultModel?.providerId === selection.from).map((each) => each.id) : [];
     return { threads, roles, botIds };
@@ -216,15 +226,97 @@ export class MoveProviderService {
     const request: MoveRequest = { providerId: options.to, model, permission: options.permission ?? null, historyTokens, patchAutomations: options.automations || selection.runners };
     const items: ThreadItem[] = [];
     for (const thread of threads) {
-      items.push(await this.moveOne(thread, roles.get(thread.id) ?? "other", request, { dryRun: options.dryRun, noDefer: !!options.noDefer, callerThreadId: options.callerThreadId ?? null, supported: target.permissionModes }));
+      const role = roles.get(thread.id) ?? "other";
+      const run = { dryRun: options.dryRun, noDefer: !!options.noDefer, callerThreadId: options.callerThreadId ?? null, supported: target.permissionModes };
+      if (options.dryRun) { items.push(await this.moveOne(thread, role, request, run)); continue; }
+      // The watcher is moving it right now: leave it to the watcher.
+      if (this.inFlight.has(thread.id)) { items.push(this.inFlightItem(thread, role, request)); continue; }
+      this.inFlight.add(thread.id);
+      try { items.push(await this.moveOne(thread, role, request, run)); } finally { this.inFlight.delete(thread.id); }
     }
-    // Automations follow every thread that is (or would be) on the target.
-    const onTarget = items.filter((item) => item.result === "moved" || item.result === "already-moved" || item.result === "would-move");
-    const automations = request.patchAutomations ? await this.patchAutomations(onTarget, request, options.dryRun, target.permissionModes) : [];
+    // Automations follow every thread that is (or would be) on the target, and the threads whose automation
+    // patches failed before for this target (a re-run picks them up even when the selectors no longer do).
+    const onTarget = items.filter((item) => item.result === "moved" || item.result === "already-moved" || item.result === "would-move").map((item) => item.threadId);
+    const ledger = await this.ledger();
+    const owed = Object.entries(ledger).filter(([id, entry]) => entry.patchErrors?.length && entry.request.providerId === options.to && entry.request.model === model && !onTarget.includes(id)).map(([id]) => id);
+    const patchThreads = [...onTarget, ...(request.patchAutomations || owed.length ? owed : [])];
+    const automations = request.patchAutomations || owed.length ? await this.patchAutomations(patchThreads, request, options.dryRun, target.permissionModes) : [];
     for (const item of items) item.automationsPatched = automations.filter((each) => each.threadId === item.threadId && (each.result === "patched" || each.result === "would-patch")).map((each) => each.automationId);
-    const botDefaults = options.botDefaults ? await this.patchBotDefaults(botIds, options.to, model, options.dryRun) : [];
-    const router = options.routerRules ? await this.patchRouter(selection.from, options.to, model, options.dryRun) : null;
+    if (!options.dryRun) await this.recordPatchErrors(patchThreads, automations);
+    const patches = await this.patchLedger();
+    const owedBots = Object.entries(patches.botDefaults).filter(([, f]) => f.providerId === options.to && f.model === model).map(([id]) => id);
+    const botTargets = [...new Set([...(options.botDefaults ? botIds : []), ...owedBots])];
+    const botDefaults = botTargets.length ? await this.patchBotDefaults(botTargets, options.to, model, options.dryRun) : [];
+    const owedRouter = patches.router && patches.router.providerId === options.to && patches.router.model === model ? patches.router : null;
+    const router = options.routerRules || owedRouter ? await this.patchRouter(selection.from ?? owedRouter?.fromProviderId, options.to, model, options.dryRun) : null;
+    if (!options.dryRun) await this.recordOtherPatches(botDefaults, router, selection.from ?? owedRouter?.fromProviderId ?? null, options.to, model);
     return { dryRun: options.dryRun, to: { providerId: options.to, model, permission: options.permission ?? null, historyTokens }, threads: items, automations, botDefaults, router, summary: summarize(items) };
+  }
+
+  private inFlightItem(thread: ThreadInfo, role: Role, request: MoveRequest): ThreadItem {
+    return { threadId: thread.id, title: thread.title, role, from: { providerId: thread.providerId ?? "", model: thread.model, permission: thread.permission }, to: { providerId: request.providerId, model: request.model, permission: null }, result: "deferred", reason: "busy", detail: "the watcher is moving it now", automationsPatched: [] };
+  }
+
+  async patchLedger(): Promise<PatchLedger> {
+    return parsePatchLedger(await this.deps.kv.get(PATCHES_KEY));
+  }
+
+  /** Each thread's failed automation patches, kept until a later run patches them. */
+  private recordPatchErrors(threadIds: readonly string[], automations: readonly AutomationItem[]): Promise<void> {
+    const write = this.ledgerWrite.then(async () => {
+      const ledger = await this.ledger();
+      let changed = false;
+      for (const id of threadIds) {
+        const entry = ledger[id];
+        if (!entry) continue;
+        const errors = automations.filter((each) => each.result === "failed" && (each.threadId === id || each.automationId === "*")).map((each) => `${each.kind} automation ${each.automationId} (${each.name}): ${each.reason ?? "failed"}`);
+        if (errors.length) { entry.patchErrors = errors; changed = true; } else if (entry.patchErrors) { delete entry.patchErrors; changed = true; }
+      }
+      if (changed) await this.deps.kv.set(LEDGER_KEY, ledger);
+    });
+    this.ledgerWrite = write.catch(() => {});
+    return write;
+  }
+
+  private recordOtherPatches(botDefaults: readonly BotDefaultItem[], router: RouterItem | null, fromProviderId: string | null, providerId: string, model: string): Promise<void> {
+    const write = this.ledgerWrite.then(async () => {
+      const patches = await this.patchLedger();
+      const at = this.now();
+      for (const each of botDefaults) {
+        if (each.result === "failed") patches.botDefaults[each.botId] = { providerId, model, error: each.reason ?? "failed", at };
+        else delete patches.botDefaults[each.botId];
+      }
+      if (router?.result === "failed" && fromProviderId) patches.router = { providerId, model, fromProviderId, error: router.reason ?? "failed", at };
+      else if (router && router.result !== "failed") patches.router = null;
+      await this.deps.kv.set(PATCHES_KEY, patches);
+    });
+    this.ledgerWrite = write.catch(() => {});
+    return write;
+  }
+
+  /** `cancel`: drops deferred entries (these ids, or every deferred one); a cancelled thread isn't moved by the watcher. */
+  cancel(ids: readonly string[], allDeferred: boolean): Promise<string[]> {
+    const write = this.ledgerWrite.then(async () => {
+      const ledger = await this.ledger();
+      const dropped = Object.entries(ledger).filter(([id, entry]) => entry.state === "deferred" && (allDeferred || ids.includes(id))).map(([id]) => id);
+      for (const id of dropped) delete ledger[id];
+      if (dropped.length) await this.deps.kv.set(LEDGER_KEY, ledger);
+      return dropped;
+    });
+    this.ledgerWrite = write.catch(() => {});
+    return write;
+  }
+
+  /** The thread was deleted: its ledger entry goes. */
+  forgetThread(threadId: string): Promise<void> {
+    const write = this.ledgerWrite.then(async () => {
+      const ledger = await this.ledger();
+      if (!ledger[threadId]) return;
+      delete ledger[threadId];
+      await this.deps.kv.set(LEDGER_KEY, ledger);
+    });
+    this.ledgerWrite = write.catch(() => {});
+    return write;
   }
 
   /** One thread, start to end. Records its outcome unless this is a dry run or a plain skip. */
@@ -240,7 +332,7 @@ export class MoveProviderService {
         const previous = (await this.ledger())[thread.id];
         // A re-run of a thread this ledger moved keeps "moved".
         if (state === "already-moved" && previous?.state === "moved") state = "moved";
-        await this.record(thread.id, { state, error: done.reason ? `${done.reason}${done.detail ? `: ${done.detail}` : ""}` : null, at: this.now(), attempts: (previous?.attempts ?? 0) + (state === "already-moved" ? 0 : 1), from: previous?.from ?? (thread.providerId ? { providerId: thread.providerId, model: thread.model } : null), request });
+        await this.record(thread.id, { state, error: done.reason ? `${done.reason}${done.detail ? `: ${done.detail}` : ""}` : null, at: this.now(), attempts: (previous?.attempts ?? 0) + (state === "already-moved" ? 0 : 1), from: previous?.from ?? (thread.providerId ? { providerId: thread.providerId, model: thread.model } : null), request, ...(previous?.patchErrors ? { patchErrors: previous.patchErrors } : {}) });
       }
       return done;
     };
@@ -249,7 +341,12 @@ export class MoveProviderService {
     if (thread.providerId === request.providerId && thread.model === request.model) return finish(item("already-moved"));
     if (!thread.providerId) return finish(item("failed", { reason: "no-provider", detail: "the thread has no provider" }));
     if (!decision.ok) return finish(item("failed", { reason: decision.reason, detail: decision.detail }));
-    if (RUNNING.has(thread.status)) return run.noDefer ? item("skipped", { reason: "running" }) : finish(item("deferred", { reason: "running" }));
+    if (RUNNING.has(thread.status)) {
+      if (!run.noDefer) return finish(item("deferred", { reason: "running" }));
+      // --no-defer: an earlier deferral of this thread is dropped too.
+      if (!run.dryRun) await this.cancel([thread.id], false);
+      return item("skipped", { reason: "running" });
+    }
 
     // An archived thread is here only because it was asked for (by id or --include-archived).
     const body: CoreMoveBody = { providerId: request.providerId, model: request.model, permissionMode: decision.mode, historyTokens: request.historyTokens, ...(thread.archived ? { includeArchived: true } : {}) };
@@ -257,7 +354,7 @@ export class MoveProviderService {
       const outcome = coreOutcome(await this.deps.coreMove(thread.id, { ...body, dryRun: true }).catch((error) => ({ status: 0, body: { message: errorText(error) } })));
       if (outcome.kind === "busy") return item(run.noDefer ? "skipped" : "deferred", { reason: "busy" });
       if (outcome.kind === "failed") return item("failed", { reason: outcome.reason, detail: outcome.detail });
-      return item(outcome.result === "already-moved" ? "already-moved" : "would-move");
+      return item(outcome.result === "already-moved" ? "already-moved" : "would-move", outcome.result === "already-moved" ? {} : { handoffEstimate: { maxChars: moveMaxChars(request.historyTokens), historyTokens: request.historyTokens } });
     }
     // The handoff first: a thread is never moved without one.
     let prepared: PrepareResult;
@@ -275,9 +372,9 @@ export class MoveProviderService {
   }
 
   /** BB automations and Studio automations that target these threads, onto the target. Unchanged ones aren't written. */
-  private async patchAutomations(threads: readonly ThreadItem[], request: MoveRequest, dryRun: boolean, supported: PermissionMode[] | null): Promise<AutomationItem[]> {
-    if (!threads.length) return [];
-    const ids = new Set(threads.map((item) => item.threadId));
+  private async patchAutomations(threadIds: readonly string[], request: MoveRequest, dryRun: boolean, supported: PermissionMode[] | null): Promise<AutomationItem[]> {
+    if (!threadIds.length) return [];
+    const ids = new Set(threadIds);
     const out: AutomationItem[] = [];
     let listed: BbAutomation[] = [];
     try {
@@ -289,13 +386,14 @@ export class MoveProviderService {
       const threadId = automation.execution.targetThreadId;
       if (automation.execution.mode !== "agent" || !threadId || !ids.has(threadId)) continue;
       const current = isMode(automation.execution.permissionMode) ? automation.execution.permissionMode : null;
-      const decision = targetPermission(current, request.permission && current && rank(request.permission) <= rank(current) ? request.permission : null, request.providerId, supported);
+      // No mode of its own: it runs with its thread's (already lowered), so it stays unset.
+      const decision = current === null ? { ok: true as const, mode: null } : targetPermission(current, request.permission && rank(request.permission) <= rank(current) ? request.permission : null, request.providerId, supported);
       const permission = decision.ok ? decision.mode : null;
       const from = { providerId: automation.execution.providerId ?? null, model: automation.execution.model ?? null, permission: current };
       const to = { providerId: request.providerId, model: request.model, permission };
       const base = { automationId: automation.id, name: automation.name, kind: "bb" as const, threadId, from, to };
-      if (!decision.ok) { out.push({ ...base, result: "failed", reason: decision.reason }); continue; }
-      if (from.providerId === to.providerId && from.model === to.model && (current === null || current === permission)) { out.push({ ...base, result: "unchanged" }); continue; }
+      if (!decision.ok) { out.push({ ...base, result: "failed", reason: (decision as { reason: string }).reason }); continue; }
+      if (from.providerId === to.providerId && from.model === to.model && current === permission) { out.push({ ...base, result: "unchanged" }); continue; }
       if (dryRun) { out.push({ ...base, result: "would-patch" }); continue; }
       try {
         await this.deps.updateBbAutomation(automation, { ...automation.execution, providerId: request.providerId, model: request.model, ...(permission ? { permissionMode: permission } : {}) });
@@ -369,7 +467,10 @@ export class MoveProviderService {
     if (!target.known) throw new MoveInputError(`No provider ${providerId}.`);
     const chosen = model ?? target.defaultModel;
     if (!chosen) throw new MoveInputError(`${providerId} has no default model; give --model.`);
-    return (await this.patchBotDefaults([bot.id], providerId, chosen, dryRun))[0]!;
+    if (target.models.length && !target.models.includes(chosen)) throw new MoveInputError(`${providerId} doesn't offer ${chosen}. It offers: ${target.models.slice(0, 20).join(", ")}.`);
+    const [item] = await this.patchBotDefaults([bot.id], providerId, chosen, dryRun);
+    if (!dryRun) await this.recordOtherPatches([item!], null, null, providerId, chosen);
+    return item!;
   }
 
   // -------------------------------------------------------------------------
@@ -377,16 +478,32 @@ export class MoveProviderService {
 
   /** Called on thread.idle. Resolves when that thread's move is done (or there was none to do). */
   async onIdle(threadId: string): Promise<ThreadItem | null> {
+    // Claimed before any await, so two idle events (or an idle and the sweep) can't both move it.
     if (this.disposed || this.inFlight.has(threadId)) return null;
-    const entry = (await this.ledger())[threadId];
-    if (entry?.state !== "deferred" || this.disposed) return null;
-    // Claimed: from here the move runs to its end, dispose or not.
     this.inFlight.add(threadId);
+    let done: ThreadItem | null = null;
     try {
-      return await this.retry(threadId, entry);
+      const ledger = await this.ledger();
+      const entry = ledger[threadId];
+      if (entry?.state !== "deferred" || this.disposed) return null;
+      // A Main waits until no other deferred thread does: Main moves last.
+      const mains = new Set(this.deps.bots().map((bot) => bot.threadId).filter((id): id is string => !!id));
+      if (mains.has(threadId) && Object.entries(ledger).some(([id, each]) => id !== threadId && each.state === "deferred" && !mains.has(id))) return null;
+      // From here the move runs to its end, dispose or not.
+      done = await this.retry(threadId, entry);
+      return done;
     } finally {
       this.inFlight.delete(threadId);
+      // The last non-Main deferred thread moved: a waiting idle Main goes now.
+      if (done && !this.disposed) void this.mainsLeft().then((left) => (left ? this.sweep() : null)).catch(() => {});
     }
+  }
+
+  /** Whether only Main threads are still deferred. */
+  private async mainsLeft(): Promise<boolean> {
+    const mains = new Set(this.deps.bots().map((bot) => bot.threadId).filter((id): id is string => !!id));
+    const deferred = Object.entries(await this.ledger()).filter(([, entry]) => entry.state === "deferred").map(([id]) => id);
+    return deferred.length > 0 && deferred.every((id) => mains.has(id));
   }
 
   /** Deferred threads that went idle while nothing watched (Studio restarted): moved now. */
@@ -394,7 +511,8 @@ export class MoveProviderService {
     const ledger = await this.ledger();
     const deferred = Object.entries(ledger).filter(([, entry]) => entry.state === "deferred").map(([id]) => id);
     if (!deferred.length) return [];
-    const threads = await this.deps.getThreads(deferred);
+    const mains = new Set(this.deps.bots().map((bot) => bot.threadId).filter((id): id is string => !!id));
+    const threads = (await this.deps.getThreads(deferred)).sort((a, b) => Number(mains.has(a.id)) - Number(mains.has(b.id)));
     const out: ThreadItem[] = [];
     for (const thread of threads) {
       if (RUNNING.has(thread.status)) continue;
@@ -407,11 +525,19 @@ export class MoveProviderService {
   private async retry(threadId: string, entry: LedgerEntry): Promise<ThreadItem | null> {
     const [thread] = await this.deps.getThreads([threadId]);
     if (!thread) return null;
+    // Someone changed its provider or model since it was deferred: the old request no longer applies.
+    if (entry.from && (thread.providerId !== entry.from.providerId || thread.model !== entry.from.model)) {
+      const detail = `it is on ${thread.providerId ?? "?"}/${thread.model ?? "?"} now, not ${entry.from.providerId}/${entry.from.model ?? "?"} as when deferred`;
+      await this.record(threadId, { ...entry, state: "failed", error: `changed-since-deferred: ${detail}`, at: this.now(), attempts: entry.attempts + 1 });
+      this.deps.log?.(`Move provider: ${threadId} not moved (changed since deferred)`);
+      return { threadId, title: thread.title, role: "other", from: { providerId: thread.providerId ?? "", model: thread.model, permission: thread.permission }, to: { providerId: entry.request.providerId, model: entry.request.model, permission: null }, result: "failed", reason: "changed-since-deferred", detail, automationsPatched: [] };
+    }
     const target = await this.deps.target(entry.request.providerId).catch(() => null);
     const roles = (await this.select({ ids: [threadId], includeArchived: true, runners: false })).roles;
     const item = await this.moveOne(thread, roles.get(threadId) ?? "other", entry.request, { dryRun: false, noDefer: false, callerThreadId: null, supported: target?.permissionModes ?? null });
     if (entry.request.patchAutomations && (item.result === "moved" || item.result === "already-moved")) {
-      const patched = await this.patchAutomations([item], entry.request, false, target?.permissionModes ?? null);
+      const patched = await this.patchAutomations([item.threadId], entry.request, false, target?.permissionModes ?? null);
+      await this.recordPatchErrors([item.threadId], patched);
       item.automationsPatched = patched.filter((each) => each.result === "patched").map((each) => each.automationId);
     }
     this.deps.log?.(`Move provider: ${threadId} ${item.result}${item.reason ? ` (${item.reason})` : ""}`);
@@ -434,12 +560,13 @@ export class MoveProviderService {
       const entry = ledger[id] ?? null;
       const thread = threads.get(id) ?? null;
       const events = await this.deps.moveEvents(id).catch(() => null);
-      const core = !events ? "unknown" : !events.move ? "none" : events.turnCompleted ? "rebuilt" : "pending";
+      const core = !events ? "unknown" : !events.move ? "none" : rebuilt(events) ? "rebuilt" : "pending";
       rows.push({
         threadId: id, title: thread?.title ?? null, ledger: entry?.state ?? null, error: entry?.error ?? null, attempts: entry?.attempts ?? 0, at: entry?.at ?? null,
         provider: thread ? { providerId: thread.providerId, model: thread.model, permission: thread.permission } : null,
         target: entry ? { providerId: entry.request.providerId, model: entry.request.model } : null,
         core,
+        patchErrors: entry?.patchErrors ?? [],
       });
     }
     return rows;
@@ -450,7 +577,7 @@ export class MoveProviderService {
    * handoff was delivered. With a question, asks it (by id only for a Main;
    * never Main from `--all`).
    */
-  async verify(ids: readonly string[], options: { all: boolean; probe?: string }): Promise<VerifyRow[]> {
+  async verify(ids: readonly string[], options: { all: boolean; probe?: string; callerThreadId?: string | null }): Promise<VerifyRow[]> {
     const ledger = await this.ledger();
     const mains = new Set(this.deps.bots().map((bot) => bot.threadId).filter((id): id is string => !!id));
     const wanted = options.all ? Object.entries(ledger).filter(([, entry]) => entry.state === "moved" || entry.state === "already-moved").map(([id]) => id) : [...ids];
@@ -462,10 +589,13 @@ export class MoveProviderService {
       const moveEvent = !!events?.move;
       const turnStarted = !!events?.turnStarted;
       const turnCompleted = !!events?.turnCompleted;
-      const verdict: VerifyRow["verdict"] = !events ? "unknown" : !moveEvent ? "no-move-event" : !turnCompleted ? "pending" : delivered === false ? "handoff-missing" : "ok";
-      const row: VerifyRow = { threadId: id, moveEvent, movedTo: events?.move?.to ?? null, turnStarted, turnCompleted, handoffDelivered: delivered, verdict };
+      const isRebuilt = !!events && rebuilt(events);
+      const verdict: VerifyRow["verdict"] = !events ? "unknown" : !moveEvent ? "no-move-event" : !isRebuilt ? "pending" : delivered === false ? "handoff-missing" : "ok";
+      const row: VerifyRow = { threadId: id, moveEvent, movedTo: events?.move?.to ?? null, turnStarted, turnCompleted, rebuilt: isRebuilt, handoffDelivered: delivered, verdict };
       if (options.probe) {
-        if (mains.has(id) && !explicit.has(id)) row.probe = { skipped: "a Main is probed only by its id" };
+        // Asking the thread this command runs in would wait on itself.
+        if (options.callerThreadId && id === options.callerThreadId) row.probe = { skipped: "the thread running this command" };
+        else if (mains.has(id) && !explicit.has(id)) row.probe = { skipped: "a Main is probed only by its id" };
         else if (!this.deps.ask) row.probe = { skipped: "probing isn't available" };
         else {
           try { row.probe = { answer: await this.deps.ask(id, options.probe) }; } catch (error) { row.probe = { error: errorText(error) }; }
@@ -486,8 +616,10 @@ export interface StatusRow {
   at: number | null;
   provider: { providerId: string | null; model: string | null; permission: PermissionMode | null } | null;
   target: { providerId: string; model: string } | null;
-  /** From the event log: none (no move), pending (moved, no completed turn since), rebuilt (a turn after it completed). */
+  /** From the event log: none (no move), pending (moved, not rebuilt yet), rebuilt (the new provider accepted a request after it). */
   core: "none" | "pending" | "rebuilt" | "unknown";
+  /** Automation patches that failed for it; a re-run to the same target tries them again. */
+  patchErrors: string[];
 }
 
 export interface VerifyRow {
@@ -496,6 +628,8 @@ export interface VerifyRow {
   movedTo: { providerId: string; model: string | null } | null;
   turnStarted: boolean;
   turnCompleted: boolean;
+  /** Core's meaning: the new provider accepted a request after the move. */
+  rebuilt: boolean;
   handoffDelivered: boolean | null;
   verdict: "ok" | "pending" | "no-move-event" | "handoff-missing" | "unknown";
   probe?: { answer?: string; error?: string; skipped?: string };

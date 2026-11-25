@@ -99,3 +99,33 @@ describe("createMoveProvider wiring", () => {
     expect((await none.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "no-move-event" });
   });
 });
+
+describe("verify --probe wiring", () => {
+  it("waits for the turn that started after the probe was sent, not the one already running", async () => {
+    const before = [{ seq: 1, type: "turn/started" }, { seq: 2, type: "item/completed", data: { item: { type: "userMessage", text: "earlier" } } }];
+    const after = [
+      { seq: 3, type: "item/completed", data: { item: { type: "agentMessage", text: "the running turn's answer" } } },
+      { seq: 4, type: "turn/completed", data: { status: "completed" } },
+      { seq: 5, type: "turn/started" },
+      { seq: 6, type: "item/completed", data: { item: { type: "agentMessage", text: "the probe's answer" } } },
+      { seq: 7, type: "turn/completed", data: { status: "completed" } },
+    ];
+    let sent = false;
+    const { bb } = fakeBb();
+    const all = () => (sent ? [...before, ...after] : before) as { seq: number; type: string }[];
+    Object.assign(bb.sdk.threads, {
+      send: async () => { sent = true; return {}; },
+      events: {
+        list: async (args: { order?: string; limit?: string; types?: string[]; afterSeq?: string }) => {
+          let rows = all().filter((row) => (!args.types || args.types.includes(row.type)) && (!args.afterSeq || row.seq > Number(args.afterSeq)));
+          if (args.order === "desc") rows = [...rows].reverse();
+          return rows.slice(0, Number(args.limit ?? 100));
+        },
+        wait: async (args: { type: string; afterSeq?: string }) => all().find((row) => row.type === args.type && (!args.afterSeq || row.seq > Number(args.afterSeq))) ?? null,
+      },
+    });
+    const service = createMoveProvider(deps(bb));
+    const [row] = await service.verify(["thr_a"], { all: false, probe: "first words?" });
+    expect(row!.probe).toEqual({ answer: "the probe's answer" });
+  });
+});

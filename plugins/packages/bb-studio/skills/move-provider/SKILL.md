@@ -22,7 +22,10 @@ why), `1` bad input.
   Main last, by id, from another thread.
 - **Never widen a permission.** Without `--permission`, `full` steps down to
   `auto`, and `auto` becomes `accept-edits` on an ACP target. `--permission`
-  can only narrow. `--permission full` needs the user's explicit OK.
+  can only narrow: `--permission full` works only for a thread that is `full`
+  already (any other thread fails with `permission-widening`), and even then
+  needs the user's explicit OK. An automation without a mode of its own keeps
+  none and runs with its thread's.
 - **Dry run first, and show it to the user.** Don't run the real move until
   the user has read the dry run and said yes.
 - Model, permission and history size are flags. Don't assume values. Without
@@ -34,11 +37,12 @@ why), `1` bad input.
 ```sh
 # Move (selectors combine: --from/--project list threads, --bot/--runners narrow or select)
 bbs studio move-provider [<thread-id>…] [--from <provider>] [--project <id>] [--bot <id|name>] \
-  [--include-archived] [--runners] --to <provider> [--model <model>] [--permission <mode>] \
+  [--include-archived] [--runners] [--exclude-main] --to <provider> [--model <model>] [--permission <mode>] \
   [--history-tokens <n>] [--automations] [--bot-defaults] [--router-rules] [--no-defer] [--dry-run] [--json]
 
 bbs studio move-provider status [<thread-id>…] [--json]   # ledger + event log: pending until a turn after the move completes, then rebuilt
 bbs studio move-provider verify <thread-id>…|--all [--probe "<question>"] [--json]
+bbs studio move-provider cancel <thread-id>…|--all-deferred [--json]   # the watcher won't move these
 bbs studio bot set-model <bot> --provider <provider> [--model <model>] [--dry-run] [--json]
 bbs studio runner move-provider <runner>…|--all [--bot <bot>] --to <provider> [--model …] [--dry-run] [--json]
 bbs studio tool-delivery [<provider> default|all|defer|trio] [--json]
@@ -51,8 +55,16 @@ bbs studio tool-delivery [<provider> default|all|defer|trio] [--json]
 - `--bot-defaults` sets the default model of the Bot (`--bot`) or of every
   Bot whose default is on `--from`.
 - `--router-rules` points router chain targets on `--from` at the target.
-- A running thread is `deferred`. Studio moves it when it goes idle. With
-  `--no-defer` it is `skipped` instead.
+- A running thread is `deferred`. Studio moves it when it goes idle (a
+  deferred Main waits until no other thread is deferred). If its provider or
+  model changed in the meantime, it fails with `changed-since-deferred`
+  instead. `cancel` drops a deferral; with `--no-defer` a running thread is
+  `skipped` and any earlier deferral of it is dropped.
+- `--history-tokens` is at least 1 (150000 by default). The whole handoff
+  fits core's budget for a move turn (`historyTokens*4 + 8000` characters):
+  the newest turns first, then as much outline as fits. The dry run shows
+  that limit per thread (`handoffEstimate`).
+- `--exclude-main` leaves every Bot's Main out unless you name it by id.
 
 Per-thread results: `moved`, `already-moved`, `would-move` (dry run),
 `deferred` (`running` or `busy`), `skipped` (`current-thread`, `running`),
@@ -60,10 +72,14 @@ Per-thread results: `moved`, `already-moved`, `would-move` (dry run),
 `provider-unavailable-on-machine`, `no-handoff-handler`, `handoff-failed`,
 `core-unavailable`, …).
 
-The ledger (KV `studio.moveProvider.ledger`) records each thread's outcome.
-Running the same command again is safe: moved threads come back
-`already-moved`, and failed and deferred ones are tried again. Patches that
-already match are `unchanged`, never written twice.
+The ledger (KV `studio.moveProvider.ledger`) records each thread's outcome
+and its failed automation patches; failed Bot default and router patches are
+in KV `studio.moveProvider.patches`. `status` shows all of them and exits 2
+while anything is failed, deferred or owed. Running a move to the same target
+again is safe: moved threads come back `already-moved`, failed and deferred
+ones are tried again, and owed patches are retried even when the selectors no
+longer pick their threads. Patches that already match are `unchanged`, never
+written twice.
 
 ## Runbook
 
@@ -88,9 +104,10 @@ already match are `unchanged`, never written twice.
    next run). Then `bbs studio move-provider verify <ids> --json` must say
    `ok`. Optionally ask a question only its early history can answer:
    `verify <id> --probe "What was the first thing I asked you here?"`.
-4. **The rest.** Run the step 2 command without `--dry-run`, but leave out
-   Main (give ids, or move Main in step 5). Run it again until `status` shows
-   no `failed` or `deferred`, or stop and report what is stuck and why.
+4. **The rest.** Run the step 2 command without `--dry-run` and with
+   `--exclude-main`. Run it again until `bbs studio move-provider status`
+   exits 0 (nothing failed, deferred or owed), or stop and report what is
+   stuck and why.
 5. **Main last,** from a worker, by id: `bbs studio move-provider <main-id> --to … --json`.
 6. **Verify all.** `bbs studio move-provider verify --all --json`.
    `--all` never probes a Main; probe Main only by its id. Check
@@ -103,7 +120,10 @@ already match are `unchanged`, never written twice.
 Move back with the same command and the old provider: `--to claude-code
 --model <old model>` (with `--automations` and `--bot-defaults` if you used
 them). History is kept either way; the thread gets a handoff on the old
-provider too. This only works while the old provider is still signed in.
+provider too. This only works while the old provider is still signed in. It does **not**
+restore lowered permissions: a thread that went from `auto` to
+`accept-edits` stays there (moving back never widens). Raise it by hand if the
+user wants it back.
 
 ## Don'ts
 

@@ -11,18 +11,19 @@ import { MoveInputError, type MoveOptions, type MoveProviderService, type MoveRe
 type CliResult = { exitCode: number; stdout?: string; stderr?: string };
 
 export const MOVE_USAGE = [
-  "bb studio move-provider [<thread-id>…] [--from <provider>] [--project <id>] [--bot <id|name>] [--include-archived] [--runners]",
+  "bb studio move-provider [<thread-id>…] [--from <provider>] [--project <id>] [--bot <id|name>] [--include-archived] [--runners] [--exclude-main]",
   "    --to <provider> [--model <model>] [--permission accept-edits|auto|full] [--history-tokens <n>]",
   "    [--automations] [--bot-defaults] [--router-rules] [--no-defer] [--dry-run] [--json]",
   "bb studio move-provider status [<thread-id>…] [--json]",
   "bb studio move-provider verify <thread-id>…|--all [--probe \"<question>\"] [--json]",
+  "bb studio move-provider cancel <thread-id>…|--all-deferred [--json]",
 ].join("\n");
 export const BOT_USAGE = "bb studio bot set-model <bot id|name> --provider <provider> [--model <model>] [--dry-run] [--json]";
 export const RUNNER_USAGE = "bb studio runner move-provider <runner id|name>…|--all [--bot <id|name>] --to <provider> [--model <model>] [--permission <mode>] [--history-tokens <n>] [--dry-run] [--json]";
 export const TOOL_DELIVERY_USAGE = `bb studio tool-delivery [<provider> ${TOOL_DELIVERY_MODES.join("|")}] [--json]`;
 
 const MOVE_SPEC: CliSpec = {
-  flags: ["--include-archived", "--runners", "--automations", "--bot-defaults", "--router-rules", "--no-defer", "--dry-run", "--json"],
+  flags: ["--include-archived", "--runners", "--exclude-main", "--automations", "--bot-defaults", "--router-rules", "--no-defer", "--dry-run", "--json"],
   options: ["--from", "--project", "--bot", "--to", "--model", "--permission", "--history-tokens"],
 };
 
@@ -55,6 +56,7 @@ function moveOptions(parsed: Extract<ReturnType<typeof parseCliArgs>, { ok: true
 export async function moveProviderCli(argv: readonly string[], deps: MoveCliDeps): Promise<CliResult> {
   if (argv[0] === "status") return statusCli(argv.slice(1), deps);
   if (argv[0] === "verify") return verifyCli(argv.slice(1), deps);
+  if (argv[0] === "cancel") return cancelCli(argv.slice(1), deps);
   if (argv[0] === "help" || argv.includes("--help")) return { exitCode: 0, stdout: `usage: ${MOVE_USAGE}\n` };
   const parsed = parseCliArgs(argv, MOVE_SPEC);
   if (!parsed.ok) return bad(MOVE_USAGE, parsed.error);
@@ -62,7 +64,7 @@ export async function moveProviderCli(argv: readonly string[], deps: MoveCliDeps
   if (typeof options === "string") return bad(MOVE_USAGE, options);
   const selection: Selection = {
     ids: parsed.positional, from: parsed.options.get("--from"), projectId: parsed.options.get("--project"), bot: parsed.options.get("--bot"),
-    includeArchived: parsed.flags.has("--include-archived"), runners: parsed.flags.has("--runners"),
+    includeArchived: parsed.flags.has("--include-archived"), runners: parsed.flags.has("--runners"), excludeMain: parsed.flags.has("--exclude-main"),
   };
   return runMove(deps, selection, options, parsed.flags.has("--json"));
 }
@@ -101,16 +103,23 @@ async function statusCli(argv: readonly string[], deps: MoveCliDeps): Promise<Cl
   const parsed = parseCliArgs(argv, { flags: ["--json"] });
   if (!parsed.ok) return bad(MOVE_USAGE, parsed.error);
   const rows = await deps.service.status(parsed.positional);
+  const patches = await deps.service.patchLedger();
   const counts = countBy(rows, (row) => row.ledger ?? "none");
-  const exitCode = rows.some((row) => row.ledger === "failed" || row.ledger === "deferred") ? 2 : 0;
-  if (parsed.flags.has("--json")) return json({ threads: rows, counts }, exitCode);
-  if (!rows.length) return { exitCode, stdout: "No moves recorded.\n" };
-  return { exitCode, stdout: `${rows.map(statusLine).join("\n")}\n${Object.entries(counts).map(([key, value]) => `${key} ${value}`).join(", ")}\n` };
+  const patchFailures = rows.reduce((sum, row) => sum + row.patchErrors.length, 0) + Object.keys(patches.botDefaults).length + (patches.router ? 1 : 0);
+  // Anything still to do (a failed or deferred move, a failed patch) exits 2: "re-run until status exits 0".
+  const exitCode = rows.some((row) => row.ledger === "failed" || row.ledger === "deferred") || patchFailures > 0 ? 2 : 0;
+  if (parsed.flags.has("--json")) return json({ threads: rows, counts, patches: { failures: patchFailures, botDefaults: patches.botDefaults, router: patches.router } }, exitCode);
+  const patchLines = [
+    ...Object.entries(patches.botDefaults).map(([id, f]) => `failed patch: Bot ${id} default → ${f.providerId}/${f.model}: ${f.error}`),
+    ...(patches.router ? [`failed patch: router rules ${patches.router.fromProviderId} → ${patches.router.providerId}/${patches.router.model}: ${patches.router.error}`] : []),
+  ];
+  if (!rows.length && !patchLines.length) return { exitCode, stdout: "No moves recorded.\n" };
+  return { exitCode, stdout: `${[...rows.map(statusLine), ...patchLines].join("\n")}\n${Object.entries(counts).map(([key, value]) => `${key} ${value}`).join(", ")}${patchFailures ? `, failed patches ${patchFailures}` : ""}\n` };
 }
 
 function statusLine(row: StatusRow): string {
   const on = row.provider ? `${row.provider.providerId ?? "?"}/${row.provider.model ?? "?"}` : "gone";
-  return `${(row.ledger ?? "none").padEnd(13)} ${row.threadId} ${JSON.stringify(row.title ?? "")} on ${on} · core ${row.core}${row.error ? ` · ${row.error}` : ""}${row.attempts > 1 ? ` · ${row.attempts} attempts` : ""}`;
+  return `${(row.ledger ?? "none").padEnd(13)} ${row.threadId} ${JSON.stringify(row.title ?? "")} on ${on} · core ${row.core}${row.error ? ` · ${row.error}` : ""}${row.attempts > 1 ? ` · ${row.attempts} attempts` : ""}${row.patchErrors.map((line) => `\n    failed patch: ${line}`).join("")}`;
 }
 
 async function verifyCli(argv: readonly string[], deps: MoveCliDeps): Promise<CliResult> {
@@ -121,7 +130,7 @@ async function verifyCli(argv: readonly string[], deps: MoveCliDeps): Promise<Cl
   if (!all && !parsed.positional.length) return bad(usage, "Give thread ids or --all.");
   if (all && parsed.positional.length) return bad(usage, "Give thread ids or --all, not both.");
   const probe = parsed.options.get("--probe");
-  const rows = await deps.service.verify(parsed.positional, { all, ...(probe ? { probe } : {}) });
+  const rows = await deps.service.verify(parsed.positional, { all, callerThreadId: deps.callerThreadId, ...(probe ? { probe } : {}) });
   const exitCode = rows.every((row) => row.verdict === "ok") ? 0 : 2;
   if (parsed.flags.has("--json")) return json({ threads: rows, counts: countBy(rows, (row) => row.verdict) }, exitCode);
   if (!rows.length) return { exitCode, stdout: "Nothing to verify.\n" };
@@ -131,6 +140,17 @@ async function verifyCli(argv: readonly string[], deps: MoveCliDeps): Promise<Cl
 function verifyLine(row: VerifyRow): string {
   const probe = row.probe ? row.probe.answer !== undefined ? `\n    answer: ${row.probe.answer.replace(/\s+/g, " ").slice(0, 400)}` : ` · probe ${row.probe.skipped ? `skipped (${row.probe.skipped})` : `failed (${row.probe.error})`}` : "";
   return `${row.verdict.padEnd(15)} ${row.threadId} · move event ${row.moveEvent ? "yes" : "no"} · first turn ${row.turnStarted ? "started" : "not yet"} · handoff ${row.handoffDelivered === null ? "unknown" : row.handoffDelivered ? "delivered" : "missing"}${probe}`;
+}
+
+async function cancelCli(argv: readonly string[], deps: MoveCliDeps): Promise<CliResult> {
+  const usage = "bb studio move-provider cancel <thread-id>…|--all-deferred [--json]";
+  const parsed = parseCliArgs(argv, { flags: ["--json", "--all-deferred"] });
+  if (!parsed.ok) return bad(usage, parsed.error);
+  const all = parsed.flags.has("--all-deferred");
+  if (all === !!parsed.positional.length) return bad(usage, "Give thread ids or --all-deferred.");
+  const cancelled = await deps.service.cancel(parsed.positional, all);
+  if (parsed.flags.has("--json")) return json({ cancelled });
+  return { exitCode: 0, stdout: cancelled.length ? `Cancelled ${cancelled.length} deferred move${cancelled.length === 1 ? "" : "s"}: ${cancelled.join(", ")}\n` : "No deferred moves to cancel.\n" };
 }
 
 export async function botCli(argv: readonly string[], deps: MoveCliDeps): Promise<CliResult> {
