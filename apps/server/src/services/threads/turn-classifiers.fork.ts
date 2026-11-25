@@ -11,6 +11,7 @@ import { registerTurnContextProvider } from "./turn-context.fork.js";
 import { registerAutoRouter } from "./auto-router.fork.js";
 import { completeTextForPlugin } from "../ai/plugin-text-completion.fork.js";
 import { readThreadForkPoint } from "./thread-fork-point.fork.js";
+import { moveThreadProviderForPlugin } from "./thread-provider-move-routes.fork.js";
 import type { DbConnection } from "@bb/db";
 
 const classifiers = new Map<string, ExperimentalTurnClassifier>();
@@ -51,6 +52,7 @@ export function forkPluginHooks(args: {
       autoRouter: true,
       textCompletion: true,
       deferredAgentTools: true,
+      providerMove: true,
     },
     experimental_classifyTurns(classifier) {
       args.assertLive();
@@ -79,6 +81,10 @@ export function forkPluginHooks(args: {
       }
       return Promise.resolve(readThreadForkPoint(args.db, threadId));
     },
+    experimental_moveThreadProvider(threadId, request) {
+      args.assertLive();
+      return moveThreadProviderForPlugin(args.pluginId, threadId, request);
+    },
     experimental_skillsRegistryPolicy(policy) {
       args.assertLive();
       if (typeof policy !== "function") {
@@ -103,13 +109,15 @@ export function forkPluginHooks(args: {
       args.assertLive();
       return completeTextForPlugin(args.pluginId, request);
     },
-    experimental_turnContext(provider) {
+    experimental_turnContext(provider, options) {
       args.assertLive();
       if (typeof provider !== "function") {
         throw new Error("experimental_turnContext expects a function");
       }
       args.disposeHooks.push(
-        registerTurnContextProvider(args.pluginId, provider),
+        registerTurnContextProvider(args.pluginId, provider, {
+          providerMove: options?.providerMove === true,
+        }),
       );
     },
   };

@@ -32,6 +32,7 @@ export function forkFakeHooks(): ForkPluginHooks {
       autoRouter: true,
       textCompletion: true,
       deferredAgentTools: true,
+      providerMove: true,
     },
     experimental_autoRouter() {},
     experimental_completeText: () =>
@@ -46,6 +47,15 @@ export function forkFakeHooks(): ForkPluginHooks {
     experimental_turnContext() {},
     experimental_skillsRegistryPolicy() {},
     experimental_threadForkPoint: () => Promise.resolve(null),
+    experimental_moveThreadProvider: (threadId: string) =>
+      Promise.resolve({
+        ok: false as const,
+        threadId,
+        httpStatus: 501,
+        code: "not_implemented",
+        message: "The fake plugin host does not move threads",
+        reason: null,
+      }),
     experimental_requestApproval: () =>
       Promise.resolve({ approved: false, picked: [] }),
   };

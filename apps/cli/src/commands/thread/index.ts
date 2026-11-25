@@ -1,3 +1,4 @@
+import { registerMoveProviderCommand } from "./move-provider.fork.js";
 import { registerContextCommand } from "./context.js";
 import { registerSessionStateCommands } from "./session-state.js";
 import { Command } from "commander";
@@ -31,4 +32,5 @@ export function registerThreadCommands(
   registerOrganizationCommands(thread, getUrl);
   registerActionsCommands(thread, getUrl);
   registerInteractionCommands(thread, getUrl);
+  registerMoveProviderCommand(thread, getUrl);
 }

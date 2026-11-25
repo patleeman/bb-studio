@@ -1,3 +1,4 @@
+import { inheritedExecutionAfterProviderMove } from "./provider-move-state.fork.js";
 import {
   appendStoredThreadEventsInTransaction,
   createEventId,
@@ -964,5 +965,5 @@ export function getLastExecutionOptions(
 ): RecordedThreadExecutionOptions | null {
   const row = getLastStoredTurnRequestEvent(deps.db, threadId);
 
-  return row ? parseStoredTurnRequestEvent(row).execution : null;
+  return inheritedExecutionAfterProviderMove(deps.db, threadId, row ? parseStoredTurnRequestEvent(row).execution : null);
 }
