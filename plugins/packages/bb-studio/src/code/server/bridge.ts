@@ -100,17 +100,7 @@ export class Bridges {
       });
       await chmod(socket, 0o600);
       // Keeps event streams open through idle proxies and notices dead ones.
-      bridge.heartbeat = setInterval(() => {
-        for (const window of bridge.windows.values()) {
-          const stream = window.stream;
-          if (!stream) continue;
-          if (stream.destroyed || stream.writableEnded) {
-            window.stream = null;
-            continue;
-          }
-          try { stream.write(": ping\n\n"); } catch { window.stream = null; }
-        }
-      }, 25_000);
+      bridge.heartbeat = setInterval(() => this.ping(id), 25_000);
       bridge.heartbeat.unref?.();
       this.bridges.set(id, bridge);
     } catch (error) {
@@ -138,6 +128,30 @@ export class Bridges {
 
   async closeAll(): Promise<void> {
     await Promise.all([...this.bridges.keys()].map((id) => this.close(id)));
+  }
+
+  private dropWindow(bridge: Bridge, windowId: string, window: Window, stream: ServerResponse): boolean {
+    if (window.stream !== stream) return false;
+    window.stream = null;
+    bridge.windows.delete(windowId);
+    for (const pending of bridge.waiting.values()) if (pending.window === window) pending.finish(CLOSED);
+    try { if (!stream.destroyed) stream.destroy(); } catch { /* already closed */ }
+    return true;
+  }
+
+  /** Pings open event streams and cleans up any dead ones (exposed for tests). */
+  ping(id: string): void {
+    const bridge = this.bridges.get(id);
+    if (!bridge) return;
+    for (const [windowId, window] of [...bridge.windows]) {
+      const stream = window.stream;
+      if (!stream) continue;
+      if (stream.destroyed || stream.writableEnded) {
+        this.dropWindow(bridge, windowId, window, stream);
+        continue;
+      }
+      try { stream.write(": ping\n\n"); } catch { this.dropWindow(bridge, windowId, window, stream); }
+    }
   }
 
   /** This run's secret, for tests and for the extension's file. */
@@ -262,10 +276,7 @@ export class Bridges {
       this.log(`workspace ${id}: editor window connected (${count()} open)`);
       this.onConnect(id);
       req.on("close", () => {
-        if (window.stream === res) {
-          bridge.windows.delete(windowId);
-          for (const pending of bridge.waiting.values()) if (pending.window === window) pending.finish(CLOSED);
-        }
+        this.dropWindow(bridge, windowId, window, res);
         this.log(`workspace ${id}: editor window left after ${Math.round((Date.now() - opened) / 1000)}s (${count()} open)`);
       });
       const held = this.held.get(id);
