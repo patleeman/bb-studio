@@ -460,13 +460,20 @@ export default async function plugin(bb: BbPluginApi) {
     const allowed = ops.get(name);
     const absorb = ABSORB_FIELDS[name];
     if (absorb && allowed) {
-      // An absorb shows only its allowed ops' fields; without the list op, page is required.
-      const base = slimFor(name) ?? fullSchema(name);
-      if (!base) return null;
-      const drop = Object.entries(absorb).filter(([op]) => !allowed.includes(op)).flatMap(([, fields]) => fields);
-      const properties = Object.fromEntries(Object.entries((base.properties ?? {}) as Record<string, unknown>).filter(([key]) => !drop.includes(key)));
-      const required = name === "pages_read" && !allowed.includes("list") ? ["page"] : (base.required as string[] | undefined);
-      return { ...base, properties, ...(required ? { required } : {}) };
+      const key = `${name}:${allowed.join(",")}`;
+      if (!mergedShownCache.has(key)) {
+        // An absorb shows only its allowed ops' fields; without the list op, page is required.
+        const base = slimFor(name) ?? fullSchema(name);
+        if (!base) {
+          mergedShownCache.set(key, null);
+        } else {
+          const drop = Object.entries(absorb).filter(([op]) => !allowed.includes(op)).flatMap(([, fields]) => fields);
+          const properties = Object.fromEntries(Object.entries((base.properties ?? {}) as Record<string, unknown>).filter(([prop]) => !drop.includes(prop)));
+          const required = name === "pages_read" && !allowed.includes("list") ? ["page"] : (base.required as string[] | undefined);
+          mergedShownCache.set(key, { ...base, properties, ...(required ? { required } : {}) });
+        }
+      }
+      return mergedShownCache.get(key)!;
     }
     if (!merge || !allowed) return null;
     const key = `${name}:${allowed.join(",")}`;
