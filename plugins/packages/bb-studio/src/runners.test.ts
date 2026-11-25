@@ -807,7 +807,11 @@ it("FM (#9): making a runner when the Main is gone or has no model says so with 
 it("bounds concurrency in list() and hideThreads() while preserving order and counts", async () => {
   const x = await setup();
   for (let i = 0; i < 10; i += 1) {
-    await x.runners.create({ name: `R${String(i).padStart(2, "0")}`, job: `Job ${i}`, schedule });
+    const name = `R${String(i).padStart(2, "0")}`;
+    await x.runners.create({ name, job: `Job ${i}`, schedule });
+    // Give each row a distinct created_at so ORDER BY created_at, id is deterministic
+    // even when consecutive creates land in the same millisecond.
+    x.db.prepare("UPDATE bot_runners SET created_at = ? WHERE name = ?").run(1_000 + i, name);
   }
   // Reset hidden = 0 so hideThreads() hides all 10 concurrently (bounded to 6).
   x.db.prepare("UPDATE bot_runners SET hidden = 0").run();
@@ -825,14 +829,16 @@ it("bounds concurrency in list() and hideThreads() while preserving order and co
   expect(maxHide).toBeGreaterThanOrEqual(2);
   expect(maxHide).toBeLessThanOrEqual(6);
 
-  // list() bounds concurrent threads.get() calls to <= 6 and preserves order.
+  // list() bounds concurrent threads.get() calls to <= 6 and preserves ORDER BY created_at, id
+  // even when later runners resolve faster than earlier ones.
   let inFlightGet = 0;
   let maxGet = 0;
   const origGet = x.get.getMockImplementation()!;
   x.get.mockImplementation(async (args) => {
     inFlightGet += 1;
     maxGet = Math.max(maxGet, inFlightGet);
-    await new Promise((r) => setTimeout(r, 15));
+    const num = Number(args.threadId.replace(/\D+/g, "")) || 0;
+    await new Promise((r) => setTimeout(r, 5 + ((10 - (num % 10)) * 2)));
     inFlightGet -= 1;
     return origGet(args);
   });
