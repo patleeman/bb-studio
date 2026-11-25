@@ -4,6 +4,7 @@ import {
   restoreServerAccessOrigins,
 } from "./services/machines/server-access.js";
 import { createPluginUpdateJobs } from "./services/plugins/plugin-update-jobs.js";
+import { registerForkProviderMoveRoutes } from "./services/threads/thread-provider-move-routes.fork.js";
 import { registerForkApprovalRoutes } from "./services/fork-approvals/index.js";
 import { registerForkImportRoutes } from "./services/fork-import/index.js";
 import { registerSkillsRegistryGate } from "./services/skills/registry-policy.fork.js";
@@ -951,6 +952,7 @@ export function createApp(
   registerServerSweepRoutes(publicApi, deps);
   registerForkImportRoutes(publicApi, deps, pluginService);
   registerForkApprovalRoutes(publicApi);
+  registerForkProviderMoveRoutes(publicApi, deps, pluginService);
   app.route("/api/v1", publicApi);
   app.use("/api/v1/*", () => {
     throw new ApiError(404, "not_found", "Not found");
