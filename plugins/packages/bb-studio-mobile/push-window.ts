@@ -49,7 +49,7 @@ export class PushWindows {
 
   /** True: send now, and a window opens. False: held until the window ends. */
   offer(key: string, messages: ExpoMessage[]): boolean {
-    if (this.disposed) return false;
+    if (this.disposed) return true;
     const now = this.now();
     for (const [k, win] of this.windows) {
       if (k !== key && win.until <= now && !win.held && !win.timer) this.windows.delete(k);
@@ -93,7 +93,7 @@ export class PushWindows {
         if (next.timer) clearTimeout(next.timer);
         this.windows.delete(key);
       } else {
-        // The previous flush did not go out, so the newly held push(es) start a fresh count.
+        // Intended: the previous flush did not go out, so the newly held push(es) start a fresh count rather than counting unsent pushes.
         next.shown = 0;
       }
     }
