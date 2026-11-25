@@ -53,7 +53,7 @@ async function checkGuides(dir) {
     else if (entry.isFile() && entry.name.endsWith(".md")) errors.push(...await localLinkErrors(file, await readFile(file, "utf8")));
   }
 }
-const rootReadme = join(root, "README.md");
+const rootReadme = (await exists(join(root, "README.md"))) ? join(root, "README.md") : resolve(root, "..", "README.md");
 errors.push(...await localLinkErrors(rootReadme, await readFile(rootReadme, "utf8")));
 await checkGuides(join(root, "docs"));
 

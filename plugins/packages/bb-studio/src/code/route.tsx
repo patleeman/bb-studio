@@ -132,7 +132,7 @@ function WorkspacePicker() {
           {error ? (
             <div className="flex flex-wrap items-center gap-2">
               <p role="alert" className="min-w-0 flex-1 text-sm text-destructive">{error}</p>
-              <button type="button" className={BAR_BUTTON} onClick={() => setAttempt((n) => n + 1)}><Icon name="RotateCw" className="size-4" /> Retry</button>
+              <button type="button" className={BAR_BUTTON} onClick={() => setAttempt((n) => n + 1)}><Icon name="RotateCcw" className="size-4" /> Retry</button>
             </div>
           ) : workspaces === null ? (
             <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Icon name="Loading" className="size-4 animate-spin motion-reduce:animate-none" /> Loading workspaces…</p>

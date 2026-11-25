@@ -32,7 +32,7 @@ export function AccountsNoticePill({ text, severe, onOpen }: { text: string; sev
         severe ? "border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15" : "border-warning/30 bg-warning/10 text-warning hover:bg-warning/15",
       )}
     >
-      <Icon name={severe ? "CircleAlert" : "AlertTriangle"} className="size-3.5 shrink-0" />
+      <Icon name={severe ? "AlertCircle" : "AlertTriangle"} className="size-3.5 shrink-0" />
       <span className="min-w-0 flex-1 truncate">{text}</span>
       <Icon name="ChevronRight" className="size-3.5 shrink-0 opacity-70" />
     </button>

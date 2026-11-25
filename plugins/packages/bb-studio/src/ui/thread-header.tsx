@@ -39,6 +39,8 @@ export function useThreadLookup<T>(threadIds: readonly string[], load: (threadId
     if (!enabled || !key) return;
     let stopped = false;
     const ids = key.split("\n");
+    const active = new Set(ids);
+    for (const id of loaded.current) if (!active.has(id)) loaded.current.delete(id);
     const fetch = (all: boolean) => {
       for (const id of ids) {
         if (!all && loaded.current.has(id)) continue;
@@ -48,8 +50,14 @@ export function useThreadLookup<T>(threadIds: readonly string[], load: (threadId
       }
     };
     fetch(false);
-    const timer = setInterval(() => fetch(true), pollMs);
-    return () => { stopped = true; clearInterval(timer); };
+    const timer = setInterval(() => { if (typeof document === "undefined" || document.visibilityState === "visible") fetch(true); }, pollMs);
+    const onVisible = () => { if (document.visibilityState === "visible") fetch(true); };
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [key, enabled, load, pollMs]);
   return values;
 }

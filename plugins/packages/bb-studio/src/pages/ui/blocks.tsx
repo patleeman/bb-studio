@@ -445,7 +445,7 @@ function MentionChip({ kind, target, label }: { kind: keyof typeof MENTION_ICONS
 const PageImageBlock = createReactBlockSpec(createImageBlockConfig, (config) => ({
   meta: { fileBlockAccept: ["image/*"] },
   render: (props) => (
-    <ResizableFileBlockWrapper {...(props as unknown as Parameters<typeof ResizableFileBlockWrapper>[0])} buttonIcon={<Icon name="Image" className="size-6" />}>
+    <ResizableFileBlockWrapper {...(props as unknown as Parameters<typeof ResizableFileBlockWrapper>[0])} buttonIcon={<Icon name="studio/artifact-image" className="size-6" />}>
       <ImagePreview {...(props as unknown as Parameters<typeof ImagePreview>[0])} />
       <button
         type="button"

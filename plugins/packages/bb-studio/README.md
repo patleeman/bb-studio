@@ -1,6 +1,6 @@
 # Studio
 
-> **Studio** is the core of **BB Studio**: pages (with their whiteboards), recordings, designs and artifacts are built in. See the [suite overview](../../README.md).
+> **Studio** is the core of **BB Studio**: pages (with their whiteboards), recordings, designs and artifacts are built in. See the [suite overview](../../../README.md).
 
 Studio is built around one Bot with many conversations: the sidebar shows
 one Bot at a time, its conversations with you and the workers it runs (see

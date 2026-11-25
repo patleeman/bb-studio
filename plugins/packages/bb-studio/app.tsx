@@ -403,7 +403,7 @@ export default definePluginApp((app) => {
   const infoSection = member(app.slots, "experimental_threadInfoSection");
   if (typeof infoSection === "function") infoSection.call(app.slots, { id: "thread-context", group: "0_context", order: 10, component: ContextInfoSection });
   app.slots.experimental_messageMetadata({ id: "strand-tag", placement: "above", component: StrandTag });
-  registerThreadTab(app, { id: STRANDS_TAB, title: "Strands", icon: "LayoutList", layout: "flush", component: StrandsTab, ...OFF_NEW_TAB });
+  registerThreadTab(app, { id: STRANDS_TAB, title: "Strands", icon: "ListView", layout: "flush", component: StrandsTab, ...OFF_NEW_TAB });
   // The Bot's other pages as tabs (Memory, Library, Automations, the Archive) and the New Tab page's "New …" actions (src/tab-kinds.ts).
   registerTabKindTabs(app);
   // Hands-free voice (src/voice/live/ui): a session is its own thread. Its

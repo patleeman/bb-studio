@@ -130,7 +130,7 @@ export function SpaceHeader({ bot, line, resume = null, chooseModel = false, gla
         {row("memory", "Memory", <span className="text-sm leading-none">◈</span>)}
         {row("skills", "Skills", <Icon name="Toolbox" className="size-4" />)}
         {row("library", "Library", <Icon name="studio/library" className="size-4" />)}
-        {row("strands", "Strands", <Icon name="LayoutList" className="size-4" />, strands ? <span data-testid="space-strands-count" className="shrink-0 text-xs tabular-nums text-warning">{strands}</span> : null)}
+        {row("strands", "Strands", <Icon name="ListView" className="size-4" />, strands ? <span data-testid="space-strands-count" className="shrink-0 text-xs tabular-nums text-warning">{strands}</span> : null)}
         {row("conversations", "Conversations", <Icon name="studio/conversations" className="size-4" />)}
       </nav>
     </header>

@@ -28,7 +28,7 @@ export function authNeeds(status: Pick<AuthStatus, "entries"> | null | undefined
     const detail = entryDetail(entry);
     out.push({
       key: `auth:${entry.id}`,
-      icon: "CircleAlert",
+      icon: "AlertCircle",
       tone: "failed",
       title: `${entry.name} signed out`,
       detail,
@@ -42,7 +42,7 @@ export function accountNeeds(status: Pick<AccountsStatus, "warnings"> | null | u
   const warnings = Array.isArray(status?.warnings) ? status.warnings : [];
   return warnings.map((warning) => ({
     key: `account:${warning.id}`,
-    icon: warning.kind === "signed_out" || warning.kind === "error" ? "CircleAlert" : "AlertTriangle",
+    icon: warning.kind === "signed_out" || warning.kind === "error" ? "AlertCircle" : "AlertTriangle",
     tone: "failed" as const,
     title: warning.title,
     detail: warning.detail,

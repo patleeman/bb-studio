@@ -22,8 +22,14 @@ export function usePendingQuestions(threadId: string | null): Pending[] {
       setPending(items);
     }, () => {});
     load();
-    const timer = setInterval(load, 30_000);
-    return () => { live = false; clearInterval(timer); };
+    const timer = setInterval(() => { if (typeof document === "undefined" || document.visibilityState === "visible") load(); }, 30_000);
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      live = false;
+      clearInterval(timer);
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [sdk, threadId]);
   return pending;
 }

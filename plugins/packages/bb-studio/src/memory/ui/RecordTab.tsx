@@ -61,7 +61,7 @@ export function RecordDetail({ record, topics }: { record: MemoryRecordView; top
   ];
   return (
     <BotItemDetail testId="record-detail" title={record.topic} facts={facts} actions={editing ? null : <>
-      {!isReplaced ? <button type="button" className={cn(OUTLINE_BUTTON, "h-7 px-2.5")} onClick={() => setEditing(true)}><Icon name="Pencil" />Edit</button> : null}
+      {!isReplaced ? <button type="button" className={cn(OUTLINE_BUTTON, "h-7 px-2.5")} onClick={() => setEditing(true)}><Icon name="Edit" />Edit</button> : null}
       <button type="button" className={cn(GHOST_BUTTON, "h-7 px-2.5")} onClick={() => void archive(!record.archived)}><Icon name={record.archived ? "RotateCcw" : "Archive"} />{record.archived ? "Restore" : "Archive"}</button>
     </>}>
       {editing ? (

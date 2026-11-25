@@ -11,7 +11,7 @@ const SOURCE_TEXT = { studio: "BB Studio Account Pooler", bb: "bb Account Pooler
 export function SignedOutLine({ name, source, onSignIn, compact = false }: { name: string; source: AccountView["source"]; onSignIn: (() => void) | null; compact?: boolean }) {
   return (
     <div data-testid="signed-out" className={cn("flex min-w-0 items-center gap-2 text-sm", compact ? "py-1" : "")}>
-      <Icon name="CircleAlert" className="size-4 shrink-0 text-destructive" />
+      <Icon name="AlertCircle" className="size-4 shrink-0 text-destructive" />
       <span className="min-w-0 flex-1 truncate"><span className="font-medium text-destructive">Signed out</span><span className="text-muted-foreground"> · {name} · {SOURCE_TEXT[source]}</span></span>
       {onSignIn ? <button type="button" className={cn(OUTLINE_BUTTON, "h-7 px-2.5 text-xs")} onClick={onSignIn}>{signInLabel({ source })}</button> : null}
     </div>

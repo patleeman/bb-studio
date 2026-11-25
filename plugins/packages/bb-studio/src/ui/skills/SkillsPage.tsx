@@ -21,7 +21,7 @@ function Diff({ diff }: { diff: string }) {
 function VersionRow({ version, showName, busy, open, onToggle, onRevert }: { version: Version; showName: boolean; busy: boolean; open: boolean; onToggle(): void; onRevert(): void }) {
   return (
     <div data-testid="skill-version" data-version={version.id} className="flex flex-col">
-      <BotPageRow icon={version.body === null ? "Trash2" : "History"} title={showName ? version.name : `Version ${version.id}`} titleText={version.name}
+      <BotPageRow icon={version.body === null ? "Trash2" : "Clock"} title={showName ? version.name : `Version ${version.id}`} titleText={version.name}
         status={version.body === null ? { label: "Deleted", tone: "danger" } : version.warnings.length ? { label: version.warnings.length === 1 ? "1 warning" : `${version.warnings.length} warnings`, tone: "warning" } : null}
         meta={relativeTime(version.at)} selected={open} onOpen={onToggle}
         actions={<Button type="button" variant="outline" size="sm" data-testid="skill-revert" disabled={busy} className={SMALL} aria-label={`Revert ${version.name} to version ${version.id}`} onClick={onRevert}><Icon name="RotateCcw" />Revert</Button>} />

@@ -26,7 +26,7 @@ export function registerForkFromHere(slots: object, deps: ForkDeps): boolean {
   return registerMessageAction(slots, {
     id: "fork-conversation",
     title: FORK_FROM_HERE,
-    icon: "GitFork",
+    icon: "Fork",
     isAvailable: (message) => Number.isFinite(message.sourceSeqEnd) && message.sourceSeqEnd >= 0 && mayBeBotThread(message.threadId),
     experimental_replaces: "thread.fork",
     run: (message) => { void forkFromHere(message, deps); },

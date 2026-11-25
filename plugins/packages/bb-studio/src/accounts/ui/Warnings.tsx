@@ -37,7 +37,7 @@ export function WarningCard({ warning, actions }: { warning: Warning; actions: W
   const severe = warning.kind === "signed_out" || warning.kind === "error";
   return (
     <li data-warning={warning.id} data-warning-kind={warning.kind} className="flex min-w-0 items-start gap-2.5 rounded-[var(--studio-card-radius,0.75rem)] border border-border/60 p-3 shadow-lg" style={{ background: "var(--fork-popover, color-mix(in oklab, var(--popover) 82%, transparent))", backdropFilter: "var(--fork-popover-filter, blur(14px))", WebkitBackdropFilter: "var(--fork-popover-filter, blur(14px))" }}>
-      <Icon name={severe ? "CircleAlert" : "AlertTriangle"} className={cn("mt-0.5 size-4 shrink-0", severe ? "text-destructive" : "text-warning")} />
+      <Icon name={severe ? "AlertCircle" : "AlertTriangle"} className={cn("mt-0.5 size-4 shrink-0", severe ? "text-destructive" : "text-warning")} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate text-sm font-medium text-foreground">{warning.title}</span>
         {warning.detail ? <span className="line-clamp-2 text-xs text-muted-foreground" title={warning.detail}>{warning.detail}</span> : null}

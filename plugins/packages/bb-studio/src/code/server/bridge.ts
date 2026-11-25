@@ -100,7 +100,17 @@ export class Bridges {
       });
       await chmod(socket, 0o600);
       // Keeps event streams open through idle proxies and notices dead ones.
-      bridge.heartbeat = setInterval(() => { for (const window of bridge.windows.values()) window.stream?.write(": ping\n\n"); }, 25_000);
+      bridge.heartbeat = setInterval(() => {
+        for (const window of bridge.windows.values()) {
+          const stream = window.stream;
+          if (!stream) continue;
+          if (stream.destroyed || stream.writableEnded) {
+            window.stream = null;
+            continue;
+          }
+          try { stream.write(": ping\n\n"); } catch { window.stream = null; }
+        }
+      }, 25_000);
       bridge.heartbeat.unref?.();
       this.bridges.set(id, bridge);
     } catch (error) {

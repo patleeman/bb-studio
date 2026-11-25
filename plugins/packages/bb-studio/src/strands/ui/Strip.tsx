@@ -410,7 +410,7 @@ export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; n
           </div>
           <div className="flex items-center border-t border-border/60 px-1 py-1">
             <button type="button" data-strand-option="all" onClick={openTab} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left text-[12px] text-muted-foreground outline-none hover:bg-accent/60 hover:text-foreground focus-visible:bg-accent/60">
-              <Icon name="LayoutList" className="size-3.5" />All strands
+              <Icon name="ListView" className="size-3.5" />All strands
             </button>
           </div>
         </div>

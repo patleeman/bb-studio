@@ -26,8 +26,14 @@ export function useSearchFreshness(enabled = true) {
     };
     void refresh();
     // Also catch missed realtime events, including recovery while this view is open.
-    const timer = setInterval(() => { void refresh(); }, 3_000);
-    return () => { live = false; clearInterval(timer); };
+    const timer = setInterval(() => { if (typeof document === "undefined" || document.visibilityState === "visible") void refresh(); }, 3_000);
+    const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      live = false;
+      clearInterval(timer);
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [rpc, enabled, signal]);
   const retry = async () => {
     if (retrying) return;
