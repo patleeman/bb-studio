@@ -58060,7 +58060,8 @@
               "open",
               "close",
               "focus",
-              "reorder"
+              "reorder",
+              "update"
             ]
           },
           "tab": {

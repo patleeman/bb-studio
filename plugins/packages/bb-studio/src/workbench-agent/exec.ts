@@ -23,7 +23,7 @@ export interface PanelTab {
   title: string;
   closable: boolean;
   detail:
-    | { kind: "plugin"; pluginId: string; tab: { id: string }; params: JsonValue | null }
+    | { kind: "plugin"; pluginId: string; tab: { id: string; availability?: string }; params: JsonValue | null }
     | { kind: "file"; path: string }
     | { kind: "browser"; url: string }
     | { kind: "terminal"; terminalId: string }

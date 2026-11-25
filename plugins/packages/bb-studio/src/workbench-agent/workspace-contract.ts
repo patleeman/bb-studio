@@ -35,7 +35,7 @@ export const workspaceState = z.object({
   version: z.number().int().min(0),
 });
 
-export const WORKSPACE_OPS = ["open", "close", "focus", "reorder"] as const;
+export const WORKSPACE_OPS = ["open", "close", "focus", "reorder", "update"] as const;
 
 export const workspaceContract = {
   /** A conversation's Workspace (its workbench tabs). */
@@ -47,7 +47,10 @@ export const workspaceContract = {
    * One change, made only when `baseVersion` is the current version.
    * open: `tab` (and `title`; `focus` default true, `position` optional),
    * selects it when it is already open. close, focus: `tabId`. reorder:
-   * `tabId` to `position`. Answers the state after it (or as it is, for
+   * `tabId` to `position`. update: `tabId` now shows `tab` (and `title`),
+   * such as a browser tab that navigated. Browser tabs are http(s) only,
+   * paths have no "..", and a file's worktree or machine must exist:
+   * anything else is refused. Answers the state after it (or as it is, for
    * conflict, notFound, refused and unchanged) and the tab acted on.
    */
   threadWorkbenchMutate: {

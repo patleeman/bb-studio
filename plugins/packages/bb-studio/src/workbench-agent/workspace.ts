@@ -40,7 +40,8 @@ export type WorkspaceTabRef = Omit<z.infer<typeof workspaceTabRefSchema>, "kind"
 
 export const mobileSupportOf = (ref: Pick<WorkspaceTabRef, "kind">): MobileSupport => ref.kind === "plugin" ? "web" : MOBILE_SUPPORT[ref.kind];
 
-const trimPath = (path: string) => path.replace(/^\.?\/+/u, "");
+/** A path as keys compare it: "./" dropped; an absolute path keeps its leading "/". */
+const trimPath = (path: string) => path.replace(/^(?:\.\/+)+/u, "");
 
 /** The ref with only the fields its kind uses, so equal refs serialize the same. */
 export function cleanRef(ref: WorkspaceTabRef): WorkspaceTabRef {
@@ -66,13 +67,57 @@ export function refKey(ref: WorkspaceTabRef): string {
   }
 }
 
-/** Whether two keys name the same thing. A file matches by path, relative or absolute (one ends with the other). */
+/**
+ * Whether two keys name the same thing. Exact, except a file named by its
+ * full path matches the same file named relative to its worktree (the
+ * absolute one ends with "/" and the relative one). Two relative paths
+ * never match by suffix: `a.ts` is not `src/a.ts`.
+ */
 export function sameKey(a: string, b: string): boolean {
   if (a === b) return true;
   if (!a.startsWith("file:") || !b.startsWith("file:")) return false;
   const left = a.slice(5);
   const right = b.slice(5);
-  return !!left && !!right && (left.endsWith(`/${right}`) || right.endsWith(`/${left}`));
+  if (!left || !right) return false;
+  const [abs, rel] = left.startsWith("/") && !right.startsWith("/") ? [left, right] : right.startsWith("/") && !left.startsWith("/") ? [right, left] : [null, null];
+  return !!abs && !!rel && abs.endsWith(`/${rel}`);
+}
+
+/** Whether two refs show the same thing: the same key, and for files the same worktree or machine where both say. */
+export function sameRef(a: WorkspaceTabRef, b: WorkspaceTabRef): boolean {
+  if (!sameKey(refKey(a), refKey(b))) return false;
+  if (a.kind !== "file") return true;
+  if (a.environmentId && b.environmentId && a.environmentId !== b.environmentId) return false;
+  if (a.hostId && b.hostId && a.hostId !== b.hostId) return false;
+  return true;
+}
+
+const hasDotDot = (path: string) => path.split(/[\\/]+/u).some((segment) => segment === "..");
+
+/**
+ * Why a ref can't be stored, or null when it can. Browser tabs are http(s)
+ * only (no javascript:, file:, data:); a path has no ".." segment; a path
+ * inside a worktree (a file with environmentId, a diff) is relative; a file
+ * on a machine (hostId) is absolute; a file says where it is.
+ */
+export function refProblem(ref: WorkspaceTabRef): string | null {
+  switch (ref.kind) {
+    case "browser": {
+      let url: URL;
+      try { url = new URL(ref.url ?? ""); } catch { return "A browser tab needs an http(s) URL."; }
+      return url.protocol === "http:" || url.protocol === "https:" ? null : "A browser tab needs an http(s) URL.";
+    }
+    case "file": case "diff": {
+      const path = ref.path ?? "";
+      if (!path || path.includes("\0")) return `A ${ref.kind} tab needs a path.`;
+      if (hasDotDot(path)) return "A path can't have \"..\" in it.";
+      const absolute = path.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(path);
+      if (ref.kind === "diff" || ref.environmentId) return absolute ? "A path in a worktree is relative to it." : null;
+      if (ref.hostId) return absolute ? null : "A file on a machine needs its full path.";
+      return "A file tab needs its worktree (environmentId) or machine (hostId).";
+    }
+    default: return refComplete(ref) ? null : `A ${ref.kind} tab is missing what it shows.`;
+  }
 }
 
 /** Whether a ref has what it needs to be shown. */
@@ -92,9 +137,15 @@ export function refOfPluginTab(pluginId: string, tabId: string, params: JsonValu
   return ref ? { kind: ref.kind, id: ref.id } : { kind: "plugin", pluginId, tabId, params };
 }
 
-/** What a desktop workbench tab shows; null for tabs that stay local (Info, New Tab, plugin details). */
+/**
+ * What a desktop workbench tab shows; null for tabs that stay local: Info,
+ * New Tab, plugin details, and fixed tabs (a plugin's own, such as the git
+ * Changes tab, which can't be closed).
+ */
 export function refOfPanelTab(tab: PanelTab): WorkspaceTabRef | null {
   const detail = tab.detail;
+  if (!tab.closable) return null;
+  if (detail.kind === "plugin" && "pluginId" in detail && detail.tab.availability === "fixed") return null;
   if (detail.kind === "plugin" && "pluginId" in detail) return refOfPluginTab(detail.pluginId, detail.tab.id, detail.params ?? null);
   if (detail.kind === "file" && "path" in detail) return { kind: "file", path: detail.path };
   if (detail.kind === "browser" && "url" in detail) return { kind: "browser", url: detail.url };

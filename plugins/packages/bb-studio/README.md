@@ -1215,9 +1215,14 @@ by Studio, per conversation, in SQLite (`src/workbench-agent/store.ts`,
 tables `thread_workbench_tabs` and `thread_workbench_state`), so the phone,
 every desktop window and the agent read and change the same tabs. Clients
 use `threadWorkbenchGet({ threadId })` and `threadWorkbenchMutate({ threadId,
-baseVersion, op: open | close | focus | reorder, tab?, title?, tabId?,
-position?, focus?, origin? })`; a change against an older `baseVersion`
-answers `result: "conflict"` with the current state and changes nothing.
+baseVersion, op: open | close | focus | reorder | update, tab?, title?,
+tabId?, position?, focus?, origin? })` (update: a tab now shows something
+else, such as a browser tab that navigated); a change against an older
+`baseVersion` answers `result: "conflict"` with the current state and
+changes nothing. The store refuses refs that aren't safe to show: browser
+tabs other than http(s), paths with "..", absolute paths inside a worktree,
+and files whose worktree or machine doesn't exist; and Workspaces for
+threads BB doesn't have. A deleted thread's Workspace goes with it.
 Each change is announced on the `workbench-changed` realtime channel
 (`{ threadId, version, origin, tabCount }`), and the Bot sidebar's
 conversation rows carry `tabCount`. A tab is a `WorkspaceTabRef` (a kind
@@ -1228,13 +1233,19 @@ each conversation it shows, both ways, through BB's public
 `experimental_workbench` (`src/workbench-agent/ui/sync.ts`): a three-way
 merge against the last state both agreed on, every second and on each
 change event, skipping its own events by origin and re-reading after a
-conflict. The first time, it brings its stored side panels over
+conflict. A tab counts as closed by the user only if that window had it at
+the last agreement (so a tab it can't show, or a diff BB shows in its git
+tab, is never closed for the user), fixed tabs stay local, and a browser tab
+that navigates is an update of the same tab. The first time, it brings its stored side panels over
 (`ui/import.ts`, only where the server has nothing yet). Info, New Tab and
 plugin details stay local to the window.
 
 **Agent tools.** The agent works the workbench of its own conversation
 (`src/workbench-agent`). List, open, close and focus act on the Workspace
-on the server, with or without a window on screen. What only a desktop
+on the server, with or without a window on screen; each window reports the
+conversations it shows (`workbench.shown`, every few seconds), and when none
+does, the answer says the change was saved to the Workspace and appears
+when the conversation is shown. What only a desktop
 window can do (`pop_out`, `arrange`, an open into pane 2 or a window of its
 own) needs the fork's `experimental_workbench` and that conversation on
 screen in BB: the tool publishes the call on the `studio-workbench` realtime

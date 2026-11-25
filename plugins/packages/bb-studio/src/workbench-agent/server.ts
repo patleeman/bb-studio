@@ -304,14 +304,17 @@ export function workbenchTools(deps: WorkbenchToolDeps) {
     workspace.store.setLayout(threadId, { layoutSet: outcome.record.layoutSet, userLayout: outcome.record.userLayout });
     return outcome.message;
   };
+  const NOT_SHOWN = "No BB window shows this conversation now: it appears when the conversation is shown, and in the phone's Workspace.";
   const storeOpen = async (threadId: string, op: Extract<WorkbenchOp, { type: "open" }>): Promise<string> => {
     const outcome = await workspace.mutate(threadId, { op: "open", tab: refOfSpec(op.spec), title: op.title, focus: op.focus, force: op.force, ...(op.index !== undefined ? { position: op.index } : {}) }, "agent");
     const name = JSON.stringify(op.title);
     const key = `key ${JSON.stringify(outcome.tabId)}`;
-    if (outcome.result === "refused") return outcome.message ?? `${name} didn't open.`;
-    if (!outcome.created) {
-      return op.focus ? `${name} was already open (${key}); selected it.` : `${name} was already open (${key}); left it where it is.`;
+    if (outcome.result === "refused" || outcome.result === "notFound" || outcome.result === "conflict") return outcome.message ?? `${name} didn't open.`;
+    if (!workspace.isShown(threadId)) {
+      const selected = op.focus ? " as the selected tab" : "";
+      return outcome.created ? `Saved ${name} to this conversation's Workspace (${key})${selected}. ${NOT_SHOWN}` : `${name} is already in this conversation's Workspace (${key})${op.focus ? "; it is the selected tab" : ""}. ${NOT_SHOWN}`;
     }
+    if (!outcome.created) return op.focus ? `${name} was already open (${key}); selected it.` : `${name} was already open (${key}); left it where it is.`;
     return `Opened ${name} (${key}) ${op.focus ? "and selected it" : "behind the selected tab"}.`;
   };
   const run = async (name: ToolName, input: object, threadId: string): Promise<string> => {
@@ -324,16 +327,19 @@ export function workbenchTools(deps: WorkbenchToolDeps) {
         // A pane or a window of its own is the desktop's: the window places it. Into a pane, the Workspace has it first, so the window's sync doesn't count it as the user's.
         if (op.pane !== "window") {
           const stored = await storeOpen(threadId, op);
-          if (stored.startsWith("Not reopened")) return stored;
-          return (await inWindow(threadId, op)) ?? `${stored} This conversation isn't on screen in BB, so it wasn't placed in pane ${op.pane === "new" ? 2 : op.pane}.`;
+          if (!stored.startsWith("Opened") && !stored.includes("was already open")) return stored;
+          return (await inWindow(threadId, op)) ?? `${stored} It wasn't placed in pane ${op.pane === "new" ? 2 : op.pane}: no BB window shows this conversation now.`;
         }
-        return (await inWindow(threadId, op)) ?? `${await storeOpen(threadId, { ...op, pane: undefined })} This conversation isn't on screen in BB, so it opened in the Workspace, not a window of its own.`;
+        return (await inWindow(threadId, op)) ?? `${await storeOpen(threadId, { ...op, pane: undefined })} No window of its own: that needs the conversation on screen in BB.`;
       }
       case "close": case "focus": {
         const tab = workspace.get(threadId).tabs.find((each) => each.tabId === op.key);
         if (!tab) return unknownTab(op.key);
-        await workspace.mutate(threadId, { op: op.type, tabId: op.key }, "agent");
+        const outcome = await workspace.mutate(threadId, { op: op.type, tabId: op.key }, "agent");
+        if (outcome.result === "notFound") return unknownTab(op.key);
+        if (outcome.result !== "ok" && outcome.result !== "unchanged") return outcome.message ?? `${JSON.stringify(tab.title)} didn't change.`;
         const title = JSON.stringify(tab.title);
+        if (!workspace.isShown(threadId)) return op.type === "close" ? `Closed ${title} in this conversation's Workspace. No BB window shows this conversation now.` : `${title} is the selected tab in this conversation's Workspace. ${NOT_SHOWN}`;
         return op.type === "close" ? `Closed ${title}.` : `Selected ${title}.`;
       }
       case "popOut": {
@@ -402,10 +408,22 @@ export function registerWorkbenchAgent(bb: BbPluginApi, db: Database.Database, d
     if (!target) return ref;
     return target.kind === "workspace" ? { kind: "file", path: target.path, environmentId: target.environmentId } : { kind: "file", path: target.path, hostId: target.hostId };
   };
-  const workspace = new WorkspaceService(new WorkspaceStore(db), (event) => { void bb.realtime.publish(WORKSPACE_CHANGED_CHANNEL, event as never); }, completeRef);
+  const exists = <T>(lookup: () => Promise<T>) => lookup().then((found) => !!found, () => false);
+  const workspace = new WorkspaceService(new WorkspaceStore(db), (event) => { void bb.realtime.publish(WORKSPACE_CHANGED_CHANNEL, event as never); }, completeRef, {
+    threadExists: (threadId) => exists(() => bb.sdk.threads.get({ threadId })),
+    placeProblem: async (ref) => {
+      if (ref.kind !== "file") return null;
+      if (ref.environmentId && !(await exists(() => bb.sdk.environments.get({ environmentId: ref.environmentId! })))) return `No worktree has id ${JSON.stringify(ref.environmentId)}.`;
+      if (ref.hostId && !(await exists(() => bb.sdk.hosts.get({ hostId: ref.hostId! })))) return `No machine has id ${JSON.stringify(ref.hostId)}.`;
+      return null;
+    },
+  });
+  // A deleted conversation's Workspace goes with it.
+  bb.events.on("thread.deleted", ({ thread }) => { try { workspace.forget(thread.id); } catch { /* nothing stored */ } });
   bb.rpc.register(workbenchContract, {
     "workbench.claim": ({ requestId }) => ({ go: router.claim(requestId) }),
     "workbench.reply": ({ requestId, message, record }) => ({ ok: router.reply(requestId, message, record) }),
+    "workbench.shown": ({ threadIds }) => { workspace.markShown(threadIds); return { ok: true }; },
     "workbench.import": async ({ threadId, tabs, activeIndex, panelOpen, origin }) => {
       const result = await workspace.importOnce(threadId, tabs as { ref: WorkspaceTabRef; title: string }[], activeIndex, panelOpen, origin ?? null);
       return { imported: result.imported, state: stateView(result.state) };

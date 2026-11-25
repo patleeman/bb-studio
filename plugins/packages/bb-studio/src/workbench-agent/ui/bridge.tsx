@@ -15,16 +15,20 @@ import { adaptWorkbench, clearSeenMark, runOp, type WorkbenchLike } from "../exe
 import { commandSchema, WORKBENCH_CHANNEL, type WorkbenchCommand } from "../shared";
 import { refKey, refOfPanelTab, sameKey } from "../workspace";
 import { WORKSPACE_CHANGED_CHANNEL, workspaceChanged } from "../workspace-contract";
-import { IMPORT_DONE_KEY, storedPanels } from "./import";
+import { IMPORT_DONE_KEY, importStoredPanels } from "./import";
 import { localSnapshots, WorkspaceSync, type WorkspaceClient } from "./sync";
 
 /** How often the selected tab is checked for a new mark to take off. */
 const MARK_CHECK_MS = 1000;
+/** Every how many checks the window reports the conversations it shows (well inside the server's 12 s). */
+const SHOWN_EVERY = 4;
 
 export interface BridgeDeps {
   workbench(threadId: string): WorkbenchLike | null;
   claim(requestId: string): Promise<boolean>;
   reply(requestId: string, message: string, record: WorkbenchCommand["record"]): Promise<unknown>;
+  /** Brings this window's workbench up to the Workspace now (ui/sync.ts). */
+  syncNow?(threadId: string): Promise<void>;
 }
 
 /** Handles one realtime payload. Answers the conversation whose workbench this window ran it on, or null. */
@@ -35,10 +39,16 @@ export async function handleCommand(payload: unknown, deps: BridgeDeps): Promise
   const shown = deps.workbench(threadId);
   if (!shown) return null;
   // pop_out names the Workspace's tab: this window finds its own key for what it shows.
+  // A tab the Workspace has but this window hasn't opened yet (the sync runs every second): sync once, then look again.
   if (op.type === "popOut" && op.item) {
     const item = op.item;
-    const tab = shown.list().tabs.find((each) => { const ref = refOfPanelTab(each); return !!ref && sameKey(refKey(ref), item); });
-    if (!tab) return null;
+    const find = () => deps.workbench(threadId)?.list().tabs.find((each) => { const ref = refOfPanelTab(each); return !!ref && sameKey(refKey(ref), item); });
+    let tab = find();
+    if (!tab && deps.syncNow) { await deps.syncNow(threadId).catch(() => {}); tab = find(); }
+    if (!tab) {
+      if (await deps.claim(requestId).catch(() => false)) await deps.reply(requestId, "That tab isn't in this window's workbench yet (BB couldn't show it here). Nothing changed.", record).catch(() => {});
+      return null;
+    }
     op.key = tab.key;
   }
   if (!(await deps.claim(requestId).catch(() => false))) return null;
@@ -100,11 +110,9 @@ export function WorkbenchAgentBridge() {
     if (typeof localStorage === "undefined" || localStorage.getItem(IMPORT_DONE_KEY)) return;
     let stopped = false;
     void (async () => {
-      for (const panel of storedPanels(localStorage)) {
-        if (stopped) return;
-        await latest.current.rpc.call("workbench.import", { ...panel, tabs: panel.tabs.slice(0, 100), origin: WINDOW_ORIGIN }).catch(() => null);
-      }
-      if (!stopped) localStorage.setItem(IMPORT_DONE_KEY, String(Date.now()));
+      const done = await importStoredPanels(localStorage, (panel) => latest.current.rpc.call("workbench.import", { ...panel, origin: WINDOW_ORIGIN }), () => stopped);
+      // Done only when the server took the calls (or there was nothing): a failed start tries again on the next load.
+      if (!stopped && done) localStorage.setItem(IMPORT_DONE_KEY, String(Date.now()));
     })();
     return () => { stopped = true; };
   }, []);
@@ -119,13 +127,16 @@ export function WorkbenchAgentBridge() {
       },
       claim: async (requestId) => (await client.call("workbench.claim", { requestId })).go,
       reply: (requestId, message, record) => client.call("workbench.reply", { requestId, message, record }),
+      syncNow: async (threadId) => { const wb = workbenchFor(threadId); if (wb) await sync.current!.sync(threadId, wb); },
     }).then((threadId) => { if (threadId) threads.current.add(threadId); });
   });
   // Opens from outside React (a drop on the workbench, a New Tab row) use BB's navigation (src/ui/tab-open.ts).
   useEffect(() => setTabNavigator(navigate), [navigate]);
   useEffect(() => {
+    let tick = 0;
     const timer = setInterval(() => {
       if (document.visibilityState !== "visible") return;
+      tick++;
       const nav = latest.current.navigate;
       const rename = renameTabOf(nav);
       const seen = new Set<string>();
@@ -135,6 +146,9 @@ export function WorkbenchAgentBridge() {
         if (rename) clearSeenMark(wb, (tab) => { rename({ tab: { id: tab.tabId }, ...(tab.params !== null ? { params: tab.params } : {}), title: tab.title }); });
         syncThread(wb.threadId);
       }
+      // Every few seconds: which conversations this window shows, so the agent tools can say whether a change is on screen.
+      const shown = [...seen].filter((threadId) => !threadId.startsWith("page:")).slice(0, 50);
+      if (shown.length && tick % SHOWN_EVERY === 1) void latest.current.rpc.call("workbench.shown", { threadIds: shown }).catch(() => {});
     }, MARK_CHECK_MS);
     return () => clearInterval(timer);
   }, []);

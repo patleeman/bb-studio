@@ -42682,6 +42682,7 @@ public enum Studio {
     case close
     case focus
     case reorder
+    case update
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -42691,6 +42692,7 @@ public enum Studio {
       case "close": self = .close
       case "focus": self = .focus
       case "reorder": self = .reorder
+      case "update": self = .update
       default: self = .unknown(value)
       }
     }
@@ -42702,6 +42704,7 @@ public enum Studio {
       case .close: try container.encode("close")
       case .focus: try container.encode("focus")
       case .reorder: try container.encode("reorder")
+      case .update: try container.encode("update")
       case .unknown(let value): try container.encode(value)
       }
     }

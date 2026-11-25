@@ -28,6 +28,8 @@ export interface SyncSnapshot {
   /** This window's synced tabs and selected one, as last seen. */
   deskOrder: string[];
   deskActive: string | null;
+  /** This window's tab keys and what each showed, as last seen: a key that now shows something else navigated (an update, not a close and an open). */
+  deskKeys?: Record<string, string>;
 }
 
 export interface WorkspaceClient {
@@ -64,7 +66,7 @@ const itemOf = (tab: WorkspaceStateView["tabs"][number]) => refKey(tab.ref as Wo
 const activeOf = (state: WorkspaceStateView) => { const tab = serverItem(state, state.activeTabId); return tab ? itemOf(tab) : null; };
 
 export function snapshotOf(state: WorkspaceStateView, desk: { tabs: readonly DeskTab[]; active: string | null }): SyncSnapshot {
-  return { version: state.version, items: state.tabs.map(itemOf), active: activeOf(state), deskOrder: desk.tabs.map((tab) => tab.item), deskActive: desk.active };
+  return { version: state.version, items: state.tabs.map(itemOf), active: activeOf(state), deskOrder: desk.tabs.map((tab) => tab.item), deskActive: desk.active, deskKeys: Object.fromEntries(desk.tabs.map((tab) => [tab.key, tab.item])) };
 }
 
 /** What one round did, for tests and logs. */
@@ -135,6 +137,15 @@ export class WorkspaceSync {
     const serverItems = state.tabs.map(itemOf);
     const deskItems = desk.tabs.map((tab) => tab.item);
     const typingIn = wb.isTyping() ? desk.selectedKey : null;
+    // A tab of this window that showed one thing at the last agreement and shows another now navigated: the server's tab follows it.
+    const navigated = desk.tabs.flatMap((tab) => {
+      const was = base.deskKeys?.[tab.key];
+      if (!was || sameKey(was, tab.item) || has(base.items, tab.item) || has(serverItems, tab.item) || has(deskItems.filter((item) => item !== tab.item), was)) return [];
+      const server = state.tabs.find((each) => sameKey(itemOf(each), was));
+      return server ? [{ tab, was, tabId: server.tabId }] : [];
+    });
+    const movedFrom = new Set(navigated.map((each) => each.was));
+    const movedTo = new Set(navigated.map((each) => each.tab.item));
 
     // Apply the other side's changes here.
     const keptHere = new Set<string>();
@@ -168,12 +179,17 @@ export class WorkspaceSync {
       if (result.result === "ok") report.pushed.push(label);
       return true;
     };
+    for (const each of navigated) {
+      if (!(await push({ op: "update", tabId: each.tabId, tab: each.tab.ref, title: each.tab.title }, `update ${each.was} -> ${each.tab.item}`))) return report;
+    }
+    // Closed here: only what this window had at the last agreement. A tab it never showed (one it couldn't open, a diff BB shows as its git tab) isn't the user's close.
     for (const item of base.items) {
-      if (has(deskItems, item) || failed.has(item) || !has(serverItems, item)) continue;
+      if (has(deskItems, item) || failed.has(item) || !has(serverItems, item) || !has(base.deskOrder, item) || movedFrom.has(item)) continue;
       const tab = current().tabs.find((each) => sameKey(itemOf(each), item));
       if (tab && !(await push({ op: "close", tabId: tab.tabId }, `close ${item}`))) return report;
     }
     for (const tab of desk.tabs) {
+      if (movedTo.has(tab.item)) continue;
       if (!keptHere.has(tab.item) && (has(base.items, tab.item) || has(serverItems, tab.item))) continue;
       if (!(await push({ op: "open", tab: tab.ref, title: tab.title, focus: false }, `open ${tab.item}`))) return report;
     }

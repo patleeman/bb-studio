@@ -68,3 +68,19 @@ export function storedPanels(storage: Pick<Storage, "length" | "key" | "getItem"
   }
   return panels;
 }
+
+/**
+ * Sends each stored panel to the server once. Answers whether the import is
+ * done: true when the server took at least one call, or there was nothing to
+ * send; false when every call failed (an older server, Studio reloading), so
+ * the next load tries again.
+ */
+export async function importStoredPanels(storage: Pick<Storage, "length" | "key" | "getItem">, send: (panel: StoredPanel) => Promise<unknown>, stopped: () => boolean = () => false): Promise<boolean> {
+  const panels = storedPanels(storage);
+  let answered = 0;
+  for (const panel of panels) {
+    if (stopped()) return false;
+    if (await send({ ...panel, tabs: panel.tabs.slice(0, 100) }).then(() => true, () => false)) answered++;
+  }
+  return answered > 0 || !panels.length;
+}

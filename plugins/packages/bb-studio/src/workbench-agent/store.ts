@@ -9,7 +9,7 @@
 // again (src/workbench-agent/workspace-contract.ts).
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
-import { cleanRef, refKey, sameKey, type WorkspaceTabRef } from "./workspace";
+import { cleanRef, refKey, refProblem, sameRef, type WorkspaceTabRef } from "./workspace";
 import type { WorkbenchRecord } from "./shared";
 
 export type Actor = "user" | "agent";
@@ -44,7 +44,9 @@ export type MutateOp =
   | { op: "open"; tab: WorkspaceTabRef; title: string; focus?: boolean; position?: number; force?: boolean }
   | { op: "close"; tabId: string }
   | { op: "focus"; tabId: string }
-  | { op: "reorder"; tabId: string; position: number };
+  | { op: "reorder"; tabId: string; position: number }
+  /** The same tab now shows something else (a browser tab that navigated): its ref and title change in place. */
+  | { op: "update"; tabId: string; tab: WorkspaceTabRef; title?: string };
 
 export type MutateResult = "ok" | "unchanged" | "conflict" | "notFound" | "refused";
 
@@ -148,8 +150,10 @@ export class WorkspaceStore {
       switch (change.op) {
         case "open": {
           const ref = cleanRef(change.tab);
+          const problem = refProblem(ref);
+          if (problem) return done("refused", null, problem);
           const item = refKey(ref);
-          const open = tabs.find((tab) => sameKey(tab.item, item));
+          const open = tabs.find((tab) => sameRef(tab.ref, ref));
           const focus = change.focus !== false;
           if (open) {
             target = open.tabId;
@@ -160,7 +164,7 @@ export class WorkspaceStore {
             break;
           }
           if (tabs.length >= OPEN_CAP) return done("refused", null, `The Workspace holds at most ${OPEN_CAP} tabs. Close one first.`);
-          const closed = (this.db.prepare("SELECT * FROM thread_workbench_tabs WHERE thread_id = ? AND dismissed_at IS NOT NULL ORDER BY dismissed_at DESC").all(threadId) as TabRow[]).find((row) => sameKey(row.item, item));
+          const closed = (this.db.prepare("SELECT * FROM thread_workbench_tabs WHERE thread_id = ? AND dismissed_at IS NOT NULL ORDER BY dismissed_at DESC").all(threadId) as TabRow[]).find((row) => sameRef(parseRef(row.ref), ref));
           if (closed && by === "agent" && closed.opened_by === "agent" && closed.closed_by === "user" && !change.force) {
             return done("refused", closed.tab_id, `Not reopened: the user closed ${JSON.stringify(closed.title)} after you opened it. Pass force: true only when the user asks for it.`);
           }
@@ -192,6 +196,20 @@ export class WorkspaceStore {
           panelOpen = true;
           break;
         }
+        case "update": {
+          const tab = tabs.find((each) => each.tabId === change.tabId);
+          if (!tab) return done("notFound", null, `No open tab has id ${JSON.stringify(change.tabId)}.`);
+          target = change.tabId;
+          const ref = cleanRef(change.tab);
+          const problem = refProblem(ref);
+          if (problem) return done("refused", target, problem);
+          const other = tabs.find((each) => each.tabId !== target && sameRef(each.ref, ref));
+          if (other) return done("refused", other.tabId, `That is already open as tab ${JSON.stringify(other.tabId)}.`);
+          const title = change.title?.trim() || tab.title;
+          if (refKey(ref) === tab.item && JSON.stringify(ref) === JSON.stringify(cleanRef(tab.ref)) && title === tab.title) return done("unchanged", target);
+          this.db.prepare("UPDATE thread_workbench_tabs SET ref = ?, item = ?, title = ? WHERE thread_id = ? AND tab_id = ?").run(JSON.stringify(ref), refKey(ref), title, threadId, target);
+          break;
+        }
         case "reorder": {
           if (!order.includes(change.tabId)) return done("notFound", null, `No open tab has id ${JSON.stringify(change.tabId)}.`);
           target = change.tabId;
@@ -214,15 +232,15 @@ export class WorkspaceStore {
     return this.db.transaction(() => {
       const before = this.get(threadId);
       if (before.version !== 0 || before.tabs.length) return { imported: false, state: before };
-      const seen: string[] = [];
       const ids: string[] = [];
       let active: string | null = null;
       const at = this.now();
+      const seen: WorkspaceTabRef[] = [];
       tabs.slice(0, OPEN_CAP).forEach((tab, index) => {
         const ref = cleanRef(tab.ref);
+        if (refProblem(ref) || seen.some((each) => sameRef(each, ref))) return;
+        seen.push(ref);
         const item = refKey(ref);
-        if (seen.some((each) => sameKey(each, item))) return;
-        seen.push(item);
         const id = this.newId();
         this.db.prepare("INSERT INTO thread_workbench_tabs (thread_id, tab_id, position, ref, item, title, opened_by, opened_at, dismissed_at, closed_by) VALUES (?, ?, ?, ?, ?, ?, 'user', ?, NULL, NULL)")
           .run(threadId, id, ids.length, JSON.stringify(ref), item, tab.title.trim() || "Untitled", at);
@@ -232,6 +250,12 @@ export class WorkspaceStore {
       this.write(threadId, ids, active ?? ids[0] ?? null, panelOpen, 1);
       return { imported: true, state: this.get(threadId) };
     })();
+  }
+
+  /** Forgets a deleted conversation's Workspace. */
+  deleteThread(threadId: string): void {
+    this.db.prepare("DELETE FROM thread_workbench_tabs WHERE thread_id = ?").run(threadId);
+    this.db.prepare("DELETE FROM thread_workbench_state WHERE thread_id = ?").run(threadId);
   }
 
   private moveTo(order: readonly string[], id: string, position: number): string[] {

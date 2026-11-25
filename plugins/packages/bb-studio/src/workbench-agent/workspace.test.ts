@@ -8,7 +8,8 @@ import type { PanelTab, WorkbenchLike } from "./exec";
 import { OFF_SCREEN, registerWorkbenchAgent, WorkbenchRouter, workbenchTools } from "./server";
 import type { OpenSpec } from "./shared";
 import { WorkspaceStore } from "./store";
-import { IMPORT_DONE_KEY, storedPanels } from "./ui/import";
+import { handleCommand } from "./ui/bridge";
+import { IMPORT_DONE_KEY, importStoredPanels, storedPanels } from "./ui/import";
 import { localSnapshots, WorkspaceSync, type WorkspaceClient } from "./ui/sync";
 import { mobileSupportOf, openSpecOf, refKey, refOfPanelTab, type WorkspaceTabRef } from "./workspace";
 import { WORKSPACE_CHANGED_CHANNEL, workspaceChanged, workspaceContract, workspaceState, type WorkspaceChanged } from "./workspace-contract";
@@ -80,7 +81,60 @@ describe("the Workspace store", () => {
   it("matches a file by path, relative or absolute", () => {
     const { store } = service();
     store.mutate("thr_1", { op: "open", tab: { kind: "file", path: "src/a.ts", environmentId: "env_1" }, title: "a.ts" }, "agent");
-    expect(store.mutate("thr_1", { op: "open", tab: { kind: "file", path: "/work/repo/src/a.ts" }, title: "a.ts" }, "user").result).toBe("unchanged");
+    expect(store.mutate("thr_1", { op: "open", tab: { kind: "file", path: "/work/repo/src/a.ts", hostId: "host_1" }, title: "a.ts" }, "user").result).toBe("unchanged");
+  });
+
+  it("R10: never matches two relative paths by suffix, or the same path in two worktrees", () => {
+    const { store } = service();
+    store.mutate("thr_1", { op: "open", tab: { kind: "file", path: "src/a.ts", environmentId: "env_1" }, title: "src/a.ts" }, "agent");
+    expect(store.mutate("thr_1", { op: "open", tab: { kind: "file", path: "a.ts", environmentId: "env_1" }, title: "a.ts" }, "agent").created).toBe(true);
+    expect(store.mutate("thr_1", { op: "open", tab: { kind: "file", path: "lib/a.ts", environmentId: "env_1" }, title: "lib/a.ts" }, "agent").created).toBe(true);
+    expect(store.mutate("thr_1", { op: "open", tab: { kind: "file", path: "src/a.ts", environmentId: "env_2" }, title: "other" }, "agent").created).toBe(true);
+    expect(store.get("thr_1").tabs).toHaveLength(4);
+  });
+
+  it("R6: refuses refs that aren't safe to show: non-http(s) URLs, \"..\" paths, absolute paths in a worktree, files with no place", () => {
+    const { store } = service();
+    const refused = (tab: WorkspaceTabRef) => store.mutate("thr_1", { op: "open", tab, title: "x" }, "user");
+    for (const url of ["javascript:alert(1)", "file:///etc/passwd", "data:text/html,<b>x</b>", "ftp://example.com", "not a url"]) {
+      expect(refused({ kind: "browser", url })).toMatchObject({ result: "refused", message: "A browser tab needs an http(s) URL." });
+    }
+    expect(refused({ kind: "file", path: "../../etc/passwd", environmentId: "env_1" })).toMatchObject({ result: "refused", message: 'A path can\'t have ".." in it.' });
+    expect(refused({ kind: "file", path: "src/../../x", environmentId: "env_1" }).result).toBe("refused");
+    expect(refused({ kind: "file", path: "/etc/passwd", environmentId: "env_1" })).toMatchObject({ result: "refused", message: "A path in a worktree is relative to it." });
+    expect(refused({ kind: "file", path: "/work/../etc/passwd", hostId: "host_1" }).result).toBe("refused");
+    expect(refused({ kind: "file", path: "notes.md", hostId: "host_1" }).result).toBe("refused");
+    expect(refused({ kind: "file", path: "notes.md" })).toMatchObject({ result: "refused", message: "A file tab needs its worktree (environmentId) or machine (hostId)." });
+    expect(refused({ kind: "diff", path: "../x" }).result).toBe("refused");
+    expect(store.get("thr_1")).toMatchObject({ tabs: [], version: 0 });
+    expect(refused({ kind: "browser", url: "https://example.com" }).result).toBe("ok");
+    expect(refused({ kind: "file", path: "/work/repo/a.ts", hostId: "host_1" }).result).toBe("ok");
+    // Imports drop what isn't safe and keep the rest.
+    const imported = store.importOnce("thr_2", [{ ref: { kind: "browser", url: "javascript:alert(1)" }, title: "bad" }, { ref: page("pg_a"), title: "A" }], null, true);
+    expect(imported.state.tabs.map((tab) => tab.title)).toEqual(["A"]);
+  });
+
+  it("R4: update changes what a tab shows in place, keeping its id, who opened it and its place", () => {
+    const { store } = service();
+    store.mutate("thr_1", { op: "open", tab: { kind: "browser", url: "http://example.com" }, title: "Example" }, "agent");
+    store.mutate("thr_1", { op: "open", tab: page("pg_a"), title: "A" }, "agent");
+    expect(store.mutate("thr_1", { op: "update", tabId: "wt_1", tab: { kind: "browser", url: "https://example.com/" }, title: "Example (https)" }, "user").result).toBe("ok");
+    expect(store.get("thr_1").tabs[0]).toMatchObject({ tabId: "wt_1", ref: { kind: "browser", url: "https://example.com/" }, title: "Example (https)", openedBy: "agent", position: 0 });
+    expect(store.closedByUser("thr_1")).toEqual([]);
+    expect(store.mutate("thr_1", { op: "update", tabId: "wt_1", tab: { kind: "browser", url: "javascript:alert(1)" } }, "user").result).toBe("refused");
+    expect(store.mutate("thr_1", { op: "update", tabId: "wt_1", tab: page("pg_a") }, "user")).toMatchObject({ result: "refused", tabId: "wt_2" });
+    expect(store.mutate("thr_1", { op: "update", tabId: "wt_9", tab: page("pg_b") }, "user").result).toBe("notFound");
+  });
+
+  it("R7: forgets a deleted conversation's Workspace", () => {
+    const { store, db } = service();
+    store.mutate("thr_1", { op: "open", tab: page("pg_a"), title: "A" }, "agent");
+    store.mutate("thr_1", { op: "close", tabId: "wt_1" }, "user");
+    store.mutate("thr_2", { op: "open", tab: page("pg_a"), title: "A" }, "agent");
+    store.deleteThread("thr_1");
+    expect((db.prepare("SELECT COUNT(*) AS n FROM thread_workbench_tabs WHERE thread_id = 'thr_1'").get() as { n: number }).n).toBe(0);
+    expect(store.get("thr_1").version).toBe(0);
+    expect(store.get("thr_2").tabs).toHaveLength(1);
   });
 
   it("imports a desktop's tabs only while the server has nothing for the conversation", () => {
@@ -124,9 +178,20 @@ describe("the tools, with no window on screen", () => {
     const call = (name: string, input: object) => (list.find((tool) => tool.name === name)!.execute as (input: object, ctx: { threadId: string }) => Promise<string>)(input, { threadId: "thr_1" });
     return { ...parts, published, call };
   }
+  const NOT_SHOWN = "No BB window shows this conversation now: it appears when the conversation is shown, and in the phone's Workspace.";
+
+  it("R5: says a change was saved to the Workspace, not shown, when no window shows the conversation", async () => {
+    const { call, published } = tools();
+    expect(await call("workbench_open", { type: "page", id: "pg_plan" })).toBe(`Saved "Plan" to this conversation's Workspace (key "wt_1") as the selected tab. ${NOT_SHOWN}`);
+    expect(await call("workbench_open", { type: "page", id: "pg_plan" })).toBe(`"Plan" is already in this conversation's Workspace (key "wt_1"); it is the selected tab. ${NOT_SHOWN}`);
+    expect(await call("workbench_tab", { action: "close", key: "wt_1" })).toBe('Closed "Plan" in this conversation\'s Workspace. No BB window shows this conversation now.');
+    expect(await call("workbench_tab", { action: "focus", key: "wt_1" })).toBe('No tab has key "wt_1". Call workbench (op: list) for the current keys.');
+    expect(published).toEqual([]);
+  });
 
   it("opens, lists, focuses and closes in the Workspace without asking a window", async () => {
-    const { call, published, store, events } = tools();
+    const { call, published, store, events, workspace } = tools();
+    workspace.markShown(["thr_1"]);
     expect(await call("workbench_open", { type: "page", id: "pg_plan" })).toBe('Opened "Plan" (key "wt_1") and selected it.');
     expect(await call("workbench_open", { type: "conversation", id: "thr_other", focus: false })).toBe('Opened "Release notes" (key "wt_2") behind the selected tab.');
     expect(await call("workbench_open", { type: "page", id: "pg_plan" })).toBe('"Plan" was already open (key "wt_1"); selected it.');
@@ -147,6 +212,7 @@ describe("the tools, with no window on screen", () => {
     const { call, workspace } = tools();
     await call("workbench_open", { type: "page", id: "pg_plan" });
     await workspace.rpcMutate({ threadId: "thr_1", baseVersion: 1, op: "close", tabId: "wt_1", origin: "phone:dev_1" });
+    workspace.markShown(["thr_1"]);
     expect(await call("workbench_open", { type: "page", id: "pg_plan" })).toBe('Not reopened: the user closed "Plan" after you opened it. Pass force: true only when the user asks for it.');
     expect(await call("workbench_list", {})).toContain('Closed by the user after you opened them (not reopened without force): "Plan".');
     expect(await call("workbench_open", { type: "page", id: "pg_plan", force: true })).toBe('Opened "Plan" (key "wt_1") and selected it.');
@@ -163,7 +229,7 @@ describe("the tools, with no window on screen", () => {
 
   it("stores an open into a pane, then notes that no window placed it", async () => {
     const { call, store } = tools();
-    expect(await call("workbench_open", { type: "page", id: "pg_plan", pane: "new" })).toBe('Opened "Plan" (key "wt_1") and selected it. This conversation isn\'t on screen in BB, so it wasn\'t placed in pane 2.');
+    expect(await call("workbench_open", { type: "page", id: "pg_plan", pane: "new" })).toBe(`Saved "Plan" to this conversation's Workspace (key "wt_1") as the selected tab. ${NOT_SHOWN}`);
     expect(store.get("thr_1").tabs).toHaveLength(1);
   });
 });
@@ -173,7 +239,7 @@ describe("the contract", () => {
   afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 
   it("round-trips Get and Mutate through the registered RPCs and publishes workbench-changed", async () => {
-    const { bb, harness } = createFakePluginHost({ pluginId: "studio" });
+    const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: { threads: { get: async ({ threadId }: { threadId: string }) => (threadId === "thr_1" ? { id: "thr_1" } : null) } } } as never);
     dispose.push(() => harness.lifecycle.dispose());
     const db = bb.storage.database();
     ensureTables(db);
@@ -187,6 +253,10 @@ describe("the contract", () => {
     const stale = workspaceContract.threadWorkbenchMutate.output.parse(await call("threadWorkbenchMutate", { ...input, tab: { kind: "vscode" }, title: "VS Code" }));
     expect(stale).toMatchObject({ result: "conflict", version: 1 });
     expect(workspaceContract.threadWorkbenchMutate.output.parse(await call("threadWorkbenchMutate", { threadId: "thr_1", baseVersion: 1, op: "close" }))).toMatchObject({ result: "refused", message: "close needs tabId." });
+    // R7: an unknown conversation gets no Workspace, by Mutate or by import.
+    expect(workspaceContract.threadWorkbenchMutate.output.parse(await call("threadWorkbenchMutate", { ...input, threadId: "thr_gone" }))).toMatchObject({ result: "refused", message: 'No thread has id "thr_gone".' });
+    expect(await call("workbench.import", { threadId: "thr_gone", tabs: [{ ref: { kind: "page", id: "pg_a" }, title: "A" }], activeIndex: null, panelOpen: null })).toMatchObject({ imported: false });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM thread_workbench_state WHERE thread_id = 'thr_gone'").get()).toEqual({ n: 0 });
     const signals = harness.realtimeSignals.filter((signal) => signal.channel === WORKSPACE_CHANGED_CHANNEL).map((signal) => signal.payload);
     expect(signals).toEqual([{ threadId: "thr_1", version: 1, origin: "phone:dev_1", tabCount: 1 }]);
     expect(Object.keys(workspaceRpcContract)).toEqual(["threadWorkbenchGet", "threadWorkbenchMutate"]);
@@ -213,9 +283,11 @@ describe("the contract", () => {
 
 /** A desktop workbench as BB keeps it, for the sync. */
 function fakeDesk() {
-  const state = { tabs: [] as PanelTab[], selectedKey: null as string | null, open: true, typing: false, next: 0, refuse: new Set<string>() };
+  const state = { tabs: [] as PanelTab[], selectedKey: null as string | null, open: true, typing: false, next: 0, refuse: new Set<string>(), poppedOut: [] as string[] };
   const detailOf = (spec: OpenSpec): PanelTab["detail"] => spec.kind === "tab" ? { kind: "plugin", pluginId: spec.tab.pluginId ?? "studio", tab: { id: spec.tab.id }, params: spec.params ?? null }
-    : spec.kind === "url" ? { kind: "browser", url: spec.url } : spec.kind === "terminal" ? { kind: "terminal", terminalId: spec.terminalId } : spec.kind === "file" ? { kind: "file", path: spec.target.path } : { kind: "diff" };
+    : spec.kind === "url" ? { kind: "browser", url: spec.url } : spec.kind === "terminal" ? { kind: "terminal", terminalId: spec.terminalId } : spec.kind === "file" ? { kind: "file", path: spec.target.path }
+      // BB shows a diff in the git plugin's fixed tab, never as diff:<path>.
+      : { kind: "plugin", pluginId: "git", tab: { id: "changes", availability: "fixed" }, params: null };
   const wb: WorkbenchLike = {
     list: () => ({ open: state.open, selectedKey: state.selectedKey, tabs: [...state.tabs] }),
     open: async (spec, { focus }) => {
@@ -223,7 +295,7 @@ function fakeDesk() {
       const detail = detailOf(spec);
       const existing = state.tabs.find((tab) => JSON.stringify(tab.detail) === JSON.stringify(detail));
       const key = existing?.key ?? `k${++state.next}`;
-      if (!existing) state.tabs.push({ key, title: spec.kind === "tab" ? spec.title ?? "" : spec.kind, closable: true, detail });
+      if (!existing) state.tabs.push({ key, title: spec.kind === "tab" ? spec.title ?? "" : spec.kind, closable: spec.kind !== "diff", detail });
       if (focus) state.selectedKey = key;
       return key;
     },
@@ -232,10 +304,13 @@ function fakeDesk() {
     layout: () => ({ panel: state.open ? "open" : "closed", widthPercent: 40, conversation: "shown" }),
     arrange: () => true,
     isTyping: () => state.typing,
+    popOut: async (key) => { const at = state.tabs.findIndex((tab) => tab.key === key); if (at < 0) return false; state.poppedOut.push(state.tabs[at]!.title); state.tabs.splice(at, 1); return true; },
   };
+  /** The user follows a link in a browser tab: same key, another URL. */
+  const navigate = (key: string, url: string) => { const tab = state.tabs.find((each) => each.key === key)!; tab.detail = { kind: "browser", url }; tab.title = url; };
   const userOpens = async (spec: OpenSpec) => wb.open(spec, { focus: true });
   const titles = () => state.tabs.map((tab) => tab.title);
-  return { wb, state, userOpens, titles };
+  return { wb, state, userOpens, titles, navigate };
 }
 
 const pageSpec = (id: string, title: string): OpenSpec => ({ kind: "tab", tab: { id: "studio" }, params: { kind: "page", id }, title });
@@ -371,6 +446,92 @@ describe("desktop sync", () => {
     expect(workspace.get("thr_1").tabs).toEqual([]);
   });
 
+  it("R1: after a reload, doesn't close on the server a tab this window couldn't open", async () => {
+    const { workspace, store, events } = service();
+    const desk = fakeDesk();
+    desk.state.refuse.add("https://example.com");
+    await desk.userOpens(pageSpec("pg_a", "A"));
+    const storage = new Map<string, string>();
+    const first = desktop(workspace, "desktop:w1", storage);
+    await first.sync.sync("thr_1", desk.wb);
+    await workspace.mutate("thr_1", { op: "open", tab: { kind: "browser", url: "https://example.com" }, title: "Ex", focus: false }, "agent");
+    first.sync.changed(events.at(-1)!);
+    await first.sync.sync("thr_1", desk.wb);
+    // Reload: the window forgets what it failed to open; a later change marks the conversation dirty.
+    const again = desktop(workspace, "desktop:w2", storage);
+    await workspace.mutate("thr_1", { op: "open", tab: page("pg_b"), title: "B", focus: false }, "agent");
+    again.sync.changed(events.at(-1)!);
+    expect(await again.sync.sync("thr_1", desk.wb)).toMatchObject({ pushed: [] });
+    expect(store.get("thr_1").tabs.map((tab) => tab.title)).toEqual(["A", "Ex", "B"]);
+    expect(store.closedByUser("thr_1")).toEqual([]);
+  });
+
+  it("R2: leaves fixed tabs local, so a closed one isn't pushed back", async () => {
+    const { workspace, store } = service();
+    const desk = fakeDesk();
+    await desk.userOpens(pageSpec("pg_a", "A"));
+    desk.state.tabs.push({ key: "kfix", title: "Changes", closable: false, detail: { kind: "plugin", pluginId: "git", tab: { id: "changes", availability: "fixed" }, params: null } });
+    desk.state.tabs.push({ key: "kfix2", title: "Pinned", closable: true, detail: { kind: "plugin", pluginId: "other", tab: { id: "pinned", availability: "fixed" }, params: null } });
+    const { sync } = desktop(workspace);
+    await sync.sync("thr_1", desk.wb);
+    desk.state.selectedKey = "kfix";
+    await sync.sync("thr_1", desk.wb);
+    expect(store.get("thr_1").tabs.map((tab) => tab.title)).toEqual(["A"]);
+  });
+
+  it("R3: doesn't close an agent's diff that BB shows as its git tab", async () => {
+    const { workspace, store, events } = service();
+    const desk = fakeDesk();
+    await desk.userOpens(pageSpec("pg_a", "A"));
+    const { sync } = desktop(workspace);
+    await sync.sync("thr_1", desk.wb);
+    await workspace.mutate("thr_1", { op: "open", tab: { kind: "diff", path: "src/a.ts" }, title: "a.ts diff", focus: false }, "agent");
+    sync.changed(events.at(-1)!);
+    expect(await sync.sync("thr_1", desk.wb)).toMatchObject({ applied: ["open diff:src/a.ts"], pushed: [] });
+    await workspace.mutate("thr_1", { op: "open", tab: page("pg_b"), title: "B", focus: false }, "agent");
+    sync.changed(events.at(-1)!);
+    expect((await sync.sync("thr_1", desk.wb))!.pushed).toEqual([]);
+    expect(store.get("thr_1").tabs.map((tab) => tab.title)).toEqual(["A", "a.ts diff", "B"]);
+    expect(store.closedByUser("thr_1")).toEqual([]);
+  });
+
+  it("R4: a browser tab that navigates updates the same server tab, not a close and an open", async () => {
+    const { workspace, store, events } = service();
+    const desk = fakeDesk();
+    const { sync } = desktop(workspace);
+    await sync.sync("thr_1", desk.wb);
+    await workspace.mutate("thr_1", { op: "open", tab: { kind: "browser", url: "http://example.com" }, title: "Example" }, "agent");
+    sync.changed(events.at(-1)!);
+    await sync.sync("thr_1", desk.wb);
+    const tabId = store.get("thr_1").tabs[0]!.tabId;
+    desk.navigate(desk.state.tabs[0]!.key, "https://example.com/login");
+    expect(await sync.sync("thr_1", desk.wb)).toMatchObject({ pushed: ["update url:http://example.com -> url:https://example.com/login"] });
+    expect(store.get("thr_1").tabs).toEqual([expect.objectContaining({ tabId, ref: { kind: "browser", url: "https://example.com/login" }, openedBy: "agent" })]);
+    expect(store.closedByUser("thr_1")).toEqual([]);
+    expect(await sync.sync("thr_1", desk.wb)).toMatchObject({ pushed: [], applied: [] });
+  });
+
+  it("R9: pop_out of a tab this window hasn't opened yet syncs first, then pops it out", async () => {
+    const { workspace } = service();
+    const desk = fakeDesk();
+    const { sync } = desktop(workspace);
+    await sync.sync("thr_1", desk.wb);
+    await workspace.mutate("thr_1", { op: "open", tab: page("pg_plan"), title: "Plan" }, "agent");
+    const replies: string[] = [];
+    const deps = {
+      workbench: () => desk.wb,
+      claim: async () => true,
+      reply: async (_id: string, message: string) => { replies.push(message); },
+      syncNow: async () => { sync.changed({ threadId: "thr_1", version: workspace.get("thr_1").version, origin: "agent", tabCount: 1 }); await sync.sync("thr_1", desk.wb); },
+    };
+    await handleCommand({ requestId: "r1", threadId: "thr_1", op: { type: "popOut", key: "wt_1", item: "page:pg_plan", force: false }, record: { opened: [], dismissed: [], layoutSet: {}, userLayout: [] } }, deps);
+    expect(desk.state.poppedOut).toEqual(["Plan"]);
+    expect(replies[0]).toMatch(/^Opened "Plan" in a window of its own/);
+    // A tab it can't show at all: an answer, not "off screen".
+    await handleCommand({ requestId: "r2", threadId: "thr_1", op: { type: "popOut", key: "wt_9", item: "page:pg_none", force: false }, record: { opened: [], dismissed: [], layoutSet: {}, userLayout: [] } }, { ...deps, syncNow: async () => {} });
+    expect(replies[1]).toBe("That tab isn't in this window's workbench yet (BB couldn't show it here). Nothing changed.");
+  });
+
   it("joins a conversation the server already has: each side gets what the other has", async () => {
     const { workspace } = service();
     await workspace.mutate("thr_1", { op: "open", tab: page("pg_plan"), title: "Plan" }, "agent");
@@ -416,5 +577,15 @@ describe("the one-time import of stored side panels", () => {
       ],
     }]);
     expect(panels[0]!.tabs.map((tab) => refKey(tab.ref))).toEqual(["page:pg_a", "file:src/a.ts", "url:https://example.com", "terminal:term_1"]);
+  });
+
+  it("R8: counts the import done only when the server took a call, or there was nothing to send", async () => {
+    const entries: Record<string, string> = { "bb.thread.fixedPanelTabsState-thr_1-1": JSON.stringify({ secondary: { tabs: [{ id: "t3", kind: "browser", url: "https://example.com", title: "Example" }], activeTabId: "t3", isOpen: true } }) };
+    const storage = (map: Record<string, string>) => { const keys = Object.keys(map); return { length: keys.length, key: (index: number) => keys[index] ?? null, getItem: (key: string) => map[key] ?? null }; };
+    expect(await importStoredPanels(storage(entries), async () => { throw new Error("no such method"); })).toBe(false);
+    const sent: string[] = [];
+    expect(await importStoredPanels(storage(entries), async (panel) => { sent.push(panel.threadId); })).toBe(true);
+    expect(sent).toEqual(["thr_1"]);
+    expect(await importStoredPanels(storage({}), async () => { throw new Error("unused"); })).toBe(true);
   });
 });

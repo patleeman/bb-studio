@@ -31,6 +31,11 @@ export const workbenchContract = defineRpcContract({
     }),
     output: z.object({ imported: z.boolean(), state: workspaceState }),
   },
+  "workbench.shown": {
+    experimental_description: "A desktop window says which conversations' workbenches it shows, every few seconds, so the agent tools can say whether a change is on screen.",
+    input: z.object({ threadIds: z.array(z.string().min(1).max(200)).max(50) }),
+    output: z.object({ ok: z.boolean() }),
+  },
 });
 
 /** The Workspace RPCs (workspace-contract.ts), as a contract the server registers and the app calls. */
