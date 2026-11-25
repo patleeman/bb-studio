@@ -152,6 +152,52 @@ describe("desk hold", () => {
     await hold.releaseNow();
     expect(sent).toHaveLength(1);
   });
+
+  it("does not call send() after dispose() when release() is awaiting seen()", async () => {
+    let resolveSeen!: (value: boolean) => void;
+    const sent: ExpoMessage[][] = [];
+    const hold = new DeskHold({
+      seen: () => new Promise<boolean>((resolve) => { resolveSeen = resolve; }),
+      send: async (messages) => { sent.push(messages); },
+    });
+    hold.beat(active);
+    hold.hold([reply("thr_a")]);
+    const releasing = hold.releaseNow();
+    await Promise.resolve();
+
+    hold.dispose();
+    resolveSeen(false);
+    await releasing;
+
+    expect(sent).toEqual([]);
+    expect(hold.hold([reply("thr_b")])).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("checks unique seen() keys in parallel during release()", async () => {
+    const started: string[] = [];
+    const resolvers: Array<() => void> = [];
+    const sent: ExpoMessage[][] = [];
+    const hold = new DeskHold({
+      seen: ({ threadId }) => {
+        started.push(threadId);
+        return new Promise<boolean>((resolve) => {
+          resolvers.push(() => resolve(false));
+        });
+      },
+      send: async (messages) => { sent.push(messages); },
+    });
+    hold.beat(active);
+    hold.hold([reply("thr_a"), reply("thr_b"), reply("thr_c"), reply("thr_a")]);
+    const releasing = hold.releaseNow();
+    await Promise.resolve();
+
+    // All 3 unique threads must be queried before any single seen() resolves.
+    expect(started).toEqual(["thr_a", "thr_b", "thr_c"]);
+    for (const resolve of resolvers) resolve();
+    await releasing;
+    expect(sent).toHaveLength(1);
+  });
 });
 
 describe("holdable", () => {
