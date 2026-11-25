@@ -19,23 +19,44 @@ const MORE: readonly RegExp[] = [
 /** A password in a URL (scheme://user:password@host): the password goes, the user and host stay. */
 const URL_PASSWORD = /\b([a-z][a-z0-9+.-]*:\/\/[^\s:@/]+):([^\s@/]+)@/giu;
 /**
- * A secret named in a pair: the value goes, the name stays. The name is any
- * identifier (env-style, dotted, camelCase, quoted JSON key) that contains a
- * secret word anywhere: token, secret, password/passwd/pwd, passphrase,
- * credential, cookie, session; or KEY / AUTH as one of its parts
- * (AWS_SECRET_ACCESS_KEY=, SLACK_BOT_TOKEN=, api_key:, "authToken":), so
- * "keyboard" and "author" stay.
+ * A secret named in a pair ("password=…", "AWS_SECRET_ACCESS_KEY=…",
+ * "api_key: …", "--token=…"): the value goes, the name stays. Names are
+ * judged by whole parts (split at _ . - and camelCase), so "tokens",
+ * "tokenizer", "secretary" and "passwordless" are ordinary words.
+ * - Strong names lose any value: a part that is secret, password, passwd,
+ *   pwd, passphrase or credential(s); token with another part
+ *   (SLACK_BOT_TOKEN, authToken, --with-token); key after api, private,
+ *   access, secret, signing, encryption or master; session with id, token,
+ *   key or secret.
+ * - Weak names (key, auth, session or token, alone or with other parts)
+ *   lose only a value that looks like a secret: 8+ characters, not a
+ *   number, not code ({…}, (…), <…>, […]) and not a type name.
+ * Type words (string, number, boolean, true, false, null…) always stay, so
+ * TypeScript ("token: string") reads as it was.
  */
-const PAIR = /(?<![A-Za-z0-9_.-])([A-Za-z_][A-Za-z0-9_.-]*)(["']?[ \t]*[:=][ \t]*["']?)(?!\[redacted\])([^\s"',;]+)/gu;
-const SECRET_WORD = /token|secret|passw(?:or)?d|pwd|passphrase|credential|cookie|session/iu;
-const SECRET_PARTS = new Set(["key", "keys", "auth", "apikey", "privatekey", "accesskey"]);
+const PAIR = /(?<![A-Za-z0-9_.])([A-Za-z_][A-Za-z0-9_.-]*)(["']?[ \t]*[:=][ \t]*["']?)(?!\[redacted\])([^\s"',;>)}]+)/gu;
+const STRONG_PARTS = new Set(["secret", "secrets", "password", "passwords", "passwd", "pwd", "passphrase", "credential", "credentials", "apikey", "privatekey", "accesskey", "clientsecret"]);
+const KEY_QUALIFIERS = new Set(["api", "private", "access", "secret", "signing", "encryption", "master"]);
+const SESSION_SECRET = new Set(["id", "token", "key", "secret"]);
+const WEAK_PARTS = new Set(["key", "keys", "auth", "session", "token"]);
+const TYPE_WORDS = new Set(["string", "number", "boolean", "bigint", "true", "false", "null", "undefined", "any", "unknown", "object", "void", "never"]);
 /** The name's parts: split at _ . - and camelCase, lower case ("awsAccessKey" → aws, access, key). */
-const parts = (name: string) => name.replace(/([a-z0-9])([A-Z])/gu, "$1_$2").toLowerCase().split(/[_.-]+/u);
-const secretName = (name: string) => SECRET_WORD.test(name) || parts(name).some((part) => SECRET_PARTS.has(part));
-/** Authorization and Proxy-Authorization headers, any scheme (Bearer, Basic, …): everything after the name. */
-const AUTH_HEADER = /\b((?:proxy-)?authorization)([ \t]*[:=][ \t]*)(?!\[redacted\])[^\r\n]+/giu;
-/** Cookie and Set-Cookie lines: every cookie on them. */
-const COOKIE_HEADER = /\b((?:set-)?cookie)([ \t]*:[ \t]*)(?!\[redacted\])[^\r\n]+/giu;
+const parts = (name: string) => name.replace(/([a-z0-9])([A-Z])/gu, "$1_$2").toLowerCase().split(/[_.-]+/u).filter(Boolean);
+type Strength = "strong" | "weak" | null;
+function strength(name: string): Strength {
+  const each = parts(name);
+  if (each.some((part) => STRONG_PARTS.has(part))) return "strong";
+  if (each.includes("token") && each.length > 1) return "strong";
+  for (let i = 1; i < each.length; i++) if ((each[i] === "key" || each[i] === "keys") && KEY_QUALIFIERS.has(each[i - 1]!)) return "strong";
+  if (each.includes("session") && each.some((part) => SESSION_SECRET.has(part))) return "strong";
+  return each.some((part) => WEAK_PARTS.has(part)) ? "weak" : null;
+}
+/** A value a weak name keeps: short, a number, code, or a type name ("AuthConfig"). */
+const ordinaryValue = (value: string) => value.length < 8 || /^[\d.,:_-]+$/u.test(value) || /^[{(<[]/u.test(value) || /^[A-Z][A-Za-z]*$/u.test(value);
+/** Authorization and Proxy-Authorization headers: a scheme and its credential, or one long credential. */
+const AUTH_HEADER = /(?<=^|["'\s])((?:proxy-)?authorization)([ \t]*[:=][ \t]*)(?!\[redacted\])(?:[A-Za-z][A-Za-z0-9-]*[ \t]+[^\s"']{6,}|[^\s"']{16,})/gimu;
+/** Cookie and Set-Cookie headers (with a name=value after them): every cookie on them. */
+const COOKIE_HEADER = /(?<=^|["'\s])((?:set-)?cookie)([ \t]*:[ \t]*)(?=[^\r\n"']*=)(?!\[redacted\])[^\r\n"']+/gimu;
 
 /** Known values shorter than this aren't matched (too likely to be ordinary words). */
 const MIN_KNOWN = 8;
@@ -53,7 +74,13 @@ export function scrubber(known: readonly string[] = []): Scrub {
     out = out.replace(URL_PASSWORD, `$1:${REDACTED}@`)
       .replace(AUTH_HEADER, `$1$2${REDACTED}`)
       .replace(COOKIE_HEADER, `$1$2${REDACTED}`)
-      .replace(PAIR, (match, name: string, sep: string) => (secretName(name) ? `${name}${sep}${REDACTED}` : match));
-    return redact(out);
+      .replace(PAIR, (match, name: string, sep: string, value: string) => {
+        const kind = strength(name);
+        if (!kind || TYPE_WORDS.has(value.toLowerCase())) return match;
+        if (kind === "weak" && ordinaryValue(value)) return match;
+        return `${name}${sep}${REDACTED}`;
+      });
+    // Named pairs are judged above (strong and weak names); redact() adds the token shapes.
+    return redact(out, { pairs: false });
   };
 }

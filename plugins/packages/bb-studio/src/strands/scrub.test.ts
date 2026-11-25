@@ -3,7 +3,7 @@ import { scrubber } from "./scrub";
 
 const scrub = scrubber();
 
-describe("scrubber: named secrets, headers and cookies", () => {
+describe("scrubber: secrets go", () => {
   it.each([
     ["ANTHROPIC_AUTH_TOKEN=abc123def456", "ANTHROPIC_AUTH_TOKEN=[redacted]"],
     ["AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMIabc", "AWS_SECRET_ACCESS_KEY=[redacted]"],
@@ -16,20 +16,52 @@ describe("scrubber: named secrets, headers and cookies", () => {
     ['{"authToken": "abc", "sessionId": "s-1"}', '{"authToken": "[redacted]", "sessionId": "[redacted]"}'],
     ["awsAccessKey=plainvalue", "awsAccessKey=[redacted]"],
     ["config.auth.key = plainvalue", "config.auth.key = [redacted]"],
+    ["curl --token=plainvalue https://x", "curl --token=[redacted] https://x"],
+    ["gh auth login --with-token=abc", "gh auth login --with-token=[redacted]"],
+    ["MY_KEY=s3cr3tvalue99", "MY_KEY=[redacted]"],
     ["cookie: session=abc; theme=dark", "cookie: [redacted]"],
     ["Set-Cookie: sid=abc; HttpOnly", "Set-Cookie: [redacted]"],
+    ["curl -H 'Cookie: sid=abc123' x", "curl -H 'Cookie: [redacted]' x"],
     ["Authorization: Basic dXNlcjpwYXNz", "Authorization: [redacted]"],
     ["Proxy-Authorization: Digest username=x", "Proxy-Authorization: [redacted]"],
-    ["authorization: Bearer abcdefghijkl", "authorization: [redacted]"],
+    ["curl -H 'Authorization: Token abcdef123456' x", "curl -H 'Authorization: [redacted]' x"],
   ])("%s", (input, expected) => {
     expect(scrub(input)).toBe(expected);
   });
+});
 
-  it("leaves ordinary pairs alone", () => {
-    for (const text of ["keyboard: logitech", "author: Jane", "monkey=3", "status: ok", "model=new-model", "turns: 25"]) expect(scrub(text)).toBe(text);
+describe("scrubber: ordinary text stays", () => {
+  it.each([
+    "Session: 3 went well",
+    "In this session: we fixed the bug",
+    "**Session:** recap",
+    "Tokens: 1234",
+    "max_tokens: 4096",
+    "historyTokens: 150000",
+    "inputTokens=1200",
+    "tokenizer=cl100k",
+    "secretary: Bob",
+    "sessions: 12",
+    "passwordless=true",
+    "<li key={item.id}>",
+    'const key = "theme";',
+    "key: Enter",
+    "Primary key: id",
+    "token: string; sessionId: string; auth: AuthConfig",
+    "password: string",
+    "cookie: the browser stores it",
+    "The authorization: header is missing",
+    "keyboard: logitech",
+    "author: Jane",
+    "monkey=3",
+    "status: ok",
+    "model=new-model",
+    "turns: 25",
+  ])("%s", (text) => {
+    expect(scrub(text)).toBe(text);
   });
 
   it("keeps the line structure: a header redaction stops at the end of its line", () => {
-    expect(scrub("Authorization: Basic dXNl\nnext line stays")).toBe("Authorization: [redacted]\nnext line stays");
+    expect(scrub("Authorization: Basic dXNl12345\nnext line stays")).toBe("Authorization: [redacted]\nnext line stays");
   });
 });
