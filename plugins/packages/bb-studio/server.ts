@@ -7,6 +7,7 @@ import { setupVoiceLive } from "./src/server/voice-live";
 import { registerPlatformRpcs } from "./src/server/platform-rpcs";
 import { registerStudioCli } from "./src/server/cli";
 import { registerStudioRpc } from "./src/server/rpc";
+import { setupHubWiring } from "./src/server/hub-wiring";
 import { registerWorkCards } from "./src/work/register";
 import { STRAND_NOTE_TOOL } from "./src/strands/contract";
 import { phoneActs, registerUserTasks } from "./src/tasks/user";
@@ -65,8 +66,7 @@ import { registerTalk, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/se
 import { PAGE_TOOLS, registerPages } from "./src/pages/server";
 import { registerExploreBuiltin } from "./src/explore/server";
 import { importReactionsSettings } from "./src/reactions/server";
-import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
-import { builtinProviderContract } from "./src/builtin-provider";
+import { builtinItemAt } from "./src/builtins";
 import { BUILTIN_KINDS, builtinOn, KindSettingsStore, resolveKinds, routeProviders, routingInstructions, type KindRoute } from "./src/kinds";
 import { registerSettings } from "./src/settings/register";
 import { loopTimeZone } from "./src/settings/constants";
@@ -89,12 +89,12 @@ import { isCanvasThreadOrigin } from "./src/voice/live/canvas-plugin";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { experimental_PluginRpcRefusal } from "@get-bb/plugin-sdk";
 import { join } from "node:path";
-import { STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, STUDIO_REALTIME_CHANNEL } from "./src/kit/contract";
+import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "./src/kit/contract";
 import { untitled } from "./src/kit/format";
 import { z } from "zod";
-import { schemas, TABS_CHANNEL, type SidebarView, type StarredItemView, type ThreadOptionView, type TabView } from "./src/contract";
+import { type SidebarView, type StarredItemView, type TabView } from "./src/contract";
 import { errorText, StudioHub, type HubItem } from "./src/hub";
-import { ChangeLog, recordProviderChanges } from "./src/changes";
+import { ChangeLog } from "./src/changes";
 import { isPanelVisible } from "./src/sidebar";
 import { TriggerEngine } from "./src/triggers/engine";
 import { EngineScheduler, scheduleKey } from "./src/triggers/scheduler";
@@ -149,18 +149,13 @@ import { automationRefId, parseAutomationRefId } from "./src/automation-table-co
 import { ITEM_KINDS, type TabKindId } from "./src/tab-kinds";
 import { Automations } from "./src/automations";
 import { REVIEW_TOOLS, SkillLearning } from "./src/skill-learning";
-import { itemAtPath, TabStore } from "./src/tabs";
-import { WorkspacePresence } from "./src/workspace-presence";
+import { itemAtPath } from "./src/tabs";
 import { TagStore, type ItemRef } from "./src/tags";
-import { StarStore } from "./src/stars";
 import { planMove } from "./src/move-items";
-import { ThreadTitles } from "./src/thread-titles";
 import { withTagHint } from "./src/create-tag-hint";
-import { SearchIndex, type SearchHit } from "./src/search-index";
+import type { SearchHit } from "./src/search-index";
 import { externalResults } from "./src/search-external";
 import { StudioServices } from "./src/services";
-import { ProviderComments } from "./src/provider-comments";
-import { firstThreadItemRefs, firstThreadMentionPlugins, mentionProviderLookup } from "./src/thread-item-refs";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./src/project-lead";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
@@ -193,9 +188,10 @@ export default async function plugin(bb: BbPluginApi) {
   // Built-ins can publish while registration awaits settings. Flush once the hub is ready.
   let servicesReady!: () => void;
   const ready = new Promise<void>((resolve) => { servicesReady = resolve; });
+  let studioChangedFn!: (input: { pluginId: string; ids?: string[]; removed?: string[] }) => Promise<{ ok: true }>;
   const notifyBuiltin = async (pluginId: string, ids?: string[]) => {
     await ready;
-    try { await studioChanged({ pluginId, ids }); }
+    try { await studioChangedFn({ pluginId, ids }); }
     catch (error) { bb.log.warn(`Studio changes for ${pluginId} could not be recorded; retrying: ${errorText(error)}`); throw error; }
   };
   const db = bb.storage.database();
@@ -623,174 +619,35 @@ export default async function plugin(bb: BbPluginApi) {
     const title = (id: string) => botThreads.store.get(id)?.title ?? null;
     return conversationInstructions(rec, rec.title ?? "this conversation", rec.forkedFrom ? title(rec.forkedFrom.threadId) : null);
   };
-  // Other add-ons reach built-in kinds' provider methods through Studio
-  // (callProvider in the kit), as they reach an add-on's over RPC.
-  bb.rpc.register(builtinProviderContract, {
-    [STUDIO_PROVIDER_CALL_METHOD]: ({ pluginId, method, input }) => {
-      if (!BUILTIN_PLUGIN_IDS.has(pluginId)) throw new Error(`${pluginId} isn't built into Studio.`);
-      return hub.call(pluginId, method, input as never);
+  const {
+    tags,
+    stars,
+    tabs,
+    threadTitles,
+    listed,
+    workspace,
+    searchIndex,
+    studioChanged,
+    contentSearch,
+    providerComments,
+    hostEvents,
+    tabsChanged,
+    overview,
+    recentThreads,
+    tagsChanged,
+    deleteItems,
+  } = await setupHubWiring({
+    bb,
+    db,
+    hub,
+    changes,
+    services,
+    triggers,
+    onStudioChangedReady: (fn) => {
+      studioChangedFn = fn;
+      servicesReady();
     },
   });
-  const tags = new TagStore(db);
-  const stars = new StarStore(db);
-  const tabs = new TabStore(db);
-  const threadTitles = new ThreadTitles(async (threadId) => { const thread = (await bb.sdk.threads.get({ threadId })) as { title?: string | null; titleFallback?: string | null }; return thread.title?.trim() || thread.titleFallback?.trim() || ""; });
-  /** Adds each item's tag ids, when it was starred, and the thread that made it. */
-  const listed = async <T extends { pluginId: string; id: string }>(items: readonly T[]) => {
-    const assigned = tags.assignments();
-    const starredAt = stars.map();
-    const createdBy = services.creators();
-    const origins = services.originThreads();
-    const keys = items.map((item) => `${item.pluginId}:${item.id}`);
-    const titles = await threadTitles.titles(keys.flatMap((key) => origins.get(key) ?? []));
-    return items.map((item, index) => {
-      const threadId = origins.get(keys[index]!);
-      return { ...item, tags: assigned.get(keys[index]!) ?? [], starredAt: starredAt.get(keys[index]!) ?? null, createdBy: createdBy.get(keys[index]!) ?? null, thread: threadId ? { id: threadId, title: titles.get(threadId) ?? "" } : null };
-    });
-  };
-  const workspace = new WorkspacePresence();
-  const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
-  bb.onDispose(() => searchIndex.dispose());
-  async function studioChanged({ pluginId, ids, removed }: { pluginId: string; ids?: string[]; removed?: string[] }) {
-    await searchIndex.changed(pluginId, ids, removed);
-    await recordProviderChanges(hub, changes, pluginId, ids, removed);
-    bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
-    return { ok: true };
-  }
-  servicesReady();
-  const contentSearch = async (query: string, keys?: string[]) => {
-    await searchIndex.ensure();
-    const indexed = searchIndex.search(query, { limit: 100, keys });
-    return {
-      keys: [...new Set(indexed.map((hit) => `${hit.ref.pluginId}:${hit.ref.id}`))],
-      snippets: Object.fromEntries(indexed.map((hit) => [`${hit.ref.pluginId}:${hit.ref.id}`, hit.snippet.text])),
-    };
-  };
-  const providerComments = new ProviderComments(bb.sdk);
-  const pendingThreadChecks = new Set(services.activeThreads().map((thread) => thread.threadId));
-  let reconcilingThreads: Promise<void> | null = null;
-  const reconcileThreads = (): Promise<void> => reconcilingThreads ??= (async () => {
-    for (const threadId of pendingThreadChecks) {
-      const complete = await services.reconcileThread(threadId, () => bb.sdk.threads.get({ threadId }),
-        (error) => bb.log.warn(`Thread ${threadId} unavailable: ${errorText(error)}`));
-      if (complete) pendingThreadChecks.delete(threadId);
-    }
-  })().finally(() => { reconcilingThreads = null; });
-  await reconcileThreads();
-  let lastReconcile = Date.now();
-  // Thread events keep linked threads current; this pass only catches what was missed, so it is rare where BB reports interruptions itself.
-  const hostEvents = { listening: false };
-  triggers.every("thread-reconcile", 60_000, () => (hostEvents.listening && Date.now() - lastReconcile < 30 * 60_000 ? undefined : (lastReconcile = Date.now(), reconcileThreads().catch((error) => bb.log.warn(`Thread reconciliation failed: ${errorText(error)}`)))));
-  bb.onDispose(async () => { await reconcilingThreads; });
-  const updateThread = (threadId: string, state: string) => {
-    pendingThreadChecks.delete(threadId);
-    for (const found of services.threadsForThread(threadId)) services.linkThread({ ...found, state, updatedAt: Date.now() });
-    changes.append(null);
-    bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
-  };
-  bb.events.on("thread.active", ({ thread }) => updateThread(thread.id, "working"));
-  bb.events.on("thread.idle", ({ thread }) => updateThread(thread.id, "idle"));
-  bb.events.on("thread.failed", ({ thread }) => updateThread(thread.id, "failed"));
-  bb.events.on("thread.archived", ({ thread }) => updateThread(thread.id, "archived"));
-  bb.events.on("thread.deleted", ({ thread }) => updateThread(thread.id, "deleted"));
-  bb.events.on("thread.unarchived", ({ thread }) => updateThread(thread.id, "idle"));
-  // The composer does not expose a thread id to add-ons. Its first accepted
-  // input still contains the item's link or mention, so link it when saved.
-  const mentionProviders = mentionProviderLookup((pluginId, signal) => BUILTIN_PLUGIN_IDS.has(pluginId)
-    ? hub.call(pluginId, "studio_describe", null)
-    : bb.sdk.plugins.callRpc({ pluginId, method: "studio_describe", input: null, outputSchema: schemas.provider.studio_describe.output, signal }));
-  const checkedThreads = new Set<string>();
-  const checkingThreads = new Set<string>();
-  const pendingThreads = new Map<string, { id: string; createdAt: number; status: string }>();
-  const linkComposerThread = async (thread: { id: string; createdAt: number; status: string }) => {
-    if (checkedThreads.has(thread.id) || services.threadsForThread(thread.id).length) return;
-    if (checkingThreads.has(thread.id)) { pendingThreads.set(thread.id, thread); return; }
-    checkingThreads.add(thread.id);
-    try {
-      const events = await bb.sdk.threads.events.list({ threadId: thread.id, order: "asc", limit: "50", types: ["client/thread/start", "client/turn/requested", "client/turn/start"] });
-      const providers = await mentionProviders(firstThreadMentionPlugins(events));
-      const refs = firstThreadItemRefs(events, { providers });
-      if (refs === null) return;
-      for (const ref of refs) {
-        services.linkThread({ threadId: thread.id, ref, role: "new-thread", state: thread.status, createdAt: thread.createdAt, updatedAt: Date.now(), metadata: {} });
-      }
-      if (refs.length) {
-        changes.append(null);
-        bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
-      }
-      checkedThreads.add(thread.id);
-    } finally {
-      checkingThreads.delete(thread.id);
-      const pending = pendingThreads.get(thread.id);
-      if (pending) {
-        pendingThreads.delete(thread.id);
-        queueMicrotask(() => { void linkComposerThread(pending).catch(() => {}); });
-      }
-    }
-  };
-  const tryLinkComposerThread = (thread: { id: string; createdAt: number; status: string }) => {
-    void linkComposerThread(thread).catch(() => { /* The first input may not be saved yet. */ });
-  };
-  bb.events.on("thread.created", ({ thread }) => tryLinkComposerThread(thread));
-  bb.events.on("experimental_thread.events", ({ thread }) => tryLinkComposerThread(thread));
-  bb.events.on("thread.active", ({ thread }) => tryLinkComposerThread(thread));
-  bb.events.on("thread.idle", ({ thread }) => tryLinkComposerThread(thread));
-  void bb.sdk.threads.list({ limit: 200 }).then((threads) => {
-    for (const thread of threads) tryLinkComposerThread(thread);
-  }).catch(() => {});
-  bb.events.on("interaction.pending", () => {
-    changes.append(null);
-    bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
-  });
-  /** Every window's sidebar refetches its tabs. */
-  const tabsChanged = () => bb.realtime.publish(TABS_CHANNEL, {});
-
-  /**
-   * Every item with its tag ids. Tags and tabs of items a provider no longer
-   * lists are dropped; a provider that is down, or listed only some, keeps them.
-   */
-  const overview = async () => {
-    const result = await hub.overview();
-    let closed = false;
-    for (const provider of result.providers) {
-      if (provider.state !== "ready" || result.truncated.has(provider.pluginId)) continue;
-      const live = new Set(result.items.filter((item) => item.pluginId === provider.pluginId).map((item) => item.id));
-      tags.prune(provider.pluginId, live);
-      stars.prune(provider.pluginId, live);
-      closed = tabs.prune(provider.pluginId, live) || closed;
-    }
-    if (closed) tabsChanged();
-    return {
-      providers: result.providers,
-      items: await listed(result.items),
-      tags: tags.list(),
-    };
-  };
-
-  /** Recent open threads, newest first, to pick a lead from. */
-  const recentThreads = async (): Promise<ThreadOptionView[]> =>
-    (await bb.sdk.threads.list({ archived: false, limit: 100 }))
-      .map((thread) => ({
-        id: thread.id,
-        title: thread.title || thread.titleFallback || "Untitled thread",
-        status: thread.status,
-        projectId: thread.projectId ?? null,
-        updatedAt: thread.updatedAt ?? thread.createdAt ?? 0,
-      }))
-      .sort((a, b) => b.updatedAt - a.updatedAt);
-  /** Open collections refetch, as when an add-on's items change. */
-  const tagsChanged = () => {
-    changes.append(null);
-    bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
-  };
-  /** Deletes an add-on's items and forgets their tags, stars and tabs. */
-  const deleteItems = async (pluginId: string, ids: string[]) => {
-    const result = await hub.call(pluginId, "studio_delete", { ids });
-    tags.forget(pluginId, result.done);
-    stars.forget(pluginId, result.done);
-    if (tabs.forget(pluginId, result.done)) tabsChanged();
-    return result;
-  };
 
   // Each project's optional lead thread and its heartbeat (src/project-lead.ts).
   // The heartbeat of the personal project is the Bot's check-in, under its name.
