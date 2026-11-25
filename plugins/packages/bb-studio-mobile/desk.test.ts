@@ -153,15 +153,18 @@ describe("desk hold", () => {
     expect(sent).toHaveLength(1);
   });
 
-  it("does not call send() after dispose() when release() is awaiting seen()", async () => {
+  it("lets an already-running release finish sending after dispose(), while post-dispose hold()/beat() do nothing", async () => {
     let resolveSeen!: (value: boolean) => void;
     const sent: ExpoMessage[][] = [];
+    const logs: string[] = [];
     const hold = new DeskHold({
       seen: () => new Promise<boolean>((resolve) => { resolveSeen = resolve; }),
       send: async (messages) => { sent.push(messages); },
+      log: (line) => logs.push(line),
     });
     hold.beat(active);
-    hold.hold([reply("thr_a")]);
+    const msg = reply("thr_a");
+    hold.hold([msg]);
     const releasing = hold.releaseNow();
     await Promise.resolve();
 
@@ -169,9 +172,30 @@ describe("desk hold", () => {
     resolveSeen(false);
     await releasing;
 
-    expect(sent).toEqual([]);
+    // Pushes already in flight still go out; post-dispose logging is suppressed.
+    expect(sent).toEqual([[msg]]);
+    expect(logs).toEqual([]);
+    // Post-dispose beat/hold do not hold or schedule timers.
+    hold.beat(active);
     expect(hold.hold([reply("thr_b")])).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("times out a hung seen() check to undefined (unseen) so releases are never blocked", async () => {
+    const sent: ExpoMessage[][] = [];
+    const hold = new DeskHold({
+      seen: ({ threadId }) => (threadId === "thr_hung" ? new Promise(() => {}) : Promise.resolve(false)),
+      send: async (messages) => { sent.push(messages); },
+      seenTimeoutMs: 500,
+    });
+    hold.beat(active);
+    hold.hold([reply("thr_hung"), reply("thr_ok")]);
+    const releasing = hold.releaseNow();
+    await vi.advanceTimersByTimeAsync(500);
+    await releasing;
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]![0]!.title).toBe("2 updates while you were away");
   });
 
   it("checks unique seen() keys in parallel during release()", async () => {

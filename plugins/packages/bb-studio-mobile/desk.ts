@@ -15,6 +15,8 @@ import type { ExpoMessage } from "./apns.js";
 export const DESK_FRESH_MS = 2 * 60_000;
 /** A held push is sent only if the user goes away within this long. */
 export const HOLD_MAX_MS = 10 * 60_000;
+/** Max wait per seen() check before treating the thread as unseen so one hung check can't stall releases. */
+export const SEEN_TIMEOUT_MS = 10_000;
 /** Clients forgotten after this long without a beat. */
 const CLIENT_TTL_MS = 60 * 60_000;
 const MAX_CLIENTS = 50;
@@ -90,6 +92,7 @@ export type DeskHoldDeps = {
   /** Sends the pushes that go out when the user leaves. */
   send(messages: ExpoMessage[]): Promise<void>;
   log?(message: string): void;
+  seenTimeoutMs?: number;
 };
 
 export type DeskStatus = { atDesk: boolean | null; held: number; clients: number; lastBeatAt: number | null };
@@ -193,10 +196,18 @@ export class DeskHold {
         if (!unique.has(id)) unique.set(id, { key, seen: undefined });
         return id;
       });
+      const seenTimeoutMs = this.deps.seenTimeoutMs ?? SEEN_TIMEOUT_MS;
       await Promise.all([...unique.values()].map(async (entry) => {
-        entry.seen = await this.deps.seen(entry.key).catch(() => undefined);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const late = new Promise<undefined>((resolve) => {
+          timer = setTimeout(() => resolve(undefined), seenTimeoutMs);
+          timer.unref?.();
+        });
+        entry.seen = await Promise.race([
+          this.deps.seen(entry.key).catch(() => undefined),
+          late,
+        ]).finally(() => { if (timer) clearTimeout(timer); });
       }));
-      if (this.disposed) return;
       const unseen = pushes.filter((_, index) => unique.get(ids[index]!)?.seen !== true);
       const messages = awayMessages(unseen);
       if (messages.length > 0) await this.deps.send(messages);
