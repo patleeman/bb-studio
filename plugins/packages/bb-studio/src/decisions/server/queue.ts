@@ -258,6 +258,7 @@ export class SmartQueue {
       const row = live.get(id);
       if (!row || !row.editable || rowText(row) !== entry.text) this.drop(id);
     }
+    for (const id of this.releaseWarnedAt.keys()) if (!this.entries.has(id)) this.releaseWarnedAt.delete(id);
     for (const row of rows) if (!this.departed.has(row.id)) this.queued(row);
   }
 
@@ -457,6 +458,7 @@ export class SmartQueue {
       if (!current()) return;
       if (answer === "free") {
         this.entries.delete(row.id);
+        this.releaseWarnedAt.delete(row.id);
         await this.deps.recheck();
         return;
       }
@@ -500,6 +502,7 @@ export class SmartQueue {
         // Cancelled, or already being sent because the owner sent it by hand.
         if (/not found|HTTP 404|already being sent/i.test(String(error))) {
           this.entries.delete(row.id);
+          this.releaseWarnedAt.delete(row.id);
           return;
         }
         this.deps.warn(`Smart Queue could not steer ${row.id}: ${String(error)}`);
@@ -573,14 +576,18 @@ export class SmartQueue {
         this.releaseWarnedAt.delete(id);
       } catch (error) {
         if (/not found|HTTP 404|already being sent/i.test(String(error))) {
-          if (this.entries.get(id) === released) this.entries.delete(id);
+          if (this.entries.get(id) === released) {
+            this.entries.delete(id);
+            this.releaseWarnedAt.delete(id);
+          }
           continue;
         }
         // Still held unless the row was sent, cancelled or edited meanwhile.
-        if (this.entries.get(id) === released) this.entries.set(id, entry);
+        const stillHeld = this.entries.get(id) === released;
+        if (stillHeld) this.entries.set(id, entry);
         const warned = this.releaseWarnedAt.get(id);
         if (warned === undefined || this.now() - warned >= releaseWarnEveryMs) {
-          this.releaseWarnedAt.set(id, this.now());
+          if (stillHeld) this.releaseWarnedAt.set(id, this.now());
           this.deps.warn(`Smart Queue could not release ${id}: ${String(error)}`);
         }
         break;

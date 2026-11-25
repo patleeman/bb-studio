@@ -765,3 +765,79 @@ test("gone() bounds departed map, forget() clears releaseWarnedAt, and dispose()
   assert.equal(internal.heldAt.size, 0);
   assert.equal(queue.routed.size, 0);
 });
+
+test("releaseWarnedAt is cleared on 404 and not written when a row disappeared mid-release", async () => {
+  let at = 1_000;
+  let steerCall = 0;
+  const warnings: string[] = [];
+  const { queue } = harness(
+    { action: "followup", source: "jev", confidence: 0.9, note: null },
+    {
+      now: () => at,
+      warn: (msg) => warnings.push(msg),
+      steer: async ({ id }) => {
+        steerCall += 1;
+        if (steerCall === 1) throw new Error("temporary network error");
+        if (steerCall === 2) throw new Error("HTTP 404: not found");
+        // 3rd call: row vanishes via gone() while steer is failing
+        queue.gone({ id });
+        throw new Error("temporary network error");
+      },
+    },
+  );
+  const internal = queue as unknown as { releaseWarnedAt: Map<string, number> };
+
+  // Row 1: first release fails (sets releaseWarnedAt), second hits 404 (must delete releaseWarnedAt).
+  queue.queued(row({ id: "q_404", threadId: "thr_1", createdAt: 1 }));
+  await settle();
+  await (queue as unknown as { releaseThread(t: string, before: QueuedRow): Promise<void> }).releaseThread("thr_1", row({ id: "q_after", createdAt: 2 }));
+  assert.equal(internal.releaseWarnedAt.has("q_404"), true);
+
+  await (queue as unknown as { releaseThread(t: string, before: QueuedRow): Promise<void> }).releaseThread("thr_1", row({ id: "q_after", createdAt: 2 }));
+  assert.equal(queue.entries.has("q_404"), false);
+  assert.equal(internal.releaseWarnedAt.has("q_404"), false);
+
+  // Row 2: gone() runs while steer fails -> must not write releaseWarnedAt.
+  queue.queued(row({ id: "q_vanished", threadId: "thr_1", createdAt: 3 }));
+  await settle();
+  await (queue as unknown as { releaseThread(t: string, before: QueuedRow): Promise<void> }).releaseThread("thr_1", row({ id: "q_after2", createdAt: 4 }));
+  assert.equal(internal.releaseWarnedAt.has("q_vanished"), false);
+  assert.equal(warnings.length, 2);
+});
+
+test("after departed TTL expires, a stale sync snapshot from before the row left hits 404 and is ignored without sending", async () => {
+  let at = 1_000;
+  const warnings: string[] = [];
+  const steered: string[] = [];
+  const { queue } = harness(
+    { action: "steer", source: "jev", confidence: 0.9, note: null },
+    {
+      now: () => at,
+      warn: (msg) => warnings.push(msg),
+      steer: async ({ id }) => {
+        if (id === "q_stale") throw new Error("HTTP 404: not found");
+        steered.push(id);
+      },
+    },
+  );
+
+  // Row was tracked and then left the queue.
+  const staleRow = row({ id: "q_stale", threadId: "thr_1", createdAt: 1 });
+  const listedBeforeGone = at;
+  queue.queued(staleRow);
+  queue.gone(staleRow);
+
+  // Advance past departedTtlMs and trigger eviction via another gone() row.
+  at += 6 * 60_000;
+  queue.routed.add("q_other");
+  queue.gone({ id: "q_other" });
+
+  // Stale snapshot taken before q_stale left arrives after departed TTL expired.
+  queue.sync([staleRow], listedBeforeGone);
+  await settle();
+
+  // The stale row hits 404 on steer, is dropped cleanly, never sent, and produces no warning.
+  assert.deepEqual(steered, []);
+  assert.equal(queue.entries.has("q_stale"), false);
+  assert.deepEqual(warnings, []);
+});
