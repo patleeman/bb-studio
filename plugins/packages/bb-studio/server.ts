@@ -88,7 +88,8 @@ import { isCanvasThreadOrigin } from "./src/voice/live/canvas-plugin";
 // - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { experimental_PluginRpcRefusal } from "@get-bb/plugin-sdk";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "./src/kit/contract";
 import { untitled } from "./src/kit/format";
 import { z } from "zod";
@@ -137,6 +138,8 @@ import { BOT_THREADS_CHANNEL } from "./src/bot-threads-contract";
 import { readMirroredSince, readMirrorLive } from "./src/mirror-live";
 import { registerLiveActivity } from "./src/live-activity";
 import { ThreadSeeds } from "./src/thread-seeds";
+import { MoveHandoffs } from "./src/provider-move/handoff";
+import { moveProviderContract } from "./src/provider-move/contract";
 import { FINISH_TOPIC, registerBotFinish } from "./src/bot-finish";
 import { askModel } from "./src/kit/decisions";
 import type { ModelSelection } from "./src/decisions/contract";
@@ -1026,6 +1029,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.created", ({ thread }) => void sideThreads.created(thread).catch((error) => bb.log.warn(`Side chat: ${errorText(error)}`)));
   bb.events.on("thread.active", ({ thread }) => sideThreads.touched(thread.id));
   bb.events.on("thread.deleted", ({ thread }) => sideThreads.forget(thread.id));
+  bb.events.on("thread.deleted", ({ thread }) => void moveHandoffs.settled(thread.id).catch(() => undefined));
   // Archived from its menu (or BB's): the Bot's lists drop it, and bring it back unarchived.
   bb.events.on("thread.archived", ({ thread }) => sideThreads.touched(thread.id));
   bb.events.on("thread.unarchived", ({ thread }) => sideThreads.touched(thread.id));
@@ -1151,6 +1155,29 @@ export default async function plugin(bb: BbPluginApi) {
   // A run's thread with no model falls back on its Bot's default model (src/thread-model.ts).
   scheduler.preferModel((threadId) => { const bot = bots.forThread(threadId); return bot ? bots.defaultModel(bot.id) : bots.defaultModel(); });
   const threadSeeds = new ThreadSeeds(db);
+  // Secret values scrubbed from what Studio sends or keeps (strands, the move handoff's transcript).
+  const knownSecrets = async () => {
+    const values = await settings.get().catch(() => ({} as Record<string, unknown>));
+    const keys = Object.keys(STUDIO_KEY_SETTINGS).map((key) => values[key]).filter((value): value is string => typeof value === "string");
+    return [...keys, ...(toolGateway?.secretValues() ?? [])];
+  };
+  // A thread moved to another provider (src/provider-move/handoff.ts): its catch-up, prepared at move
+  // time by the move command and handed over on the first turn after it. The transcript goes in the
+  // thread's storage folder when it's on this machine, else in Studio's own folder.
+  const moveHandoffs = new MoveHandoffs({
+    listEvents: async ({ threadId, afterSeq, limit, types }) => await bb.sdk.threads.events.list({ threadId, afterSeq: String(afterSeq), order: "asc", limit: String(limit), types: [...types] as unknown as NonNullable<Parameters<typeof bb.sdk.threads.events.list>[0]["types"]> }) as { seq?: number; type?: string; createdAt?: number; data?: unknown }[],
+    dirFor: async (threadId) => {
+      const location = await bb.sdk.threads.storageLocation({ threadId }).catch(() => null);
+      const root = location?.storageRootPath;
+      return root && existsSync(root) ? join(root, "studio-move", threadId) : join(dirname(db.name), "move-provider", threadId);
+    },
+    secrets: knownSecrets,
+    kv: bb.storage.kv,
+    log: (message) => bb.log.warn(message),
+  });
+  bb.rpc.register(moveProviderContract, {
+    "moveProvider.prepare": ({ threadId, from, to, historyTokens }) => moveHandoffs.prepare(threadId, { from, to, historyTokens }),
+  });
   const pushRpc = (call: Parameters<typeof bb.sdk.plugins.callRpc>[0]) => bb.sdk.plugins.callRpc(call);
   const botThreads = registerBotThreads(bb, db, {
     bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name, avatar: bot.avatar, shape: bot.shape ?? null, color: bot.color ?? null, primary: !!bot.primary, threadId: bot.threadId, appearance: bot.appearance ?? null, presence: bots.presenceOf(bot.id), state: bot.state })),
@@ -1240,11 +1267,7 @@ export default async function plugin(bb: BbPluginApi) {
       mainOf: (botId) => bots.stored(botId)?.threadId ?? null,
       defaultMain: () => (bots.list().find((bot) => bot.primary) ?? bots.list()[0])?.threadId ?? null,
     },
-    secrets: async () => {
-      const values = await settings.get().catch(() => ({} as Record<string, unknown>));
-      const keys = Object.keys(STUDIO_KEY_SETTINGS).map((key) => values[key]).filter((value): value is string => typeof value === "string");
-      return [...keys, ...(toolGateway?.secretValues() ?? [])];
-    },
+    secrets: knownSecrets,
     log: (message) => bb.log.warn(message),
   });
   // Startup, and every 5 minutes: a Bot whose Main was deleted or archived while Studio was off, or
@@ -1322,7 +1345,7 @@ export default async function plugin(bb: BbPluginApi) {
   const onboarding = registerOnboarding(bb, { db, bots, errorText });
   // Awareness (src/live-activity.ts): what each conversation and worker is
   // doing now, the per-turn digest of the others, and bot_activity_lookup.
-  const liveActivity = registerLiveActivity(bb, db, { threads: botThreads.store, actingBot: async (threadId) => (await acting(threadId))?.botId ?? null, log: (message) => bb.log.warn(message), seeds: threadSeeds });
+  const liveActivity = registerLiveActivity(bb, db, { threads: botThreads.store, actingBot: async (threadId) => (await acting(threadId))?.botId ?? null, log: (message) => bb.log.warn(message), seeds: threadSeeds, moves: moveHandoffs });
   // Finishing a conversation (src/bot-finish.ts): its summary to memory, Main gets the card, then archived.
   const botFinish = registerBotFinish(bb, {
     db, threads: botThreads.store, mainOf: (botId) => bots.stored(botId)?.threadId ?? null,
