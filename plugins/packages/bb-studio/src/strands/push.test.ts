@@ -135,4 +135,64 @@ describe("the needs-you push", () => {
     await h.pushes.check();
     expect(h.kept()).toEqual(["s1"]);
   });
+
+  it("stops run() without saving or notifying when disposed while overview() is in flight", async () => {
+    let releaseOverview!: () => void;
+    let calls = 0;
+    const overview = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) await new Promise<void>((resolve) => { releaseOverview = resolve; });
+      return { conversations: [conversation("thr_main", [strand("s1", "needs-you", [ask("thr_main")])])] };
+    });
+    const save = vi.fn(async () => {});
+    const notify = vi.fn(async () => {});
+    const pushed = vi.fn();
+    const h = harness({
+      bots: () => [{ id: "bot_1", name: "One" }, { id: "bot_2", name: "Two" }],
+      load: async () => [],
+      overview,
+      save,
+      notify,
+      pushed,
+    });
+
+    const checking = h.pushes.check();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(overview).toHaveBeenCalledTimes(1);
+
+    h.pushes.dispose();
+    releaseOverview();
+    await checking;
+
+    expect(overview).toHaveBeenCalledTimes(1);
+    expect(save).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    expect(pushed).not.toHaveBeenCalled();
+  });
+
+  it("stops run() before notify() when disposed while pushFor() is in flight", async () => {
+    let releaseAsk!: () => void;
+    const notify = vi.fn(async () => {});
+    const pushed = vi.fn();
+    const h = harness({
+      load: async () => [],
+      bbPushesAsks: async () => {
+        await new Promise<void>((resolve) => { releaseAsk = resolve; });
+        return false;
+      },
+      notify,
+      pushed,
+    });
+    h.set([conversation("thr_main", [strand("s1", "needs-you", [ask("thr_main")])])]);
+
+    const checking = h.pushes.check();
+    await new Promise((r) => setTimeout(r, 0));
+
+    h.pushes.dispose();
+    releaseAsk();
+    await checking;
+
+    expect(notify).not.toHaveBeenCalled();
+    expect(pushed).not.toHaveBeenCalled();
+  });
 });
