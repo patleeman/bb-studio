@@ -12,10 +12,12 @@ import { relativeTime } from "./shared";
 import { useOpenCard } from "../../links/open";
 
 
+import { LruCache } from "../../kit/lru";
+
 export { isPageId };
 
 // A remounted card reuses the text the last one read for the same edit.
-const markdowns = new Map<string, { updatedAt: number; markdown: string }>();
+const markdowns = new LruCache<string, { updatedAt: number; markdown: string }>(100);
 
 /** The page's Markdown, read again on each edit: undefined while loading, null if it can't be read. */
 function usePageMarkdown(id: string | null, updatedAt: number | undefined): string | null | undefined {

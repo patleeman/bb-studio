@@ -10,6 +10,7 @@ import { createPortal } from "react-dom";
 import { StudioBar } from "../kit/app/index";
 import { useHostTabWindow } from "../kit/app/host-sdk";
 import { usePortalScopeProps } from "../kit/ui/portal-scope";
+import { LruCache } from "../kit/lru";
 
 export interface PageBarProps { icon?: ReactNode; title: string; detail?: ReactNode; actions?: ReactNode }
 
@@ -37,7 +38,7 @@ export const ENTRY_TITLE = { automation: "Automation", todo: "Task", record: "Me
 export type EntryKind = keyof typeof ENTRY_TITLE;
 const isEntryKind = (segment: string): segment is EntryKind => Object.hasOwn(ENTRY_TITLE, segment);
 
-const botNames = new Map<string, string>();
+const botNames = new LruCache<string, string>(200);
 const botNameListeners = new Set<() => void>();
 const subscribeBotNames = (listener: () => void) => { botNameListeners.add(listener); return () => { botNameListeners.delete(listener); }; };
 

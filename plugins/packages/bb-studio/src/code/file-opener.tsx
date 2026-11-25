@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRpc, type PluginFileOpenerProps, type PluginFileOpenerSource } from "@get-bb/plugin-sdk/app";
 import { BAR_BUTTON, Icon } from "../kit/app/index";
 import { errorMessage } from "../kit/format";
+import { LruCache } from "../kit/lru";
 import { CODE_TAB, tabParamsOfKey, type Workspace } from "./shared";
 import { requestThreadTab, useOpenThreadTab, type ThreadTabOpen } from "../kit/app/thread-panel";
 import { wantsBbPreview } from "./bb-preview";
@@ -101,7 +102,7 @@ type State = { kind: "opening" } | { kind: "opened" } | { kind: "shown" } | { ki
  * closing VS Code shows the file tab again, which remounts this opener, and
  * that must not open VS Code again.
  */
-const sent = new Map<string, unknown>();
+const sent = new LruCache<string, unknown>(200);
 
 /** Whether this open (a file and its line range, by identity) still has to go to VS Code; records it when it does. */
 export function claimOpen(threadId: string, path: string, range: unknown): boolean {

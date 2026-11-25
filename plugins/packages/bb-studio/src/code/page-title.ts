@@ -2,6 +2,7 @@
 // ("VS Code" in BB's rail): its addresses, and what the page is called in
 // BB's header, the window title and the page's own bar.
 import { useSyncExternalStore } from "react";
+import { LruCache } from "../kit/lru";
 
 /** The nav panel's id and path. */
 export const VSCODE_PANEL = "vscode";
@@ -26,7 +27,7 @@ export function codePageAt(subPath: string): string | null {
 }
 
 // Workspace names as their pages last loaded them, for the title hook below.
-const titles = new Map<string, string>();
+const titles = new LruCache<string, string>(200);
 const listeners = new Set<() => void>();
 
 /** A workspace's page tells its name, once loaded and whenever it changes. */
