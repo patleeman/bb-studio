@@ -356,6 +356,12 @@ struct RoomView: View {
                                           page: order.count > 1 ? chatPage : nil,
                                           pages: RoomChatPages(index: order.firstIndex(of: pager.shown) ?? 0, count: order.count),
                                           strandsBeside: pages != nil))
+        // The room is dark under its frost and shade, whatever variant the
+        // scene's driver chose for the hour: the conversation's chrome (its
+        // bottom band, strands pill, composer, header) takes the theme's dark
+        // tokens too, not a light canvas under a dark transcript.
+        .environment(\.look, Look(theme: look.theme, scheme: .dark, showsScene: look.showsScene))
+        .environment(\.colorScheme, .dark)
     }
 
     /// A sideways drag on the open conversation's messages: it follows the
