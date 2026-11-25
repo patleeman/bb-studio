@@ -54,9 +54,11 @@ function useComposerRects(enabled: boolean): Rect[] {
     }
     measure();
     // A composer can mount or unmount under the card (another page opens): look again now and then.
-    const timer = window.setInterval(measure, 1000);
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") measure(); }, 1000);
+    const onVisible = () => { if (document.visibilityState === "visible") measure(); };
     window.addEventListener("resize", measure);
-    return () => { window.clearInterval(timer); window.removeEventListener("resize", measure); observer.disconnect(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { window.clearInterval(timer); window.removeEventListener("resize", measure); document.removeEventListener("visibilitychange", onVisible); observer.disconnect(); };
   }, [enabled]);
   return rects;
 }

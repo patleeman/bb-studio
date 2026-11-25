@@ -307,7 +307,7 @@ export function ArchiveButton({ thread, title }: { thread: ReturnType<typeof men
 /** Rename in place: a sidebar thread, or a Bot's side thread (BotSidebar.tsx). */
 export function RenameInput({ thread, onDone }: { thread: Pick<Thread, "id" | "title" | "displayTitle">; onDone(): void }) {
   const sdk = useSdk();
-  const [value, setValue] = useState(thread.title ?? thread.displayTitle);
+  const [value, setValue] = useState(thread.title ?? thread.displayTitle ?? "");
   const commit = () => {
     const title = value.trim();
     onDone();

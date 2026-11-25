@@ -44,6 +44,11 @@ function useWidth(ref: React.RefObject<HTMLElement | null>): number {
 function Content({ item, width, height, theme }: { item: CanvasItem; width: number; height: number; theme: WidgetTheme }) {
   const version = versionOf(item);
   const [layers, setLayers] = useState<{ version: string; item: CanvasItem }[]>([{ version, item }]);
+  const timers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  useEffect(() => () => {
+    for (const timer of timers.current) clearTimeout(timer);
+    timers.current.clear();
+  }, []);
   useLayoutEffect(() => {
     setLayers((current) => (current.at(-1)!.version === version ? current : [...current.slice(-1), { version, item }]));
   }, [version]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -66,7 +71,8 @@ function Content({ item, width, height, theme }: { item: CanvasItem; width: numb
                 const drop = () => setLayers((current) => current.filter((each) => each.version !== layer.version));
                 fadeOut(element, drop);
                 // A hidden tab doesn't run animations: don't leave the old copy behind.
-                setTimeout(drop, 900);
+                const timer = setTimeout(() => { timers.current.delete(timer); drop(); }, 900);
+                timers.current.add(timer);
               } else if (shown.length > 1) fadeIn(element);
             }}
           >
