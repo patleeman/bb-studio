@@ -32,7 +32,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { turnContext, type ThreadSeeds } from "./thread-seeds";
-import type { ProviderMoveInput } from "./provider-move/handoff";
+import { moveMaxChars, type ProviderMoveInput } from "./provider-move/handoff";
 import { taskTitle } from "./tasks/store";
 import { latestLine, repoTag, threadRunning, type BotThreads, type ThreadFacts, type WorkerStatus } from "./bot-threads";
 
@@ -359,7 +359,7 @@ export interface TurnContextInput { threadId: string; providerMove?: ProviderMov
 interface TurnContextHooks { experimental_turnContext?: (provider: (context: TurnContextInput) => string | null | Promise<string | null>, options?: { providerMove?: boolean }) => void }
 
 /** Registers the per-turn digest on a BB that has the hook. Answers whether it did. */
-export function registerTurnContext(bb: { experimental_hooks?: object }, provider: (threadId: string, context: TurnContextInput) => string | null | Promise<string | null>): boolean {
+export function registerTurnContext(bb: { experimental_hooks?: object }, provider: (threadId: string, context: TurnContextInput) => string | null | Promise<string | null>, options: { providerMove?: boolean } = {}): boolean {
   const hooks = bb.experimental_hooks as TurnContextHooks | undefined;
   if (typeof hooks?.experimental_turnContext !== "function") return false;
   hooks.experimental_turnContext((context) => {
@@ -367,7 +367,7 @@ export function registerTurnContext(bb: { experimental_hooks?: object }, provide
       const text = provider(context.threadId, context);
       return text instanceof Promise ? text.catch(() => null) : text;
     } catch { return null; }
-  }, { providerMove: true });
+  }, options.providerMove ? { providerMove: true } : undefined);
   return true;
 }
 
@@ -380,8 +380,15 @@ export function turnText(threadId: string, context: TurnContextInput, base: () =
     return base();
   }
   const move = context.providerMove;
+  // Core counts the whole answer against the move budget and cuts the end when it is over: the digest
+  // comes along only when it fits after the handoff (which is built to fit on its own).
+  const limit = moveMaxChars(move.historyTokens);
   return moves.forTurn(threadId, move).catch(() => null)
-    .then((handoff) => [handoff, base()].filter((part): part is string => !!part).join("\n\n") || null);
+    .then((handoff) => {
+      const digest = base();
+      const parts = handoff && digest && handoff.length + 2 + digest.length > limit ? [handoff] : [handoff, digest];
+      return parts.filter((part): part is string => !!part).join("\n\n") || null;
+    });
 }
 
 /**
@@ -399,7 +406,7 @@ export function registerLiveActivity(bb: Bb, db: Database.Database, deps: LiveAc
   bb.events.on("interaction.pending", ({ thread }) => safe("pending", () => activity.pending(thread as ThreadFacts)));
   bb.events.on("thread.deleted", ({ thread }) => safe("deleted", () => { activity.deleted(thread.id); deps.seeds?.forget(thread.id); }));
 
-  const hooked = registerTurnContext(bb, (threadId, context) => turnText(threadId, context, () => turnContext(deps.seeds?.take(threadId) ?? null, digestFor(db, threadId, now())), deps.moves));
+  const hooked = registerTurnContext(bb, (threadId, context) => turnText(threadId, context, () => turnContext(deps.seeds?.take(threadId) ?? null, digestFor(db, threadId, now())), deps.moves), { providerMove: !!deps.moves });
   if (hooked) deps.seeds?.enable();
 
   bb.agents.registerTool({

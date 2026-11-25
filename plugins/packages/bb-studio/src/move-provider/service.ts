@@ -211,6 +211,7 @@ export class MoveProviderService {
     if (!model) throw new MoveInputError(`${options.to} has no default model; give --model.`);
     if (target.models.length && !target.models.includes(model)) throw new MoveInputError(`${options.to} doesn't offer ${model}. It offers: ${target.models.slice(0, 20).join(", ")}.`);
     const historyTokens = options.historyTokens ?? DEFAULT_HISTORY_TOKENS;
+    if (!Number.isInteger(historyTokens) || historyTokens < 1) throw new MoveInputError("--history-tokens is a whole number of at least 1.");
     const { threads, roles, botIds } = await this.select(selection);
     const request: MoveRequest = { providerId: options.to, model, permission: options.permission ?? null, historyTokens, patchAutomations: options.automations || selection.runners };
     const items: ThreadItem[] = [];

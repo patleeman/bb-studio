@@ -148,6 +148,10 @@ describe("selectors", () => {
     expect((await w.cli(["a"])).exitCode).toBe(1);
     expect((await w.cli(["a", "--to", TO, "--permission", "root"])).exitCode).toBe(1);
     expect((await w.cli(["a", "--to", TO, "--bogus"])).exitCode).toBe(1);
+    const zero = await w.cli(["a", "--to", TO, "--history-tokens", "0"]);
+    expect(zero).toMatchObject({ exitCode: 1 });
+    expect(zero.stderr).toContain("from 1 to");
+    await expect(w.service.move({ ids: ["a"], includeArchived: false, runners: false }, { ...base, to: TO, historyTokens: 0 })).rejects.toThrow("at least 1");
     expect(w.calls.core).toEqual([]);
   });
 });

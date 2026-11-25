@@ -43,7 +43,8 @@ function moveOptions(parsed: Extract<ReturnType<typeof parseCliArgs>, { ok: true
   if (permission !== undefined && !isPermissionMode(permission)) return `--permission is one of ${PERMISSION_MODES.join(", ")}.`;
   const tokens = parsed.options.get("--history-tokens");
   const historyTokens = tokens === undefined ? undefined : Number(tokens);
-  if (historyTokens !== undefined && (!Number.isInteger(historyTokens) || historyTokens < 0 || historyTokens > MAX_HISTORY_TOKENS)) return `--history-tokens is a whole number from 0 to ${MAX_HISTORY_TOKENS}.`;
+  // One rule in every layer (the CLI, the handoff RPC, core): at least 1 token.
+  if (historyTokens !== undefined && (!Number.isInteger(historyTokens) || historyTokens < 1 || historyTokens > MAX_HISTORY_TOKENS)) return `--history-tokens is a whole number from 1 to ${MAX_HISTORY_TOKENS}.`;
   return {
     to, model: parsed.options.get("--model"), permission: permission as MoveOptions["permission"], historyTokens,
     dryRun: parsed.flags.has("--dry-run"), automations: parsed.flags.has("--automations"), botDefaults: parsed.flags.has("--bot-defaults"),
