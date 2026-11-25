@@ -51,7 +51,8 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
         let launchPrep = app.buttons["roomConversation-thr_demo_interview"]
         XCTAssertTrue(launchPrep.waitForExistence(timeout: 10))
         launchPrep.tap()
-        let more = app.buttons["More"].firstMatch
+        // The conversation's menu is its title (round 5).
+        let more = app.conversationMore
         XCTAssertTrue(more.waitForExistence(timeout: 10))
         more.tap()
         let make = app.buttons["makeMain"]

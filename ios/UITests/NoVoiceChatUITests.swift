@@ -38,7 +38,8 @@ final class NoVoiceChatUITests: ServerIsolatedUITestCase {
         if duo { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/outer")!) }
         sleep(2)
         shot("thread")
-        let more = app.buttons["More"].firstMatch
+        // A Bot conversation's menu is its title (round 5); a plain thread's is ⋯.
+        let more = app.conversationMore
         XCTAssertTrue(more.waitForExistence(timeout: 10))
         more.tap()
         XCTAssertTrue(app.buttons["Find in thread"].waitForExistence(timeout: 5), "The thread menu opened")

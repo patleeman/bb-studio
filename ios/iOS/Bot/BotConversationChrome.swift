@@ -131,69 +131,56 @@ struct ConversationReplyRow: View {
     }
 }
 
-struct ConversationTitle: View {
+/// A Bot conversation's title, the header's one control besides Home
+/// (round 5): its name, and under it the model, or "Writing" while a reply
+/// runs. Tapping it opens the conversation's menu (Find, Rename, Model,
+/// Files, hands-free, Archive and the rest). The page dots are gone from
+/// view; VoiceOver still hears "Conversation 2 of 4".
+struct ConversationTitle<Menu: View>: View {
     let title: String
     let model: String?
+    var writing = false
     var pages: RoomChatPages? = nil
-    /// Tapping the name opens the conversation list (the conversation is home).
-    var openList: (() -> Void)? = nil
-    let choose: () -> Void
+    @ViewBuilder let menu: () -> Menu
+
+    private var subtitle: String { writing ? "Writing" : (model ?? "") }
 
     var body: some View {
-        VStack(spacing: 1) {
-            Group {
-                if let openList {
-                    Button(action: openList) {
-                        HStack(spacing: 3) {
-                            Text(title).lineLimit(1)
-                            Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
-                        }
-                        .font(.headline)
-                        .contentShape(.rect)
+        SwiftUI.Menu { menu() } label: {
+            VStack(spacing: 1) {
+                HStack(spacing: 3) {
+                    Text(title).lineLimit(1)
+                    Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                }
+                .font(.headline)
+                .id(title)
+                .transition(.push(from: .trailing).combined(with: .opacity))
+                if !subtitle.isEmpty {
+                    HStack(spacing: 4) {
+                        if writing { ProgressView().controlSize(.mini) }
+                        Text(subtitle).lineLimit(1)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("\(title), conversations")
-                    .accessibilityIdentifier("conversationTitleList")
-                } else {
-                    Text(title).font(.headline).lineLimit(1)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
-            .id(title)
-            .transition(.push(from: .trailing).combined(with: .opacity))
-            HStack(spacing: 6) {
-                if let pages, pages.count > 1 {
-                    HStack(spacing: 4) {
-                        ForEach(0..<min(pages.count, 9), id: \.self) { at in
-                            Capsule().fill(.primary.opacity(at == pages.index ? 0.8 : 0.25))
-                                .frame(width: at == pages.index ? 10 : 4, height: 4)
-                        }
-                    }
-                    .animation(.snappy, value: pages.index)
-                    .accessibilityElement(children: .ignore)
+            .foregroundStyle(.primary)
+            .frame(minHeight: 44)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .tint(.primary)
+        .accessibilityLabel([title, subtitle].filter { !$0.isEmpty }.joined(separator: ", "))
+        .accessibilityHint("Opens the conversation's menu")
+        .accessibilityIdentifier("conversationMore")
+        .overlay(alignment: .bottom) {
+            if let pages, pages.count > 1 {
+                Color.clear.frame(width: 1, height: 1)
+                    .accessibilityElement()
                     .accessibilityLabel("Conversation \(pages.index + 1) of \(pages.count)")
                     .accessibilityIdentifier("conversationPageDots")
-                }
-                chip
             }
         }
-    }
-
-    private var chip: some View {
-            Button(action: choose) {
-                HStack(spacing: 3) {
-                    Text(model ?? "Model").lineLimit(1)
-                    Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
-                }
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(.fill.tertiary, in: .capsule)
-                .contentShape(.capsule)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Model: \(model ?? "unknown")")
-            .accessibilityIdentifier("conversationModelChip")
     }
 }
 

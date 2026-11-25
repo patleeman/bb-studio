@@ -228,6 +228,22 @@ struct RoomView: View {
                 }
                 .navigationDestination(for: Route.self) { route in destination(route) }
         }
+        // The leading edge is back to Home (round 5): a swipe in from it goes
+        // home; a sideways swipe anywhere else pages conversations, which
+        // already ignores drags that start at the edge. Clear of the composer.
+        .overlay(alignment: .leading) {
+            if router.detailPath.isEmpty {
+                Color.clear
+                    .frame(width: 22)
+                    .padding(.top, 100)
+                    .padding(.bottom, 150)
+                    .contentShape(.rect)
+                    .gesture(DragGesture(minimumDistance: 12).onEnded { drag in
+                        if drag.translation.width > 60, abs(drag.translation.height) < drag.translation.width { showList() }
+                    })
+                    .accessibilityHidden(true)
+            }
+        }
         .sheet(item: placeBinding) { place in
             RoomPlaceSheet(place: place, bot: bot, store: store, mainThreadId: mainThreadId,
                            open: openItem, startedConversation: { id in openItem(.conversation(id)) },

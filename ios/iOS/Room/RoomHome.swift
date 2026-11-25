@@ -34,8 +34,9 @@ enum RoomHome {
     }
 }
 
-/// The header's Bot mark: its avatar still (no animation), amber while
-/// something needs you. Opens the conversation list.
+/// The header's way home (round 5): a back chevron and the Bot's avatar
+/// still (no animation), with an amber dot while something else needs you.
+/// Opens the conversation list.
 struct RoomHomeButton: View {
     let bot: BotSpace
     let view: BotThreadsView?
@@ -45,6 +46,8 @@ struct RoomHomeButton: View {
 
     var body: some View {
         Button(action: action) {
+            HStack(spacing: 2) {
+            Image(systemName: "chevron.left").font(.body.weight(.semibold)).foregroundStyle(.primary)
             ZStack(alignment: .topTrailing) {
                 PresenceView(bot: bot, state: bot.presenceState(live: view),
                              workers: view?.workers.filter { $0.status == .running }.count ?? bot.activity.workers,
@@ -55,11 +58,14 @@ struct RoomHomeButton: View {
                         .offset(x: 2, y: -2)
                 }
             }
-            .frame(width: 44, height: 44)
+            }
+            .padding(.horizontal, 4)
+            .frame(minHeight: 44)
+            .fixedSize()
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(needsYou ? "Conversations, something needs you" : "Conversations")
+        .accessibilityLabel(needsYou ? "Home, something needs you" : "Home")
         .accessibilityIdentifier("roomList")
     }
 }

@@ -60,14 +60,14 @@ extension XCUIApplication {
         bar.buttons.element(boundBy: 0).tap()
     }
 
-    /// The conversation's ⋯: in the header, or in the folded Duo's side column.
+    /// The conversation's menu: the header's title (round 5), or ⋯ in the folded Duo's side column.
     var conversationMore: XCUIElement { buttons["conversationMore"].firstMatch }
 
-    /// The conversation's name: the header's title button, or the folded
-    /// Duo's title (the side column's Bot mark opens the list there).
+    /// The conversation's name: the header's title (it opens the menu), or
+    /// the folded Duo's title line.
     var conversationTitle: XCUIElement {
         let folded = staticTexts["foldedChatTitle"]
-        return folded.exists ? folded : buttons["conversationTitleList"]
+        return folded.exists ? folded : buttons["conversationMore"]
     }
 
     /// Which conversation shows: the page dots ("Conversation 2 of 4") on

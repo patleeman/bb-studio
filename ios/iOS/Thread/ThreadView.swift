@@ -440,79 +440,97 @@ struct ThreadView: View {
         transcriptV2Screen
     }
 
+    /// A plain thread's header actions. A Bot conversation's header is its
+    /// title alone (round 5): the title opens these as a menu, Stop sits
+    /// beside Send, and hands-free is in the "+" menu and here.
     @ViewBuilder private var threadActions: some View {
-        if model.thread?.isRunning == true, !isWorker {
-            Button { Task { await model.stop() } } label: { Image(systemName: "stop.circle") }
-                .accessibilityLabel("Stop")
+        if conversation == nil {
+            if model.thread?.isRunning == true, !isWorker {
+                Button { Task { await model.stop() } } label: { Image(systemName: "stop.circle") }
+                    .accessibilityLabel("Stop")
+            }
+            // On iPad there's room for Find beside the menu.
+            if sizeClass == .regular {
+                Button { finding = true } label: { Image(systemName: "magnifyingglass") }
+                    .accessibilityLabel("Find")
+            }
+            // One menu rather than a row of buttons, so the title has room.
+            Menu { menuItems } label: {
+                Image(systemName: "ellipsis").modifier(DuoHeaderMenuLabel())
+            }
+            .accessibilityLabel("More")
+            .accessibilityIdentifier("conversationMore")
         }
-        // On iPad there's room for Find beside the menu.
-        if sizeClass == .regular {
-            Button { finding = true } label: { Image(systemName: "magnifyingglass") }
-                .accessibilityLabel("Find")
-        }
-        // Hands-free voice speaks as this conversation (its identity comes from the thread).
+    }
+
+    /// The folded Duo's rail for a Bot conversation: hands-free and the conversation's menu, as round buttons.
+    @ViewBuilder private var railActions: some View {
+        Button { startHandsFree() } label: { Label("Talk hands-free", systemImage: "waveform") }
+            .accessibilityIdentifier("conversationHandsFree")
+        Menu { menuItems } label: { Label("More", systemImage: "ellipsis") }
+            .accessibilityLabel("More")
+            .accessibilityIdentifier("conversationMore")
+    }
+
+    /// Hands-free voice speaks as this conversation (its identity comes from the thread).
+    private func startHandsFree() { Router.shared.sheet = .handsFree(threadId: model.threadId) }
+
+    /// The thread's menu: the header's ⋯ in a plain thread, the title's menu in a Bot conversation.
+    @ViewBuilder private var menuItems: some View {
         if conversation != nil {
-            Button { Router.shared.sheet = .handsFree(threadId: model.threadId) } label: { Image(systemName: "waveform") }
-                .accessibilityLabel("Talk hands-free")
-                .accessibilityIdentifier("conversationHandsFree")
+            Button { startHandsFree() } label: { Label("Talk hands-free", systemImage: "waveform") }
+                .accessibilityIdentifier("menuHandsFree")
         }
-        // One menu rather than a row of buttons, so the title has room.
-        Menu {
-            Button { finding = true } label: { Label("Find in thread", systemImage: "magnifyingglass") }
-            if let conversation, conversation.mainThreadId != model.threadId {
-                Button { makeMain(conversation) } label: { Label("Make this the Main", systemImage: "star") }
-                    .accessibilityIdentifier("makeMain")
-            }
-            Button {
-                newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
-                renaming = true
-            } label: { Label("Rename", systemImage: "pencil") }
-            Button { choosingModel = true } label: {
-                Label(conversation != nil ? "Model" : "Model & permissions", systemImage: "cpu")
-            }
-            .accessibilityIdentifier("menuModel")
-            if let terminals = TerminalScope.forThread(model.threadId, environmentId: model.thread?.environmentId) {
-                Button { showingFiles = true } label: { Label("Files & changes", systemImage: "folder") }
-                Button { push(.terminals(scope: terminals, title: "Terminals")) } label: {
-                    Label("Terminals", systemImage: "apple.terminal")
-                }
-            }
-            Button { showingHistory = true } label: { Label("Recent prompts", systemImage: "clock.arrow.circlepath") }
-            if canSaveFiles {
-                Button { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: nil) } label: {
-                    Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
-                }
-            }
-            if let sourcePage {
-                Button { push(.page(id: sourcePage.id)) } label: {
-                    Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")
-                }
-            }
-            if ConversationFinish.canRemove(conversation?.conversation, running: model.thread?.isRunning == true) {
-                Button { finish() } label: {
-                    Label(finishing ? "Archiving…" : "Archive", systemImage: "archivebox")
-                    Text(ConversationFinish.archiveHint)
-                }
-                .disabled(finishing)
-                .accessibilityIdentifier("menuArchive")
-                Button(role: .destructive) { confirmingDelete = true } label: {
-                    Label("Delete conversation…", systemImage: "trash")
-                }
-                .disabled(finishing)
-                .accessibilityIdentifier("menuDelete")
-            }
-            if compactHeader {
-                Menu { contextItems } label: { Label("Context", systemImage: "chart.bar") }
-                Menu { shareItems } label: { Label("Share & notifications", systemImage: "square.and.arrow.up") }
-            } else {
-                Section { contextItems }
-                shareItems
-            }
-        } label: {
-            Image(systemName: "ellipsis").modifier(DuoHeaderMenuLabel())
+        Button { finding = true } label: { Label("Find in thread", systemImage: "magnifyingglass") }
+        if let conversation, conversation.mainThreadId != model.threadId {
+            Button { makeMain(conversation) } label: { Label("Make this the Main", systemImage: "star") }
+                .accessibilityIdentifier("makeMain")
         }
-        .accessibilityLabel("More")
-        .accessibilityIdentifier("conversationMore")
+        Button {
+            newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
+            renaming = true
+        } label: { Label("Rename", systemImage: "pencil") }
+        Button { choosingModel = true } label: {
+            Label(conversation != nil ? "Model" : "Model & permissions", systemImage: "cpu")
+        }
+        .accessibilityIdentifier("menuModel")
+        if let terminals = TerminalScope.forThread(model.threadId, environmentId: model.thread?.environmentId) {
+            Button { showingFiles = true } label: { Label("Files & changes", systemImage: "folder") }
+            Button { push(.terminals(scope: terminals, title: "Terminals")) } label: {
+                Label("Terminals", systemImage: "apple.terminal")
+            }
+        }
+        Button { showingHistory = true } label: { Label("Recent prompts", systemImage: "clock.arrow.circlepath") }
+        if canSaveFiles {
+            Button { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: nil) } label: {
+                Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
+            }
+        }
+        if let sourcePage {
+            Button { push(.page(id: sourcePage.id)) } label: {
+                Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")
+            }
+        }
+        if ConversationFinish.canRemove(conversation?.conversation, running: model.thread?.isRunning == true) {
+            Button { finish() } label: {
+                Label(finishing ? "Archiving…" : "Archive", systemImage: "archivebox")
+                Text(ConversationFinish.archiveHint)
+            }
+            .disabled(finishing)
+            .accessibilityIdentifier("menuArchive")
+            Button(role: .destructive) { confirmingDelete = true } label: {
+                Label("Delete conversation…", systemImage: "trash")
+            }
+            .disabled(finishing)
+            .accessibilityIdentifier("menuDelete")
+        }
+        if compactHeader {
+            Menu { contextItems } label: { Label("Context", systemImage: "chart.bar") }
+            Menu { shareItems } label: { Label("Share & notifications", systemImage: "square.and.arrow.up") }
+        } else {
+            Section { contextItems }
+            shareItems
+        }
     }
 
     @ViewBuilder private var contextItems: some View {
@@ -1076,8 +1094,8 @@ struct ThreadView: View {
 
     private var conversationTitle: some View {
         ConversationTitle(title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? conversation?.conversation?.title ?? "Conversation",
-                          model: conversationModel?.chip ?? executionLabel, pages: roomChat?.pages,
-                          openList: roomChat?.showList) { choosingModel = true }
+                          model: conversationModel?.chip ?? executionLabel, writing: model.thread?.isRunning == true,
+                          pages: roomChat?.pages) { menuItems }
     }
 
     /// Replaces the `@word` being typed with the mention.
@@ -1407,6 +1425,8 @@ struct ThreadView: View {
                     label: ThreadNotes.expandLabel(hasNote: notes.note != nil, draftEmpty: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
                     busy: notes.expanding, disabled: dictation.blocksSend, run: expandToPage) : nil,
                 compact: true, prominentMic: compactInput, micTint: compactInput ? look.micTint : nil,
+                stop: conversation != nil && model.thread?.isRunning == true && !isWorker ? { Task { await model.stop() } } : nil,
+                handsFree: conversation != nil ? { startHandsFree() } : nil,
                 top: conversation != nil && !composerChips.isEmpty
                     ? AnyView(ComposerChipsRow(chips: composerChips, goal: model.shelf.goal?.objective, tap: tapChip, close: closeChip)) : nil
             ) {
@@ -1769,7 +1789,7 @@ extension ThreadView {
         } else {
             FoldedBackButton()
         }
-        threadActions
+        if conversation != nil { railActions } else { threadActions }
         // The ↓ joins the rail's round buttons, so it never narrows the composer. With the
         // keyboard up the rail has no room under ⋯; sending jumps to the end anyway.
         if jumpState.shown && !composerFocused {

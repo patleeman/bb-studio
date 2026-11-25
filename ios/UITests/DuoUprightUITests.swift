@@ -37,8 +37,8 @@ final class DuoUprightUITests: ServerIsolatedUITestCase {
         command("capture?" + name)
     }
 
-    /// The conversation's header: its model chip, in every layout.
-    private var title: XCUIElement { app.buttons["conversationModelChip"] }
+    /// The conversation's header: its title (round 5), in every layout.
+    private var title: XCUIElement { app.buttons["conversationMore"] }
 
     func testUprightIsOneColumnAndOnItsSideTwoPages() throws {
         try XCTSkipUnless(UIDevice.current.name.lowercased().contains("duo") || ProcessInfo.processInfo.environment["UPRIGHT_ANY"] != nil,

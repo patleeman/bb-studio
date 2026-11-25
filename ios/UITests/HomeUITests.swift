@@ -60,14 +60,25 @@ final class HomeUITests: ServerIsolatedUITestCase {
         XCTAssertEqual(app.shownConversation.label, picked, "it opens on the last conversation opened")
     }
 
-    func testTheTitleOpensTheListToo() throws {
+    /// Round 5: two header controls. Home (back and the avatar) opens the
+    /// list; the title opens the conversation's menu.
+    func testHomeOpensTheListAndTheTitleTheMenu() throws {
         launch()
         XCTAssertTrue(app.waitForRoom())
         // The folded Duo's title is plain text; its side column's Bot mark opens the list.
         try XCTSkipIf(app.isFoldedDuo, "the folded Duo has no title button")
-        let title = app.buttons["conversationTitleList"]
+        let title = app.buttons["conversationMore"]
         XCTAssertTrue(title.waitForExistence(timeout: 30))
+        XCTAssertFalse(app.buttons["conversationModelChip"].exists, "no model chip")
+        XCTAssertFalse(app.buttons["conversationHandsFree"].exists, "no waveform in the header")
         title.tap()
+        XCTAssertTrue(app.buttons["menuHandsFree"].waitForExistence(timeout: 5), "the title opens the menu, hands-free first")
+        XCTAssertTrue(app.buttons["menuModel"].exists, "Model is in it")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)).tap()
+        let home = app.buttons["roomList"]
+        XCTAssertTrue(home.waitForExistence(timeout: 5))
+        XCTAssertTrue(home.label.hasPrefix("Home"), home.label)
+        home.tap()
         XCTAssertTrue(any("RoomSheet-conversations").waitForExistence(timeout: 10))
     }
 
