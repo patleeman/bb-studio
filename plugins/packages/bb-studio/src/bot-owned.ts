@@ -1,4 +1,3 @@
-import { mapPool } from "./kit/pool";
 // Bot-owned threads: every thread a Bot uses lives under that Bot in Studio
 // (Bots panel, Activity), not in BB's main thread list. That is the Bot's
 // own chain (its chat and the threads it handed off from) and the work it
@@ -41,6 +40,7 @@ import { mapPool } from "./kit/pool";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import { mapPool } from "./kit/pool";
 
 type Sdk = BbPluginApi["sdk"];
 type Listed = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];

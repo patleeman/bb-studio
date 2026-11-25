@@ -1617,3 +1617,64 @@ it("logs and tolerates corrupted warnings JSON in bot_skill_versions without cra
     warn.mockRestore();
   }
 });
+
+it("stop() does not mark stopped or pause later automations when an earlier pause fails", async () => {
+  const x = await setup();
+  const created = await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const threadId = created.bot!.threadId!;
+  for (let i = 1; i <= 8; i++) {
+    x.automations.push({ id: `auto_${i}`, name: `Auto ${i}`, enabled: true, trigger: { cron: "0 9 * * *" }, execution: { targetThreadId: threadId }, nextRunAt: 99 });
+  }
+  const pausedIds: string[] = [];
+  const real = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => {
+    if (args.method === "automations_pause") {
+      const id = String(args.input.automationId);
+      pausedIds.push(id);
+      if (id === "auto_1") throw new Error("pause-boom-1");
+      await new Promise((resolve) => setTimeout(resolve, 15));
+    }
+    return real(args);
+  });
+
+  await expect(x.bots.stop()).rejects.toThrow("pause-boom-1");
+  expect((await x.bots.get()).bot?.state).not.toBe("stopped");
+  // Concurrency is 6: auto_7 and auto_8 must not have been started after auto_1 failed.
+  expect(pausedIds).not.toContain("auto_7");
+  expect(pausedIds).not.toContain("auto_8");
+});
+
+it("restorePaused() restores surviving items, keeps failed ones, and throws the lowest-rowid failure", async () => {
+  const x = await setup();
+  const created = await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const threadId = created.bot!.threadId!;
+  for (const id of ["auto_1", "auto_2", "auto_3"]) {
+    x.automations.push({ id, name: id, enabled: true, trigger: { cron: "0 9 * * *" }, execution: { targetThreadId: threadId }, nextRunAt: 99 });
+  }
+  await x.bots.stop();
+  expect((await x.bots.get()).bot?.state).toBe("stopped");
+
+  const real = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => {
+    if (args.method === "automations_resume") {
+      const id = String(args.input.automationId);
+      if (id === "auto_2") {
+        // Fails slower than auto_3, but has lower rowid so its error must win.
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        throw new Error("resume-fail-2");
+      }
+      if (id === "auto_3") {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        throw new Error("resume-fail-3");
+      }
+    }
+    return real(args);
+  });
+
+  await expect(x.bots.resume()).rejects.toThrow("resume-fail-2");
+  expect((await x.bots.get()).bot?.state).toBe("stopped");
+  // auto_1 succeeded and was forgotten; auto_2 and auto_3 stay recorded for retry.
+  expect(x.automations.find((a) => a.id === "auto_1")?.enabled).toBe(true);
+  const remaining = (x.db.prepare("SELECT item_id FROM bot_stop_paused WHERE bot_id = ? ORDER BY rowid").all(BOT_ID) as { item_id: string }[]).map((r) => r.item_id);
+  expect(remaining).toEqual(["auto_2", "auto_3"]);
+});
