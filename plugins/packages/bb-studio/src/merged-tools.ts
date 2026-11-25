@@ -76,9 +76,17 @@ export function callRuns(item: { tool?: string; name?: string; arguments?: unkno
   if (name === oldName) return true;
   const alias = ALIASES.get(oldName);
   if (!alias || name !== alias.merged) return false;
+  const args = item?.arguments && typeof item.arguments === "object" ? item.arguments as Record<string, unknown> : {};
   const merge = MERGES.find((each) => each.name === alias.merged);
-  const args = (item?.arguments ?? {}) as Record<string, unknown>;
-  return merge ? args[merge.field] === alias.op : false;
+  if (merge) return args[merge.field] === alias.op;
+  if (alias.merged === "pages_read") {
+    if (alias.op === "list") return args.page === undefined && args.comments === undefined;
+    if (alias.op === "comments") return args.page !== undefined && args.comments !== undefined;
+  }
+  if (alias.merged === "code_comments") {
+    if (alias.op === "reply") return args.op === "reply";
+  }
+  return false;
 }
 
 /** For tool scope: loaded and on-demand old names → merged names, and the ops each merged tool may run. */
@@ -186,17 +194,21 @@ export function mergedTools(deps: MergedToolDeps) {
       parameters: z.object({ [merge.field]: opField }).catchall(z.unknown()),
       execute: async (input: Record<string, unknown>, ctx: unknown) => {
         const { [merge.field]: op, ...rest } = input;
-        const usable: string[] = [];
-        for (const [each, old] of Object.entries(merge.ops)) if (await deps.allowed(ctx, old)) usable.push(each);
-        const old = merge.ops[String(op)];
-        if (!old || !usable.includes(String(op))) {
+        const opName = String(op);
+        const old = Object.prototype.hasOwnProperty.call(merge.ops, opName) ? merge.ops[opName] : undefined;
+        if (!old || !(await deps.allowed(ctx, old))) {
+          const usable: string[] = [];
+          for (const [each, member] of Object.entries(merge.ops)) {
+            if (each === opName) continue;
+            if (await deps.allowed(ctx, member)) usable.push(each);
+          }
           return usable.length ? `${merge.name}: ${merge.field} must be one of: ${opsNote(merge, deps.book, usable)}.` : `${merge.name} isn't available in this thread.`;
         }
-        const checked = mergedParameters(merge, deps.book, [String(op)]).safeParse(input);
-        if (!checked.success) return `${merge.name} ${String(op)} can't take that: ${checked.error.issues.map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`).join("; ")}`;
-        const back = Object.fromEntries(Object.entries(merge.rename?.[String(op)] ?? {}).map(([from, to]) => [to, from]));
+        const checked = mergedParameters(merge, deps.book, [opName]).safeParse(input);
+        if (!checked.success) return `${merge.name} ${opName} can't take that: ${checked.error.issues.map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`).join("; ")}`;
+        const back = Object.fromEntries(Object.entries(merge.rename?.[opName] ?? {}).map(([from, to]) => [to, from]));
         const args = Object.fromEntries(Object.entries(rest).map(([key, value]) => [back[key] ?? key, value]));
-        return await deps.book.run(old, args, ctx, `${merge.name} ${String(op)}`);
+        return await deps.book.run(old, args, ctx, `${merge.name} ${opName}`);
       },
     };
   });
