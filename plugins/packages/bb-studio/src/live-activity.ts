@@ -32,6 +32,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { turnContext, type ThreadSeeds } from "./thread-seeds";
+import type { ProviderMoveInput } from "./provider-move/handoff";
 import { taskTitle } from "./tasks/store";
 import { latestLine, repoTag, threadRunning, type BotThreads, type ThreadFacts, type WorkerStatus } from "./bot-threads";
 
@@ -320,6 +321,8 @@ export interface LiveActivityDeps {
   log(message: string): void;
   now?(): number;
   seeds?: ThreadSeeds;
+  /** The catch-up for the first turn after a provider move (src/provider-move/handoff.ts). */
+  moves?: { forTurn(threadId: string, move: ProviderMoveInput): Promise<string | null>; settled(threadId: string): Promise<void> };
 }
 
 /** A thread's details for the lookup tool. */
@@ -350,16 +353,34 @@ export async function lookUp(sdk: Sdk, activity: LiveActivity, threads: BotThrea
 
 type Bb = Pick<BbPluginApi, "events" | "sdk" | "agents"> & { experimental_hooks?: object };
 
-interface TurnContextHooks { experimental_turnContext?: (provider: (context: { threadId: string }) => string | null | Promise<string | null>) => void }
+/** The hook's input. `providerMove`: set by BB while the first turn after a provider move hasn't started. */
+export interface TurnContextInput { threadId: string; providerMove?: ProviderMoveInput }
+interface TurnContextHooks { experimental_turnContext?: (provider: (context: TurnContextInput) => string | null | Promise<string | null>) => void }
 
 /** Registers the per-turn digest on a BB that has the hook. Answers whether it did. */
-export function registerTurnContext(bb: { experimental_hooks?: object }, provider: (threadId: string) => string | null): boolean {
+export function registerTurnContext(bb: { experimental_hooks?: object }, provider: (threadId: string, context: TurnContextInput) => string | null | Promise<string | null>): boolean {
   const hooks = bb.experimental_hooks as TurnContextHooks | undefined;
   if (typeof hooks?.experimental_turnContext !== "function") return false;
-  hooks.experimental_turnContext(({ threadId }) => {
-    try { return provider(threadId); } catch { return null; }
+  hooks.experimental_turnContext((context) => {
+    try {
+      const text = provider(context.threadId, context);
+      return text instanceof Promise ? text.catch(() => null) : text;
+    } catch { return null; }
   });
   return true;
+}
+
+/** The per-turn text: the handoff first on a moved thread's first turn, then the seed and digest. */
+export function turnText(threadId: string, context: TurnContextInput, base: () => string | null, moves: LiveActivityDeps["moves"]): string | null | Promise<string | null> {
+  if (!moves) return base();
+  if (!context.providerMove) {
+    // A turn without a move: any stored handoff was delivered (or is stale). Not awaited: the hook stays fast.
+    void moves.settled(threadId).catch(() => undefined);
+    return base();
+  }
+  const move = context.providerMove;
+  return moves.forTurn(threadId, move).catch(() => null)
+    .then((handoff) => [handoff, base()].filter((part): part is string => !!part).join("\n\n") || null);
 }
 
 /**
@@ -377,7 +398,7 @@ export function registerLiveActivity(bb: Bb, db: Database.Database, deps: LiveAc
   bb.events.on("interaction.pending", ({ thread }) => safe("pending", () => activity.pending(thread as ThreadFacts)));
   bb.events.on("thread.deleted", ({ thread }) => safe("deleted", () => { activity.deleted(thread.id); deps.seeds?.forget(thread.id); }));
 
-  const hooked = registerTurnContext(bb, (threadId) => turnContext(deps.seeds?.take(threadId) ?? null, digestFor(db, threadId, now())));
+  const hooked = registerTurnContext(bb, (threadId, context) => turnText(threadId, context, () => turnContext(deps.seeds?.take(threadId) ?? null, digestFor(db, threadId, now())), deps.moves));
   if (hooked) deps.seeds?.enable();
 
   bb.agents.registerTool({
