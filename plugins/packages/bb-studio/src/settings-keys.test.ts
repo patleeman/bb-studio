@@ -22,7 +22,9 @@ function sources(dir: string): string[] {
 }
 
 function definedKeys(path: string): string[] {
-  const file = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
+  const text = readFileSync(path, "utf8");
+  if (!text.includes(".define(")) return [];
+  const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, false);
   const keys: string[] = [];
   const visit = (node: ts.Node) => {
     if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)

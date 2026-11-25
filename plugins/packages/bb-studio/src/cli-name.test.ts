@@ -60,7 +60,9 @@ function files(dir: string, keep: (path: string) => boolean, out: string[] = [])
 }
 
 function literals(path: string): { text: string; line: number }[] {
-  const source = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, false, ts.ScriptKind.TSX);
+  const raw = readFileSync(path, "utf8");
+  if (!COMMAND.test(raw)) return [];
+  const source = ts.createSourceFile(path, raw, ts.ScriptTarget.Latest, false, ts.ScriptKind.TSX);
   const out: { text: string; line: number }[] = [];
   const visit = (node: ts.Node) => {
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node) || ts.isJsxText(node)) {

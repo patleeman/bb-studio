@@ -73,8 +73,10 @@ function files(dir: string, keep: (path: string) => boolean, out: string[] = [])
 }
 
 /** The text of every string and template literal in a source file, with its line. */
-function literals(path: string): { text: string; line: number }[] {
-  const source = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, false, path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+function literals(path: string, needed: ReadonlySet<string>): { text: string; line: number }[] {
+  const raw = readFileSync(path, "utf8");
+  if (!mentions(raw).some((name) => needed.has(name))) return [];
+  const source = ts.createSourceFile(path, raw, ts.ScriptTarget.Latest, false, path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const out: { text: string; line: number }[] = [];
   const visit = (node: ts.Node) => {
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
@@ -124,7 +126,7 @@ describe("tool names agents read", () => {
     const voice = new Set<string>([...VOICE_TOOLS]);
     const bad = sources.flatMap((path) => {
       const inVoice = relative(root, path).startsWith("src/voice/");
-      return literals(path)
+      return literals(path, retired)
         // A literal that is only the name is code naming a handler, an RPC or a voice tool, not text an agent reads.
         .filter(({ text }) => !retired.has(text.trim()))
         .flatMap(({ text, line }) => mentions(text)
@@ -158,7 +160,7 @@ describe("tool names agents read", () => {
       .filter((path) => !ALIAS_DEFINITIONS.has(relative(root, path)));
     const code = sources.flatMap((path) => {
       const inVoice = relative(root, path).startsWith("src/voice/");
-      return literals(path)
+      return literals(path, aliased)
         .filter(({ text }) => !aliased.has(text.trim()) && !SQL.test(text))
         .flatMap(({ text, line }) => mentions(text).filter((name) => aliased.has(name) && !(inVoice && voice.has(name))).map((name) => `${relative(root, path)}:${line} ${name}`));
     });
