@@ -75,7 +75,7 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
   const moveEvents = async (threadId: string): Promise<MoveEventStatus> => {
     // The move is a system/operation event with data.operation "thread/provider-move" (W1). Newest first,
     // 100 a page (BB's cap): turns after it say the first turn on the new provider started, and completed.
-    type Row = { seq: number | string; type: string; createdAt?: number; data?: { operation?: string; metadata?: { to?: { providerId?: string; model?: string | null }; at?: number | string } } };
+    type Row = { seq: number | string; type: string; createdAt?: number; data?: { operation?: string; status?: string; metadata?: { to?: { providerId?: string; model?: string | null }; at?: number | string } } };
     let turnStarted = false;
     let turnCompleted = false;
     let before: string | undefined;
@@ -83,7 +83,8 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
       const rows = await sdk.threads.events.list({ threadId, order: "desc", limit: "100", types: ["system/operation", "turn/started", "turn/completed"], ...(before ? { beforeSeq: before } : {}) } as never) as Row[];
       for (const row of rows) {
         if (row.type === "turn/started") { turnStarted = true; continue; }
-        if (row.type === "turn/completed") { turnCompleted = true; continue; }
+        // Only a turn that completed well counts, as core's status says: a failed first turn leaves the move pending.
+        if (row.type === "turn/completed") { if (row.data?.status === "completed") turnCompleted = true; continue; }
         if (row.type === "system/operation" && row.data?.operation === "thread/provider-move") {
           const meta = row.data.metadata;
           const at = typeof meta?.at === "string" ? Date.parse(meta.at) || row.createdAt || 0 : meta?.at ?? row.createdAt ?? 0;

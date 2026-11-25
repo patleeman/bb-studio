@@ -91,7 +91,9 @@ describe("createMoveProvider wiring", () => {
     expect((await pending.verify(["thr_a"], { all: false }))[0]).toMatchObject({ moveEvent: true, turnStarted: false, verdict: "pending", movedTo: { providerId: TO } });
     const started = createMoveProvider(deps(fakeBb({ events: [{ seq: 6, type: "turn/started" }, move] }).bb));
     expect((await started.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "pending", turnStarted: true, turnCompleted: false });
-    const done = createMoveProvider(deps(fakeBb({ events: [{ seq: 7, type: "turn/completed" }, { seq: 6, type: "turn/started" }, move] }).bb));
+    const failed = createMoveProvider(deps(fakeBb({ events: [{ seq: 7, type: "turn/completed", data: { status: "failed" } }, { seq: 6, type: "turn/started" }, move] }).bb));
+    expect((await failed.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "pending", turnCompleted: false });
+    const done = createMoveProvider(deps(fakeBb({ events: [{ seq: 9, type: "turn/completed", data: { status: "completed" } }, { seq: 8, type: "turn/started" }, { seq: 7, type: "turn/completed", data: { status: "failed" } }, { seq: 6, type: "turn/started" }, move] }).bb));
     expect((await done.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "ok", turnStarted: true, turnCompleted: true, handoffDelivered: null });
     const none = createMoveProvider(deps(fakeBb({ events: [{ seq: 6, type: "turn/started" }, other] }).bb));
     expect((await none.verify(["thr_a"], { all: false }))[0]).toMatchObject({ verdict: "no-move-event" });
