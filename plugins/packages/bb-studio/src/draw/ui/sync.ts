@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { reconcileElements, restoreElements } from "@excalidraw/excalidraw";
 import { useRealtime } from "@get-bb/plugin-sdk/app";
+import { visiblePoll } from "../../kit/app/visible-poll";
 import { elementsChanged, missingFiles, type SceneElement } from "../merge";
 import { parseScene } from "./scene";
 
@@ -129,7 +130,7 @@ export function useDrawingSync(
   // Polling fallback (cheap updatedAt check; full scene only on change).
   useEffect(() => {
     let cancelled = false;
-    const timer = setInterval(async () => {
+    const check = async () => {
       if (cancelled || busyRef.current) return;
       try {
         const res = await rpc.call("drawings.getDrawingUpdatedAt", { id: drawingId });
@@ -138,10 +139,11 @@ export function useDrawingSync(
       } catch {
         // ignore — next tick retries
       }
-    }, 5000);
+    };
+    const stop = visiblePoll(() => { void check(); }, 5000);
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      stop();
     };
   }, [drawingId, rpc, applyRemote]);
 

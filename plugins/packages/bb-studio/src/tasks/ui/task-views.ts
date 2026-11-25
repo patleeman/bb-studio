@@ -6,6 +6,7 @@
 import { useRealtime, useRealtimeConnectionState } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { STUDIO_REALTIME_CHANNEL } from "../../kit/contract";
+import { visiblePoll } from "../../kit/app/visible-poll";
 import { errorMessage } from "../../kit/format";
 import { useCall } from "../../ui/live";
 import { TASKS_GET_MANY_MAX } from "../limits";
@@ -36,7 +37,7 @@ export class TaskViews {
   private readonly entries = new Map<string, Entry>();
   private readonly wanted = new Set<string>();
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private poll: ReturnType<typeof setInterval> | null = null;
+  private stopPoll: (() => void) | null = null;
   private inflight = false;
   /** Every card hears each signal; the first one queues the read for all. */
   private signalled = false;
@@ -52,7 +53,7 @@ export class TaskViews {
       this.want([id], MOUNT_COALESCE_MS);
     }
     entry.listeners.add(listener);
-    this.poll ??= setInterval(() => this.signal(), TASK_VIEWS_POLL_MS);
+    this.stopPoll ??= visiblePoll(() => this.signal(), TASK_VIEWS_POLL_MS);
     return () => {
       const current = this.entries.get(id);
       if (!current) return;
@@ -61,9 +62,9 @@ export class TaskViews {
       this.entries.delete(id);
       this.wanted.delete(id);
       if (this.entries.size) return;
-      if (this.poll) clearInterval(this.poll);
+      this.stopPoll?.();
       if (this.timer) clearTimeout(this.timer);
-      this.poll = null;
+      this.stopPoll = null;
       this.timer = null;
     };
   }

@@ -1,5 +1,6 @@
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
+import { visiblePoll } from "../../kit/app/visible-poll";
 
 export interface ProviderCard {
   providerId: string;
@@ -76,8 +77,8 @@ export function useProviderCards(enabled = true, withReadyAgents = false): Provi
       }
     };
     void load();
-    const timer = setInterval(() => void load(), PROVIDER_POLL_MS);
-    return () => { live = false; clearInterval(timer); };
+    const stop = visiblePoll(() => void load(), PROVIDER_POLL_MS);
+    return () => { live = false; stop(); };
   }, [sdk, enabled, withReadyAgents]);
   return cards;
 }

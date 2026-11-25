@@ -2,7 +2,8 @@
 // agents asked for, each server's page (tools, test, sign-in, log), which
 // providers get the tools, and the import from Agent Plugins. Every change
 // needs BB Studio's app window (api.ts); elsewhere the page is read-only.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { visiblePoll } from "../../kit/app/visible-poll";
 import { errorMessage, plural, relativeTime } from "../../kit/format";
 import { Button, Input, Textarea } from "../../kit/ui/index";
 import { Card, Row, Segmented, SubHeading, Switch } from "../../settings/ui/controls";
@@ -234,11 +235,18 @@ function ServerPage({ id, writable, onChanged, onEdit, onClose }: { id: string; 
   const [signInUrl, setSignInUrl] = useState<string | null>(null);
   const [callback, setCallback] = useState("");
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const load = useCallback(() => { void call("toolGateway.server", { id }).then(setDetail, (cause) => setLoadError(errorMessage(cause))); }, [id]);
+  const mounted = useRef(true);
+  const load = useCallback(() => {
+    void call("toolGateway.server", { id }).then(
+      (next) => { if (mounted.current) setDetail(next); },
+      (cause) => { if (mounted.current) setLoadError(errorMessage(cause)); },
+    );
+  }, [id]);
   useEffect(() => {
+    mounted.current = true;
     load();
-    const timer = setInterval(load, POLL_MS);
-    return () => clearInterval(timer);
+    const stop = visiblePoll(load, POLL_MS);
+    return () => { mounted.current = false; stop(); };
   }, [load]);
   const { busy, error, run } = useBusy(() => { load(); onChanged(); });
   if (!detail) return <Card><ErrorLine error={loadError} />{loadError ? null : <p className="px-4 py-3 text-sm text-muted-foreground">Loading…</p>}</Card>;
@@ -427,13 +435,18 @@ export function ToolGatewaySection() {
   const [form, setForm] = useState<{ initial: FormState; mode: "add" | "edit"; requestId?: string } | null>(null);
   const [importing, setImporting] = useState(false);
   const [importKey, setImportKey] = useState(0);
+  const mounted = useRef(true);
   const refresh = useCallback(() => {
-    void call("toolGateway.snapshot", null).then((next) => { setSnapshot(next); setLoadError(null); }, (cause) => setLoadError(errorMessage(cause)));
+    void call("toolGateway.snapshot", null).then(
+      (next) => { if (mounted.current) { setSnapshot(next); setLoadError(null); } },
+      (cause) => { if (mounted.current) setLoadError(errorMessage(cause)); },
+    );
   }, []);
   useEffect(() => {
-    void canChange().then(setWritable);
+    mounted.current = true;
+    void canChange().then((next) => { if (mounted.current) setWritable(next); });
     refresh();
-    const timer = setInterval(refresh, POLL_MS);
+    const stop = visiblePoll(refresh, POLL_MS);
     const openImport = () => {
       if (!importRequested) return;
       importRequested = false;
@@ -445,7 +458,8 @@ export function ToolGatewaySection() {
     openImport();
     globalThis.addEventListener?.(IMPORT_EVENT, openImport);
     return () => {
-      clearInterval(timer);
+      mounted.current = false;
+      stop();
       globalThis.removeEventListener?.(IMPORT_EVENT, openImport);
     };
   }, [refresh]);
