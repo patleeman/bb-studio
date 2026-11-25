@@ -3,9 +3,10 @@ import XCTest
 /// A reply that needs the user, marked in the transcript, offline
 /// (`-qaConversationHome -qaSpacesDemo list -qaBotDemo chat -qaStrandsDemo
 /// -qaReplyAskDemo`: Main's newest reply is tagged needs-you with its asking
-/// sentence, and a strand waits on it first). The sentence is marked in place;
-/// the long-press says Done is on the Mac; Show in the strands box brings the
-/// reply into view and flashes it. `TEST_RUNNER_ASK_OUT` keeps PNGs.
+/// sentence, and a strand waits on it first). The reply is an ordinary message:
+/// no standing highlight (round 5). The long-press says Done is on the Mac;
+/// Show in the strands box brings the reply into view and flashes it briefly.
+/// `TEST_RUNNER_ASK_OUT` keeps PNGs.
 final class ReplyAskUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
@@ -23,15 +24,13 @@ final class ReplyAskUITests: ServerIsolatedUITestCase {
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
-    func testTheAskingSentenceIsMarkedAndShowFlashesIt() {
+    func testTheAskIsAnOrdinaryMessageAndShowFlashesIt() {
         launch()
-        XCTAssertTrue(mark.waitForExistence(timeout: 20), "the reply that needs you is marked")
-        XCTAssertTrue(mark.label.contains("Want me to draft the approval note?"), mark.label)
-        XCTAssertEqual(mark.value as? String, "marked")
-        shot("1-marked")
-
         let sentence = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Want me to draft")).firstMatch
-        XCTAssertTrue(sentence.exists)
+        XCTAssertTrue(sentence.waitForExistence(timeout: 20), "the reply that asks")
+        XCTAssertFalse(mark.exists, "no standing needs-you highlight")
+        shot("1-ordinary")
+
         sentence.press(forDuration: 1.2)
         let done = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Mark done in BB Studio on your Mac")).firstMatch
         XCTAssertTrue(done.waitForExistence(timeout: 5), "the long-press says where Done is")
@@ -53,7 +52,7 @@ final class ReplyAskUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(waitForValue("flash", timeout: 5), "it flashes")
         XCTAssertTrue(mark.isHittable || sentence.isHittable, "and is in view")
         shot("4-flash")
-        XCTAssertTrue(waitForValue("marked", timeout: 5), "then stays marked")
+        XCTAssertTrue(mark.waitForNonExistence(timeout: 8), "then the flash goes, with no mark left behind")
     }
 
     private func shot(_ name: String) {

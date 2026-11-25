@@ -89,6 +89,14 @@ struct ThreadView: View {
     @State private var workerAskError: String?
     @State private var answeringHere = false
     @StateObject private var approvals = ConversationApprovals()
+    /// The slot's approval pages: the one shown, and those put away (⌄).
+    @State private var approvalPage = 0
+    @State private var approvalPageId: String?
+    @State private var hiddenApprovals: Set<String> = []
+    /// A Bot conversation's queue and todos, from their composer chips.
+    @State private var showingQueue = false
+    @State private var showingTodos = false
+    @AppStorage(ServerScope.key("dismissedFallbacks")) private var dismissedFallbacks = ""
     /// Permissions chosen in Model & permissions, waiting for the next message.
     @AppStorage private var pendingPermission: String?
 
@@ -240,6 +248,27 @@ struct ThreadView: View {
                         .toolbar { Button("Done") { showingWeb = false } }
                 }
             }
+        }
+        .sheet(isPresented: $showingQueue) {
+            NavigationStack {
+                ScrollView {
+                    ThreadShelf(model: model, shelf: ThreadModel.Shelf(), queued: model.queued, showsBackground: false, expandsQueue: true)
+                        .padding()
+                }
+                .navigationTitle("Queued")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { Button("Done") { showingQueue = false } }
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showingTodos) {
+            NavigationStack {
+                ScrollView { TodoCard(items: model.shelf.todos, expandedAtStart: true).padding() }
+                    .navigationTitle("Todos")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { Button("Done") { showingTodos = false } }
+            }
+            .presentationDetents([.medium, .large])
         }
         .sheet(item: $reviewingPlan, onDismiss: { Task { await model.loadPlanReview() } }) { review in
             PlanReviewSheet(review: review) { await model.loadPlanReview() }
@@ -1132,106 +1161,234 @@ struct ThreadView: View {
 
     private var stackClear: CGFloat { duoLayout.twoPages ? duoLayout.statusColumn : 0 }
 
+    // MARK: A Bot conversation's slot, chips and notices
+
+    /// The approval card's pages: actionable approvals, then desktop-only Tool Gateway asks.
+    private var slotPages: [ComposerSlot.Page] {
+        ComposerSlot.pages(approvals.cards, gateway: ComposerSlot.gatewayAsks(strands.list(model.threadId)), hidden: hiddenApprovals)
+    }
+
+    /// The one thing above a Bot conversation's composer (`ComposerSlot`).
+    @ViewBuilder private func conversationSlot(_ conversation: BotConversationContext) -> some View {
+        let pages = slotPages
+        let notice = RouterNotices.shared.notices[model.threadId]?.text.map { !$0.isEmpty } ?? false
+        let pick = ComposerSlot.pick(.init(
+            approvals: pages.count, routerNotice: notice, planReview: model.planReview != nil && !editing,
+            onlyStrand: strands.only[model.threadId] != nil,
+            strands: roomChat?.strandsBeside != true && StrandsBoxModel.shown(strands.list(model.threadId))))
+        Group {
+            switch pick {
+            case .approval:
+                approvalSlot(pages, conversation)
+            case .routerNotice:
+                RouterNoticeBanner(threadId: model.threadId, openThread: openRouterThread)
+            case .planReview:
+                if let review = model.planReview {
+                    ShelfCard(icon: "doc.text.magnifyingglass", tint: look.needsYou) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Plan ready for review").fontWeight(.medium)
+                            if let title = review.title, !title.isEmpty {
+                                Text(title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        }
+                    } trailing: {
+                        Button("Review") { reviewingPlan = review }
+                            .font(.footnote.weight(.semibold))
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                }
+            case .onlyStrand:
+                if let only = strands.only[model.threadId] {
+                    StrandFilterBar(title: strands.title(only, in: model.threadId)) {
+                        withAnimation(.snappy) { strands.only[model.threadId] = nil }
+                    }
+                }
+            case .strands:
+                StrandsBox(threadId: model.threadId, typing: composerFocused, openThread: openStrandThread)
+            case .none:
+                EmptyView()
+            }
+        }
+        .onChange(of: approvals.cards.map(\.id), initial: true) { _, ids in
+            ApprovalSlots.shared.set(Set(ids), for: model.threadId)
+        }
+        .onChange(of: pages.map(\.id)) { _, _ in
+            approvalPage = ComposerSlot.page(approvalPage, previousId: approvalPageId, in: slotPages)
+        }
+        .onChange(of: ApprovalSlots.shared.requests[model.threadId]) { _, request in
+            guard request != nil, let id = ApprovalSlots.shared.take(model.threadId) else { return }
+            hiddenApprovals.remove(id)
+            if let index = slotPages.firstIndex(where: { $0.id == id }) {
+                approvalPage = index
+                approvalPageId = id
+            }
+        }
+        .onDisappear { ApprovalSlots.shared.clear(model.threadId) }
+    }
+
+    @ViewBuilder private func approvalSlot(_ pages: [ComposerSlot.Page], _ conversation: BotConversationContext) -> some View {
+        let index = min(max(0, approvalPage), pages.count - 1)
+        let next = {
+            approvalPage = (index + 1) % pages.count
+            approvalPageId = pages[approvalPage].id
+        }
+        switch pages[index] {
+        case .approval(let card):
+            ApprovalSlotCard(card: card, index: index, count: pages.count, next: next,
+                             hide: { withAnimation(.snappy) { _ = hiddenApprovals.insert(card.id) } },
+                             openWorker: { conversation.push(.thread(id: card.approval.worker.threadId)) },
+                             decide: { decideApproval(card.id, $0) })
+        case .gateway(let ask):
+            let id = pages[index].id
+            GatewaySlotCard(ask: ask, index: index, count: pages.count, next: next,
+                            hide: { withAnimation(.snappy) { _ = hiddenApprovals.insert(id) } })
+        }
+    }
+
+    /// A Bot conversation's lasting states, as chips in the composer's top row.
+    private var composerChips: [ComposerChip] {
+        guard let conversation else { return [] }
+        return ComposerChip.chips(
+            pause: conversation.botPause, planning: model.shelf.isPlanning, goal: model.shelf.goal?.objective,
+            todos: model.shelf.todos, background: model.shelf.background.count, queued: model.queued.count,
+            note: notes.note != nil && !editing, editing: editing, permission: editing ? nil : pendingPermission,
+            handingOff: handoffStatus?.working == true)
+    }
+
+    private func tapChip(_ kind: ComposerChip.Kind) {
+        switch kind {
+        case .paused:
+            guard let conversation else { return }
+            Task {
+                do {
+                    try await app.client.setBotSpaceState(.resume, botId: conversation.botId)
+                    conversation.refresh()
+                } catch {
+                    app.flash("It didn't resume: " + BBClient.describe(error, server: app.client.baseURL))
+                }
+            }
+        case .planMode: Task { await model.perform { try await $0.exitPlanMode($1) } }
+        case .goal: Task { await model.perform { try await $0.clearGoal($1) } }
+        case .todos: showingTodos = true
+        case .queued: showingQueue = true
+        case .notes: if let note = notes.note { notes.editing = note }
+        case .permission: choosingModel = true
+        case .editing, .background, .handingOff: break
+        }
+    }
+
+    private func closeChip(_ kind: ComposerChip.Kind) {
+        switch kind {
+        case .editing:
+            editing = false
+            draft = ""
+        case .permission: PermissionMode.setPending(nil, for: model.threadId)
+        default: break
+        }
+    }
+
+    /// Things that happened once, as lines at the end of a Bot conversation.
+    private var transcriptNotices: [TranscriptNotice] {
+        TranscriptNotice.lines(fallback: model.shelf.fallback, dismissedFallbacks: dismissedFallbacks,
+                               handoffDone: handoffStatus.flatMap { $0.working ? nil : $0.text },
+                               storageError: outbox.storageError, turnFailed: model.thread?.status == "error" && !editing)
+    }
+
+    private func act(_ action: TranscriptNotice.Action) {
+        switch action {
+        case .dismissFallback(let seq): dismissedFallbacks += ",\(seq)"
+        case .retryTurn: Task { await model.run { try await $0.retry(model.threadId) } }
+        case .retryStorage:
+            let error = outbox.storageError
+            outbox.retryStorage()
+            if outbox.storageError == nil, model.error == error { model.error = nil }
+        case .dismissHandoff: handoffStatus = nil
+        }
+    }
+
     private var threadComposer: some View {
         VStack(spacing: 8) {
-            if conversation != nil {
-                RouterNoticeBanner(threadId: model.threadId, openThread: openRouterThread)
-                    .padding(.trailing, stackClear)
-            }
-            if let conversation, let pause = conversation.botPause {
-                BotPausedBanner(botId: conversation.botId, botName: conversation.botName, stopped: pause == "stopped",
-                                refresh: { conversation.refresh() })
-                    .padding(.trailing, stackClear)
-            }
-            if stackLine, let only = strands.only[model.threadId] {
-                StrandFilterBar(title: strands.title(only, in: model.threadId)) {
-                    withAnimation(.snappy) { strands.only[model.threadId] = nil }
-                }
-                .padding(.trailing, stackClear)
-            }
-            if stackLine, roomChat?.strandsBeside != true {
-                StrandsBox(threadId: model.threadId, typing: composerFocused, openThread: openStrandThread)
-                    .padding(.trailing, stackClear)
-            }
             if let conversation {
-                WorkerApprovalCards(approvals: approvals, openWorker: { conversation.push(.thread(id: $0)) }, decide: decideApproval)
-            }
-            if !(composerFocused && stackLine) {
-                ThreadShelf(model: model, shelf: model.shelf, queued: model.queued, showsBackground: true)
+                conversationSlot(conversation)
                     .padding(.trailing, stackClear)
-            }
-            if let error = outbox.storageError {
-                ShelfCard(icon: "exclamationmark.triangle", tint: .red) {
-                    Text(error).lineLimit(3)
-                } trailing: {
-                    Button("Retry") {
-                        outbox.retryStorage()
-                        if outbox.storageError == nil, model.error == error { model.error = nil }
-                    }
-                    .font(.footnote.weight(.semibold))
-                    .padding(.trailing, 6)
+            } else {
+                if !(composerFocused && stackLine) {
+                    ThreadShelf(model: model, shelf: model.shelf, queued: model.queued, showsBackground: true)
+                        .padding(.trailing, stackClear)
                 }
-                .accessibilityIdentifier("outboxStorageError")
-            }
-            if let status = handoffStatus {
-                ShelfCard(icon: status.working ? "arrow.triangle.2.circlepath" : "checkmark.circle", tint: status.working ? .orange : .green) {
-                    HStack(spacing: 6) {
-                        if status.working { ProgressView().controlSize(.mini) }
-                        Text(status.text).lineLimit(1)
-                    }
-                } trailing: { EmptyView() }
-                .accessibilityIdentifier("handoffStatus")
-            }
-            if model.thread?.status == "error", !editing {
-                ShelfCard(icon: "exclamationmark.triangle", tint: .red) {
-                    Text("The last turn failed").lineLimit(1)
-                } trailing: {
-                    Button("Retry") { Task { await model.run { try await $0.retry(model.threadId) } } }
-                        .font(.footnote.weight(.semibold))
-                        .padding(.trailing, 6)
-                }
-            }
-            if let pendingPermission, !editing {
-                ShelfCard(icon: "lock.shield", tint: pendingPermission == "full" ? .orange : .accentColor) {
-                    Button { choosingModel = true } label: {
-                        Text("Next message: \(PermissionMode.label(pendingPermission))").lineLimit(1)
-                    }
-                    .buttonStyle(.plain)
-                } trailing: {
-                    Button("Undo") { PermissionMode.setPending(nil, for: model.threadId) }
-                        .font(.footnote.weight(.semibold))
-                        .padding(.trailing, 6)
-                }
-                .accessibilityIdentifier("pendingPermission")
-            }
-            if let review = model.planReview {
-                ShelfCard(icon: "doc.text.magnifyingglass", tint: .orange) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Plan ready for review").fontWeight(.medium)
-                        if let title = review.title, !title.isEmpty {
-                            Text(title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                if let error = outbox.storageError {
+                    ShelfCard(icon: "exclamationmark.triangle", tint: .red) {
+                        Text(error).lineLimit(3)
+                    } trailing: {
+                        Button("Retry") {
+                            outbox.retryStorage()
+                            if outbox.storageError == nil, model.error == error { model.error = nil }
                         }
-                    }
-                } trailing: {
-                    Button("Review") { reviewingPlan = review }
                         .font(.footnote.weight(.semibold))
                         .padding(.trailing, 6)
-                }
-            }
-            if editing {
-                ShelfCard(icon: "pencil", tint: .accentColor) {
-                    Text("Editing your last message").lineLimit(1)
-                } trailing: {
-                    Button("Cancel") {
-                        editing = false
-                        draft = ""
                     }
-                    .font(.footnote.weight(.semibold))
-                    .padding(.trailing, 6)
+                    .accessibilityIdentifier("outboxStorageError")
                 }
-            }
-            if let note = notes.note, !editing {
-                NotesInProgressChip(note: note) { notes.editing = note }
+                if let status = handoffStatus {
+                    ShelfCard(icon: status.working ? "arrow.triangle.2.circlepath" : "checkmark.circle", tint: status.working ? .orange : .green) {
+                        HStack(spacing: 6) {
+                            if status.working { ProgressView().controlSize(.mini) }
+                            Text(status.text).lineLimit(1)
+                        }
+                    } trailing: { EmptyView() }
+                    .accessibilityIdentifier("handoffStatus")
+                }
+                if model.thread?.status == "error", !editing {
+                    ShelfCard(icon: "exclamationmark.triangle", tint: .red) {
+                        Text("The last turn failed").lineLimit(1)
+                    } trailing: {
+                        Button("Retry") { Task { await model.run { try await $0.retry(model.threadId) } } }
+                            .font(.footnote.weight(.semibold))
+                            .padding(.trailing, 6)
+                    }
+                }
+                if let pendingPermission, !editing {
+                    ShelfCard(icon: "lock.shield", tint: pendingPermission == "full" ? .orange : .accentColor) {
+                        Button { choosingModel = true } label: {
+                            Text("Next message: \(PermissionMode.label(pendingPermission))").lineLimit(1)
+                        }
+                        .buttonStyle(.plain)
+                    } trailing: {
+                        Button("Undo") { PermissionMode.setPending(nil, for: model.threadId) }
+                            .font(.footnote.weight(.semibold))
+                            .padding(.trailing, 6)
+                    }
+                    .accessibilityIdentifier("pendingPermission")
+                }
+                if let review = model.planReview {
+                    ShelfCard(icon: "doc.text.magnifyingglass", tint: .orange) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Plan ready for review").fontWeight(.medium)
+                            if let title = review.title, !title.isEmpty {
+                                Text(title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        }
+                    } trailing: {
+                        Button("Review") { reviewingPlan = review }
+                            .font(.footnote.weight(.semibold))
+                            .padding(.trailing, 6)
+                    }
+                }
+                if editing {
+                    ShelfCard(icon: "pencil", tint: .accentColor) {
+                        Text("Editing your last message").lineLimit(1)
+                    } trailing: {
+                        Button("Cancel") {
+                            editing = false
+                            draft = ""
+                        }
+                        .font(.footnote.weight(.semibold))
+                        .padding(.trailing, 6)
+                    }
+                }
+                if let note = notes.note, !editing {
+                    NotesInProgressChip(note: note) { notes.editing = note }
+                }
             }
             TalkIndicator(talk: talk)
             if composerFocused, let query = MentionSuggestions.query(in: draft) {
@@ -1249,7 +1406,9 @@ struct ThreadView: View {
                 toPage: canUseNotes && !editing && !compactInput ? ComposerPageAction(
                     label: ThreadNotes.expandLabel(hasNote: notes.note != nil, draftEmpty: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
                     busy: notes.expanding, disabled: dictation.blocksSend, run: expandToPage) : nil,
-                compact: true, prominentMic: compactInput, micTint: compactInput ? look.micTint : nil
+                compact: true, prominentMic: compactInput, micTint: compactInput ? look.micTint : nil,
+                top: conversation != nil && !composerChips.isEmpty
+                    ? AnyView(ComposerChipsRow(chips: composerChips, goal: model.shelf.goal?.objective, tap: tapChip, close: closeChip)) : nil
             ) {
                 if !compactInput {
                     Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
@@ -1767,6 +1926,7 @@ extension ThreadView {
         guard conversation != nil else { return shown }
         return ThreadTranscriptRow.strands(shown, tags: strands.tags[model.threadId], only: strands.only[model.threadId],
                                            flash: strands.flash[model.threadId])
+            + transcriptNotices.map(ThreadTranscriptRow.notice)
     }
 
     /// Jump to reply (the strands box): the reply that asks comes into view while its sentence flashes.
@@ -1793,6 +1953,7 @@ extension ThreadView {
             openSideThread: inConversation ? { showThread($0) } : nil,
             replier: conversation?.look,
             resolve: { await model.resolve($0, $1) }, cancel: { await model.cancel($0) }, openWeb: { showingWeb = true },
+            notice: { act($0) },
             threadTitle: { [conversation] id in
                 guard let conversation else { return nil }
                 if id == conversation.mainThreadId { return "Main" }
@@ -1900,6 +2061,8 @@ extension ThreadView {
     /// A question or approval waiting doesn't take the reader to the end;
     /// the pill says so instead (with push and the badge as before).
     fileprivate var transcriptV2PillNote: String? {
+        // A Bot conversation's questions are ordinary messages: no orange jump.
+        guard conversation == nil else { return nil }
         let waiting = shownInteractions
         guard let first = waiting.first else { return nil }
         if waiting.count > 1 { return "\(waiting.count) waiting" }

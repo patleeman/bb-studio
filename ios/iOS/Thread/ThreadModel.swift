@@ -379,6 +379,8 @@ final class ThreadModel: ObservableObject {
             thread = demo.thread
             rows = demo.rows
             interactions = demo.interactions
+            // `-qaShelfDemo`: every lasting state and the model fallback, for the chips and notice lines.
+            if ProcessInfo.processInfo.arguments.contains("-qaShelfDemo") { shelf = .demo }
             loaded = true
             return
         }

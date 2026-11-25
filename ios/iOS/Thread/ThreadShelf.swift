@@ -7,6 +7,8 @@ struct ThreadShelf: View {
     let shelf: ThreadModel.Shelf
     let queued: [QueuedMessage]
     var showsBackground = true
+    /// Opens with every queued message listed (the queue's own sheet).
+    var expandsQueue = false
     @EnvironmentObject private var app: AppModel
     @AppStorage(ServerScope.key("dismissedFallbacks")) private var dismissedFallbacks = ""
     @State private var editing: QueuedMessage?
@@ -86,6 +88,7 @@ struct ThreadShelf: View {
         }
         .animation(.snappy, value: shelf)
         .animation(.snappy, value: queued)
+        .onAppear { if expandsQueue { queueExpanded = true } }
         .sheet(item: $editing) { message in
             QueuedMessageEditor(client: app.client, message: message) {
                 Task { await model.loadInteractions() }
@@ -256,6 +259,8 @@ struct ShelfCard<Content: View, Trailing: View>: View {
 /// "3/7 complete" with the task in progress; expands to the whole list.
 struct TodoCard: View {
     let items: [Todos.Item]
+    /// Opens with the whole list (the todos' own sheet).
+    var expandedAtStart = false
     @State private var expanded = false
 
     var body: some View {
@@ -301,6 +306,7 @@ struct TodoCard: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .onAppear { if expandedAtStart { expanded = true } }
         .font(.footnote)
         .buttonStyle(.plain)
         .padding(.leading, 12)

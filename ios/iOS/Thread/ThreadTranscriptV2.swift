@@ -24,6 +24,8 @@ struct ThreadTranscriptActions {
     var resolve: (PendingInteraction, JSONValue) async -> Bool
     var cancel: (PendingInteraction) async -> Void
     var openWeb: () -> Void
+    /// A one-shot notice's action (a Bot conversation's lines at the end).
+    var notice: (TranscriptNotice.Action) -> Void = { _ in }
     var threadTitle: (String) -> String? = { _ in nil }
 }
 
@@ -40,6 +42,8 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
     case working(thinking: String?)
     /// Strands in the timeline: a divider where the strand changes, or "N other messages" under a filter.
     case strand(StrandTimeline.Mark, key: String)
+    /// Something that happened once, as a quiet line at the end (a Bot conversation).
+    case notice(TranscriptNotice)
 
     struct ItemState: Equatable {
         var unread = false
@@ -62,6 +66,7 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         case .interaction(let interaction): interaction.id
         case .working: "transcript:working"
         case .strand(_, let key): "strand:\(key)"
+        case .notice(let notice): "notice:\(notice.id)"
         }
     }
 
@@ -74,6 +79,7 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         case let (.interaction(x), .interaction(y)): x == y
         case let (.working(x), .working(y)): x == y
         case let (.strand(x, k), .strand(y, l)): x == y && k == l
+        case let (.notice(x), .notice(y)): x == y
         default: false
         }
     }
@@ -179,6 +185,8 @@ struct ThreadTranscriptRowView: View {
             StrandDividerRow(title: title, only: actions.onlyStrand.map { only in { only(strandId) } })
         case .strand(.gap(let count), _):
             StrandGapRow(count: count)
+        case .notice(let notice):
+            TranscriptNoticeRow(notice: notice, act: actions.notice)
         }
     }
 }
