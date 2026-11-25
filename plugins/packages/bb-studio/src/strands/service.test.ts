@@ -240,3 +240,56 @@ describe("bb studio strands", () => {
     expect((await runStrandsCli(["--bogus"], deps)).exitCode).toBe(1);
   });
 });
+
+describe("strands.overview and list concurrency", () => {
+  it("calls busy() once per list() and reads multiple conversations concurrently while preserving order", async () => {
+    const db = database();
+    const busyCalls: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const threads = ["thr_1", "thr_2", "thr_3"];
+    const svc = new StrandService({
+      db,
+      conversation: (id) => (threads.includes(id) ? { botId: "bot", lastActiveAt: NOW } : null),
+      conversationsOf: async () => [
+        { threadId: "thr_1", title: "One", isMain: false, lastActiveAt: NOW - 1_000 },
+        { threadId: "thr_2", title: "Two", isMain: false, lastActiveAt: NOW - 2_000 },
+        { threadId: "thr_3", title: "Three", isMain: false, lastActiveAt: NOW - 3_000 },
+      ],
+      events: async () => [],
+      jev: fakeJev(),
+      model: fakeModel(),
+      changed: () => {},
+      log: () => {},
+      now: () => NOW,
+      setTimer: () => null,
+      clearTimer: () => {},
+      workers: async () => [],
+      interactions: async () => [],
+      busy: async (threadId) => {
+        busyCalls.push(threadId);
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((r) => setTimeout(r, 20));
+        inFlight -= 1;
+        return false;
+      },
+    });
+    for (const id of threads) {
+      svc.store.saveRead(id, { backfill: JSON.stringify({ at: NOW }) });
+      svc.store.create({ threadId: id, title: `Strand ${id}`, origin: "user", seq: 1, at: NOW - 1_000 });
+    }
+
+    // Single list() must call busy() only once (not twice).
+    await svc.list("thr_1");
+    expect(busyCalls).toEqual(["thr_1"]);
+
+    // overview() must read the 3 conversations concurrently and preserve order.
+    busyCalls.length = 0;
+    maxInFlight = 0;
+    const ov = await svc.overview("bot");
+    expect(maxInFlight).toBeGreaterThanOrEqual(2);
+    expect(busyCalls.sort()).toEqual(["thr_1", "thr_2", "thr_3"]);
+    expect(ov.conversations.map((c) => c.threadId)).toEqual(["thr_1", "thr_2", "thr_3"]);
+  });
+});
