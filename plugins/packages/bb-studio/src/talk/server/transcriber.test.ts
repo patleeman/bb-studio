@@ -187,4 +187,53 @@ describe("Transcriber", () => {
     expect(store.transcript(REC)).toBe("");
     expect(store.transcript(rec2)).toBe("second ok");
   });
+
+  it("returns promptly on shutdown even if transcribe ignores abort, without counting an attempt", async () => {
+    const { store, files, put } = await setup();
+    await put(0, "hung");
+    let started!: () => void;
+    const began = new Promise<void>((resolve) => { started = resolve; });
+    const transcriber = new Transcriber({
+      store,
+      files,
+      timeoutMs: 5_000,
+      transcribe: () => {
+        started();
+        return new Promise<string>(() => {}); // ignores abort, hangs forever
+      },
+      onSegment: () => {},
+      warn: () => {},
+    });
+    const lifetime = new AbortController();
+    const running = transcriber.run(lifetime.signal);
+    await began;
+    const t0 = Date.now();
+    lifetime.abort();
+    await running;
+    expect(Date.now() - t0).toBeLessThan(500);
+    expect(store.segments(REC)[0]).toMatchObject({ status: "pending", attempts: 0, error: null });
+  });
+
+  it("ignores a late transcribe() resolution after timeout (writes nothing)", async () => {
+    const { store, files, put } = await setup();
+    await put(0, "late");
+    let resolveLate!: (text: string) => void;
+    const transcriber = new Transcriber({
+      store,
+      files,
+      timeoutMs: 30,
+      transcribe: () => new Promise<string>((resolve) => { resolveLate = resolve; }),
+      onSegment: () => {},
+      warn: () => {},
+    });
+    const lifetime = new AbortController();
+    const running = transcriber.run(lifetime.signal);
+    await until(() => store.segments(REC)[0]!.attempts === 1);
+    resolveLate("late text that must not land");
+    await new Promise((r) => setTimeout(r, 20));
+    lifetime.abort();
+    await running;
+    expect(store.transcript(REC)).toBe("");
+    expect(store.segments(REC)[0]).toMatchObject({ status: "pending", attempts: 1 });
+  });
 });
