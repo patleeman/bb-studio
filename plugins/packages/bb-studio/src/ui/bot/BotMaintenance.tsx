@@ -104,7 +104,12 @@ export function BotMaintenance({ botId, heading = true }: { botId: string; headi
             </div>
           ) : null}
         </div>
-      ) : <p className="pt-1 text-xs text-muted-foreground">{live.loading ? "Loading…" : live.error}</p>}
+      ) : live.loading ? <p className="pt-1 text-xs text-muted-foreground">Loading…</p> : (
+        <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground" role="alert">
+          <span className="min-w-0 flex-1">{live.error}</span>
+          <button type="button" onClick={() => void live.refresh()} className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-[11px] text-foreground hover:bg-state-hover">Retry</button>
+        </div>
+      )}
       {error ? <p role="alert" className="pt-1 text-xs text-destructive">{error}</p> : null}
     </section>
   );

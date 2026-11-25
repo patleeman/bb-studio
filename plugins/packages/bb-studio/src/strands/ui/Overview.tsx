@@ -93,7 +93,7 @@ export function overviewLine(data: { needs: number; running: number } | null | u
 }
 
 /** The conversations' strand cards, needs you first; `overview` is strands.overview's answer. */
-export function StrandsCards({ overview, now = Date.now(), query = "" }: { overview: { data?: { conversations: OverviewConversation[] } | null; error?: string | null }; now?: number; query?: string }) {
+export function StrandsCards({ overview, now = Date.now(), query = "" }: { overview: { data?: { conversations: OverviewConversation[] } | null; error?: string | null; refresh?: () => unknown }; now?: number; query?: string }) {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const all = overview.data?.conversations ?? [];
   const rows = words.length
@@ -102,7 +102,16 @@ export function StrandsCards({ overview, now = Date.now(), query = "" }: { overv
     : all;
   return (
     <section aria-label="Strands" data-testid="strands-overview" className="flex flex-col gap-2.5">
-      {!overview.data ? <p className="text-sm text-muted-foreground">{overview.error ?? "Loading…"}</p> : null}
+      {!overview.data ? (
+        overview.error ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground" role="alert">
+            <span className="min-w-0 flex-1">{overview.error}</span>
+            {overview.refresh ? (
+              <button type="button" onClick={() => void overview.refresh?.()} className="shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-foreground hover:bg-state-hover">Retry</button>
+            ) : null}
+          </div>
+        ) : <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : null}
       {overview.data && !rows.length ? <p data-testid="strands-empty" className="text-sm text-muted-foreground">{words.length ? "No strands match." : "No open strands"}</p> : null}
       {rows.map((row) => <Card key={row.threadId} row={row} now={now} />)}
     </section>

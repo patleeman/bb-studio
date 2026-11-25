@@ -86,6 +86,8 @@ const state = vi.hoisted(() => ({
   openTab: vi.fn(() => true),
   composerThread: "thr_main" as string | null,
   overview: null as unknown,
+  error: null as string | null,
+  refresh: vi.fn(),
   toast: vi.fn((_message: string, _options?: { action?: { label: string; onClick(): void } }) => undefined),
 }));
 const { submittedComposer, submitted } = vi.hoisted(() => {
@@ -99,7 +101,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_InfoSection: ({ label, children }: { label: string; children?: React.ReactNode }) => <section aria-label={label}>{children}</section>,
 }));
 vi.mock("../../ui/live", () => ({
-  useLive: (method: string) => ({ data: method === "strands.list" ? state.list : method === "strands.tags" ? state.tags : method === "strands.overview" ? state.overview : null, error: null, loading: false, refresh: vi.fn() }),
+  useLive: (method: string) => ({ data: method === "strands.list" ? state.list : method === "strands.tags" ? state.tags : method === "strands.overview" ? state.overview : null, error: state.error, loading: false, refresh: state.refresh }),
   useCall: () => state.call,
 }));
 vi.mock("../../kit/ui/index", async () => ({ ...(await import("../../loops/ui/test-kit")).kitUi, Tooltip: ({ children }: { children?: React.ReactNode }) => <>{children}</> }));
@@ -122,8 +124,8 @@ const { flashReply, resetAskMarksForTests, takeFlash } = await import("./ask-mar
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  Object.assign(state, { list: LIST, tags: TAGS, composerThread: "thr_main" });
-  state.call.mockClear(); state.toast.mockClear(); state.toAppPath.mockClear(); state.toThread.mockClear(); state.openTab.mockClear();
+  Object.assign(state, { list: LIST, tags: TAGS, composerThread: "thr_main", error: null });
+  state.call.mockClear(); state.toast.mockClear(); state.toAppPath.mockClear(); state.toThread.mockClear(); state.openTab.mockClear(); state.refresh.mockClear();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -697,5 +699,26 @@ describe("one box above the composer: what Studio hides of BB's stack, thread by
     state.list = { ...LIST, enabled: false, strands: [], earlier: [] };
     render(<ContextInfoSection threadId="thr_main" projectId="proj" environment={null} />);
     expect(container.innerHTML).toBe("");
+  });
+});
+
+describe("error states with Retry", () => {
+  it("renders a Retry button on StrandsTab and StrandsOverview errors that invokes refresh()", () => {
+    state.list = null as never;
+    state.overview = null;
+    state.error = "Studio is starting";
+
+    render(<StrandsTab threadId="thr_main" environment={null} params={null} />);
+    const tabRetry = [...container.querySelectorAll("button")].find((b) => b.textContent === "Retry");
+    expect(tabRetry).toBeTruthy();
+    expect(container.textContent).toContain("Studio is starting");
+    act(() => { tabRetry!.click(); });
+    expect(state.refresh).toHaveBeenCalledTimes(1);
+
+    render(<StrandsOverview botId="bot_1" />);
+    const overviewRetry = [...container.querySelectorAll("button")].find((b) => b.textContent === "Retry");
+    expect(overviewRetry).toBeTruthy();
+    act(() => { overviewRetry!.click(); });
+    expect(state.refresh).toHaveBeenCalledTimes(2);
   });
 });

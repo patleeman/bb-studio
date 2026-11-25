@@ -171,7 +171,14 @@ export function StrandsTab({ threadId, now: at }: ThreadTabProps & { now?: numbe
   const selection = useSelection(threadId);
   const [earlier, setEarlier] = useState(false);
   const now = at ?? Date.now();
-  if (!list.data) return <p className="p-4 text-sm text-muted-foreground">{list.error ?? "Loading…"}</p>;
+  if (!list.data) {
+    return list.error ? (
+      <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground" role="alert">
+        <span className="min-w-0 flex-1">{list.error}</span>
+        <button type="button" onClick={() => void list.refresh()} className="shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-foreground hover:bg-state-hover">Retry</button>
+      </div>
+    ) : <p className="p-4 text-sm text-muted-foreground">Loading…</p>;
+  }
   if (!list.data.enabled) return <p className="p-4 text-sm text-muted-foreground">No strands in this conversation</p>;
   const groups = groupsOf(list.data);
   const all = [...list.data.strands, ...list.data.earlier];

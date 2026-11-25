@@ -161,7 +161,12 @@ export function BotsList({ onNavigate, activeThreadId, threadId }: { onNavigate(
       {bots.length ? bots.map((bot) => bot.id === selected?.id
         ? <BotEntry key={bot.id} view={view.data!} onNavigate={onNavigate} active={activeThreadId} onThread={!!threadId} providers={providers} />
         : <BotRow key={bot.id} bot={bot} onNavigate={onNavigate} />)
-        : none ? null : <p className="px-2 text-xs text-muted-foreground">{list.loading || view.loading ? "Loading…" : list.error ?? view.error}</p>}
+        : none ? null : list.loading || view.loading ? <p className="px-2 text-xs text-muted-foreground">Loading…</p> : (
+          <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground" role="alert">
+            <span className="min-w-0 flex-1">{list.error ?? view.error}</span>
+            <button type="button" onClick={() => { void list.refresh(); void view.refresh(); }} className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-[11px] text-foreground hover:bg-state-hover">Retry</button>
+          </div>
+        )}
     </nav>
   );
 }
