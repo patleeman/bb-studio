@@ -235,6 +235,8 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb thread interactions`
 - `bb thread interactions list`
 - `bb thread interactions show`
+- `bb thread move-provider`
+- `bb thread move-provider status`
 - `bb thread interactions approve`
 - `bb thread interactions grant`
 - `bb thread interactions answer`

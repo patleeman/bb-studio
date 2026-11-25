@@ -1,3 +1,4 @@
+import { assertNotBeforeProviderMove } from "./provider-move-state.fork.js";
 import { getEnvironment, getThread } from "@bb/db";
 import type { EnvironmentRow } from "@bb/db";
 import type { PromptInput, Thread } from "@bb/domain";
@@ -64,6 +65,7 @@ export async function createThreadForkFromRequest(
   request: ForkThreadRequest,
 ) {
   const sourceThread = requireForkSourceThread(deps, request.sourceThreadId);
+  assertNotBeforeProviderMove(deps.db, sourceThread.id, request.sourceSeqEnd);
   requireForkCapableProvider(deps, sourceThread);
   const sourceEnvironment = requireSourceEnvironment(deps, sourceThread);
   const sourceExecution = getLastExecutionOptions(deps, sourceThread.id);

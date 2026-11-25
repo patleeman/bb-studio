@@ -1,3 +1,4 @@
+import { assertEditTargetAfterProviderMove } from "./provider-move-state.fork.js";
 import { createHash, randomUUID } from "node:crypto";
 import {
   deleteThreadEventSuffixInTransaction,
@@ -468,6 +469,7 @@ export async function editThreadMessage(
     initialThread,
     args.payload.expectedRequestSequence,
   );
+  assertEditTargetAfterProviderMove(deps.db, initialThread.id, initialTarget.requestSequence);
   let editableThread = await stopThreadBeforeMessageEdit(deps, {
     environment: args.environment,
     threadId: initialThread.id,
@@ -493,6 +495,7 @@ export async function editThreadMessage(
     editableThread,
     initialTarget.requestSequence,
   );
+  assertEditTargetAfterProviderMove(deps.db, editableThread.id, target.requestSequence);
   const readyEnvironment = requireReadyThreadEnvironment(args.environment);
   await ensureHostSessionReadyForWork(deps, {
     hostId: readyEnvironment.hostId,

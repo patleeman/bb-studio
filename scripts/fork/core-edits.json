@@ -167,9 +167,9 @@
       "budget": 2
     },
     "apps/server/src/server.ts": {
-      "seam": "import-sync, approvals, skills-registry-policy, thread-successor, text-completion, list-quiet",
-      "intent": "Registers the fork's import routes (/api/v1/fork/import/* and /api/v1/fork/bring-over/*, given the plugin service so a plugin from bb can be added) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain. One fork import and registerForkTextCompletion(deps) right after it, so plugins' experimental_completeText can run bb's title task (services/ai/plugin-text-completion.fork.ts). One fork import and the /ws route's onOpen calls markListQuiet(socket, context.req.url) before onClientSocketOpen, so a client that opened /ws?listEvents=status is quiet (ws/list-quiet.fork.ts).",
-      "budget": 16
+      "seam": "import-sync, approvals, skills-registry-policy, thread-successor, text-completion, list-quiet, provider-move",
+      "intent": "Registers the fork's import routes (/api/v1/fork/import/* and /api/v1/fork/bring-over/*, given the plugin service so a plugin from bb can be added) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain. One fork import and registerForkTextCompletion(deps) right after it, so plugins' experimental_completeText can run bb's title task (services/ai/plugin-text-completion.fork.ts). One fork import and the /ws route's onOpen calls markListQuiet(socket, context.req.url) before onClientSocketOpen, so a client that opened /ws?listEvents=status is quiet (ws/list-quiet.fork.ts). One fork import and registerForkProviderMoveRoutes(publicApi, deps, pluginService) right after registerForkApprovalRoutes (the plugin service resolves plugin RPC callers for the move's \"by\"): POST/GET /api/v1/threads/:id/move-provider and /api/v1/fork/provider-move/* (services/threads/thread-provider-move-routes.fork.ts), which also hands deps.db to the turn-context seam.",
+      "budget": 18
     },
     "apps/server/src/services/plugins/plugin-service.ts": {
       "seam": "quiet-turns, plugin-events, bundled-studio, secret-redaction",
@@ -257,9 +257,9 @@
       "budget": 19
     },
     "plugins/bb-guide/skills/bb-cli/references/command-index.md": {
-      "seam": "import-sync",
-      "intent": "Lists the `bb server mirror` commands; a test requires every core command path here.",
-      "budget": 7
+      "seam": "import-sync, provider-move",
+      "intent": "Lists the `bb server mirror` and `bb thread move-provider` (and its status) commands; a test requires every core command path here.",
+      "budget": 9
     },
     "plugins/bb-guide/skills/bb-plugin-authoring/SKILL.md": {
       "seam": "sdk-tables",
@@ -292,8 +292,8 @@
       "budget": 4
     },
     "apps/server/src/services/threads/thread-commands.ts": {
-      "seam": "turn-context, codex-computer-use",
-      "intent": "buildThreadStartCommand and prepareTurnSubmitCommandPayload (only for target.mode start, never a steer) pass their input through withTurnContext (turn-context.fork.ts), which appends each plugin's experimental_turnContext text as agent-only items to input and the last input group. Nothing is stored; no wire field changes. toRuntimeExecutionOptions spreads forkProviderOptionsContext(deps, providerId, threadId) (services/providers/provider-options-context.fork.ts, imported at the top) into the deriveProviderOptions context, so a provider sees the thread's metadata under its own plugin id.",
+      "seam": "turn-context, codex-computer-use, provider-move",
+      "intent": "buildThreadStartCommand and prepareTurnSubmitCommandPayload (as startsTurnForTurnContext says: target.mode start gets every plugin; auto gets only provider-move handlers, and only while a move is pending on a thread that is not active with no running turn; a steer gets none) pass their input through withTurnContext (turn-context.fork.ts), which appends each plugin's experimental_turnContext text as agent-only items to input and the last input group. Nothing is stored; no wire field changes. toRuntimeExecutionOptions spreads forkProviderOptionsContext(deps, providerId, threadId) (services/providers/provider-options-context.fork.ts, imported at the top) into the deriveProviderOptions context, so a provider sees the thread's metadata under its own plugin id.",
       "budget": 5
     },
     "apps/server/src/services/plugins/plugin-api.ts": {
@@ -702,9 +702,9 @@
       "budget": 4
     },
     "apps/server/src/services/threads/turn-retry.ts": {
-      "seam": "system-compaction",
-      "intent": "dispatchRetry passes retrySystemCompactionNotice(db, { threadId, failed }) (system-compaction.fork.ts, imported at the top of the file) as the retry's systemNotice: a retried compaction bb ran on its own keeps its reason when it re-sends the same /compact; every other retry still has none.",
-      "budget": 3
+      "seam": "system-compaction, provider-move",
+      "intent": "dispatchRetry passes retrySystemCompactionNotice(db, { threadId, failed }) (system-compaction.fork.ts, imported at the top of the file) as the retry's systemNotice: a retried compaction bb ran on its own keeps its reason when it re-sends the same /compact; every other retry still has none. retryTurnAfterRestart, for an idle thread, calls assertRequestAfterProviderMove (provider-move-state.fork.ts, imported at the top) before dispatching the resume, so a request made before the thread's newest provider move is never replayed with its old execution on the new provider.",
+      "budget": 5
     },
     "plugins/provider-codex/server.ts": {
       "seam": "codex-computer-use",
@@ -815,6 +815,26 @@
       "seam": "cli-name",
       "intent": "One line at the top re-exports studio-cli.fork.ts (names, guardStudioCliEnv, isStudioCliPath, toStudioCommandText, toStudioGuide) through @bb/config/cli-command, which bb-app, the server and the CLI already import.",
       "budget": 1
+    },
+    "apps/cli/src/commands/thread/index.ts": {
+      "seam": "provider-move",
+      "intent": "registerThreadCommands registers `thread move-provider` (and `move-provider status`) from commands/thread/move-provider.fork.ts, imported at the top.",
+      "budget": 2
+    },
+    "apps/server/src/services/threads/thread-events.ts": {
+      "seam": "provider-move",
+      "intent": "getLastExecutionOptions passes the newest stored turn request's execution through inheritedExecutionAfterProviderMove (provider-move-state.fork.ts, imported at the top), so until a turn is requested after a provider move every caller (the next turn's plan, forks, children's parent defaults) gets the move's model, lowered permission and reasoning, never the old provider's (which the target may reject or which could widen access).",
+      "budget": 3
+    },
+    "apps/server/src/services/threads/thread-edit-message.ts": {
+      "seam": "provider-move",
+      "intent": "editThreadMessage calls assertEditTargetAfterProviderMove (provider-move-state.fork.ts, imported at the top) on the request resolveEditableTurn chose, and again on the target it resolves after stopping the thread (a move may commit in between), so an edit of a request at or before the thread's newest provider move, or one whose rewind would return to a turn at or before it, is refused with 409 crosses_provider_move: it would rewind the old provider's session on the new one and cut the move record away.",
+      "budget": 3
+    },
+    "apps/server/src/services/threads/thread-fork.ts": {
+      "seam": "provider-move",
+      "intent": "createThreadForkFromRequest calls assertNotBeforeProviderMove (provider-move-state.fork.ts, imported at the top) with the request's sourceSeqEnd right after loading the source, so a fork whose point or anchor turn is at or before the source's newest provider move is refused with 409 crosses_provider_move: it would fork the old provider's session on the new provider.",
+      "budget": 2
     }
   }
 }
