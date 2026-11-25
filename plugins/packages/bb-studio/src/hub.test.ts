@@ -218,4 +218,37 @@ describe("StudioHub", () => {
     const hub = new StudioHub(fakeSdk({ plugins: [], rpc: {} }));
     await expect(hub.call("studio", "studio_list", null)).rejects.toThrow("Studio isn't a provider.");
   });
+
+  it("coalesces concurrent overview() and providers() fan-outs, then runs fresh after settlement", async () => {
+    let listCalls = 0;
+    let releaseList!: () => void;
+    const gate = new Promise<void>((resolve) => { releaseList = resolve; });
+    const sdk = fakeSdk({
+      plugins: [plugin("pages")],
+      rpc: {
+        "pages.studio_describe": () => ({ pluginId: "pages", version: 2, panel: "pages", kinds: [kind] }),
+        "pages.studio_list": async () => {
+          listCalls += 1;
+          await gate;
+          return { items: [item("pg_1")] };
+        },
+      },
+    });
+    const hub = new StudioHub(sdk);
+    const pending = Promise.all([hub.overview(), hub.overview(), hub.overview(), hub.overview()]);
+    releaseList();
+    const results = await pending;
+    expect(listCalls).toBe(1);
+    expect(results.every((r) => r.items.length === 1)).toBe(true);
+
+    // After settlement, a subsequent call runs a fresh fan-out.
+    await hub.overview();
+    expect(listCalls).toBe(2);
+
+    // Concurrent providers() calls also coalesce.
+    const describeBefore = sdk.calls.filter((c) => c === "pages.studio_describe").length;
+    const providerLists = await Promise.all([hub.providers(), hub.providers(), hub.providers()]);
+    expect(providerLists).toHaveLength(3);
+    expect(sdk.calls.filter((c) => c === "pages.studio_describe").length).toBe(describeBefore);
+  });
 });

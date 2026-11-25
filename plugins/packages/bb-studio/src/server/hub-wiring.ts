@@ -197,8 +197,9 @@ export async function setupHubWiring({
   /**
    * Every item with its tag ids. Tags and tabs of items a provider no longer
    * lists are dropped; a provider that is down, or listed only some, keeps them.
+   * Concurrent callers share one in-flight overview pass.
    */
-  const overview = async () => {
+  const runOverview = async () => {
     const result = await hub.overview();
     let closed = false;
     for (const provider of result.providers) {
@@ -215,6 +216,8 @@ export async function setupHubWiring({
       tags: tags.list(),
     };
   };
+  let overviewInFlight: ReturnType<typeof runOverview> | null = null;
+  const overview = () => overviewInFlight ??= runOverview().finally(() => { overviewInFlight = null; });
 
   /** Recent open threads, newest first, to pick a lead from. */
   const recentThreads = async (): Promise<ThreadOptionView[]> =>

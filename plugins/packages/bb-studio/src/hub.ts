@@ -49,6 +49,8 @@ export type HubItem = StudioItem & { pluginId: string };
 export class StudioHub {
   private readonly described = new Map<string, { revision: string; expiresAt: number; info: StudioProviderInfo }>();
   private inventory: Map<string, string> | null = null;
+  private providersInFlight: Promise<ProviderView[]> | null = null;
+  private overviewInFlight: Promise<{ providers: ProviderView[]; items: HubItem[]; truncated: Set<string>; discoveryComplete: boolean }> | null = null;
 
   private readonly builtins: ReadonlyMap<string, BuiltinProvider>;
 
@@ -136,9 +138,11 @@ export class StudioHub {
     });
   }
 
-  /** Every installed, enabled provider, ready or not. */
+  /** Every installed, enabled provider, ready or not. Concurrent calls coalesce. */
   async providers(): Promise<ProviderView[]> {
-    return (await this.providerSnapshot()).providers;
+    return this.providersInFlight ??= this.providerSnapshot()
+      .then((snapshot) => snapshot.providers)
+      .finally(() => { this.providersInFlight = null; });
   }
 
   private async providerSnapshot(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; discoveryComplete: boolean; installed: Set<string> }> {
@@ -176,8 +180,16 @@ export class StudioHub {
   /**
    * Providers and every ready provider's items; a provider that fails to list
    * goes offline. `truncated` names the providers that listed only some.
+   * Concurrent unfiltered calls coalesce into one provider fan-out.
    */
   async overview(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; items: HubItem[]; truncated: Set<string>; discoveryComplete: boolean }> {
+    if (!only) {
+      return this.overviewInFlight ??= this.loadOverview().finally(() => { this.overviewInFlight = null; });
+    }
+    return this.loadOverview(only);
+  }
+
+  private async loadOverview(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; items: HubItem[]; truncated: Set<string>; discoveryComplete: boolean }> {
     const { providers, discoveryComplete } = await this.providerSnapshot(only);
     const lists = await fanOutProviders(
       providers,
