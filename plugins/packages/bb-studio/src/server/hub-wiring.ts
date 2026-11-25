@@ -119,6 +119,7 @@ export async function setupHubWiring({
   let lastReconcile = Date.now();
   // Thread events keep linked threads current; this pass only catches what was missed, so it is rare where BB reports interruptions itself.
   const hostEvents = { listening: false };
+  const pendingThreads = new Map<string, { id: string; createdAt: number; status: string }>();
   triggers.every("thread-reconcile", 60_000, () => (disposed || (hostEvents.listening && Date.now() - lastReconcile < 30 * 60_000) ? undefined : (lastReconcile = Date.now(), reconcileThreads().catch((error) => { if (!disposed) bb.log.warn(`Thread reconciliation failed: ${errorText(error)}`); }))));
   bb.onDispose(async () => {
     disposed = true;
@@ -145,7 +146,6 @@ export async function setupHubWiring({
     : bb.sdk.plugins.callRpc({ pluginId, method: "studio_describe", input: null, outputSchema: schemas.provider.studio_describe.output, signal }));
   const checkedThreads = new Set<string>();
   const checkingThreads = new Set<string>();
-  const pendingThreads = new Map<string, { id: string; createdAt: number; status: string }>();
   const linkComposerThread = async (thread: { id: string; createdAt: number; status: string }) => {
     if (disposed || checkedThreads.has(thread.id) || services.threadsForThread(thread.id).length) return;
     if (checkingThreads.has(thread.id)) { pendingThreads.set(thread.id, thread); return; }

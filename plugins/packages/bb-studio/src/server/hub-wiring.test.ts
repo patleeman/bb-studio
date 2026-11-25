@@ -7,7 +7,9 @@ import { StudioServices } from "../services";
 import { TriggerEngine } from "../triggers/engine";
 import { setupHubWiring } from "./hub-wiring";
 
-it("does not fan out composer thread linking or write to DB after plugin dispose", async () => {
+const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
+
+it("does not fan out composer thread linking or touch DB after plugin dispose", async () => {
   let resolveList!: (threads: ReturnType<typeof makeThreadResponse>[]) => void;
   const listPromise = new Promise<ReturnType<typeof makeThreadResponse>[]>((resolve) => { resolveList = resolve; });
   const eventsList = vi.fn(async () => []);
@@ -26,6 +28,7 @@ it("does not fan out composer thread linking or write to DB after plugin dispose
   const hub = new StudioHub(bb.sdk, []);
   const changes = new ChangeLog();
   const services = new StudioServices(db);
+  const threadsForThreadSpy = vi.spyOn(services, "threadsForThread");
   const triggers = new TriggerEngine(db);
 
   await setupHubWiring({
@@ -40,10 +43,11 @@ it("does not fan out composer thread linking or write to DB after plugin dispose
 
   // Dispose before startup threads.list resolves.
   await harness.lifecycle.dispose();
+  threadsForThreadSpy.mockClear();
   resolveList([makeThreadResponse({ id: "thr_1", projectId: "proj_1" })]);
-  await Promise.resolve();
-  await Promise.resolve();
+  await tick();
 
+  expect(threadsForThreadSpy).not.toHaveBeenCalled();
   expect(eventsList).not.toHaveBeenCalled();
 });
 
@@ -89,8 +93,7 @@ it("does not link or publish realtime events if disposed while composer events.l
       data: { input: [{ type: "text", text: "See /plugins/studio/studio/pages/pg_123" }] },
     },
   ]);
-  await Promise.resolve();
-  await Promise.resolve();
+  await tick();
 
   expect(linkSpy).not.toHaveBeenCalled();
   expect(publish).not.toHaveBeenCalled();
