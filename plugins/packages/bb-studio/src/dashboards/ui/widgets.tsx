@@ -13,6 +13,7 @@ import type { WidgetView, WidgetTypeView } from "../shared";
 import { CustomFrame, type WidgetTheme } from "./custom-frame";
 import { Markdown } from "./markdown";
 import { isMiniId } from "../../minis/shared";
+import "./dashboards.css";
 
 // A mini app tile is the app itself; its host loads when a dashboard first shows one.
 const MiniTile = lazy(() => import("../../minis/ui/mini-view").then((module) => ({ default: module.MiniTile })));
