@@ -93,7 +93,7 @@ final class DesignZoomUITests: ServerIsolatedUITestCase {
         while painted(live) < 0.001, Date() < until { Thread.sleep(forTimeInterval: 0.5) }
         XCTAssertGreaterThan(painted(live), 0.001, "the live page is painted with no touch")
         shot("3-large-playing")
-        app.buttons["designPlayToggle"].tap()
+        app.segmentedControls["designMode"].buttons["View"].tap()
         XCTAssertTrue(still.waitForExistence(timeout: 10), "and View goes back to the still")
     }
 

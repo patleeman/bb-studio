@@ -17,6 +17,49 @@ extension StudioDesign {
     public var screens: [DesignScreen] { (rounds ?? []).flatMap { $0.screens ?? [] } }
 }
 
+/// A comment on a design, open or resolved, with its pin's number: pins
+/// count in the order comments were made, as on the desktop canvas.
+public struct DesignComment: Identifiable, Hashable, Sendable {
+    public var id: String
+    public var screenId: String
+    public var step: String
+    public var selector: String
+    public var elementText: String
+    public var body: String
+    public var createdAt: Double
+    public var sent: Bool
+    public var resolved: Bool
+    public var number: Int
+}
+
+extension StudioDesign {
+    /// Every comment, open and resolved, numbered by when it was made.
+    public var allComments: [DesignComment] {
+        let open = (comments ?? []).map {
+            DesignComment(id: $0.id ?? "", screenId: $0.screenId ?? "", step: $0.step ?? "", selector: $0.selector ?? "",
+                          elementText: $0.elementText ?? "", body: $0.body ?? "", createdAt: $0.createdAt ?? 0,
+                          sent: $0.sent == true, resolved: false, number: 0)
+        }
+        let resolved = (resolvedComments ?? []).map {
+            DesignComment(id: $0.id ?? "", screenId: $0.screenId ?? "", step: $0.step ?? "", selector: $0.selector ?? "",
+                          elementText: $0.elementText ?? "", body: $0.body ?? "", createdAt: $0.createdAt ?? 0,
+                          sent: $0.sent == true, resolved: true, number: 0)
+        }
+        return (open + resolved).sorted { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }.enumerated().map { index, comment in
+            var numbered = comment
+            numbered.number = index + 1
+            return numbered
+        }
+    }
+
+    /// The round a screen is in, newest first like `rounds`.
+    public func round(of screenId: String) -> Studio.DesignsGetDesignOutputDesignRoundsItem? {
+        rounds?.first { $0.screens?.contains { $0.id == screenId } == true }
+    }
+
+    public func screen(_ id: String) -> DesignScreen? { screens.first { $0.id == id } }
+}
+
 /// Studio's `VIEWPORTS` presets (packages/bb-studio/src/design/shared.ts).
 let designViewports: [String: (width: Double, height: Double)] = [
     "desktop": (1280, 800), "tablet": (834, 1112), "mobile": (390, 844),
