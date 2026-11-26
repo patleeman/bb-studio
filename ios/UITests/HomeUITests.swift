@@ -72,9 +72,9 @@ final class HomeUITests: ServerIsolatedUITestCase {
         XCTAssertFalse(app.buttons["conversationModelChip"].exists, "no model chip")
         XCTAssertFalse(app.buttons["conversationHandsFree"].exists, "no waveform in the header")
         title.tap()
-        XCTAssertTrue(app.buttons["menuHandsFree"].waitForExistence(timeout: 5), "the title opens the menu, hands-free first")
-        XCTAssertTrue(app.buttons["menuModel"].exists, "Model is in it")
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)).tap()
+        XCTAssertTrue(any("workspaceStrip").waitForExistence(timeout: 5), "the title opens the Workspace")
+        XCTAssertTrue(app.buttons["workspaceModel"].exists, "Info has the model")
+        app.buttons["workspaceDone"].tap()
         let home = app.buttons["roomList"]
         XCTAssertTrue(home.waitForExistence(timeout: 5))
         XCTAssertTrue(home.label.hasPrefix("Home"), home.label)

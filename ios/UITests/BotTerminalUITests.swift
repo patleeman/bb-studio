@@ -11,7 +11,7 @@ final class BotTerminalUITests: ServerIsolatedUITestCase {
         let options = app.conversationMore
         XCTAssertTrue(options.waitForExistence(timeout: 20))
         XCTAssertTrue(app.descendants(matching: .any)["composerMic"].firstMatch.waitForExistence(timeout: 20), "the chat loaded")
-        options.tap()
+        app.openConversationMenu()
         let terminals = app.buttons["Terminals"]
         XCTAssertTrue(terminals.waitForExistence(timeout: 5), "Terminals is in the conversation's menu")
         sleep(1)

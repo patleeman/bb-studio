@@ -98,7 +98,7 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
 
     func testMainHasNoFinish() {
         launch("list")
-        app.conversationMore.tap()
+        app.openConversationMenu()
         XCTAssertTrue(app.buttons["menuModel"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["menuArchive"].exists)
         XCTAssertFalse(app.buttons["menuDelete"].exists)

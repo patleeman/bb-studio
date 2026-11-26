@@ -95,6 +95,11 @@ struct ThreadView: View {
     @State private var hiddenApprovals: Set<String> = []
     /// A Bot conversation's queue and todos, from their composer chips.
     @State private var showingQueue = false
+    /// A Bot conversation's Workspace sheet (iPhone, folded Duo), from the title.
+    @State private var showingWorkspace = false
+    @State private var workspaceDetent: PresentationDetent = .medium
+    /// More (the rest of the old ⋯), asked for by the unfolded Duo's Info.
+    @State private var showingMore = false
     @State private var showingTodos = false
     @AppStorage(ServerScope.key("dismissedFallbacks")) private var dismissedFallbacks = ""
     /// Permissions chosen in Model & permissions, waiting for the next message.
@@ -249,6 +254,44 @@ struct ThreadView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingWorkspace) {
+            NavigationStack {
+                workspace()
+                    .navigationTitle((model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Conversation") + " · Workspace")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { Button("Done") { showingWorkspace = false }.accessibilityIdentifier("workspaceDone") }
+            }
+            // Medium for Info and Strands, large for a document (round 5).
+            .presentationDetents([.medium, .large], selection: $workspaceDetent)
+            .onChange(of: WorkspaceStore.shared.selected[model.threadId]) { _, id in
+                let local = id == nil || id == WorkspaceStore.info || id == WorkspaceStore.strands
+                withAnimation(.snappy) { workspaceDetent = local ? .medium : .large }
+            }
+        }
+        .sheet(isPresented: $showingMore) {
+            NavigationStack {
+                List { menuItems }
+                    .navigationTitle("More")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { Button("Done") { showingMore = false } }
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .onChange(of: WorkspaceRequests.shared.pending[model.threadId]) { _, action in
+            guard action != nil, conversation != nil, let action = WorkspaceRequests.shared.take(model.threadId) else { return }
+            infoAction(action)
+        }
+        .onChange(of: approvals.cards, initial: true) { _, cards in
+            ApprovalSlots.shared.setWaiting(cards.filter { $0.approval.state.waiting }, for: model.threadId)
+        }
+        .onAppear { if conversation != nil { WorkspaceShown.shared.show(model.threadId) } }
+        .task(id: conversation != nil ? model.threadId : "") {
+            // The title's tab count, before the Workspace is opened.
+            guard conversation != nil else { return }
+            WorkspaceStore.shared.attach(app.realtime)
+            await WorkspaceStore.shared.load(model.threadId)
+        }
+        .onDisappear { if conversation != nil { WorkspaceShown.shared.hide(model.threadId) } }
         .sheet(isPresented: $showingQueue) {
             NavigationStack {
                 ScrollView {
@@ -467,8 +510,18 @@ struct ThreadView: View {
     @ViewBuilder private var railActions: some View {
         Button { startHandsFree() } label: { Label("Talk hands-free", systemImage: "waveform") }
             .accessibilityIdentifier("conversationHandsFree")
-        Menu { menuItems } label: { Label("More", systemImage: "ellipsis") }
-            .accessibilityLabel("More")
+        Button { openWorkspace() } label: { Label("Workspace", systemImage: "square.on.square") }
+            .overlay(alignment: .topTrailing) {
+                let count = WorkspaceStore.shared.count(model.threadId)
+                if count > 0 {
+                    Text("\(count)").font(.caption2.weight(.bold)).monospacedDigit()
+                        .padding(.horizontal, 5).frame(minWidth: 18, minHeight: 18)
+                        .background(.primary, in: .capsule).foregroundStyle(Color(uiColor: .systemBackground))
+                        .offset(x: 4, y: -4).allowsHitTesting(false)
+                }
+            }
+            .accessibilityLabel("Workspace")
+            .accessibilityValue("\(WorkspaceStore.shared.count(model.threadId)) tabs")
             .accessibilityIdentifier("conversationMore")
     }
 
@@ -478,47 +531,47 @@ struct ThreadView: View {
     /// The thread's menu: the header's ⋯ in a plain thread, the title's menu in a Bot conversation.
     @ViewBuilder private var menuItems: some View {
         if conversation != nil {
-            Button { startHandsFree() } label: { Label("Talk hands-free", systemImage: "waveform") }
+            Button { run { startHandsFree() } } label: { Label("Talk hands-free", systemImage: "waveform") }
                 .accessibilityIdentifier("menuHandsFree")
         }
-        Button { finding = true } label: { Label("Find in thread", systemImage: "magnifyingglass") }
+        Button { run { finding = true } } label: { Label("Find in thread", systemImage: "magnifyingglass") }
         if let conversation, conversation.mainThreadId != model.threadId {
-            Button { makeMain(conversation) } label: { Label("Make this the Main", systemImage: "star") }
+            Button { run { makeMain(conversation) } } label: { Label("Make this the Main", systemImage: "star") }
                 .accessibilityIdentifier("makeMain")
         }
-        Button {
+        Button { run {
             newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
             renaming = true
-        } label: { Label("Rename", systemImage: "pencil") }
-        Button { choosingModel = true } label: {
+        } } label: { Label("Rename", systemImage: "pencil") }
+        Button { run { choosingModel = true } } label: {
             Label(conversation != nil ? "Model" : "Model & permissions", systemImage: "cpu")
         }
         .accessibilityIdentifier("menuModel")
         if let terminals = TerminalScope.forThread(model.threadId, environmentId: model.thread?.environmentId) {
-            Button { showingFiles = true } label: { Label("Files & changes", systemImage: "folder") }
-            Button { push(.terminals(scope: terminals, title: "Terminals")) } label: {
+            Button { run { showingFiles = true } } label: { Label("Files & changes", systemImage: "folder") }
+            Button { run { push(.terminals(scope: terminals, title: "Terminals")) } } label: {
                 Label("Terminals", systemImage: "apple.terminal")
             }
         }
-        Button { showingHistory = true } label: { Label("Recent prompts", systemImage: "clock.arrow.circlepath") }
+        Button { run { showingHistory = true } } label: { Label("Recent prompts", systemImage: "clock.arrow.circlepath") }
         if canSaveFiles {
-            Button { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: nil) } label: {
+            Button { run { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: nil) } } label: {
                 Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
             }
         }
         if let sourcePage {
-            Button { push(.page(id: sourcePage.id)) } label: {
+            Button { run { push(.page(id: sourcePage.id)) } } label: {
                 Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")
             }
         }
         if ConversationFinish.canRemove(conversation?.conversation, running: model.thread?.isRunning == true) {
-            Button { finish() } label: {
+            Button { run { finish() } } label: {
                 Label(finishing ? "Archiving…" : "Archive", systemImage: "archivebox")
                 Text(ConversationFinish.archiveHint)
             }
             .disabled(finishing)
             .accessibilityIdentifier("menuArchive")
-            Button(role: .destructive) { confirmingDelete = true } label: {
+            Button(role: .destructive) { run { confirmingDelete = true } } label: {
                 Label("Delete conversation…", systemImage: "trash")
             }
             .disabled(finishing)
@@ -535,20 +588,20 @@ struct ThreadView: View {
 
     @ViewBuilder private var contextItems: some View {
         if conversation == nil {
-            Button {
+            Button { run {
                 Task { if let id = await model.fork() { open(.thread(id: id)) } }
-            } label: { Label("Fork thread", systemImage: "arrow.triangle.branch") }
+            } } label: { Label("Fork thread", systemImage: "arrow.triangle.branch") }
         }
-        Button { showingContext = true } label: {
+        Button { run { showingContext = true } } label: {
             Label("Context usage", systemImage: "chart.bar")
         }
-        Button { confirmingCompact = true } label: { Label("Compact context", systemImage: "rectangle.compress.vertical") }
-        Button { confirmingClearContext = true } label: { Label("Clear context", systemImage: "eraser") }
+        Button { run { confirmingCompact = true } } label: { Label("Compact context", systemImage: "rectangle.compress.vertical") }
+        Button { run { confirmingClearContext = true } } label: { Label("Clear context", systemImage: "eraser") }
     }
 
     @ViewBuilder private var shareItems: some View {
         let isMuted = muted.ids.contains(model.threadId)
-        Button {
+        Button { run {
             Task {
                 do {
                     try await muted.set(model.threadId, muted: !isMuted)
@@ -556,16 +609,24 @@ struct ThreadView: View {
                     model.error = BBClient.describe(error, server: client.baseURL)
                 }
             }
-        } label: {
+        } } label: {
             Label(isMuted ? "Unmute notifications" : "Mute notifications", systemImage: isMuted ? "bell" : "bell.slash")
         }
-        Button { showingWeb = true } label: { Label("Open in BB web", systemImage: "safari") }
+        Button { run { showingWeb = true } } label: { Label("Open in BB web", systemImage: "safari") }
         if let thread = model.thread {
             ShareLink(item: client.webURL(forThread: thread).absoluteURL) {
                 Label("Share link", systemImage: "square.and.arrow.up")
             }
         }
-        Button { UIPasteboard.general.string = model.threadId } label: { Label("Copy Thread ID", systemImage: "number") }
+        Button { run { UIPasteboard.general.string = model.threadId } } label: { Label("Copy Thread ID", systemImage: "number") }
+    }
+
+    /// An action from the Workspace sheet (Info, More): the sheet goes first, so
+    /// what the action presents (a sheet, an alert, a push) can show.
+    private func run(_ action: @escaping () -> Void) {
+        guard showingWorkspace else { return action() }
+        showingWorkspace = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { action() }
     }
 
     @ViewBuilder private var jumpButton: some View {
@@ -1095,7 +1156,8 @@ struct ThreadView: View {
     private var conversationTitle: some View {
         ConversationTitle(title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? conversation?.conversation?.title ?? "Conversation",
                           model: conversationModel?.chip ?? executionLabel, writing: model.thread?.isRunning == true,
-                          pages: roomChat?.pages) { menuItems }
+                          tabs: WorkspaceStore.shared.count(model.threadId),
+                          pages: roomChat?.pages, open: openWorkspace)
     }
 
     /// Replaces the `@word` being typed with the mention.
@@ -1178,6 +1240,79 @@ struct ThreadView: View {
     }
 
     private var stackClear: CGFloat { duoLayout.twoPages ? duoLayout.statusColumn : 0 }
+
+    // MARK: The Workspace (round 5, change 3)
+
+    /// The Workspace: Info and Strands, then the conversation's tabs.
+    @ViewBuilder private func workspace(trailingClear: CGFloat = 0) -> some View {
+        WorkspaceView(threadId: model.threadId, trailingClear: trailingClear,
+                      openThread: { id in run { conversation?.openConversation(id) } },
+                      webURL: model.thread.map { client.webURL(forThread: $0) }) {
+            workspaceInfo
+        } strands: {
+            ScrollView {
+                StrandsBox(threadId: model.threadId, panel: true, openThread: { id in run { openStrandThread(id) } })
+                    .padding(12)
+            }
+        }
+    }
+
+    /// Info, in the Workspace sheet: the actions run here, after the sheet goes.
+    private var workspaceInfo: some View {
+        WorkspaceInfoView(thread: model.thread, modelLabel: conversationModel?.chip ?? executionLabel,
+                              cards: approvals.cards.filter { $0.approval.state.waiting },
+                              muted: muted.ids.contains(model.threadId),
+                              canArchive: ConversationFinish.canRemove(conversation?.conversation, running: model.thread?.isRunning == true),
+                              archiving: finishing, shareURL: model.thread.map { client.webURL(forThread: $0).absoluteURL },
+                              act: infoAction) {
+                NavigationLink {
+                    List { menuItems }
+                        .navigationTitle("More")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar { Button("Done") { showingWorkspace = false }.accessibilityIdentifier("workspaceDone") }
+                } label: {
+                    LabeledContent("More", value: "Main, context, files, web, ID")
+                }
+                .accessibilityIdentifier("workspaceMore")
+            }
+    }
+
+    /// What Info asks for, from the sheet or (on the unfolded Duo) from the right screen.
+    private func infoAction(_ action: WorkspaceInfoAction) {
+        switch action {
+        case .approval(let id):
+            run {
+                hiddenApprovals.remove(id)
+                ApprovalSlots.shared.bringUp(id, in: model.threadId)
+            }
+        case .model: run { choosingModel = true }
+        case .notifications:
+            let isMuted = muted.ids.contains(model.threadId)
+            Task {
+                do { try await muted.set(model.threadId, muted: !isMuted) } catch {
+                    model.error = BBClient.describe(error, server: client.baseURL)
+                }
+            }
+        case .find: run { finding = true }
+        case .rename:
+            run {
+                newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
+                renaming = true
+            }
+        case .handsFree: run { startHandsFree() }
+        case .archive: run { finish() }
+        case .more: showingMore = true
+        }
+    }
+
+    /// The title: on the unfolded Duo it shows Info on the right screen; elsewhere it opens the Workspace sheet.
+    private func openWorkspace() {
+        WorkspaceStore.shared.selected[model.threadId] = WorkspaceStore.info
+        if let show = roomChat?.showWorkspace { show() } else {
+            workspaceDetent = .medium
+            showingWorkspace = true
+        }
+    }
 
     // MARK: A Bot conversation's slot, chips and notices
 

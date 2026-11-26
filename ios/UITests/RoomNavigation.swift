@@ -63,6 +63,31 @@ extension XCUIApplication {
     /// The conversation's menu: the header's title (round 5), or ⋯ in the folded Duo's side column.
     var conversationMore: XCUIElement { buttons["conversationMore"].firstMatch }
 
+    /// The conversation's menu items (round 5): the title opens the
+    /// Workspace, whose Info → More holds the old ⋯; a plain thread's ⋯ opens them directly.
+    func openConversationMenu(file: StaticString = #filePath, line: UInt = #line) {
+        let more = conversationMore
+        XCTAssertTrue(more.waitForExistence(timeout: 15), "the conversation's menu", file: file, line: line)
+        more.tap()
+        // A Bot conversation: Info opens; its More row sits at the foot (the List makes it once it scrolls near).
+        let info = descendants(matching: .any)["workspaceInfo"].firstMatch
+        guard info.waitForExistence(timeout: 5) else { return }
+        let workspaceMore = buttons["workspaceMore"]
+        // Grow the sheet to large and scroll Info to its foot, where More is.
+        info.swipeUp()
+        sleep(1)
+        for _ in 0..<2 where !(workspaceMore.exists && workspaceMore.isHittable) { info.swipeUp() }
+        XCTAssertTrue(workspaceMore.waitForExistence(timeout: 5), "More in Info", file: file, line: line)
+        // The swipe may still be growing the sheet: let it settle, and tap again if the push didn't take.
+        sleep(1)
+        workspaceMore.tap()
+        if !navigationBars["More"].waitForExistence(timeout: 3), workspaceMore.exists {
+            sleep(1)
+            workspaceMore.tap()
+        }
+        XCTAssertTrue(navigationBars["More"].waitForExistence(timeout: 5), "More opened", file: file, line: line)
+    }
+
     /// The conversation's name: the header's title (it opens the menu), or
     /// the folded Duo's title line.
     var conversationTitle: XCUIElement {

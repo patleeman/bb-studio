@@ -23,8 +23,15 @@ final class HeaderTapUITests: ServerIsolatedUITestCase {
     func testConversationHeader() throws {
         launch(bot: true)
         let more = app.conversationMore
-        check("conversation: ⋯", more, opened: { self.app.buttons["menuModel"].exists },
-              close: { self.closeMenu(self.app.buttons["menuModel"]) })
+        // Round 5: the title opens the Workspace (a sheet; the right screen on the unfolded Duo).
+        let strip = app.descendants(matching: .any)["workspaceStrip"].firstMatch
+        check("conversation: title", more, opened: { strip.exists },
+              close: {
+                  let done = self.app.buttons["workspaceDone"]
+                  if done.exists { done.tap() } else if self.app.buttons["roomList"].exists { self.app.buttons["roomList"].firstMatch.tap() }
+              },
+              // On the unfolded Duo the title moves the conversation left and shows the Workspace: the screen rearranges by design.
+              keepsTranscript: layout == "phone")
         finish()
     }
 

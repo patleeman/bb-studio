@@ -39,9 +39,7 @@ final class NoVoiceChatUITests: ServerIsolatedUITestCase {
         sleep(2)
         shot("thread")
         // A Bot conversation's menu is its title (round 5); a plain thread's is ⋯.
-        let more = app.conversationMore
-        XCTAssertTrue(more.waitForExistence(timeout: 10))
-        more.tap()
+        app.openConversationMenu()
         XCTAssertTrue(app.buttons["Find in thread"].waitForExistence(timeout: 5), "The thread menu opened")
         sleep(1)
         shot("thread-menu")

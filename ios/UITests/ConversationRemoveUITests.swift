@@ -49,9 +49,7 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
     private func shown(_ page: String, _ name: String) -> String { app.isFoldedDuo ? name : page }
 
     private func openMore() {
-        let more = app.buttons["More"].firstMatch
-        XCTAssertTrue(more.waitForExistence(timeout: 15), "the ⋯ menu")
-        more.tap()
+        app.openConversationMenu()
         XCTAssertTrue(app.buttons["menuModel"].waitForExistence(timeout: 5))
     }
 

@@ -132,21 +132,29 @@ struct ConversationReplyRow: View {
 }
 
 /// A Bot conversation's title, the header's one control besides Home
-/// (round 5): its name, and under it the model, or "Writing" while a reply
-/// runs. Tapping it opens the conversation's menu (Find, Rename, Model,
-/// Files, hands-free, Archive and the rest). The page dots are gone from
-/// view; VoiceOver still hears "Conversation 2 of 4".
-struct ConversationTitle<Menu: View>: View {
+/// (round 5): its name, and under it the model and how many Workspace tabs
+/// are open, or "Writing" while a reply runs. Tapping it opens the
+/// Workspace (Info first): a sheet on the iPhone, the right screen on the
+/// unfolded Duo. The page dots are gone from view; VoiceOver still hears
+/// "Conversation 2 of 4".
+struct ConversationTitle: View {
     let title: String
     let model: String?
     var writing = false
+    var tabs = 0
     var pages: RoomChatPages? = nil
-    @ViewBuilder let menu: () -> Menu
+    let open: () -> Void
 
-    private var subtitle: String { writing ? "Writing" : (model ?? "") }
+    /// Model and tab count; the count goes before the model would truncate (large text).
+    private var subtitle: String {
+        let lead = writing ? "Writing" : (model ?? "")
+        guard tabs > 0 else { return lead }
+        let count = "\(tabs) \(tabs == 1 ? "tab" : "tabs")"
+        return lead.isEmpty ? count : "\(lead) · \(count)"
+    }
 
     var body: some View {
-        SwiftUI.Menu { menu() } label: {
+        Button(action: open) {
             VStack(spacing: 1) {
                 HStack(spacing: 3) {
                     Text(title).lineLimit(1)
@@ -168,10 +176,10 @@ struct ConversationTitle<Menu: View>: View {
             .frame(minHeight: 44)
             .contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        // No style of its own: in the Duo's header, `DuoHeaderButtonStyle` routes the tap.
         .tint(.primary)
         .accessibilityLabel([title, subtitle].filter { !$0.isEmpty }.joined(separator: ", "))
-        .accessibilityHint("Opens the conversation's menu")
+        .accessibilityHint("Opens the conversation's Workspace")
         .accessibilityIdentifier("conversationMore")
         .overlay(alignment: .bottom) {
             if let pages, pages.count > 1 {

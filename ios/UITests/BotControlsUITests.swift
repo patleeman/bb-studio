@@ -52,9 +52,7 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(launchPrep.waitForExistence(timeout: 10))
         launchPrep.tap()
         // The conversation's menu is its title (round 5).
-        let more = app.conversationMore
-        XCTAssertTrue(more.waitForExistence(timeout: 10))
-        more.tap()
+        app.openConversationMenu()
         let make = app.buttons["makeMain"]
         XCTAssertTrue(make.waitForExistence(timeout: 5), "Make this the Main in the conversation's menu")
         shot("4-make-main")
