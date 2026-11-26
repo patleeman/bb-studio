@@ -98,8 +98,8 @@ enum WorkbenchTabKind: Equatable {
 /// A screen the phone already has (a drawing, an app, an artifact, a
 /// recording, the terminals), shown in the tab without its bar: its own
 /// stack keeps its toolbar from reaching the conversation's bar, and the bar
-/// is hidden. Its full set of actions is one step away: Open Full Screen in
-/// the shell's More pushes the screen as it is everywhere else.
+/// is hidden. Its screen actions reach the shell's More, with Open Full
+/// Screen, which pushes it as it is everywhere else.
 private struct WorkbenchItemTab: View {
     let route: Route
     @EnvironmentObject private var app: AppModel
@@ -108,10 +108,11 @@ private struct WorkbenchItemTab: View {
         NavigationStack {
             screen.toolbar(.hidden, for: .navigationBar)
         }
-        .screenActions([
-            ScreenAction(id: "fullScreen", title: "Open Full Screen", systemImage: "arrow.up.left.and.arrow.down.right",
-                               run: { app.push(route) }),
-        ])
+        // The screen's own actions come up from inside; Open Full Screen joins them.
+        .transformPreference(ScreenActionsKey.self) { actions in
+            actions.append(ScreenAction(id: "fullScreen", title: "Open Full Screen", systemImage: "arrow.up.left.and.arrow.down.right",
+                                        run: { app.push(route) }))
+        }
     }
 
     @ViewBuilder private var screen: some View {
