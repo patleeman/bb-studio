@@ -281,7 +281,7 @@ struct ArtifactView: View {
                 ScreenAction(id: "version-\(choice.id)",
                              title: "v\(choice.number) · \(Date(timeIntervalSince1970: choice.createdAt / 1000).formatted(.relative(presentation: .named)))",
                              systemImage: "clock", checked: choice.id == version?.id,
-                             run: { versionId = choice.id == artifact.version.id ? nil : choice.id })
+                             run: { versionId = choice.id == self.artifact?.version.id ? nil : choice.id })
             }))
         }
         if let thread = artifact.sourceThreadId {
@@ -293,7 +293,7 @@ struct ArtifactView: View {
             list.append(ScreenAction(id: "saveAsPage", title: "Save as Page", systemImage: "doc.badge.plus", run: { Task { await saveAsPage() } }))
         }
         list.append(ScreenAction(id: "rename", title: "Rename", systemImage: "pencil", run: {
-            newTitle = artifact.title
+            newTitle = self.artifact?.title ?? ""
             renaming = true
         }))
         list.append(ScreenAction(id: "move", title: "Move to Project", systemImage: "folder", children: projectChoices.map { choice in

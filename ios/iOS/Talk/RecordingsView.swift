@@ -92,7 +92,7 @@ struct RecordingDetailView: View {
         list.append(ScreenAction(id: "copy", title: "Copy Transcript", systemImage: "doc.on.doc", disabled: transcript.isEmpty,
                                  run: { UIPasteboard.general.string = transcript }))
         list.append(ScreenAction(id: "rename", title: "Rename", systemImage: "pencil", run: {
-            newTitle = recording.title
+            newTitle = self.recording?.title ?? ""
             renaming = true
         }))
         if recording.failedCount > 0 {

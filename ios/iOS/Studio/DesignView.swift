@@ -113,7 +113,7 @@ struct DesignView: View {
                                            run: { act { try await studio.setStarred(item, !starred, client: $0) } }))
         }
         list.append(ScreenAction(id: "rename", title: "Rename", systemImage: "pencil", run: {
-            newName = design.name ?? ""
+            newName = model.design?.name ?? ""
             renaming = true
         }))
         if let threadId = design.threadId, !inWorkbench {

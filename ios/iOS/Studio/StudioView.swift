@@ -612,8 +612,12 @@ struct StudioView: View {
             let everything = all.isSubset(of: selection) && !all.isEmpty
             return [
                 ScreenAction(id: "done", title: "Done", systemImage: "checkmark", run: { endSelecting() }),
+                // Read when tapped: the shown items can change while the title stays the same.
                 ScreenAction(id: "selectAll", title: everything ? "Deselect All" : "Select All",
-                             systemImage: everything ? "circle" : "checkmark.circle", run: { selection = everything ? [] : all }),
+                             systemImage: everything ? "circle" : "checkmark.circle", run: {
+                                 let shown = Set(visible.map(\.id))
+                                 selection = shown.isSubset(of: selection) && !shown.isEmpty ? [] : shown
+                             }),
             ]
         }
         var list: [ScreenAction] = []
@@ -1394,71 +1398,21 @@ struct StudioRow: View {
     var snippet: String?
     var highlight = ""
 
+    // In parts, each a struct: the row's view type stays shallow (the 1 MB stack).
     var body: some View {
         let kind = StudioKind.of(item.kind)
         HStack(alignment: .top, spacing: 12) {
-            Group {
-                if let path = item.thumbnailUrl {
-                    StudioThumbnail(item: item, path: path, kind: kind)
-                } else if let emoji = item.emoji {
-                    Text(emoji).font(.title3)
-                } else {
-                    Image(systemName: kind.symbol).font(.body.weight(.medium)).foregroundStyle(kind.tint)
-                }
-            }
-            .frame(width: item.thumbnailUrl == nil ? 36 : 52, height: item.thumbnailUrl == nil ? 36 : 52)
-            .background(kind.tint.opacity(0.12), in: .rect(cornerRadius: 9))
-            .clipShape(.rect(cornerRadius: 9))
+            StudioRowIcon(item: item, kind: kind)
             VStack(alignment: .leading, spacing: 3) {
-                (dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3))
-                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline))) {
-                    Text(item.displayTitle)
-                        .fontWeight(.medium)
-                        .foregroundStyle(item.title.isEmpty ? .secondary : .primary)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                    if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 4) }
-                    Text(Date(timeIntervalSince1970: item.updatedAt / 1000), format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                        .font(.caption)
-                        .foregroundStyle(Color.primary.opacity(0.75))
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                StudioRowTitle(item: item)
                 if let snippet {
                     Text(Self.highlighted(snippet, highlight)).font(.subheadline).foregroundStyle(Color.primary.opacity(0.75)).lineLimit(3)
                         .accessibilityIdentifier("studioSnippet")
                 } else if let preview = item.preview, !preview.isEmpty {
-                    Text(preview).font(.subheadline).foregroundStyle(Color.primary.opacity(0.75)).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    Text(preview).font(.subheadline).foregroundStyle(Color.primary.opacity(0.75))
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 }
-                (dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-                    : AnyLayout(HStackLayout(spacing: 4))) {
-                    // Empty facts, like a task with no due day, and ones the badge already says, are left out.
-                    let facts = item.facts.map(\.display).filter { !$0.isEmpty && $0 != item.badge?.label }
-                    Text(([kind.label] + [project].compactMap { $0 } + facts).joined(separator: " · "))
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let badge = item.badge {
-                        Text(badge.label)
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .foregroundStyle(tone(badge.tone))
-                            .background(tone(badge.tone).opacity(0.15), in: .capsule)
-                    }
-                    ForEach(tags) { tag in
-                        Text(tag.name)
-                            .font(.caption2.weight(.medium))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .foregroundStyle(Color(hex: tag.color))
-                            .background(Color(hex: tag.color).opacity(0.15), in: .capsule)
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(Color.primary.opacity(0.75))
+                StudioRowFacts(item: item, kind: kind, project: project, tags: tags)
             }
         }
         .padding(.vertical, 2)
@@ -1477,8 +1431,79 @@ struct StudioRow: View {
         }
         return result
     }
+}
 
-    private func tone(_ tone: String) -> Color {
+/// The row's picture: a thumbnail, the item's emoji, or its kind's symbol.
+private struct StudioRowIcon: View {
+    let item: StudioItem
+    let kind: StudioKind
+
+    var body: some View {
+        Group {
+            if let path = item.thumbnailUrl {
+                StudioThumbnail(item: item, path: path, kind: kind)
+            } else if let emoji = item.emoji {
+                Text(emoji).font(.title3)
+            } else {
+                Image(systemName: kind.symbol).font(.body.weight(.medium)).foregroundStyle(kind.tint)
+            }
+        }
+        .frame(width: item.thumbnailUrl == nil ? 36 : 52, height: item.thumbnailUrl == nil ? 36 : 52)
+        .background(kind.tint.opacity(0.12), in: .rect(cornerRadius: 9))
+        .clipShape(.rect(cornerRadius: 9))
+    }
+}
+
+/// The title and when it changed, side by side, or stacked at accessibility sizes.
+private struct StudioRowTitle: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let item: StudioItem
+
+    var body: some View {
+        let large = dynamicTypeSize.isAccessibilitySize
+        (large ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3)) : AnyLayout(HStackLayout(alignment: .firstTextBaseline))) {
+            Text(item.displayTitle)
+                .fontWeight(.medium)
+                .foregroundStyle(item.title.isEmpty ? .secondary : .primary)
+                .lineLimit(large ? nil : 2)
+            if !large { Spacer(minLength: 4) }
+            Text(Date(timeIntervalSince1970: item.updatedAt / 1000), format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                .font(.caption)
+                .foregroundStyle(Color.primary.opacity(0.75))
+                .lineLimit(large ? nil : 1)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// Kind, project and facts, then the badge and the tags.
+private struct StudioRowFacts: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let item: StudioItem
+    let kind: StudioKind
+    let project: String?
+    let tags: [StudioTag]
+
+    var body: some View {
+        let large = dynamicTypeSize.isAccessibilitySize
+        (large ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 4))) {
+            // Empty facts, like a task with no due day, and ones the badge already says, are left out.
+            let facts = item.facts.map(\.display).filter { !$0.isEmpty && $0 != item.badge?.label }
+            Text(([kind.label] + [project].compactMap { $0 } + facts).joined(separator: " · "))
+                .lineLimit(large ? nil : 1)
+                .fixedSize(horizontal: false, vertical: true)
+            if let badge = item.badge {
+                StudioChip(text: badge.label, color: Self.tone(badge.tone), weight: .semibold)
+            }
+            ForEach(tags) { tag in
+                StudioChip(text: tag.name, color: Color(hex: tag.color), weight: .medium)
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(Color.primary.opacity(0.75))
+    }
+
+    static func tone(_ tone: String) -> Color {
         switch tone {
         case "live": .red
         case "progress": .blue
@@ -1487,6 +1512,25 @@ struct StudioRow: View {
         case "success": .green
         default: .secondary
         }
+    }
+}
+
+/// A badge or a tag: a word in its colour on a pale capsule.
+private struct StudioChip: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let text: String
+    let color: Color
+    let weight: Font.Weight
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(weight))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .foregroundStyle(color)
+            .background(color.opacity(0.15), in: .capsule)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
