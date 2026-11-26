@@ -1,3 +1,4 @@
+import { studioCoreCardEntries } from "./threadContextCardCore.fork";
 import { parentRowIcon, parentRowLabel } from "@/components/promptbox/banner/parentRelationship.fork";
 import { useNavigate } from "react-router-dom";
 import {
@@ -83,21 +84,21 @@ function ChildThreadsSection({ threadId }: ExperimentalThreadContextCardProps) {
 }
 
 export const CORE_THREAD_CONTEXT_CARD_ROWS: readonly CoreThreadContextCardRow[] =
-  [
+  studioCoreCardEntries([
     {
       id: "parent",
       group: experimental_THREAD_INFO_ROW_GROUPS.thread,
       order: 10,
       component: ParentRow,
     },
-  ];
+  ]);
 
 export const CORE_THREAD_CONTEXT_CARD_SECTIONS: readonly CoreThreadContextCardSection[] =
-  [
+  studioCoreCardEntries([
     {
       id: "childThreads",
       group: experimental_THREAD_INFO_SECTION_GROUPS.related,
       order: 10,
       component: ChildThreadsSection,
     },
-  ];
+  ]);
