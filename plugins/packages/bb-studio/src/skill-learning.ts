@@ -43,6 +43,8 @@ export const STALE_AFTER_MS = 30 * 86_400_000;
 export const ARCHIVE_AFTER_MS = 90 * 86_400_000;
 export const REVIEW_TIMEOUT_MS = 20 * 60_000;
 export const SKILL_SOFT_LIMIT = 8000;
+/** Reviews a Bot starts in one local day, daily and archive passes together; Run now isn't counted against it. */
+export const DAILY_REVIEW_CAP = 6;
 /** When the daily sweep may run (local hour) and how far apart sweeps are at least. */
 const DAILY_HOUR = 3;
 const DAY_MS = 86_400_000;
@@ -191,7 +193,7 @@ export function reviewPrompt(input: { name: string; reason: ReviewReason; since?
     SAVE_RULES,
     "",
     "How to write:",
-    "- One skill per kind of task, not per incident. Check what you have first (bot_skill op list, op view) and prefer bot_skill op edit with change \"patch\" on the skill that covers it over a new skill. Your always-on skill is core-profile (view it before you patch it).",
+    "- One skill per kind of task, not per incident. Check what you have first (bot_skill op list, op view) and prefer bot_skill op edit with change \"patch\" on the skill that covers it over a new skill. Your always-on skills (Preferences, Right now, Check-in) are in your instructions; view one before you patch it.",
     "- Keep each skill short: when to use it, the steps, the pitfalls. The tool result may carry notes on shape and caps; heed them.",
     "",
     `Use only ${REVIEW_NAMES.join(", ")}. Don't run commands, edit files, message anyone or start threads. Skill changes apply immediately. After saving, inspect the saved versions with bot_skill op lint and attach any quality or safety warnings to the exact version you inspected; warnings never block saving.`,
@@ -218,7 +220,7 @@ type LearningRow = {
   last_review_at: number | null; last_review_result: string | null; curator_last_at: number | null; curator_last_result: string | null;
   daily_at: number | null;
 };
-type ReviewRow = { thread_id: string; bot_id: string; kind: "review" | "consolidate"; status: "running" | "done"; saved: number; memory: number; started_at: number; finished_at: number | null; result: string | null; source_thread_id: string | null };
+type ReviewRow = { thread_id: string; bot_id: string; kind: "review" | "consolidate"; status: "running" | "done"; saved: number; memory: number; started_at: number; finished_at: number | null; result: string | null; source_thread_id: string | null; source_seq: number | null };
 type QueueRow = { thread_id: string; bot_id: string; reason: ReviewReason; queued_at: number };
 
 export interface LearningBot { id: string; name: string; threadId: string | null; state: string; kind?: string }
@@ -252,6 +254,9 @@ export type LearningView = {
   lastCurator: { at: number; result: string } | null;
 };
 
+/** When the local day `at` falls on began. */
+const dayStart = (at: number) => { const date = new Date(at); date.setHours(0, 0, 0, 0); return date.getTime(); };
+
 /** The local day a time falls on, as "YYYY-M-D". */
 const localDay = (at: number) => { const date = new Date(at); return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`; };
 
@@ -269,6 +274,8 @@ export class SkillLearning {
   private readonly started = new Set<string>();
   /** Review forks already told once that their tools are connected. */
   private readonly retried = new Set<string>();
+  /** A minute tick still running: the next one waits for it rather than overlapping. */
+  private ticking = false;
 
   constructor(private readonly deps: LearningDeps) {}
 
@@ -390,25 +397,63 @@ export class SkillLearning {
     return queued;
   }
 
+  /**
+   * The first look at a Bot (right after the upgrade, or when learning is
+   * first on): every thread's current tip becomes its mark, and the day's
+   * sweep counts as done, so old history never queues a backlog of reviews.
+   */
+  async baseline(botId: string, now = Date.now()): Promise<void> {
+    const bot = this.studioBot(botId);
+    if (!bot) return;
+    const threads = [...new Set([...(bot.threadId ? [bot.threadId] : []), ...this.deps.conversations(botId)])];
+    for (const threadId of threads) {
+      const tip = await this.tip(threadId);
+      if (tip !== null) this.deps.db.prepare("INSERT OR IGNORE INTO bot_skill_review_marks (thread_id, bot_id, seq, at) VALUES (?, ?, ?, ?)").run(threadId, botId, tip, now);
+    }
+    this.save(botId, { daily_at: now });
+  }
+
+  /** Reviews the Bot started today: daily and archive passes, not Run now's or the curator's. */
+  startedToday(botId: string, now = Date.now()): number {
+    return (this.deps.db.prepare("SELECT COUNT(*) AS n FROM bot_skill_reviews WHERE bot_id = ? AND kind = 'review' AND started_at >= ? AND COALESCE(reason, '') != 'manual'").get(botId, dayStart(now)) as { n: number }).n;
+  }
+
   /** Run now: the sweep at once, and the first review starts. True when something was queued or is running. */
   async runNow(botId: string, now = Date.now()): Promise<boolean> {
+    if (this.studioBot(botId)?.state !== "active") return false;
     const queued = await this.sweep(botId, now, "manual");
-    await this.next(botId);
+    await this.next(botId, now);
     return queued > 0 || !!this.running(botId);
   }
 
-  /** Starts the Bot's next queued review, when none is running. */
-  async next(botId: string): Promise<boolean> {
+  /**
+   * Starts the Bot's next queued review, when none is running. An entry
+   * leaves the queue only once its review started, or when its thread is
+   * gone; a thread that's busy, or a start that can't happen yet, waits for
+   * a later tick. Daily and archive passes stop at DAILY_REVIEW_CAP a day.
+   */
+  async next(botId: string, now = Date.now()): Promise<boolean> {
     if (this.running(botId) || this.starting.has(botId)) return false;
     const bot = this.studioBot(botId);
     if (!bot || bot.state !== "active") return false;
     for (const entry of this.queued(botId)) {
+      if (entry.reason !== "manual" && this.startedToday(botId, now) >= DAILY_REVIEW_CAP) continue;
       const thread = await this.deps.sdk.threads.get({ threadId: entry.thread_id }).catch(() => null) as ThreadLike | null;
       // Gone: nothing to review. Busy: it waits for a later tick.
       if (!thread) { this.dequeue(entry.thread_id); continue; }
       if (thread.status && thread.status !== "idle" && !thread.archivedAt) continue;
+      let started = false;
+      try {
+        started = await this.start(botId, "review", entry.reason, entry.thread_id);
+      } catch (error) {
+        // It failed after forking (the fork is closed): drop it, so a broken thread doesn't retry every minute.
+        this.deps.log?.(`Skill review of ${entry.thread_id}: ${error instanceof Error ? error.message : String(error)}`);
+        this.dequeue(entry.thread_id);
+        return false;
+      }
+      if (!started) return false;
       this.dequeue(entry.thread_id);
-      return this.start(botId, "review", entry.reason, entry.thread_id).catch((error: unknown) => { this.deps.log?.(`Skill review of ${entry.thread_id}: ${error instanceof Error ? error.message : String(error)}`); return false; });
+      return true;
     }
     return false;
   }
@@ -453,9 +498,8 @@ export class SkillLearning {
         visibility: "hidden", pluginMetadata: { botReview: botId },
       } as never);
       const now = Date.now();
-      this.deps.db.prepare("INSERT INTO bot_skill_reviews (thread_id, bot_id, kind, status, started_at, source_thread_id) VALUES (?, ?, ?, 'running', ?, ?)").run(fork.id, botId, kind, now, sourceId);
-      if (kind === "review" && tip !== null) this.deps.db.prepare(`INSERT INTO bot_skill_review_marks (thread_id, bot_id, seq, at) VALUES (?, ?, ?, ?)
-        ON CONFLICT (thread_id) DO UPDATE SET seq = excluded.seq, at = excluded.at`).run(sourceId, botId, tip, now);
+      // The tip it reviews up to; the thread's mark moves there only when the review finishes (finish).
+      this.deps.db.prepare("INSERT INTO bot_skill_reviews (thread_id, bot_id, kind, status, started_at, source_thread_id, source_seq, reason) VALUES (?, ?, ?, 'running', ?, ?, ?, ?)").run(fork.id, botId, kind, now, sourceId, tip, reason);
       try {
         // A message sent while the fork's workspace is still provisioning waits in its queue and
         // isn't sent on its own: wait until it's ready.
@@ -516,6 +560,12 @@ export class SkillLearning {
     this.retried.delete(fresh.thread_id);
     const result = parts.length ? parts.join(" · ") : fresh.kind === "consolidate" ? "Nothing to merge" : "Nothing to save";
     if (!parts.length && text && !isPassOutput(text)) this.deps.log?.(`Skill review ${fresh.thread_id} wrote nothing but replied: ${text.slice(0, 200)}`);
+    // Done: the reviewed thread's mark moves to the tip the review started from. Only here; a review that
+    // fails, is stopped or never got its prompt leaves the mark where it was.
+    if (fresh.kind === "review" && fresh.source_thread_id && fresh.source_seq !== null) {
+      this.deps.db.prepare(`INSERT INTO bot_skill_review_marks (thread_id, bot_id, seq, at) VALUES (?, ?, ?, ?)
+        ON CONFLICT (thread_id) DO UPDATE SET seq = MAX(bot_skill_review_marks.seq, excluded.seq), at = excluded.at`).run(fresh.source_thread_id, fresh.bot_id, fresh.source_seq, fresh.started_at);
+    }
     await this.close(fresh, result);
   }
 
@@ -534,11 +584,8 @@ export class SkillLearning {
   async active(threadId: string): Promise<void> {
     if (this.review(threadId)?.status === "running") { this.started.add(threadId); return; }
     const review = this.deps.db.prepare("SELECT * FROM bot_skill_reviews WHERE status = 'running' AND source_thread_id = ?").get(threadId) as ReviewRow | undefined;
-    if (review) {
-      // Its mark goes back, so what it didn't finish is reviewed next time.
-      this.deps.db.prepare("DELETE FROM bot_skill_review_marks WHERE thread_id = ? AND at >= ?").run(threadId, review.started_at);
-      await this.close(review, "Stopped: you started a turn", true);
-    }
+    // Its mark stays where it was (it moves only when a review finishes), so the next sweep reviews this part again.
+    if (review) await this.close(review, "Stopped: you started a turn", true);
   }
 
   /** A review fork failed. */
@@ -569,6 +616,12 @@ export class SkillLearning {
 
   /** The minute tick: times out stuck reviews, stops reviews of paused Bots, runs the daily sweep and starts queued reviews. */
   async tick(now = Date.now()): Promise<void> {
+    if (this.ticking) return;
+    this.ticking = true;
+    try { await this.tickOnce(now); } finally { this.ticking = false; }
+  }
+
+  private async tickOnce(now: number): Promise<void> {
     for (const review of this.deps.db.prepare("SELECT * FROM bot_skill_reviews WHERE status = 'running'").all() as ReviewRow[]) {
       const bot = this.deps.bot(review.bot_id);
       if (!bot || bot.state !== "active") await this.close(review, `Stopped: ${bot?.name ?? "the bot"} is ${bot?.state ?? "gone"}`, true);
@@ -578,8 +631,11 @@ export class SkillLearning {
       if (bot.kind === "external" || bot.state !== "active") continue;
       const row = this.row(bot.id);
       if (!row.enabled) continue;
-      if (sweepDue(row.daily_at, now)) await this.sweep(bot.id, now).catch((error: unknown) => this.deps.log?.(`Skill sweep for ${bot.id}: ${error instanceof Error ? error.message : String(error)}`));
-      await this.next(bot.id);
+      const report = (error: unknown) => this.deps.log?.(`Skill sweep for ${bot.id}: ${error instanceof Error ? error.message : String(error)}`);
+      // First look (the upgrade, or learning just turned on): a baseline, no backlog.
+      if (row.daily_at === null) { await this.baseline(bot.id, now).catch(report); continue; }
+      if (sweepDue(row.daily_at, now)) await this.sweep(bot.id, now).catch(report);
+      await this.next(bot.id, now);
     }
   }
 }

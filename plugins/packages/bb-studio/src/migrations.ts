@@ -1263,4 +1263,6 @@ export const MIGRATIONS: string[] = [
        records INTEGER NOT NULL,
        exported_at INTEGER NOT NULL
      );`,
+  // Why a review ran (archive, daily, manual): the daily cap counts daily and archive passes only.
+  `ALTER TABLE bot_skill_reviews ADD COLUMN reason TEXT;`,
 ];

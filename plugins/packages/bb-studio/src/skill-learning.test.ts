@@ -4,7 +4,7 @@ import { MIGRATIONS } from "./migrations";
 import { rpcContract } from "./contract";
 import {
   ARCHIVE_AFTER_MS, cheapestModel, curatorPlan, lineDiff, lintSkill, patchText, REVIEW_TOOLS, RETRY_PROMPT, reviewPrompt, gaveUpOnTools,
-  SAVE_RULES, SkillLearning, STALE_AFTER_MS, sweepDue, type LearningSkill, type SkillState,
+  DAILY_REVIEW_CAP, SAVE_RULES, SkillLearning, STALE_AFTER_MS, sweepDue, type LearningSkill, type SkillState,
 } from "./skill-learning";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -116,6 +116,7 @@ it("nudges only once: a second give-up closes the review and logs the reply", as
 async function setup() {
   const threads = new Map([["bot1", makeThreadResponse({ id: "bot1", projectId: "proj_personal", providerId: "claude-code", status: "idle", updatedAt: 0 })]]);
   let events: { seq: number; type: string; data: Record<string, unknown> }[] = [];
+  const tips = new Map<string, number>();
   let forks = 0;
   const fork = vi.fn(async ({ sourceThreadId }: { sourceThreadId: string }) => {
     const thread = makeThreadResponse({ id: `fork${++forks}`, projectId: "proj_personal", providerId: "claude-code", status: "idle", sourceThreadId });
@@ -130,7 +131,9 @@ async function setup() {
     // BB refuses pages over 100.
     if (Number(limit) > 100) throw Object.assign(new Error("Thread event limit cannot exceed 100"), { status: 400 });
     // A fork's workspace is ready at once.
-    if (threadId !== "bot1") return [{ seq: 1, type: "system/thread-provisioning", data: { status: "completed" } }];
+    // A fork's workspace is ready at once; another conversation's last event is its tip in `tips`.
+    if (threadId.startsWith("fork")) return [{ seq: 1, type: "system/thread-provisioning", data: { status: "completed" } }];
+    if (threadId !== "bot1") return [{ seq: tips.get(threadId) ?? 1, type: "turn/completed", data: {} }];
     const after = events.filter((event) => event.seq > Number(afterSeq ?? 0));
     return (order === "desc" ? [...after].reverse() : after).slice(0, Number(limit ?? 100));
   });
@@ -161,54 +164,136 @@ async function setup() {
     setState: (_botId, name, state) => { db.prepare("UPDATE bot_skills SET state = ? WHERE name = ?").run(state, name); },
   });
   const work = (n: number, user = false) => { for (let i = 0; i < n; i++) events.push(...turn((events.at(-1)?.seq ?? 0) + 1, ["commandExecution"], { user })); };
-  return { db, bot, threads, learning, conversations, fork, update, send, stop, archive, work, skills, writeSkill, setEvents: (next: typeof events) => { events = next; } };
+  return { db, bot, threads, learning, conversations, tips, fork, update, send, stop, archive, work, skills, writeSkill, setEvents: (next: typeof events) => { events = next; } };
 }
 
-it("sweeps once a day: forks a review of each thread with new events on a cheap model, one at a time", async () => {
+const markOf = (x: { db: import("better-sqlite3").Database }, threadId: string) => (x.db.prepare("SELECT seq FROM bot_skill_review_marks WHERE thread_id = ?").get(threadId) as { seq: number } | undefined)?.seq ?? null;
+
+it("sweeps once a day: a baseline first, then forks a review of each thread with new events on a cheap model, one at a time", async () => {
   const x = await setup();
   x.threads.set("conv1", makeThreadResponse({ id: "conv1", projectId: "proj_personal", providerId: "claude-code", status: "idle", updatedAt: 0 }));
   x.conversations.push("bot1", "conv1");
   x.work(3);
+  x.tips.set("conv1", 4);
   const morning = new Date(2026, 10, 26, 9).getTime();
   vi.useFakeTimers({ toFake: ["Date"] });
   const at = (time: number) => { vi.setSystemTime(time); return time; };
   at(morning);
-  // Idle turns don't start reviews any more.
+  // Idle turns don't start reviews.
   await x.learning.idle(x.threads.get("bot1")!, "done");
-  expect(x.fork).not.toHaveBeenCalled();
+  // The first look (right after the upgrade) is a baseline: every tip marked, no backlog.
   await x.learning.tick(morning);
+  expect(x.fork).not.toHaveBeenCalled();
+  expect(await x.learning.view("bot_main")).toMatchObject({ queued: 0, lastSweepAt: morning });
+  expect(markOf(x, "bot1")).toBe(9);
+  expect(markOf(x, "conv1")).toBe(4);
+  // The next day: both have new events.
+  x.work(1);
+  x.tips.set("conv1", 7);
+  const next = morning + 86_400_000;
+  await x.learning.tick(at(next));
   expect(x.fork).toHaveBeenCalledTimes(1);
   expect(x.fork).toHaveBeenCalledWith(expect.objectContaining({ sourceThreadId: "bot1", visibility: "hidden", pluginMetadata: { botReview: "bot_main" } }));
   expect(x.update).toHaveBeenCalledWith({ threadId: "fork1", model: "claude-haiku", reasoningLevel: "low" });
-  expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ threadId: "fork1", input: [expect.objectContaining({ text: expect.stringMatching(/Background skill review for "Dot"\. This is the daily review/) })] }));
-  expect(await x.learning.view("bot_main")).toMatchObject({ reviewing: true, queued: 1, cadence: "daily-and-archive", lastSweepAt: morning, defaultModel: "claude-haiku", modelNames: { "claude-opus": "Opus", "claude-haiku": "Haiku Fast" } });
+  expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ threadId: "fork1", input: [expect.objectContaining({ text: expect.stringMatching(/Background skill review for "Dot"\. This is the daily review.*since the last review/) })] }));
+  expect(await x.learning.view("bot_main")).toMatchObject({ reviewing: true, queued: 1, cadence: "daily-and-archive", lastSweepAt: next, defaultModel: "claude-haiku", modelNames: { "claude-opus": "Opus", "claude-haiku": "Haiku Fast" } });
   expect(x.learning.reviewThreads()).toEqual(new Set(["fork1"]));
+  // The mark doesn't move while the review runs.
+  expect(markOf(x, "bot1")).toBe(9);
   // Single flight: no second review while one runs.
   expect(await x.learning.start("bot_main", "review")).toBe(false);
-  await x.learning.tick(at(morning + 60_000));
+  await x.learning.tick(at(next + 60_000));
   expect(x.fork).toHaveBeenCalledTimes(1);
-
   // A fork is idle before its prompt lands: that idle isn't the end.
   await x.learning.idle(x.threads.get("fork1")!, null);
   expect((await x.learning.view("bot_main")).reviewing).toBe(true);
-  // The fork saves a skill and finishes; the next queued thread starts.
+  // The fork saves a skill and finishes: the mark moves to the tip it started from; the next queued thread starts.
   await x.learning.active("fork1");
   x.learning.noteWrite("fork1", "saved");
   await x.learning.idle(x.threads.get("fork1")!, "Saved deploy-check.");
+  expect(markOf(x, "bot1")).toBe(12);
   expect(x.archive).not.toHaveBeenCalled();
   expect(x.fork).toHaveBeenLastCalledWith(expect.objectContaining({ sourceThreadId: "conv1" }));
   await x.learning.active("fork2");
   await x.learning.idle(x.threads.get("fork2")!, "[PASS]");
+  expect(markOf(x, "conv1")).toBe(7);
   expect(await x.learning.view("bot_main")).toMatchObject({ reviewing: false, queued: 0, lastReview: { result: "Nothing to save" } });
-
-  // The same day: no second sweep. The next day: only threads with new events.
-  await x.learning.tick(at(morning + 3_600_000));
+  // The same day: no second sweep. The day after: only threads with new events.
+  await x.learning.tick(at(next + 3_600_000));
   expect(x.fork).toHaveBeenCalledTimes(2);
   x.work(1);
-  await x.learning.tick(at(morning + 86_400_000));
+  await x.learning.tick(at(next + 86_400_000));
   expect(x.fork).toHaveBeenCalledTimes(3);
   expect(x.fork).toHaveBeenLastCalledWith(expect.objectContaining({ sourceThreadId: "bot1" }));
-  expect(x.send).toHaveBeenLastCalledWith(expect.objectContaining({ input: [expect.objectContaining({ text: expect.stringMatching(/since the last review/) })] }));
+});
+
+it("moves a thread's mark only when its review finishes: a stopped or failed review leaves it", async () => {
+  const x = await setup();
+  x.work(2);
+  await x.learning.baseline("bot_main");
+  expect(markOf(x, "bot1")).toBe(6);
+  x.work(2);
+  // Stopped by a new turn in the thread: the mark stays, and the next sweep queues it again.
+  expect(await x.learning.start("bot_main", "review", "daily", "bot1")).toBe(true);
+  await x.learning.active("bot1");
+  expect((await x.learning.view("bot_main")).lastReview?.result).toMatch(/you started a turn/);
+  expect(markOf(x, "bot1")).toBe(6);
+  // Its prompt couldn't be sent: closed, mark unchanged.
+  x.send.mockRejectedValueOnce(new Error("offline"));
+  await expect(x.learning.start("bot_main", "review", "daily", "bot1")).rejects.toThrow("offline");
+  expect(markOf(x, "bot1")).toBe(6);
+  // A failed fork: unchanged too.
+  expect(await x.learning.start("bot_main", "review", "daily", "bot1")).toBe(true);
+  await x.learning.failed("fork3", "provider error");
+  expect(markOf(x, "bot1")).toBe(6);
+  expect(await x.learning.sweep("bot_main")).toBe(1);
+});
+
+it("keeps a queued review when it can't start yet, and caps daily and archive passes per day", async () => {
+  const x = await setup();
+  const now = new Date(2026, 10, 26, 9).getTime();
+  await x.learning.baseline("bot_main", now);
+  for (let n = 1; n <= 9; n++) {
+    const id = `conv${n}`;
+    x.threads.set(id, { ...makeThreadResponse({ id, projectId: "proj_personal", providerId: "claude-code", status: "idle", updatedAt: 0 }), archivedAt: 5 });
+    x.learning.archived("bot_main", id, now);
+  }
+  // The Bot is paused: nothing starts, nothing leaves the queue.
+  x.bot.state = "paused";
+  expect(await x.learning.next("bot_main", now)).toBe(false);
+  expect((await x.learning.view("bot_main")).queued).toBe(9);
+  x.bot.state = "active";
+  // A thread that is busy waits in the queue; the next one starts.
+  x.threads.set("conv1", { ...x.threads.get("conv1")!, status: "active", archivedAt: null } as never);
+  expect(await x.learning.next("bot_main", now)).toBe(true);
+  expect(x.fork).toHaveBeenLastCalledWith(expect.objectContaining({ sourceThreadId: "conv2" }));
+  expect((await x.learning.view("bot_main")).queued).toBe(8);
+  // Finish one review after another: the day stops at the cap; the rest wait for tomorrow.
+  for (let n = 1; n <= 12; n++) {
+    const running = [...x.learning.reviewThreads()].find((id) => x.learning.review(id)?.status === "running");
+    if (!running) break;
+    await x.learning.active(running);
+    await x.learning.idle(x.threads.get(running)!, "[PASS]");
+  }
+  expect(x.learning.startedToday("bot_main", now)).toBe(DAILY_REVIEW_CAP);
+  expect((await x.learning.view("bot_main")).queued).toBe(9 - DAILY_REVIEW_CAP);
+  expect(x.learning.startedToday("bot_main", now + 86_400_000)).toBe(0);
+  // Run now isn't held by the cap.
+  x.work(3);
+  expect(await x.learning.runNow("bot_main", now)).toBe(true);
+  expect(x.fork).toHaveBeenLastCalledWith(expect.objectContaining({ sourceThreadId: "bot1" }));
+});
+
+it("doesn't overlap minute ticks", async () => {
+  const x = await setup();
+  let release = () => {};
+  const slow = new Promise<void>((done) => { release = done; });
+  const baseline = vi.spyOn(x.learning, "baseline").mockImplementation(async () => { await slow; });
+  const first = x.learning.tick();
+  await x.learning.tick();
+  expect(baseline).toHaveBeenCalledTimes(1);
+  release();
+  await first;
 });
 
 it("runs the daily sweep after 3 AM local, once per day", () => {
