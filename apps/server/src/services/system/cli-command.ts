@@ -316,12 +316,12 @@ async function installUnix(context: CliCommandContext): Promise<void> {
   }
   if (shadow?.source === "npm") {
     throw blocked(
-      `bb is already on your PATH at ${shadow.path}, installed by npm.`,
+      `bbs is already on your PATH at ${shadow.path}, installed by npm.`,
     );
   }
   if (shadow !== null) {
     throw blocked(
-      `Another bb at ${shadow.path} comes first on your PATH. Remove it, or run bb's command directly at ${context.launcherPath}.`,
+      `Another bbs at ${shadow.path} comes first on your PATH. Remove it, or run BB Studio's command directly at ${context.launcherPath}.`,
     );
   }
   const onPath = newTerminalPathEntries(context.env);
@@ -352,7 +352,7 @@ async function installUnix(context: CliCommandContext): Promise<void> {
     }
   }
   throw blocked(
-    `Another bb command is already installed, or no folder on your PATH is writable. Run bb's command directly at ${context.launcherPath}.`,
+    `Another bbs command is already installed, or no folder on your PATH is writable. Run BB Studio's command directly at ${context.launcherPath}.`,
   );
 }
 

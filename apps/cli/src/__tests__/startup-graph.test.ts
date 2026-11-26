@@ -144,7 +144,7 @@ describe("bb startup module graph", () => {
   it("loads only the named command group for `bb thread`", async () => {
     const run = await runCli("source", ["thread", "--help"]);
 
-    expect(run.stdout).toContain("Usage: bb thread");
+    expect(run.stdout).toContain("Usage: bbs thread");
     expect(loaded(run, "/apps/cli/src/commands/thread/index.ts")).toHaveLength(
       1,
     );
@@ -241,7 +241,7 @@ describe("bb startup module graph", () => {
     it("loads only the thread chunk for `bb thread`", async () => {
       const run = await runCli("dist", ["thread", "--help"]);
 
-      expect(run.stdout).toContain("Usage: bb thread");
+      expect(run.stdout).toContain("Usage: bbs thread");
       expect(loaded(run, `${chunkDirUrl}thread-`)).toHaveLength(1);
 
       const otherGroups = CORE_COMMAND_GROUPS.map((group) => group.name).filter(

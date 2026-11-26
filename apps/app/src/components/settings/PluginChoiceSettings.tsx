@@ -66,7 +66,7 @@ interface KeyedChoice {
   builtIn: BuiltInChoice | null;
 }
 
-const BB_BUILT_IN = "bb (built-in)";
+const BB_BUILT_IN = "BB Studio (built-in)";
 
 function groupByKey<Registration extends { pluginId: string; id: string }>(
   registrations: readonly Registration[],
@@ -108,7 +108,7 @@ export function usePluginChoices(): PluginChoices {
       kind: "slot",
       label: "Navigation",
       description:
-        "What draws New thread, Plugins, Skills, and plugin pages in the sidebar.",
+        "What draws New conversation, Plugins, Skills, and plugin pages in the sidebar.",
       claimants: navigations,
       atom: sidebarNavigationProviderAtom,
       rule: PLUGIN_ONLY_RULE,
@@ -116,8 +116,8 @@ export function usePluginChoices(): PluginChoices {
     },
     {
       kind: "slot",
-      label: "Sidebar thread list",
-      description: "Which plugin draws your threads in the sidebar.",
+      label: "Sidebar conversation list",
+      description: "Which plugin draws your conversations in the sidebar.",
       claimants: threadLists,
       atom: threadListProviderAtom,
       rule: PLUGIN_ONLY_RULE,
@@ -132,26 +132,26 @@ export function usePluginChoices(): PluginChoices {
       rule: REPLACEMENT_RULE,
       builtIn: {
         title: BB_BUILT_IN,
-        description: "Syntax highlighting and gutters from the bb code theme.",
+        description: "Syntax highlighting and gutters from the built-in code theme.",
       },
     },
     {
       kind: "slot",
       label: "Diffs",
-      description: "File diffs in threads, the diff panel, and plugin views.",
+      description: "File diffs in conversations, the diff panel, and plugin views.",
       claimants: diffRenderers,
       atom: diffRendererProviderAtom,
       rule: REPLACEMENT_RULE,
       builtIn: {
         title: BB_BUILT_IN,
-        description: "Unified and split diffs from the bb code theme.",
+        description: "Unified and split diffs from the built-in code theme.",
       },
     },
     {
       kind: "slot",
       label: "Composer",
       description:
-        "The prompt box in threads, the New thread screen, and message editors.",
+        "The prompt box in conversations, the New conversation screen, and message editors.",
       claimants: composers,
       atom: composerRendererProviderAtom,
       rule: PLUGIN_ONLY_RULE,
@@ -202,7 +202,7 @@ export function usePluginChoices(): PluginChoices {
     ),
     atom: fileOpenerPreferenceAtom,
     rule: REPLACEMENT_RULE,
-    builtIn: { title: "Built-in preview", description: "bb's file preview." },
+    builtIn: { title: "Built-in preview", description: "BB Studio's file preview." },
   };
   const codeFences: KeyedChoice = {
     kind: "keyed",
@@ -219,7 +219,7 @@ export function usePluginChoices(): PluginChoices {
     ),
     atom: codeFencePicksAtom,
     rule: REPLACEMENT_RULE,
-    builtIn: { title: BB_BUILT_IN, description: "bb's code block." },
+    builtIn: { title: BB_BUILT_IN, description: "BB Studio's code block." },
   };
   const directives: KeyedChoice = {
     kind: "keyed",

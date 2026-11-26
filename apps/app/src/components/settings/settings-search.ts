@@ -45,11 +45,11 @@ export const SETTINGS_SEARCH_INDEX: Record<
     keywords: ["preferences"],
     settings: [
       {
-        title: "Navigate to threads on creation",
+        title: "Open new conversations",
         keywords: ["new thread", "open", "background"],
       },
       {
-        title: "Default thread followup behavior",
+        title: "Follow-up behavior",
         keywords: ["enter", "steer", "queue", "follow-up"],
       },
       {
@@ -58,7 +58,7 @@ export const SETTINGS_SEARCH_INDEX: Record<
         when: "desktopQuitConfirmation",
       },
       {
-        title: "Thread archive confirmation",
+        title: "Archive confirmation",
         keywords: ["confirm", "child threads"],
       },
       {
@@ -99,8 +99,8 @@ export const SETTINGS_SEARCH_INDEX: Record<
         keywords: ["git", "worktree", "branch name"],
       },
       {
-        title: "bb CLI",
-        keywords: ["command line", "terminal", "path", "install"],
+        title: "bbs CLI",
+        keywords: ["command line", "terminal", "path", "install", "bbs", "bb-studio"],
         when: "cliCommand",
       },
       {
@@ -139,7 +139,7 @@ export const SETTINGS_SEARCH_INDEX: Record<
     keywords: ["bb cloud", "llm"],
     settings: [
       {
-        title: "Thread titles",
+        title: "Conversation titles",
         keywords: ["naming", "branch names", "generate"],
       },
       { title: "Commit messages", keywords: ["git", "generate"] },
@@ -168,7 +168,7 @@ export const SETTINGS_SEARCH_INDEX: Record<
         when: "sidebarNavigations",
       },
       {
-        title: "Sidebar thread list",
+        title: "Sidebar conversation list",
         keywords: ["threads", "plugin"],
         when: "threadLists",
       },
@@ -301,7 +301,6 @@ export const SETTINGS_SEARCH_INDEX: Record<
   community: {
     keywords: ["help", "support", "feedback"],
     settings: [
-      { title: "Discord", keywords: ["chat", "support"] },
       {
         title: "GitHub",
         keywords: ["issues", "source code", "bug report", "releases"],

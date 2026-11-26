@@ -103,7 +103,7 @@ const SURFACES: PinnedSurface[] = [
   },
   {
     name: "thread list",
-    settingLabel: "Sidebar thread list",
+    settingLabel: "Sidebar conversation list",
     setPick: (store, pick) => store.set(threadListProviderAtom, pick),
     registrations: ({ id, title }) => ({
       threadLists: [{ id, title, component }],

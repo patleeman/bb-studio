@@ -155,7 +155,7 @@ async function addRoute(name: string) {
 it("lists routes that are on and offers the rest from Add a route", async () => {
   renderSettings();
   expect(namesIn("Routes")).toEqual([]);
-  expect(screen.getByText(/Only this computer can reach bb/)).toBeTruthy();
+  expect(screen.getByText(/Only this computer can reach BB Studio/)).toBeTruthy();
 
   await addRoute("Local network");
   expect(state.mutate).toHaveBeenLastCalledWith({ localNetworkEnabled: true });

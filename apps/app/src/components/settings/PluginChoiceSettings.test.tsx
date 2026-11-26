@@ -107,7 +107,7 @@ describe("plugin choice settings", () => {
     });
     expect(row.textContent).toContain("Not chosen");
 
-    await choose(row, /^tasks \(from bb\)/u);
+    await choose(row, /^tasks \(from BB Studio\)/u);
 
     expect(store.get(messageDirectivePicksAtom)).toEqual({
       task: "tasks/task",

@@ -62,7 +62,7 @@ export interface MachineAccessState {
 }
 
 const LOCAL_NETWORK_TRUST_WARNING =
-  "Anyone on this network can use bb; only add it on a network you trust.";
+  `Anyone on this network can use BB Studio; only add it on a network you trust.`;
 
 function machineAccessRoutes(
   access: ServerAccessStatus | undefined,
@@ -191,7 +191,7 @@ export function MachineAccessSettingsContent({
   return (
     <SettingsSection
       title="How devices reach this server"
-      description="Other machines and your phone connect to bb over these routes."
+      description="Other machines and your phone connect to BB Studio over these routes."
       action={
         machineAccess.access !== undefined && addable.length > 0 ? (
           <AddRouteMenu
@@ -208,7 +208,7 @@ export function MachineAccessSettingsContent({
         <div className="space-y-3">
           <RoutesOn
             machineAccess={machineAccess}
-            emptyMessage="Only this computer can reach bb right now. Add a route so other machines and your phone can connect."
+            emptyMessage="Only this computer can reach BB Studio right now. Add a route so other machines and your phone can connect."
           />
           {addingManual && !manualOn && (
             <div
@@ -688,7 +688,7 @@ export function MobileServerAccessContent({
       <div>
         <h2 className="text-sm font-semibold">{title}</h2>
         <p className="mt-1 text-xs text-subtle-foreground">
-          Your phone reaches bb over the same routes as your machines.{" "}
+          Your phone reaches BB Studio over the same routes as your machines.{" "}
           <Link
             className="underline underline-offset-2 hover:text-foreground"
             to={getSettingsTargetPath({ section: "machines" })}

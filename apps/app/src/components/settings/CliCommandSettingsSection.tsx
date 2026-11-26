@@ -7,7 +7,7 @@ import {
 import { useChangeCliCommand } from "@/hooks/mutations/settings-mutations";
 import { useCliCommandStatus } from "@/hooks/queries/system-queries";
 
-const CLI_COMMAND_SETTING_LABEL = "bb CLI";
+const CLI_COMMAND_SETTING_LABEL = "bbs CLI";
 
 interface CliCommandSettingsSectionContentProps {
   onChange: (change: "install" | "remove") => void;
@@ -20,19 +20,19 @@ export function describeCliCommandStatus(
 ): string {
   if (status.installedPath !== null) {
     return status.onPath
-      ? `Installed at ${status.installedPath}. You can control bb from any terminal, and so can agents outside bb, such as Claude Code or Codex.`
-      : `Installed at ${status.installedPath}, but its folder is not on your PATH. Add the folder to your PATH to use bb outside bb.`;
+      ? `Installed at ${status.installedPath} as bbs and bb-studio. bb is left as it is.`
+      : `Installed at ${status.installedPath}, but its folder is not on your PATH.`;
   }
   if (status.shadowedBy === null) {
-    return "Install the bb CLI for use outside bb. You can control bb from any terminal, and so can agents outside bb, such as Claude Code or Codex. Threads in bb already have it.";
+    return "Installs bbs and bb-studio for terminals and outside agents. bb is left as it is. Conversations in BB Studio already have bbs and bb.";
   }
   if (status.shadowedBy.source === "npm") {
-    return `Already installed for use outside bb at ${status.shadowedBy.path}, by npm.`;
+    return `bbs is already installed at ${status.shadowedBy.path}, by npm.`;
   }
   if (status.shadowedBy.source === "machine") {
-    return `The bb machine on this computer added a bb at ${status.shadowedBy.path} that can run an older bb. Install replaces it with this one.`;
+    return `The machine on this computer added a bbs at ${status.shadowedBy.path} that can run an older bbs. Install replaces it with this one.`;
   }
-  return `Another bb at ${status.shadowedBy.path} comes first on your PATH. Remove it to install this one.`;
+  return `Another bbs at ${status.shadowedBy.path} comes first on your PATH. Remove it to install this one.`;
 }
 
 export function CliCommandSettingsSectionContent({

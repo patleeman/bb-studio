@@ -1091,7 +1091,7 @@ describe("ModelReasoningPicker", () => {
       screen.getByRole("button", { name: "Provider, model and reasoning" }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Hand off to new thread" }),
+      screen.getByRole("button", { name: "Continue in a new conversation" }),
     );
     expect(onStart).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "5.5" }));
@@ -1127,7 +1127,7 @@ describe("ModelReasoningPicker", () => {
       screen.getByRole("button", { name: "Provider, model and reasoning" }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Hand off to new thread" }),
+      screen.getByRole("button", { name: "Continue in a new conversation" }),
     );
     fireEvent.click(screen.getByTitle("Claude Code"));
 
@@ -1177,7 +1177,7 @@ describe("ModelReasoningPicker", () => {
         screen.getByRole("button", { name: "Provider, model and reasoning" }),
       );
       fireEvent.click(
-        screen.getByRole("button", { name: "Hand off to new thread" }),
+        screen.getByRole("button", { name: "Continue in a new conversation" }),
       );
       fireEvent.click(screen.getByTitle("Claude Code"));
       await screen.findByText("Opus 4.7");
@@ -1226,7 +1226,7 @@ describe("ModelReasoningPicker", () => {
         screen.getByRole("button", { name: "Provider, model and reasoning" }),
       );
       fireEvent.click(
-        screen.getByRole("button", { name: "Hand off to new thread" }),
+        screen.getByRole("button", { name: "Continue in a new conversation" }),
       );
       fireEvent.click(screen.getByTitle("Claude Code"));
       await screen.findByText("Opus 4.7");

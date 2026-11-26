@@ -258,7 +258,7 @@ describe.skipIf(process.platform === "win32")("bb entrypoint errors", () => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Usage: bb machine");
+    expect(result.stdout).toContain("Usage: bbs machine");
   }, 30_000);
 
   it("prints the JSON envelope when the server is down", async () => {

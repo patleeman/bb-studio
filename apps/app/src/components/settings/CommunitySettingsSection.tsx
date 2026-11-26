@@ -7,8 +7,7 @@ import {
 } from "@bb/shared-ui/settings-section";
 import { openUrlInExternalBrowser } from "@/lib/url-open-routing";
 
-const DISCORD_INVITE_URL = "https://discord.gg/kvBU6tJhcJ";
-const GITHUB_REPO_URL = "https://github.com/get-bb/bb";
+const GITHUB_REPO_URL = "https://github.com/patleeman/bb-studio";
 
 interface CommunityLinkRowProps {
   description: string;
@@ -54,20 +53,12 @@ export function CommunitySettingsSection() {
   return (
     <SettingsSection
       title="Community"
-      description="Chat with other bb users and follow development on GitHub."
+      description="Follow BB Studio on GitHub."
     >
       <div className="space-y-5">
         <CommunityLinkRow
-          label="Discord"
-          description="Join the server for support, feedback, and announcements."
-          href={DISCORD_INVITE_URL}
-          icon="DiscordLogo"
-          iconClassName="text-brand-discord"
-          openLabel="Join Discord"
-        />
-        <CommunityLinkRow
           label="GitHub"
-          description="Source code, issues, and releases for the bb project."
+          description="Source code, issues, and releases for BB Studio."
           href={GITHUB_REPO_URL}
           icon="GithubLogo"
           openLabel="View on GitHub"

@@ -22,8 +22,8 @@ maybeReexecViaBbCli();
 const program = new Command();
 
 program
-  .name("bb")
-  .description("BB CLI - manage your AI coding agents")
+  .name("bbs")
+  .description("BB Studio CLI (bbs, also bb-studio) - manage your AI coding agents")
   .enablePositionalOptions()
   .exitOverride()
   .showSuggestionAfterError(false)
@@ -81,8 +81,8 @@ async function tryPluginCommandProxy(
     );
     if (disabledId !== null) {
       console.error(
-        `bb ${candidate} is provided by the "${disabledId}" plugin, which is disabled — ` +
-          `run \`bb plugin enable ${disabledId}\` or enable it in Plugins.`,
+        `bbs ${candidate} is provided by the "${disabledId}" plugin, which is disabled — ` +
+          `run \`bbs plugin enable ${disabledId}\` or enable it in Plugins.`,
       );
       process.exit(1);
     }
@@ -245,10 +245,10 @@ Current context:
   BB_SERVER_URL: ${context.serverUrl}
 
 Quick start:
-  bb status
-  bb project list
-  bb thread show <id>
-  bb thread spawn --project <id> --provider codex --prompt "..."
+  bbs status
+  bbs project list
+  bbs thread show <id>
+  bbs thread spawn --project <id> --provider codex --prompt "..."
 `;
   });
 

@@ -81,7 +81,7 @@ function formatCommandIndexLine(
   withOptions: boolean,
 ): string {
   const names = [entry.path, ...entry.aliases.map((alias) => `|${alias}`)];
-  const head = [`bb ${names.join("")}`, entry.arguments]
+  const head = [`bbs ${names.join("")}`, entry.arguments]
     .filter((part) => part.length > 0)
     .join(" ");
   const options =
@@ -95,7 +95,7 @@ export function registerGuideCommand(program: Command): void {
   program
     .command("guide [chapter] [group]")
     .description(
-      "Show the BB system overview and CLI guide; `bb guide commands [group]` lists every core command on one page",
+      "Show the BB Studio overview and CLI guide; `bbs guide commands [group]` lists every core command on one page",
     )
     .option("--json", "Print machine-readable JSON output")
     .action(
@@ -114,7 +114,7 @@ export function registerGuideCommand(program: Command): void {
             console.log(lines.join("\n"));
             if (group === undefined) {
               console.log(
-                "\nRun `bb guide commands <group>` (for example `bb guide commands thread`) to include every option. Commands contributed by plugins are listed by `bb plugin list`.",
+                "\nRun `bbs guide commands <group>` (for example `bbs guide commands thread`) to include every option. Commands contributed by plugins are listed by `bbs plugin list`.",
               );
             }
             return;
