@@ -5,6 +5,7 @@ import WebKit
 /// Tapping a screen plays it full screen; comments and edits stay with the
 /// design's thread and BB web, where elements can be picked.
 struct DesignView: View {
+    @Environment(\.look) private var look
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
@@ -173,7 +174,7 @@ struct DesignView: View {
         let round = review.round.map { " round \(Int($0))" } ?? ""
         let (text, symbol, tint): (String, String, Color) = switch review.state {
         case .reviewing: ("Reviewing\(round)…", "eye", .blue)
-        case .needs_work: ("The reviewer sent\(round) back for fixes", "exclamationmark.triangle", .orange)
+        case .needs_work: ("The reviewer sent\(round) back for fixes", "exclamationmark.triangle", .secondary)
         case .failed: ("The review\(round) didn't finish", "xmark.octagon", .red)
         default: ("Reviewed\(round)", "checkmark.seal", .green)
         }

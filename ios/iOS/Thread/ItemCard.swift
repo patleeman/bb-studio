@@ -143,7 +143,7 @@ struct StudioCardChrome<Icon: View, Preview: View>: View {
                                 .padding(.vertical, 5)
                                 .background(.fill.tertiary, in: .capsule)
                         } else {
-                            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                         }
                     }
                     .contentShape(.rect)

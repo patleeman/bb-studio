@@ -9,7 +9,7 @@ struct StrandDividerRow: View {
     var body: some View {
         Button { only?() } label: {
             HStack(spacing: 8) {
-                Text(title).font(.caption.weight(.semibold)).foregroundStyle(.tertiary).lineLimit(1)
+                Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary).lineLimit(1)
                 Rectangle().fill(.separator).frame(height: 0.5)
             }
             .padding(.top, 10).padding(.bottom, 2)
@@ -30,7 +30,7 @@ struct StrandGapRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Rectangle().fill(.separator).frame(height: 0.5)
-            Text("\(count) other message\(count == 1 ? "" : "s")").font(.caption).foregroundStyle(.tertiary).fixedSize()
+            Text("\(count) other message\(count == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary).fixedSize()
             Rectangle().fill(.separator).frame(height: 0.5)
         }
         .padding(.vertical, 6)

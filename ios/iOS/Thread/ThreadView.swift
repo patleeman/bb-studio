@@ -1483,7 +1483,7 @@ struct ThreadView: View {
                     .accessibilityIdentifier("outboxStorageError")
                 }
                 if let status = handoffStatus {
-                    ShelfCard(icon: status.working ? "arrow.triangle.2.circlepath" : "checkmark.circle", tint: status.working ? .orange : .green) {
+                    ShelfCard(icon: status.working ? "arrow.triangle.2.circlepath" : "checkmark.circle", tint: status.working ? .secondary : .green) {
                         HStack(spacing: 6) {
                             if status.working { ProgressView().controlSize(.mini) }
                             Text(status.text).lineLimit(1)
@@ -1501,7 +1501,7 @@ struct ThreadView: View {
                     }
                 }
                 if let pendingPermission, !editing {
-                    ShelfCard(icon: "lock.shield", tint: pendingPermission == "full" ? .orange : .accentColor) {
+                    ShelfCard(icon: "lock.shield", tint: pendingPermission == "full" ? .red : .accentColor) {
                         Button { choosingModel = true } label: {
                             Text("Next message: \(PermissionMode.label(pendingPermission))").lineLimit(1)
                         }
@@ -1514,7 +1514,7 @@ struct ThreadView: View {
                     .accessibilityIdentifier("pendingPermission")
                 }
                 if let review = model.planReview {
-                    ShelfCard(icon: "doc.text.magnifyingglass", tint: .orange) {
+                    ShelfCard(icon: "doc.text.magnifyingglass", tint: look.needsYou) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Plan ready for review").fontWeight(.medium)
                             if let title = review.title, !title.isEmpty {
@@ -1849,6 +1849,7 @@ extension ScrollGeometry {
 
 /// Grey bubbles where a chat's messages will be, until the first rows arrive.
 struct ChatSkeleton: View {
+    @Environment(\.look) private var look
     var bot = false
     private static let bubbles: [(mine: Bool, width: CGFloat, height: CGFloat)] = [
         (false, 0.7, 64), (true, 0.45, 40), (false, 0.8, 96), (false, 0.55, 40), (true, 0.6, 40), (false, 0.75, 80),
@@ -1937,7 +1938,7 @@ extension ThreadView {
                     Circle().fill(look.accent).frame(width: 9, height: 9).offset(x: -6, y: 6).allowsHitTesting(false)
                 }
             }
-            .tint(jumpState.note != nil ? .orange : nil)
+            .tint(jumpState.note != nil ? look.needsYou : nil)
             .transition(.opacity.combined(with: .scale(scale: 0.8)))
             .accessibilityIdentifier("jumpToLatest")
         }
@@ -2247,7 +2248,7 @@ extension ThreadView {
             .frame(minWidth: 40, minHeight: 40)
             .padding(.horizontal, label != nil ? 10 : 0)
         }
-        .buttonStyle(.glass(state.note != nil ? .regular.tint(.orange) : .regular))
+        .buttonStyle(.glass(state.note != nil ? .regular.tint(look.needsYou) : .regular))
         .background(look.stackFill, in: .capsule)
         .clipShape(.capsule)
         .padding(12)
@@ -2296,7 +2297,7 @@ struct InlineJump: ViewModifier {
                 .font(.body.weight(.semibold))
                 .frame(width: 44, height: 44)
                 .background(look.stackFill, in: .circle)
-                .glassEffect(state.note != nil ? .regular.tint(.orange) : .regular, in: .circle)
+                .glassEffect(state.note != nil ? .regular.tint(look.needsYou) : .regular, in: .circle)
                 .overlay(alignment: .topTrailing) {
                     if state.unseen > 0, state.note == nil {
                         Circle().fill(look.accent).frame(width: 9, height: 9).offset(x: -6, y: 6)

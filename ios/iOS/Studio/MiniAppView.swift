@@ -199,12 +199,13 @@ final class MiniSession {
 
 /// The strips over the app: its access request and its last error.
 struct MiniStrips: View {
+    @Environment(\.look) private var look
     let mini: MiniApp
     let appError: String?
 
     var body: some View {
         if let access = mini.accessText {
-            MiniStrip(symbol: "lock.shield", tint: .orange, text: access + " Approve it in BB on your computer.")
+            MiniStrip(symbol: "lock.shield", tint: look.needsYou, text: access + " Approve it in BB on your computer.")
                 .accessibilityIdentifier("miniAccessBanner")
         }
         if let appError {

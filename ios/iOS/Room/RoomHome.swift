@@ -289,7 +289,7 @@ struct RoomContextPane: View {
 
     private func section(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+            .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             .padding(.bottom, 4)
             .accessibilityAddTraits(.isHeader)
     }

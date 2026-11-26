@@ -156,6 +156,7 @@ struct MessageBubble: View {
 }
 
 struct RelayedRow: View {
+    @Environment(\.look) private var look
     let relayed: RelayedMessage
     var quiet = false
     var title: String?
@@ -185,7 +186,7 @@ struct RelayedRow: View {
                     Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
                         .rotationEffect(.degrees(expanded ? 90 : 0))
                 }
-                .foregroundStyle(relayed.urgent ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                .foregroundStyle(relayed.urgent ? AnyShapeStyle(look.needsYou) : AnyShapeStyle(.secondary))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
                 .contentShape(.rect)
@@ -218,7 +219,7 @@ struct QuietCheckMarker: View {
         }
         .labelStyle(.titleAndIcon)
         .font(.caption)
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(.secondary)
         .padding(.horizontal, 8)
         .padding(.vertical, 2)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -560,6 +561,7 @@ struct FlowLayout: Layout {
 /// A run of tool calls and reasoning, collapsed to one line. Expanded, each step
 /// shows what it did, and a tap on a step shows its output.
 struct ActivityGroup: View {
+    @Environment(\.look) private var look
     let rows: [TimelineRow]
     @State private var expanded = false
 
@@ -574,7 +576,7 @@ struct ActivityGroup: View {
                 if running {
                     ProgressView().controlSize(.mini)
                 } else if failed {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
                 }
                 Text(summary).lineLimit(1)
                 if !running, let stats = diffStats { DiffStats(stats: stats) }

@@ -5,6 +5,7 @@ import SwiftUI
 /// runs, Run now and Edit; + makes one of each kind. "Turn off check-ins"
 /// pauses every check-in, the old sheet's Off.
 struct BotAutomationsSheet: View {
+    @Environment(\.look) private var look
     var botId: String? = nil
     var botName: String = BotInfo.defaultName
     var active = true
@@ -33,7 +34,7 @@ struct BotAutomationsSheet: View {
             if automation.state == "active" || automation.state == "paused" {
                 Button { act(automation.active ? .pause : .resume, automation) } label: {
                     Label(automation.active ? "Pause" : "Resume", systemImage: automation.active ? "pause" : "play")
-                }.tint(.orange)
+                }.tint(look.accent)
             }
         }
     }

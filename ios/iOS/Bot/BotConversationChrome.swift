@@ -166,7 +166,11 @@ struct ConversationTitle: View {
                 if !subtitle.isEmpty {
                     HStack(spacing: 4) {
                         if writing { ProgressView().controlSize(.mini) }
-                        Text(subtitle).lineLimit(1)
+                        // Large text: the tab count goes before the model would truncate.
+                        ViewThatFits(in: .horizontal) {
+                            Text(subtitle).lineLimit(1)
+                            Text(writing ? "Writing" : (model ?? subtitle)).lineLimit(1)
+                        }
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -193,6 +197,7 @@ struct ConversationTitle: View {
 }
 
 struct WorkerTitle: View {
+    @Environment(\.look) private var look
     let info: WorkerInfo
 
     var body: some View {
@@ -204,7 +209,7 @@ struct WorkerTitle: View {
                     Text(info.headerLabel(now: context.date)).lineLimit(1)
                 }
                 .font(.caption)
-                .foregroundStyle(info.status == .needsYou ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                .foregroundStyle(info.status == .needsYou ? AnyShapeStyle(look.needsYou) : AnyShapeStyle(.secondary))
             }
         }
         .accessibilityElement(children: .ignore)
