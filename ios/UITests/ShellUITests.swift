@@ -161,9 +161,9 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["rail-new"].exists && app.buttons["rail-search"].exists, "Home's rail: New, Search")
         capture("duo-folded-home")
         element("homeMemory").tap()
-        XCTAssertTrue(app.staticTexts["Memory"].waitForExistence(timeout: 10), "Memory, pushed")
-        XCTAssertTrue(element("shellRail").waitForNonExistence(timeout: 5),
-                      "a pushed page keeps its own bar, whose buttons iOS puts in the column: no second rail")
+        XCTAssertTrue(element("memory-page").waitForExistence(timeout: 10), "Memory, pushed")
+        XCTAssertTrue(app.buttons["rail-back"].waitForExistence(timeout: 5), "one rail: Back in it")
+        XCTAssertFalse(app.navigationBars.firstMatch.exists, "no bar of its own")
         capture("duo-folded-memory")
     }
 
@@ -247,7 +247,8 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(element("home").waitForExistence(timeout: 10))
         capture("duo-vertical-home")
         activate("homeMemory")
-        XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 10), "a pushed page keeps its own bar")
+        XCTAssertTrue(element("rail-back").waitForExistence(timeout: 10), "one rail: Back in it")
+        XCTAssertFalse(app.navigationBars.firstMatch.exists, "no bar of its own")
         capture("duo-vertical-memory")
         command("outer")
     }

@@ -29,6 +29,7 @@ struct ShellRoot: View {
         }
         .environment(\.shellPosture, posture)
         .environment(\.shellReservedColumn, geometry.trailingInset)
+        .background { ShellBackground() }
         // The vertical Duo is a big iPhone: type a step up (9f: 18 pt body), never down.
         .dynamicTypeSize(posture.largeType ? .xLarge ... .accessibility5 : .xSmall ... .accessibility5)
         .lookRoot(bot: bot, theme: bot.map(theme))
@@ -263,7 +264,6 @@ private struct ShellPages: View {
     var body: some View {
         GeometryReader { proxy in
             let page = max(0, window.width / 2 - Self.hinge / 2 - proxy.safeAreaInsets.leading)
-            ShellBackground()
             HStack(spacing: 0) {
                 left(width: page)
                     .frame(width: page)
@@ -423,17 +423,45 @@ private struct ShellWorkbenchPage: View {
 }
 
 extension View {
-    /// A screen on a shell stack: the theme's canvas behind it, not the stack's black.
+    /// A screen on a shell stack: see-through, so the theme's backdrop behind the shell shows.
     func shellSurface() -> some View {
-        containerBackground(for: .navigation) { ShellBackground() }
+        containerBackground(.clear, for: .navigation)
     }
 }
 
-/// Behind every screen: the theme's canvas (the room's frost and lights are gone).
+/// Behind the whole shell, once: the Bot's theme as the desktop shows it.
+/// A scene theme's still (Tonight's Sky, Aurora Fjord…) under a veil of its
+/// own canvas, darker toward the bottom where text and the composer sit, so
+/// text keeps the theme's contrast; a classic theme's canvas. A still, not
+/// the live scene: nothing on the phone animates all the time.
 struct ShellBackground: View {
     @Environment(\.look) private var look
+    @ObservedObject private var store = BotSpacesStore.shared
+    @ObservedObject private var router = Router.shared
 
     var body: some View {
-        (look.showsScene ? look.canvas : Color(uiColor: .systemBackground)).ignoresSafeArea()
+        if look.showsScene {
+            let bot = BotShell.shownBot(store.spaces, chosen: router.shownBotId)
+            ZStack {
+                SceneBackdrop(theme: look.theme, botId: bot?.id, view: bot.flatMap { store.view(for: $0.id) }, paused: true, motion: false)
+                LinearGradient(stops: [.init(color: look.canvas.opacity(Self.veilTop), location: 0),
+                                       .init(color: look.canvas.opacity(Self.veilMid), location: 0.4),
+                                       .init(color: look.canvas.opacity(Self.veilBottom), location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            #if DEBUG
+            .overlay { Color.clear.accessibilityElement().accessibilityIdentifier("shellScene").accessibilityValue(look.theme.id) }
+            #endif
+        } else {
+            look.canvas.ignoresSafeArea()
+        }
     }
+
+    /// The veil's strength: the scene reads at the top, text sits on more canvas below.
+    static let veilTop = 0.35
+    static let veilMid = 0.55
+    static let veilBottom = 0.75
 }
