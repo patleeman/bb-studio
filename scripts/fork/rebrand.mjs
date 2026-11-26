@@ -1103,6 +1103,81 @@ const replacements = [
     "check \\`bb plugin list\\`.`",
     "check \\`bbs plugin list\\`.`",
   ],
+  [
+    "apps/app/src/components/sidebar/SidebarUpdatesBadge.tsx",
+    "\"Restart bb now\"",
+    `\`Restart ${NAME} now\``,
+  ],
+  [
+    "apps/app/src/components/sidebar/SidebarUpdatesBadge.tsx",
+    "`Restart into bb ${bb.version} now`",
+    `\`Restart into ${NAME} \${bb.version} now\``,
+  ],
+  [
+    "apps/app/src/components/settings/MachineAccessSettings.tsx",
+    "\"Anyone on this network can use bb; only add it on a network you trust.\"",
+    `\`Anyone on this network can use ${NAME}; only add it on a network you trust.\``,
+  ],
+  [
+    "apps/app/src/components/settings/MachineAccessSettings.tsx",
+    "description=\"Other machines and your phone connect to bb over these routes.\"",
+    `description="Other machines and your phone connect to ${NAME} over these routes."`,
+  ],
+  [
+    "apps/app/src/components/settings/MachineAccessSettings.tsx",
+    "emptyMessage=\"Only this computer can reach bb right now. Add a route so other machines and your phone can connect.\"",
+    `emptyMessage="Only this computer can reach ${NAME} right now. Add a route so other machines and your phone can connect."`,
+  ],
+  [
+    "apps/app/src/components/settings/MachineAccessSettings.tsx",
+    "Your phone reaches bb over the same routes as your machines.",
+    `Your phone reaches ${NAME} over the same routes as your machines.`,
+  ],
+  [
+    "apps/app/src/components/settings/ReplacementProviderSetting.tsx",
+    "`Chooses ${builtIn?.title ?? \"bb\"}.`",
+    `\`Chooses \${builtIn?.title ?? "${NAME}"}.\``,
+  ],
+  [
+    "apps/app/src/components/settings/ReplacementProviderSetting.tsx",
+    "\"from bb\"",
+    `"from ${NAME}"`,
+  ],
+  [
+    "apps/app/src/components/settings/ReplacementProviderSetting.tsx",
+    "`${titleOf(slot)} (from bb)`",
+    `\`\${titleOf(slot)} (from ${NAME})\``,
+  ],
+  [
+    "apps/app/src/components/settings/PluginChoiceSettings.tsx",
+    "\"bb's file preview.\"",
+    `"${NAME}'s file preview."`,
+  ],
+  [
+    "apps/app/src/components/settings/PluginChoiceSettings.tsx",
+    "\"bb's code block.\"",
+    `"${NAME}'s code block."`,
+  ],
+  [
+    "apps/app/src/components/settings/UpdatesSettingsSection.tsx",
+    "updated outside bb. This page",
+    `updated outside ${NAME}. This page`,
+  ],
+  [
+    "apps/app/src/components/settings/PluginChoiceSettings.test.tsx",
+    "/^tasks \\(from bb\\)/u",
+    "/^tasks \\(from BB Studio\\)/u",
+  ],
+  [
+    "apps/app/src/components/sidebar/SidebarUpdatesBadge.test.tsx",
+    'name: "Restart into bb 0.49.0 now"',
+    `name: "Restart into ${NAME} 0.49.0 now"`,
+  ],
+  [
+    "apps/app/src/components/settings/MachineAccessSettings.test.tsx",
+    "/Only this computer can reach bb/",
+    "/Only this computer can reach BB Studio/",
+  ],
 ];
 for (const [file, from, to, expected = 1] of replacements) {
   const target = join(root, file);
