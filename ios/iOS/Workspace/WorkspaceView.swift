@@ -113,14 +113,15 @@ struct WorkspaceView<Info: View, Strands: View>: View {
             }
             // Heavy views stay loaded (hidden) while among the two newest; the rest load when shown.
             ForEach(tabs.filter { $0.heavy && store.mounted.contains($0.id) && $0.id != selected }) { tab in
-                WorkbenchTabBody(tab: tab, threadId: threadId, webURL: webURL, openThread: openThread)
+                WorkbenchTabContent(tab: tab)
                     .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
             }
             if let tab = tabs.first(where: { $0.id == selected }) {
-                WorkbenchTabBody(tab: tab, threadId: threadId, webURL: webURL, openThread: openThread)
+                WorkbenchTabContent(tab: tab)
                     .id(tab.id)
             }
         }
+        .environment(\.workbenchContext, WorkbenchContext(threadId: threadId, webURL: webURL, openThread: openThread))
     }
 }
 
