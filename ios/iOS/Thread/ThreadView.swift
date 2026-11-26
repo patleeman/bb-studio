@@ -242,8 +242,13 @@ struct ThreadView: View {
         }
     }
 
-    /// The screen and its sheets.
-    private var withSheets: some View {
+    /// The screen and its sheets, type-erased: `body`'s chain of modifiers
+    /// stays about half as deep as one type (see `screen`).
+    private var withSheets: AnyView {
+        AnyView(withSheetsContent)
+    }
+
+    private var withSheetsContent: some View {
         withConversation
         .sheet(isPresented: $showingWeb) {
             if let thread = model.thread {
@@ -1907,7 +1912,7 @@ extension ThreadView {
                     ToolbarItemGroup(placement: .topBarTrailing) { AnyView(threadActions) }
                 }
                 if conversation != nil && !duoLayout.twoPages {
-                    ToolbarItem(placement: .principal) { AnyView(conversationTitle) }
+                    ToolbarItem(placement: .principal) { conversationTitle }
                 }
                 if conversation == nil && !duoLayout.twoPages, let worker {
                     ToolbarItem(placement: .principal) { WorkerTitle(info: worker) }
