@@ -17,7 +17,18 @@ enum DraftAttachments {
             .appending(path: threadId.replacingOccurrences(of: "/", with: "_"), directoryHint: .isDirectory)
     }
 
+    #if DEBUG
+    /// An offline demo launch (`-qaBotDemo`) starts with none: UI tests
+    /// share the demo's server, and one test's photo would wait in the next's composer.
+    private static let demoFresh: Void = {
+        if ProcessInfo.processInfo.arguments.contains("-qaBotDemo") { try? FileManager.default.removeItem(at: root) }
+    }()
+    #endif
+
     static func load(_ threadId: String, serverURL: URL) -> [PendingAttachment] {
+        #if DEBUG
+        _ = demoFresh
+        #endif
         let folder = folder(threadId, serverURL: serverURL)
         guard let data = try? Data(contentsOf: folder.appending(path: "list.json")),
               let entries = try? JSONDecoder().decode([Entry].self, from: data) else { return [] }
@@ -30,6 +41,9 @@ enum DraftAttachments {
 
     /// Writes only files it doesn't have yet, and removes the ones gone from the composer.
     static func save(_ items: [PendingAttachment], threadId: String, serverURL: URL) {
+        #if DEBUG
+        _ = demoFresh
+        #endif
         let folder = folder(threadId, serverURL: serverURL)
         let manager = FileManager.default
         guard !items.isEmpty else {

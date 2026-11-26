@@ -38,6 +38,9 @@ final class ShellPostureTests: XCTestCase {
                        [.workbench(tabs: 3), .home(lit: false), .more], "9c, Chat")
         XCTAssertEqual(RailLayout.slots(.folded, screen: .conversation(workbench: true), tabs: 3, homeShown: false),
                        [.chat, .home(lit: false), .tabs, .more], "9c, Workbench")
+        // Pushed over another conversation (a reply thread, a worker): Back lowest.
+        XCTAssertEqual(RailLayout.slots(.folded, screen: .conversation(workbench: false, over: true), tabs: 3, homeShown: false),
+                       [.back, .workbench(tabs: 3), .home(lit: false), .more])
         XCTAssertEqual(RailLayout.slots(.vertical, screen: .home, tabs: 0, homeShown: false), [.new, .search], "9f, Home")
         XCTAssertEqual(RailLayout.slots(.book, screen: .conversation(workbench: true), tabs: 3, homeShown: false),
                        [.tabs, .home(lit: false), .more], "9d")

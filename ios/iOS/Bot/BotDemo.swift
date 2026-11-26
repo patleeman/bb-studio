@@ -329,12 +329,6 @@ enum BotDemo {
         return Data(#"{"id":"\#(threadId)","projectId":"proj_personal","environmentId":"env_botdemo01","title":"Juniper","status":"\#(running ? "active" : "idle")","createdAt":1,"updatedAt":\#(now)\#(read)}"#.utf8)
     }
 
-    static var sheet: String? {
-        let arguments = ProcessInfo.processInfo.arguments
-        guard let index = arguments.firstIndex(of: "-qaBotSheet"), arguments.indices.contains(index + 1) else { return nil }
-        return arguments[index + 1]
-    }
-
     static var current: Fixture? {
         guard let variant else { return nil }
         if variant == "duo" {

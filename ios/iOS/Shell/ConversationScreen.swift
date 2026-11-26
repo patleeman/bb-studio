@@ -88,8 +88,8 @@ struct ConversationScreen: View {
     }
 
     private var slots: [RailSlot] {
-        RailLayout.slots(posture, screen: .conversation(workbench: showsWorkbench), tabs: workbench.count(threadId),
-                         homeShown: false)
+        RailLayout.slots(posture, screen: .conversation(workbench: showsWorkbench, over: router.path.count > 1),
+                         tabs: workbench.count(threadId), homeShown: false)
     }
 
     private var railActions: RailActions {
@@ -98,6 +98,7 @@ struct ConversationScreen: View {
             case .workbench: flip(to: true)
             case .chat: flip(to: false)
             case .home: router.path = []
+            case .back: if !router.path.isEmpty { router.path.removeLast() }
             default: break
             }
         }, tabs: AnyView(tabMenu), more: AnyView(moreMenu))

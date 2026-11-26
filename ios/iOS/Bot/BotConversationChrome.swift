@@ -130,29 +130,6 @@ struct ConversationReplyRow: View {
     }
 }
 
-struct WorkerTitle: View {
-    @Environment(\.look) private var look
-    let info: WorkerInfo
-
-    var body: some View {
-        VStack(spacing: 1) {
-            Text(info.displayTitle).font(.headline).lineLimit(1)
-            TimelineView(.periodic(from: .now, by: 60)) { context in
-                HStack(spacing: 5) {
-                    BotWorkerGlyph(status: info.status).accessibilityHidden(true)
-                    Text(info.headerLabel(now: context.date)).lineLimit(1)
-                }
-                .font(.caption)
-                .foregroundStyle(info.status == .needsYou ? AnyShapeStyle(look.needsYou) : AnyShapeStyle(.secondary))
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(info.displayTitle), \(info.stateLabel)")
-        .accessibilityValue(info.status.rawValue)
-        .accessibilityIdentifier("workerTitle")
-    }
-}
-
 struct WorkerAskLine: View {
     let info: WorkerInfo
     let look: BotLook

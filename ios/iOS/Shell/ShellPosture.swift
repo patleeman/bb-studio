@@ -140,7 +140,9 @@ enum ShellScreen: Equatable {
     /// Home at the root.
     case home
     /// A conversation (or a pushed thread), in Chat or in its Workbench.
-    case conversation(workbench: Bool)
+    /// `over`: pushed over another conversation (a reply thread, a fork, a
+    /// worker), so Back returns to it.
+    case conversation(workbench: Bool, over: Bool = false)
     /// Anything else pushed (Memory, a page, Settings…): its bar hides on the Duo,
     /// so Back and its actions are here. `depth`: how far over Home it is.
     case pushed(actions: [ScreenAction], depth: Int)
@@ -184,8 +186,9 @@ enum RailLayout {
         case .folded, .vertical:
             switch screen {
             case .home: return [.new, .search]
-            case .conversation(workbench: false): return [.workbench(tabs: tabs), .home(lit: false), .more]
-            case .conversation(workbench: true): return [.chat, .home(lit: false), .tabs, .more]
+            case .conversation(let workbench, let over):
+                let own: [RailSlot] = workbench ? [.chat, .home(lit: false), .tabs, .more] : [.workbench(tabs: tabs), .home(lit: false), .more]
+                return over ? [.back] + own : own
             case .pushed(let actions, let depth): return pushed(actions, depth: depth)
             }
         }

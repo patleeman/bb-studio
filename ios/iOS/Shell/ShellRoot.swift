@@ -58,7 +58,10 @@ struct ShellRoot: View {
     private func land() {
         router.land(store) { bot, main in ShellMemory.opening(main: main, botId: bot.id, store: store) }
         #if DEBUG
-        if let id = ShellMemory.qaConversation, router.path.isEmpty, store.spaces != nil { router.openConversation(id) }
+        if !ShellMemory.qaOpened, let id = ShellMemory.qaConversation, router.path.isEmpty, store.spaces != nil {
+            ShellMemory.qaOpened = true
+            router.openConversation(id)
+        }
         #endif
         router.consume(store)
     }
@@ -95,6 +98,9 @@ enum ShellMemory {
     }
 
     #if DEBUG
+    /// Once a launch: Home stays Home after the test goes back to it.
+    static var qaOpened = false
+
     /// `-qaRoomConversation <id>`: the UI tests open on a conversation, pushed over Home.
     static var qaConversation: String? {
         let arguments = ProcessInfo.processInfo.arguments
@@ -225,8 +231,12 @@ struct ShellPlace: View {
 /// What a thread's screen knows of the Bot it belongs to.
 @MainActor
 enum ShellContext {
+    /// A worker; a conversation of the Bot's; else a side thread (a reply thread or a fork) of one.
     static func kind(_ threadId: String, bot: BotSpace, store: BotSpacesStore) -> BotConversationContext.Kind {
-        store.view(for: bot.id)?.workers.contains { $0.threadId == threadId } == true ? .worker : .conversation
+        guard let view = store.view(for: bot.id) else { return .conversation }
+        if view.workers.contains(where: { $0.threadId == threadId }) { return .worker }
+        if view.conversations.contains(where: { $0.threadId == threadId }) || view.main?.threadId == threadId { return .conversation }
+        return .reply
     }
 
     static func make(_ threadId: String, kind: BotConversationContext.Kind, bot: BotSpace, store: BotSpacesStore) -> BotConversationContext {
@@ -454,7 +464,10 @@ struct ShellBackground: View {
             .allowsHitTesting(false)
             .accessibilityHidden(true)
             #if DEBUG
-            .overlay { Color.clear.accessibilityElement().accessibilityIdentifier("shellScene").accessibilityValue(look.theme.id) }
+            // A point, not the screen: a full-screen element can hide every control from XCUITest's hit test.
+            .overlay(alignment: .topLeading) {
+                Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityIdentifier("shellScene").accessibilityValue(look.theme.id)
+            }
             #endif
         } else {
             look.canvas.ignoresSafeArea()
