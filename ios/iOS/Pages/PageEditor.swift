@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 
 /// Edits the whole page as one Markdown text and saves a moment after typing
@@ -31,6 +32,9 @@ struct PageEditor: View {
     @State private var showingServer = false
     @State private var copied = false
     @State private var controller = PageTextController()
+    @State private var mentioning = false
+    @State private var photo: PhotosPickerItem?
+    @State private var uploading = false
 
     init(pageId: String, note: NoteDoneActions? = nil, onSaved: @escaping () async -> Void) {
         self.pageId = pageId
@@ -152,6 +156,12 @@ struct PageEditor: View {
             }
         }
         .sensoryFeedback(.success, trigger: copied)
+        .sheet(isPresented: $mentioning) { PageMentionPicker { controller.insert($0) } }
+        .onChange(of: photo) { _, item in
+            guard let item else { return }
+            photo = nil
+            Task { await upload(item) }
+        }
         .sheet(isPresented: $dictating) {
             DictationView(threadId: nil, autoStart: true, insertLabel: ("Insert in page", "text.insert"), gate: dictation) { spoken in
                 controller.insert(spoken)
@@ -187,7 +197,7 @@ struct PageEditor: View {
     }
 
     private var formatBar: some View {
-        HStack(spacing: 18) {
+        HStack(spacing: 14) {
             Menu {
                 Button("Paragraph") { controller.setLinePrefix("") }
                 Button("Heading 1") { controller.setLinePrefix("# ") }
@@ -202,6 +212,9 @@ struct PageEditor: View {
                 .accessibilityLabel("Checklist")
             Button { controller.insert("[link text](https://)") } label: { Image(systemName: "link") }
                 .accessibilityLabel("Insert link")
+            Button { mentioning = true } label: { Image(systemName: "at") }
+                .accessibilityLabel("Mention")
+            PageInsertMenu(controller: controller, mentioning: $mentioning, photo: $photo)
             Button { dictating = true } label: { Image(systemName: "mic") }
                 .accessibilityLabel("Dictate into page")
             Spacer()
@@ -217,9 +230,25 @@ struct PageEditor: View {
     }
 
     private var status: String {
+        if uploading { return "Uploading photo…" }
         if model.saving { return "Saving…" }
         if model.localError != nil { return "Not saved locally" }
         return model.dirty ? "Draft on this phone" : "Saved"
+    }
+
+    /// A photo from the library, uploaded to the page and put at the cursor as an image.
+    private func upload(_ item: PhotosPickerItem) async {
+        uploading = true
+        defer { uploading = false }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else { return }
+            // Studio keeps files up to 15 MB; a JPEG of the photo keeps it well under.
+            let jpeg = UIImage(data: data)?.jpegData(compressionQuality: 0.85) ?? data
+            let url = try await model.client.uploadPageFile(pageId, name: "photo.jpg", mime: "image/jpeg", data: jpeg)
+            controller.insertBlock("![Photo](\(url))")
+        } catch {
+            noteError = BBClient.describe(error, server: model.client.baseURL)
+        }
     }
 
     /// Saves the latest typing first, so the thread gets everything on screen.
