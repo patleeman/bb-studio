@@ -72,7 +72,7 @@ describe("buildAppCommandActions", () => {
     expect(actions[0]).toMatchObject({
       id: "app:thread.new",
       bucket: "Threads",
-      group: "Threads",
+      group: "Conversations",
       shortcut: SHORTCUT,
     });
   });
