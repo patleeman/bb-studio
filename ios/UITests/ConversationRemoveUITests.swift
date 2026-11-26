@@ -74,7 +74,7 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         shot("2-archive-swipe")
         restore.tap()
         XCTAssertTrue(finished.waitForNonExistence(timeout: 10), "restored, it leaves the archive")
-        app.closeRoomSheet()
+        app.goHome()
         openConversations()
         XCTAssertTrue(interview.waitForExistence(timeout: 15), "and is back in Conversations")
     }

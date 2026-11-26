@@ -146,7 +146,7 @@ final class BotWorkersTests: XCTestCase {
         let context = BotConversationContext(
             threadId: "thr_main", kind: .conversation, botId: "b", botName: "Juniper", look: BotLook(shape: nil, color: nil, emoji: "🌿"),
             mainThreadId: "thr_main", conversation: nil, workers: WorkersLine(conversationId: "thr_main", view: nil), allWorkers: [worker],
-            splitsThreads: false, push: { _ in }, openConversation: { _ in }, showList: {}, refresh: {})
+            push: { _ in }, openConversation: { _ in }, showList: {}, refresh: {})
         XCTAssertTrue(context.isWorker("thr_w"), "a worker pushed from the workers line")
         XCTAssertFalse(context.isWorker("thr_main"))
         XCTAssertEqual(context.worker("thr_w")?.status, .failed)

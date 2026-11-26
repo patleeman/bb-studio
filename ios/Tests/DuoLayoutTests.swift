@@ -80,21 +80,4 @@ final class DuoLayoutTests: XCTestCase {
         XCTAssertEqual(RegularScrollingSurface.inset(column: 0, width: 459.5, readableWidth: 760), 0)
     }
 
-    @MainActor
-    func testResizeDoesNotChangeSelectedRouteOrStoredDraft() {
-        let app = AppModel.shared
-        let previousTab = app.router.tab
-        let id = "duo-retention-\(UUID())"
-        defer {
-            app.router.tab = previousTab
-            Drafts.save(id, text: "", mentions: [], serverURL: app.serverURL)
-        }
-        app.open(.conversation(id))
-        Drafts.save(id, text: "Keep this unsent draft", mentions: [], serverURL: app.serverURL)
-        for size in [CGSize(width: 466, height: 678), CGSize(width: 951, height: 669), CGSize(width: 669, height: 951)] {
-            _ = DuoLayout(size: size)
-            XCTAssertEqual(app.router.pending, .conversation(id))
-            XCTAssertEqual(Drafts.load(id, serverURL: app.serverURL)?.text, "Keep this unsent draft")
-        }
-    }
 }

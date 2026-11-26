@@ -48,11 +48,11 @@ final class ThreadRowsMemoTests: XCTestCase {
         XCTAssertFalse(SilentOutput.isPass(nil))
 
         for token in ["[pass]", " `[FAIL]` ", "**[failed]**", "~[DONE]~", "[ok]", "[skip]", "[SKIPPED]", "[noop]"] {
-            XCTAssertTrue(RoomText.isStatusToken(token), token)
+            XCTAssertTrue(ConversationText.isStatusToken(token), token)
         }
-        XCTAssertFalse(RoomText.isStatusToken("[PASS] extra"))
-        XCTAssertFalse(RoomText.isStatusToken("[unknown]"))
-        XCTAssertFalse(RoomText.isStatusToken("plain text"))
+        XCTAssertFalse(ConversationText.isStatusToken("[PASS] extra"))
+        XCTAssertFalse(ConversationText.isStatusToken("[unknown]"))
+        XCTAssertFalse(ConversationText.isStatusToken("plain text"))
 
         let directive = Directive.last(in: "Hello\n\n::next{reply=\"👍 Looks good\"}")
         XCTAssertEqual(Directive.next(from: directive).reply, ["👍 Looks good"])

@@ -1,0 +1,93 @@
+import SwiftUI
+import XCTest
+@testable import BBStudio
+
+/// The Workbench's pure parts: loaded views, links, the contract, which tab shows, New tab's refs.
+final class WorkbenchTests: XCTestCase {
+    func testAtMostTwoHeavyViewsStayLoaded() {
+        var mounted: [String] = []
+        mounted = WorkspaceMounted.touch(mounted, "a", heavy: true)
+        mounted = WorkspaceMounted.touch(mounted, "b", heavy: true)
+        mounted = WorkspaceMounted.touch(mounted, "c", heavy: true)
+        XCTAssertEqual(mounted, ["c", "b"], "the oldest goes")
+        mounted = WorkspaceMounted.touch(mounted, "b", heavy: true)
+        XCTAssertEqual(mounted, ["b", "c"], "a revisit moves it to the front")
+        XCTAssertEqual(WorkspaceMounted.touch(mounted, "light", heavy: false), ["b", "c"], "light views don't count")
+        XCTAssertEqual(WorkspaceMounted.prune(mounted, keeping: ["c"]), ["c"])
+    }
+
+    func testOnlyHttpLinksOpen() {
+        func tab(_ url: String) -> WorkspaceTab { WorkspaceTab(id: "t", ref: .init(kind: "browser", url: url), title: "x", support: .web) }
+        XCTAssertNotNil(tab("https://example.com/a").safeURL)
+        XCTAssertNotNil(tab("http://example.test/a").safeURL)
+        XCTAssertNil(tab("javascript:alert(1)").safeURL)
+        XCTAssertNil(tab("file:///etc/hosts").safeURL)
+        XCTAssertNil(tab("bbstudio://settings").safeURL)
+    }
+
+    func testStateFromTheContract() throws {
+        let json = """
+        {"threadId":"t","activeTabId":"b","panelOpen":true,"version":7,"tabs":[
+          {"tabId":"b","ref":{"kind":"design","id":"dsn_1"},"title":"Stills","position":1,"openedBy":"agent","openedAt":2,"mobileSupport":"native"},
+          {"tabId":"a","ref":{"kind":"vscode","path":"ios/README.md"},"title":"","position":0,"openedBy":"user","openedAt":1,"mobileSupport":"desktopOnly"}]}
+        """
+        let output = try JSONDecoder().decode(Studio.ThreadWorkbenchGetOutput.self, from: Data(json.utf8))
+        let state = WorkspaceState(output, threadId: "t")
+        XCTAssertEqual(state.version, 7)
+        XCTAssertEqual(state.tabs.map(\.id), ["a", "b"], "in position order")
+        XCTAssertEqual(state.tabs[0].title, "README.md", "a nameless tab takes its path's name")
+        XCTAssertEqual(state.tabs[0].support, .desktopOnly)
+        XCTAssertTrue(state.tabs[1].openedByAgent)
+        XCTAssertEqual(state.tabs[1].ref.kind, "design")
+        XCTAssertTrue(state.tabs[1].heavy)
+    }
+
+    func testTheShownTabIsThePickedOneElseStudiosActiveElseTheFirst() {
+        let tabs = ["a", "b", "c"].map { WorkspaceTab(id: $0, ref: .init(kind: "page", id: $0), title: $0) }
+        XCTAssertEqual(WorkbenchStore.selected(tabs, picked: "c", active: "b")?.id, "c")
+        XCTAssertEqual(WorkbenchStore.selected(tabs, picked: "gone", active: "b")?.id, "b", "a closed pick falls back")
+        XCTAssertEqual(WorkbenchStore.selected(tabs, picked: nil, active: nil)?.id, "a")
+        XCTAssertNil(WorkbenchStore.selected([], picked: "a", active: "a"), "no tabs: the empty Workbench")
+    }
+
+    func testNewTabOpensStudioItemsByKind() throws {
+        func item(_ href: String) throws -> Studio.SearchAllOutputItem {
+            try JSONDecoder().decode(Studio.SearchAllOutputItem.self, from: Data(#"{"title":"x","href":"\#(href)"}"#.utf8))
+        }
+        XCTAssertEqual(WorkbenchNewTab.ref(try item("/plugins/studio/studio/pages/pg_1"))?.kind, "page")
+        XCTAssertEqual(WorkbenchNewTab.ref(try item("/plugins/studio/studio/pages/pg_1"))?.id, "pg_1")
+        XCTAssertNil(WorkbenchNewTab.ref(try item("/somewhere/else")), "what can't be a tab isn't offered")
+    }
+}
+
+/// A hidden, still-loaded tab's actions never reach the More menu; the shown tab's do.
+@MainActor
+final class ScreenActionsTests: XCTestCase {
+    private struct Tab: View {
+        let id: String
+        var body: some View {
+            Color.clear.frame(width: 10, height: 10)
+                .screenActions([ScreenAction(id: id, title: id, systemImage: "star")])
+        }
+    }
+
+    private final class Box { var ids: [String] = [] }
+
+    private func reported(_ view: some View) -> [String] {
+        let box = Box()
+        let renderer = ImageRenderer(content: view.onPreferenceChange(ScreenActionsKey.self) { actions in
+            MainActor.assumeIsolated { box.ids = actions.map(\.id) }
+        })
+        _ = renderer.uiImage
+        return box.ids
+    }
+
+    func testTheShownTabsActionsWinOverAHiddenOnesAfterIt() {
+        XCTAssertEqual(reported(ZStack { Tab(id: "shown"); Tab(id: "hidden").modifier(WorkbenchHiddenTab()) }), ["shown"])
+        XCTAssertEqual(reported(ZStack { Tab(id: "hidden").modifier(WorkbenchHiddenTab()); Tab(id: "shown") }), ["shown"])
+    }
+
+    func testAHiddenTabAloneReportsNone() {
+        XCTAssertEqual(reported(ZStack { Tab(id: "hidden").modifier(WorkbenchHiddenTab()) }), [])
+    }
+}

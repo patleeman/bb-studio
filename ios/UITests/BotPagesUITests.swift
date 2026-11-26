@@ -73,7 +73,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("strands-overview").waitForExistence(timeout: 15), "the Strands screen")
         XCTAssertTrue(any("strands-line").waitForExistence(timeout: 15), "with the Bot's open strands")
         shot("strands")
-        app.closeRoomSheet()
+        app.goHome()
 
         openPage("automations")
         XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 15))
@@ -125,7 +125,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 20), "Memory loads after the Bot's id changes under it")
         XCTAssertFalse(any("memoryLoading").exists, "no spinner left")
         shot("slow-memory-loaded")
-        app.closeRoomSheet()
+        app.goHome()
         openPage("library")
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'library-row-'")).firstMatch.exists,
@@ -146,7 +146,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         shot("memory-error-retry")
         retry.tap()
         XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 15), "Retry loads Memory")
-        app.closeRoomSheet()
+        app.goHome()
         openPage("library")
         let libraryRetry = app.buttons["Retry"].firstMatch
         XCTAssertTrue(libraryRetry.waitForExistence(timeout: 15), "an error with Retry, not a spinner")

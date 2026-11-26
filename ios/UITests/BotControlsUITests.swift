@@ -33,7 +33,7 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: paused, object: any("roomListHeader"))], timeout: 15), .completed,
                        "the header says Paused")
         shot("2-paused-list")
-        app.closeRoomSheet()
+        app.goHome()
         XCTAssertTrue(any("RoomSheet-conversations").waitForNonExistence(timeout: 10), "the list closes")
         // Round 5: a lasting state is a chip in the composer's top row, not a banner.
         let chip = app.buttons["chip-paused"]

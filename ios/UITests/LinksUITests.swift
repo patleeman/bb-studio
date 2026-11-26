@@ -19,7 +19,7 @@ final class LinksUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.navigationBars["Archive"].waitForExistence(timeout: 30), "the Archive page")
         XCTAssertTrue(app.buttons["archive-finished-thr_demo_lisbon"].waitForExistence(timeout: 15))
         shot("archive-link")
-        app.closeRoomSheet()
+        app.goHome()
         XCTAssertTrue(app.waitForRoom(timeout: 15), "pulling down shows the room")
     }
 
