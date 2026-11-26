@@ -884,6 +884,24 @@
       "coverage": "generated method"
     },
     {
+      "file": "ios/Shared/Workspace.swift",
+      "plugin": "studio",
+      "method": "threadWorkbenchGet",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Workspace.swift",
+      "plugin": "studio",
+      "method": "threadWorkbenchMutate",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Workspace.swift",
+      "plugin": "studio",
+      "method": "threadWorkbenchShown",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/iOS/App/Links.swift",
       "plugin": "studio",
       "method": "links.resolve",
