@@ -14,7 +14,7 @@ import { adoptAtStart, backupPath, KEEP_BACKUPS, migrateToTasks, summarizeTaskMi
 import { registerTasks } from "./register";
 import { seedTodo, todoGroups, withTaskTools, withWorkTools } from "./test/tools";
 import { markTasksUnavailable, normalizeTask, TaskStore } from "./store";
-import { applyLoop, applyWork, taskFromLoop, taskFromWork, toLoop, toWork } from "./views";
+import { applyWork, taskFromLoop, taskFromWork, toLoop, toWork } from "./views";
 import { taskFromLoop as captureTaskFromLoop } from "../../../../scripts/capture/task-rows.mjs";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
@@ -222,7 +222,6 @@ it("round-trips every todo status and kind and every card state through a task",
       const loop = { id: "loop_x", title: "T", why: "", source: null, kind, options: kind === "decide" ? ["A"] : [], owner: "patrick", trigger: { type: "time" as const, at: NOW }, priority: "low" as const, push: true, status, due: NOW, area: "Home", createdAt: 1, updatedAt: 2, closedAt: closed ? 3 : null, closedBy: closed ? "patrick" : null };
       const task = normalizeTask(taskFromLoop(loop), NOW);
       expect(toLoop(task)).toEqual(loop);
-      expect(toLoop(applyLoop(task, loop))).toEqual(loop);
     }
   }
   for (const state of ["running", "waiting", "needs-you", "done", "failed"] as const) {

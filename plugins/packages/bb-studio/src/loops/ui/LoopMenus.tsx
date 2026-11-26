@@ -1,4 +1,3 @@
 // The small buttons old task and to-do cards and the automation tab draw with.
 export const CARD_BUTTON = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 text-sm text-foreground hover:bg-state-hover disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-state-active [&_svg]:size-3.5";
-export const CARD_PRIMARY = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-foreground px-2.5 text-sm font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5";
 export const CARD_GHOST = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-state-active [&_svg]:size-3.5";
