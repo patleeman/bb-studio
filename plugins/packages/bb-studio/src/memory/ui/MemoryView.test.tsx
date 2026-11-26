@@ -8,7 +8,7 @@ import { Bots } from "../../bot";
 import { CORE_TEMPLATE } from "../../core-skill";
 
 const SUMMARY = "**Decisions**\n- Ship on Friday.\n\n**Left open**\n- Who writes the post?\n\n**Made**\n- The launch page.";
-const store = vi.hoisted(() => ({ bots: null as null | import("../../bot").Bots, learning: { enabled: true }, calls: [] as [string, Record<string, unknown>][], searched: [] as string[], coreReads: 0 }));
+const store = vi.hoisted(() => ({ bots: null as null | import("../../bot").Bots, learning: { enabled: true }, calls: [] as [string, Record<string, unknown>][], searched: [] as string[], coreReads: 0, beforeWrite: null as null | (() => void) }));
 vi.mock("../../ui/live", () => {
   const read = (method: string, input: Record<string, unknown>) => {
     const bots = store.bots!;
@@ -26,7 +26,7 @@ vi.mock("../../ui/live", () => {
   const call = async (method: string, input: Record<string, unknown>) => {
     store.calls.push([method, input]);
     const bots = store.bots!;
-    if (method === "bot_skill_write") return bots.writeSkill(input as never, input.botId as string);
+    if (method === "bot_skill_write") { const before = store.beforeWrite; store.beforeWrite = null; before?.(); return bots.writeSkill(input as never, input.botId as string); }
     if (method === "bot_core") return read(method, input);
     if (method === "bot_learning_set") { store.learning = { enabled: input.enabled as boolean }; return {}; }
     if (method === "bot_learning_review") return { started: true };
@@ -140,6 +140,19 @@ it("flags a conflict when the same section changed while you edited; saving agai
   await click($("[data-testid=memory-section-save]"));
   expect(bots.skill("core-profile", "bot_main")!.body).toContain("## Check-in\n\n- Mine.");
   expect(bots.skill("core-profile", "bot_main")!.body).not.toContain("Theirs");
+});
+
+it("writes with ifBody, so an edit between the read and the write becomes a conflict, not an overwrite", async () => {
+  render(<MemoryView botId="bot_main" />);
+  const prefs = qa("[data-testid=memory-core-section]").find((each) => each.dataset.section === "Preferences")!;
+  await click(prefs.querySelector("[data-testid=memory-section-edit]"));
+  type($("[data-testid=memory-section-input]") as HTMLTextAreaElement, "- Mine.");
+  // The Bot writes the same section right after the page's re-read: the compare-and-swap refuses.
+  store.beforeWrite = () => { const core = store.bots!.skill("core-profile", "bot_main")!; store.bots!.writeSkill({ name: "core-profile", description: core.description, body: core.body.replace("## Preferences\n", "## Preferences\n\n- Theirs.\n") }, "bot_main"); };
+  await click($("[data-testid=memory-section-save]"));
+  expect(store.calls.find(([method]) => method === "bot_skill_write")?.[1]).toMatchObject({ ifBody: expect.any(String) });
+  expect($("[data-testid=memory-section-conflict]")?.textContent).toContain("- Theirs.");
+  expect(store.bots!.skill("core-profile", "bot_main")!.body).not.toContain("- Mine.");
 });
 
 it("adds a skill, toggles Auto-learn and runs it now", async () => {

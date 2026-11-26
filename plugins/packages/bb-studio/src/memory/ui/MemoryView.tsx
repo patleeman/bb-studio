@@ -33,6 +33,8 @@ import { summarySections } from "../../ui/conversations/model";
 const SMALL = "h-7 px-2.5 text-xs font-normal";
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const chars = (value: number) => value.toLocaleString("en-US");
+/** Part of bot_skill_write's SKILL_CHANGED refusal (src/bot-skills.ts), which the UI can't import. */
+const SKILL_CHANGED_HINT = "changed since you opened it";
 
 /** A skill body split at its `## ` headings: the text before the first, then each section. */
 export function splitSections(body: string): { preamble: string; sections: { heading: string; text: string }[] } {
@@ -96,12 +98,19 @@ function CoreLayer({ botId }: { botId: string }) {
       const current = section === null ? latest.body : sectionText(latest.body, section) ?? "";
       if (current.trim() !== base.trim()) return { conflict: current };
       const body = section === null ? text : withSection(latest.body, section, text);
-      await call("bot_skill_write", { botId, name, description: latest.description, body });
+      // A compare-and-swap (ifBody, as the phone writes): if the Bot changed the skill after this read, nothing is written.
+      await call("bot_skill_write", { botId, name, description: latest.description, body, ifBody: latest.body });
       setEditing(null);
       core.refresh();
       return null;
     } catch (cause) {
-      setError(errorMessage(cause) || "It didn't save.");
+      const message = errorMessage(cause) ?? "";
+      if (message.includes(SKILL_CHANGED_HINT)) {
+        // Changed between the read and the write: show what it says now, as a conflict.
+        const now = (await call("bot_core", { botId }).catch(() => null))?.skills.find((each) => each.name === name);
+        if (now) return { conflict: section === null ? now.body : sectionText(now.body, section) ?? "" };
+      }
+      setError(message || "It didn't save.");
       return null;
     }
   };
