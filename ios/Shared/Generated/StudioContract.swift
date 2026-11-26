@@ -14831,13 +14831,15 @@ public enum Studio {
     public var description: String?
     public var body: String?
     public var alwaysOn: Bool?
+    public var ifBody: String?
 
-    public init(botId: String? = nil, name: String? = nil, description: String? = nil, body: String? = nil, alwaysOn: Bool? = nil) {
+    public init(botId: String? = nil, name: String? = nil, description: String? = nil, body: String? = nil, alwaysOn: Bool? = nil, ifBody: String? = nil) {
       self.botId = botId
       self.name = name
       self.description = description
       self.body = body
       self.alwaysOn = alwaysOn
+      self.ifBody = ifBody
     }
   }
 

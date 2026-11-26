@@ -625,8 +625,12 @@ export const rpcContract = defineRpcContract({
       core: z.boolean().optional() })),
     chars: z.number(), cap: z.number(), over: z.boolean(),
   }) },
-  /** Adds or replaces one of the Bot's skills (as its bot_skill_edit tool does with op "write"). */
-  bot_skill_write: { input: z.object({ botId, name: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(64), description: z.string().trim().min(1).max(500), body: z.string().min(1).max(20_000), alwaysOn: z.boolean().optional() }), output: botSkill },
+  /**
+   * Adds or replaces one of the Bot's skills (as its bot_skill_edit tool does with op "write").
+   * `ifBody` makes it a compare-and-swap: written only while the skill's body is still exactly that text
+   * (null: only while no such skill exists); otherwise it fails and writes nothing (src/bot-skills.ts, SKILL_CHANGED).
+   */
+  bot_skill_write: { input: z.object({ botId, name: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(64), description: z.string().trim().min(1).max(500), body: z.string().min(1).max(20_000), alwaysOn: z.boolean().optional(), ifBody: z.string().max(20_000).nullable().optional() }), output: botSkill },
   /** Shares a Bot skill: it moves into BB's user skills, for every agent. */
   bot_skill_share: { input: z.object({ botId, name: z.string().min(1).max(100) }), output: z.object({ path: z.string() }) },
   /** Deletes a Bot skill. */

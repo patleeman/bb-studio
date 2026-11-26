@@ -9,6 +9,7 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { botHeartbeat, botInstructions, BOT_ID, Bots, newMainNote, CHECKIN_PRESETS, classifyActivity, descendants, setupInput, spawnedBy, startedBy } from "./bot";
+import { SKILL_CHANGED } from "./bot-skills";
 import { CORE_TEMPLATE, DEFAULT_CHECKIN, sectionText } from "./core-skill";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
 
@@ -948,6 +949,22 @@ it("moves a Bot's core profile page into its always-on skill once, whole, even o
   x.bots.writeSkill({ name: "core-profile", description: "Mine", body: "Not a profile." }, other.bot!.id);
   expect(x.bots.ensureCore(other.bot!.id)).toMatchObject({ state: "created", skill: "core-profile-moved" });
   expect(x.bots.skill("core-profile", other.bot!.id)).toMatchObject({ alwaysOn: false, description: "Mine" });
+});
+
+it("writes a skill as a compare-and-swap with ifBody: only over the text the client read, never over a newer edit", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  // null: only while there's no such skill (a new skill never replaces one the Bot just made).
+  x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "v1", ifBody: null });
+  expect(() => x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "mine", ifBody: null })).toThrow(SKILL_CHANGED);
+  // The Bot edits after the client read "v1": the client's write is refused and changes nothing.
+  x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "v2 by the Bot" });
+  expect(() => x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "mine", ifBody: "v1" })).toThrow(SKILL_CHANGED);
+  expect(x.bots.skillHistory(undefined, undefined, "inbox")[0]?.body).toBe("v2 by the Bot");
+  // Over the text it read, it writes; without ifBody it writes as before.
+  x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "mine", ifBody: "v2 by the Bot" });
+  expect(x.bots.skillHistory(undefined, undefined, "inbox")[0]?.body).toBe("mine");
 });
 
 it("keeps skills to the Bot until shared into BB's user skills, and deletes them", async () => {

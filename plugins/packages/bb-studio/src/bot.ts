@@ -1274,7 +1274,7 @@ export class Bots {
   }
 
   /** Adds or replaces one of a Bot's own skills. Only its thread loads them. */
-  writeSkill(input: { name: string; description: string; body: string; alwaysOn?: boolean }, botId?: string): BotSkillView {
+  writeSkill(input: { name: string; description: string; body: string; alwaysOn?: boolean; ifBody?: string | null }, botId?: string): BotSkillView {
     const id = this.need(botId).id;
     const view = this.skillStore.write(id, input);
     // Always on means in every prompt: pinned, so the curator never retires it.

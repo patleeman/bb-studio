@@ -16936,6 +16936,17 @@
           },
           "alwaysOn": {
             "type": "boolean"
+          },
+          "ifBody": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

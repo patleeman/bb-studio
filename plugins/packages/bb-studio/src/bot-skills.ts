@@ -8,6 +8,9 @@ import { lineDiff, lintSkill } from "./skill-learning";
 import { ALWAYS_ON_CAP, alwaysOnChars, lintAlwaysOn } from "./core-skill";
 import { rankSkills, type SearchableSkill, type SkillHit } from "./skill-search";
 
+/** bot_skill_write's refusal when `ifBody` no longer matches: the skill changed (or appeared) since the caller read it. */
+export const SKILL_CHANGED = "This skill changed since you opened it. Nothing was saved: read it again and redo the edit.";
+
 export interface BotSkillStoreDeps {
   db: Database.Database;
   userSkillsDir?: string;
@@ -55,11 +58,19 @@ export class BotSkillStore {
     return changed;
   }
 
-  /** Adds or replaces one of a Bot's own skills. A new skill is on demand unless `alwaysOn`; a rewrite keeps the flag. */
-  write(botId: string, input: { name: string; description: string; body: string; alwaysOn?: boolean }): BotSkillView {
+  /**
+   * Adds or replaces one of a Bot's own skills. A new skill is on demand
+   * unless `alwaysOn`; a rewrite keeps the flag. With `ifBody` the write is
+   * a compare-and-swap: it happens only while the skill's body is still
+   * exactly `ifBody` (null: only while there is no such skill), else it
+   * throws SKILL_CHANGED and writes nothing, so a client never overwrites
+   * an edit the Bot made after it read the skill.
+   */
+  write(botId: string, input: { name: string; description: string; body: string; alwaysOn?: boolean; ifBody?: string | null }): BotSkillView {
     if (!SKILL_NAME.test(input.name)) throw new Error("A skill name is lowercase words joined by hyphens, like weekly-review.");
     const now = Date.now();
-    const existing = this.deps.db.prepare("SELECT always_on FROM bot_skills WHERE bot_id = ? AND name = ?").get(botId, input.name) as { always_on: number } | undefined;
+    const existing = this.deps.db.prepare("SELECT always_on, body FROM bot_skills WHERE bot_id = ? AND name = ?").get(botId, input.name) as { always_on: number; body: string } | undefined;
+    if (input.ifBody !== undefined && (existing?.body ?? null) !== input.ifBody) throw new Error(SKILL_CHANGED);
     const alwaysOn = input.alwaysOn ?? existing?.always_on === 1;
     this.deps.db.prepare(`INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at, state, used_at, lint_warnings, always_on) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
       ON CONFLICT (bot_id, name) DO UPDATE SET description = excluded.description, body = excluded.body, updated_at = excluded.updated_at, state = 'active', used_at = excluded.used_at, lint_warnings = excluded.lint_warnings, always_on = excluded.always_on`)
