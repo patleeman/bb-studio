@@ -16,6 +16,9 @@ struct PageActions {
     let act: (@escaping @MainActor (BBClient) async throws -> Void) -> Void
 
     private var pageId: String { model.pageId }
+    /// The page as it is when an action runs: closures read this, not the `page` they were made with
+    /// (`ScreenAction` equality ignores closures, so the shell may keep an older list).
+    private var current: PageMeta? { model.meta ?? PagesStore.shared.page(model.pageId) }
     private var hasDraft: Bool { PageDraftStore().exists(server: model.serverURL, page: pageId) }
 
     var edit: ScreenAction? {
@@ -54,7 +57,7 @@ struct PageActions {
         list.append(ScreenAction(id: "copyMarkdown", title: "Copy as Markdown", systemImage: "doc.on.doc", disabled: model.markdown == nil,
                                        run: { UIPasteboard.general.string = model.plainMarkdown }))
         list.append(ScreenAction(id: "copyReference", title: "Copy Reference", systemImage: "at", run: {
-            UIPasteboard.general.string = "@[\(page?.displayTitle ?? "Page")](page:\(pageId))"
+            UIPasteboard.general.string = "@[\(current?.displayTitle ?? "Page")](page:\(pageId))"
         }))
         list.append(ScreenAction(id: "share", title: "Share Link", systemImage: "square.and.arrow.up",
                                        share: AppModel.shared.client.webURL(forPage: pageId).absoluteURL))
@@ -79,7 +82,7 @@ struct PageActions {
 
     /// A new empty page inside this one, opened at once (an empty page opens in the editor).
     private func addChild() {
-        let projectId = page?.projectId
+        let projectId = current?.projectId
         act { client in
             let child = try await client.createPage(projectId: projectId, parentId: pageId)
             AppModel.shared.push(.page(id: child.id))
@@ -88,7 +91,7 @@ struct PageActions {
 
     /// Studio's export of the page, written to a file for the share sheet.
     private func export(_ format: String) {
-        let title = page?.displayTitle ?? "Page"
+        let title = current?.displayTitle ?? "Page"
         act { client in
             guard let file = try await client.exportItem(pluginId: "pages", id: pageId, format: format).first,
                   let data = Data(base64Encoded: file.data) else { throw BBError(status: 0, message: "Studio sent no file.") }

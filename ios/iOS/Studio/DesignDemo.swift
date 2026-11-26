@@ -16,6 +16,8 @@ enum DesignDemo {
          "createdAt": 1, "sent": false],
     ]
     nonisolated(unsafe) private static var resolved: [[String: Any]] = []
+    /// The design's name; a saved text edit renames it, so a test sees whether one got through.
+    nonisolated(unsafe) private static var name = "Zoom check"
 
     static func design() -> [String: Any] {
         let screens: [[String: Any]] = [
@@ -23,7 +25,7 @@ enum DesignDemo {
             ["id": "1b", "round": 1, "option": "b", "title": "Desktop", "caption": "The desktop's home", "viewport": "desktop", "updatedAt": 1],
         ]
         return lock.withLock {
-            ["id": id, "name": "Zoom check", "projectId": "proj_personal", "threadId": "thr_botdemo01", "updatedAt": 1,
+            ["id": id, "name": name, "projectId": "proj_personal", "threadId": "thr_botdemo01", "updatedAt": 1,
              "rounds": [["round": 1, "title": "Home", "intro": "Two sizes", "screens": screens]],
              "comments": comments, "resolvedComments": resolved]
         }
@@ -55,6 +57,9 @@ enum DesignDemo {
                 comments.removeAll { $0["id"] as? String == input["id"] as? String }
                 resolved.removeAll { $0["id"] as? String == input["id"] as? String }
                 return ["ok": true]
+            case "designs.editText":
+                name = "Edited: \(input["after"] as? String ?? "")"
+                return ["ok": true]
             case "designs.sendComment":
                 if let index = comments.firstIndex(where: { $0["id"] as? String == input["id"] as? String }) { comments[index]["sent"] = true }
                 return ["ok": true]
@@ -79,9 +84,23 @@ enum DesignDemo {
             .card p { font-size: 11px; color: #aab1bf; margin: 6px 0 0; }
             </style></head>
             <body style="width: \(desktop ? 1280 : 390)px"><h1>\(desktop ? "Desktop home" : "Phone home")</h1><div class="grid">\(cards)</div>
-            <script>\(screenScript)</script></body></html>
+            <script>\(screenScript)</script>\(desktop ? hostile : "")</body></html>
             """
     }
+
+    /// What an agent's screen could try (screen 1b, for the security tests): leave for
+    /// another site, open a window, and post the screen script's messages itself, a pick
+    /// and a text edit, whatever the mode. None of it may work.
+    private static let hostile = """
+        <script>
+        setTimeout(function () {
+          window.parent.postMessage({ bbDesign: true, type: "pick", selector: "h1", html: "<h1>", text: "forged", rect: {} }, "*");
+          window.parent.postMessage({ bbDesign: true, type: "text", before: "Desktop home", text: "Forged" }, "*");
+          window.open("https://elsewhere.invalid/popup");
+          location.href = "https://elsewhere.invalid/away";
+        }, 700);
+        </script>
+        """
 
     /// Studio's screen script, as far as the tests need it: the mode, and a pick on a tap in comment mode.
     private static let screenScript = """

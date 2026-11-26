@@ -26,7 +26,7 @@ struct DesignStill: UIViewRepresentable {
 /// moves the picture and nothing inside it rubber-bands. The minimum zoom is
 /// fit-to-width, the picture is centred while it's smaller than the view, and
 /// the edges bounce lightly. `designStill`'s value is the zoom relative to fit.
-final class DesignStillView: UIView, UIScrollViewDelegate, WKNavigationDelegate {
+final class DesignStillView: UIView, UIScrollViewDelegate, WKNavigationDelegate, WKUIDelegate {
     var play: () -> Void
     var zoomed: (Bool) -> Void = { _ in }
     private var wasZoomed = false
@@ -106,7 +106,7 @@ final class DesignStillView: UIView, UIScrollViewDelegate, WKNavigationDelegate 
     /// The page at its own width, offscreen (it must be in the window to draw), until its fonts and first frames are in.
     private func render() {
         started = true
-        let configuration = WKWebViewConfiguration()
+        let configuration = UntrustedWeb.configuration()
         configuration.suppressesIncrementalRendering = true
         let page = WKWebView(frame: CGRect(origin: .zero, size: size), configuration: configuration)
         // Opaque, under the scroll view's opaque background: a snapshot keeps the view's alpha, and a hidden view doesn't draw.
@@ -114,6 +114,7 @@ final class DesignStillView: UIView, UIScrollViewDelegate, WKNavigationDelegate 
         page.accessibilityElementsHidden = true
         page.scrollView.contentInsetAdjustmentBehavior = .never
         page.navigationDelegate = self
+        page.uiDelegate = self
         insertSubview(page, at: 0)
         renderer = page
         #if DEBUG
@@ -124,6 +125,14 @@ final class DesignStillView: UIView, UIScrollViewDelegate, WKNavigationDelegate 
         #endif
         page.load(URLRequest(url: url))
     }
+
+    /// The screen's own page only (`UntrustedWeb`): the still draws nothing else.
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
+        await UntrustedWeb.policy(for: action, allowed: url)
+    }
+
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { nil }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         let script = """
@@ -233,10 +242,12 @@ struct DesignFrame: UIViewRepresentable {
     let url: URL
 
     func makeUIView(context: Context) -> WKWebView {
-        let view = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let view = WKWebView(frame: .zero, configuration: UntrustedWeb.configuration())
         view.isUserInteractionEnabled = false
         view.scrollView.contentInsetAdjustmentBehavior = .never
         view.isOpaque = false
+        view.navigationDelegate = context.coordinator
+        view.uiDelegate = context.coordinator
         context.coordinator.load(url, in: view)
         return view
     }
@@ -249,12 +260,16 @@ struct DesignFrame: UIViewRepresentable {
     func makeCoordinator() -> DesignPageLoader { DesignPageLoader() }
 }
 
-/// Loads a screen's page once per address (the demo's pages offline).
-final class DesignPageLoader: NSObject {
+/// Loads a screen's page once per address (the demo's pages offline), and
+/// holds the view to that page (`UntrustedWebGuard`) when it is the view's delegate.
+final class DesignPageLoader: UntrustedWebGuard {
     var loaded: URL?
+
+    init() { super.init(allowed: nil) }
 
     func load(_ url: URL, in view: WKWebView) {
         loaded = url
+        allowed = url
         #if DEBUG
         if let html = DesignDemo.html(for: url) {
             view.loadHTMLString(html, baseURL: nil)

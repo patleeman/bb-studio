@@ -11,10 +11,6 @@ struct DrawingView: View {
     @State private var scene: DrawingScene?
     @State private var updatedAt: Double = 0
     @State private var error: String?
-    @State private var zoom: CGFloat = 1
-    @State private var pan: CGSize = .zero
-    @GestureState private var pinch: CGFloat = 1
-    @GestureState private var drag: CGSize = .zero
     /// The drawing as a PNG, for Share.
     @State private var snapshotFile: URL?
     @State private var renaming = false
@@ -50,25 +46,7 @@ struct DrawingView: View {
                 if scene.elements.isEmpty {
                     ContentUnavailableView("Empty drawing", systemImage: "scribble.variable")
                 } else {
-                    ExcalidrawCanvas(scene: scene)
-                        .scaleEffect(zoom * pinch)
-                        .offset(x: pan.width + drag.width, y: pan.height + drag.height)
-                        .contentShape(.rect)
-                        .gesture(
-                            MagnifyGesture()
-                                .updating($pinch) { value, state, _ in state = value.magnification }
-                                .onEnded { zoom = min(max(zoom * $0.magnification, 0.5), 12) }
-                                .simultaneously(with: DragGesture()
-                                    .updating($drag) { value, state, _ in state = value.translation }
-                                    .onEnded { pan.width += $0.translation.width; pan.height += $0.translation.height })
-                        )
-                        .onTapGesture(count: 2) {
-                            withAnimation(.snappy) {
-                                zoom = 1
-                                pan = .zero
-                            }
-                        }
-                        .clipped()
+                    ZoomableDrawing(scene: scene)
                 }
             } else if let error {
                 ContentUnavailableView("Couldn't open the drawing", systemImage: "exclamationmark.triangle", description: Text(error))
@@ -80,32 +58,9 @@ struct DrawingView: View {
         .environment(\.colorScheme, .light)
         .screenToolbar(name, actions: actions)
         .studioChat(isPresented: $chatting, pluginId: "excalidraw", itemId: id, title: name, projectId: nil)
-        .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "excalidraw", itemId: id) }
-        .sheet(isPresented: $editing, onDismiss: { Task { await refresh() } }) {
-            NavigationStack {
-                WebView(url: client.webURL(forDrawing: id))
-                    .ignoresSafeArea(edges: .bottom)
-                    .navigationTitle("Edit drawing")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar { Button("Done") { editing = false } }
-            }
-        }
-        .alert("Rename drawing", isPresented: $renaming) {
-            TextField("Name", text: $newName)
-            Button("Cancel", role: .cancel) {}
-            Button("Rename") {
-                let newName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !newName.isEmpty else { return }
-                Task {
-                    do {
-                        try await client.renameDrawing(id, name: newName)
-                        name = newName
-                    } catch {
-                        self.error = BBClient.describe(error, server: client.baseURL)
-                    }
-                }
-            }
-        }
+        .modifier(DrawingPresentations(id: id, client: client, showingRelated: $showingRelated, editing: $editing, renaming: $renaming,
+                                       newName: $newName, refresh: { await refresh() }, renamed: { name = $0 },
+                                       failed: { error = $0 }))
         .task {
             while !Task.isCancelled {
                 await refresh()
@@ -149,6 +104,81 @@ struct DrawingView: View {
         guard let png = renderer.uiImage?.pngData() else { return nil }
         let url = FileManager.default.temporaryDirectory.appending(path: "\((name.isEmpty ? "Drawing" : name).replacingOccurrences(of: "/", with: "-")).png")
         return (try? png.write(to: url)) != nil ? url : nil
+    }
+}
+
+/// The drawing to pinch (0.5× to 12×) and drag; a double tap puts it back.
+private struct ZoomableDrawing: View {
+    let scene: DrawingScene
+    @State private var zoom: CGFloat = 1
+    @State private var pan: CGSize = .zero
+    @GestureState private var pinch: CGFloat = 1
+    @GestureState private var drag: CGSize = .zero
+
+    var body: some View {
+        ExcalidrawCanvas(scene: scene)
+            .scaleEffect(zoom * pinch)
+            .offset(x: pan.width + drag.width, y: pan.height + drag.height)
+            .contentShape(.rect)
+            .gesture(
+                MagnifyGesture()
+                    .updating($pinch) { value, state, _ in state = value.magnification }
+                    .onEnded { zoom = min(max(zoom * $0.magnification, 0.5), 12) }
+                    .simultaneously(with: DragGesture()
+                        .updating($drag) { value, state, _ in state = value.translation }
+                        .onEnded { pan.width += $0.translation.width; pan.height += $0.translation.height })
+            )
+            .onTapGesture(count: 2) {
+                withAnimation(.snappy) {
+                    zoom = 1
+                    pan = .zero
+                }
+            }
+            .clipped()
+    }
+}
+
+/// A drawing's Related, the editor (BB web's Excalidraw) and Rename: a modifier of its own, so
+/// the screen's view type stays shallow (the 1 MB stack).
+private struct DrawingPresentations: ViewModifier {
+    let id: String
+    let client: BBClient
+    @Binding var showingRelated: Bool
+    @Binding var editing: Bool
+    @Binding var renaming: Bool
+    @Binding var newName: String
+    let refresh: () async -> Void
+    let renamed: (String) -> Void
+    let failed: (String) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "excalidraw", itemId: id) }
+            .sheet(isPresented: $editing, onDismiss: { Task { await refresh() } }) {
+                NavigationStack {
+                    WebView(url: client.webURL(forDrawing: id))
+                        .ignoresSafeArea(edges: .bottom)
+                        .navigationTitle("Edit drawing")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar { Button("Done") { editing = false } }
+                }
+            }
+            .alert("Rename drawing", isPresented: $renaming) {
+                TextField("Name", text: $newName)
+                Button("Cancel", role: .cancel) {}
+                Button("Rename") {
+                    let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !name.isEmpty else { return }
+                    Task {
+                        do {
+                            try await client.renameDrawing(id, name: name)
+                            renamed(name)
+                        } catch {
+                            failed(BBClient.describe(error, server: client.baseURL))
+                        }
+                    }
+                }
+            }
     }
 }
 

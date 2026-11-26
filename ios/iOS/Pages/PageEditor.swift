@@ -13,7 +13,6 @@ import SwiftUI
 struct PageEditor: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
     let pageId: String
     var note: NoteDoneActions?
     var onSaved: () async -> Void
@@ -63,35 +62,17 @@ struct PageEditor: View {
 
     // `body` in parts, so each type-checks quickly (whole, it took 2 s).
 
-    /// The error notes, the text and its format bar.
+    /// The problems, the text and its format bar.
     private var content: some View {
         VStack(spacing: 0) {
-            if let noteError {
-                Text(noteError).font(.footnote).foregroundStyle(.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal).padding(.top, 8)
-                    .onTapGesture { self.noteError = nil }
-            }
-            if let message = model.localError ?? model.error {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(message).font(.footnote).foregroundStyle(.red)
-                    HStack {
-                        Button("Retry") { Task { await model.retry() } }
-                        Button("Copy local text") { UIPasteboard.general.string = model.text; copied = true }
-                        if model.serverMarkdown != nil {
-                            Button("View server") { Task { await model.load(); showingServer = true } }
-                        }
-                    }.font(.footnote)
-                    Button("Discard local draft…", role: .destructive) { confirmingDiscard = true }
-                        .font(.footnote).disabled(model.saving)
-                    if model.localError != nil, FileManager.default.fileExists(atPath: model.draftFile.path) {
-                        ShareLink("Export stored draft", item: model.draftFile).font(.footnote)
-                    }
-                }.padding()
-            }
+            PageEditorProblems(model: model, noteError: $noteError, copied: $copied, showingServer: $showingServer,
+                               confirmingDiscard: $confirmingDiscard)
             if model.expected != nil {
                 PageTextView(text: Binding(get: { model.text }, set: { model.updateText($0) }), controller: controller, dictation: dictation)
-                    .safeAreaInset(edge: .bottom) { formatBar }
+                    .safeAreaInset(edge: .bottom) {
+                        PageFormatBar(controller: controller, dictation: dictation, status: status,
+                                      mentioning: $mentioning, photo: $photo, dictating: $dictating)
+                    }
             } else if model.error == nil && model.localError == nil {
                 ProgressView()
             } else {
@@ -113,60 +94,18 @@ struct PageEditor: View {
             }
             if note != nil { noteToolbar }
         }
-        .task { await model.load() }
-        .task(id: model.text + "\(model.saving)") {
-            guard !finished, model.dirty, model.expected != nil, model.error == nil, !model.saving else { return }
-            guard (try? await Task.sleep(for: Self.autosaveDelay)) != nil else { return }
-            Task { await model.save() }
-        }
-        // Leaving the app: save now rather than after the pause.
-        .onChange(of: scenePhase) { _, phase in
-            if phase != .active, !finished { Task { await model.save() } }
-        }
+        .modifier(PageAutosave(model: model, finished: finished, delay: Self.autosaveDelay))
     }
 
-    /// Keep, discard, the server text and dictation.
+    /// Keep, discard, the server text, mentions, photos and dictation: each group its own
+    /// modifier, so the editor's view type stays shallow (the 1 MB stack).
     private var withDialogs: some View {
         editor
-        .alert("Keep as page", isPresented: $keeping) {
-            TextField("Title", text: $keptTitle)
-            Button("Cancel", role: .cancel) {}
-            Button("Keep page") { Task { await keepNote() } }
-                .disabled(keptTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        } message: {
-            Text("It stays in Notes as an ordinary page, no longer a temp note on this thread.")
-        }
-        .confirmationDialog("Discard these notes?", isPresented: $confirmingNoteDiscard, titleVisibility: .visible) {
-            Button("Discard", role: .destructive) { Task { await discardNote() } }
-            Button("Keep editing", role: .cancel) {}
-        } message: {
-            Text("The page is deleted, with everything typed in it. This can't be undone.")
-        }
-        .confirmationDialog("Discard this phone's draft?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
-            Button("Discard and load server text", role: .destructive) { Task { await model.discardAndReload() } }
-            Button("Keep editing", role: .cancel) {}
-        } message: {
-            Text("This removes your local changes. Copy or export them first if you want to keep them. The server page is unchanged.")
-        }
-        .sheet(isPresented: $showingServer) {
-            NavigationStack {
-                ScrollView { Text(PageEditorModel.plain(model.serverMarkdown ?? "")).textSelection(.enabled).padding() }
-                    .navigationTitle("Server text")
-                    .toolbar { Button("Done") { showingServer = false } }
-            }
-        }
-        .sensoryFeedback(.success, trigger: copied)
-        .sheet(isPresented: $mentioning) { PageMentionPicker { controller.insert($0) } }
-        .onChange(of: photo) { _, item in
-            guard let item else { return }
-            photo = nil
-            Task { await upload(item) }
-        }
-        .sheet(isPresented: $dictating) {
-            DictationView(threadId: nil, autoStart: true, insertLabel: ("Insert in page", "text.insert"), gate: dictation) { spoken in
-                controller.insert(spoken)
-            }
-        }
+            .modifier(PageNoteDialogs(keeping: $keeping, keptTitle: $keptTitle, confirmingDiscard: $confirmingNoteDiscard,
+                                      keep: { await keepNote() }, discard: { await discardNote() }))
+            .modifier(PageDraftDialogs(model: model, confirmingDiscard: $confirmingDiscard, showingServer: $showingServer, copied: copied))
+            .modifier(PageEditorInputs(controller: controller, dictation: dictation, mentioning: $mentioning, dictating: $dictating,
+                                       photo: $photo, upload: { await upload($0) }))
     }
 
     private var closeTitle: String {
@@ -194,39 +133,6 @@ struct PageEditor: View {
             .keyboardShortcut(.return, modifiers: .command)
             .accessibilityIdentifier("noteSend")
         }
-    }
-
-    private var formatBar: some View {
-        HStack(spacing: 14) {
-            Menu {
-                Button("Paragraph") { controller.setLinePrefix("") }
-                Button("Heading 1") { controller.setLinePrefix("# ") }
-                Button("Heading 2") { controller.setLinePrefix("## ") }
-                Button("Heading 3") { controller.setLinePrefix("### ") }
-                Button("Bulleted list") { controller.setLinePrefix("- ") }
-                Button("Numbered list") { controller.setLinePrefix("1. ") }
-                Button("Checklist") { controller.setLinePrefix("- [ ] ") }
-            } label: { Image(systemName: "textformat") }
-                .accessibilityLabel("Format")
-            Button { controller.setLinePrefix("- [ ] ") } label: { Image(systemName: "checklist") }
-                .accessibilityLabel("Checklist")
-            Button { controller.insert("[link text](https://)") } label: { Image(systemName: "link") }
-                .accessibilityLabel("Insert link")
-            Button { mentioning = true } label: { Image(systemName: "at") }
-                .accessibilityLabel("Mention")
-            PageInsertMenu(controller: controller, mentioning: $mentioning, photo: $photo)
-            Button { dictating = true } label: { Image(systemName: "mic") }
-                .accessibilityLabel("Dictate into page")
-            Spacer()
-            if dictation.state.label != nil {
-                DictationSendStatus(gate: dictation)
-            } else {
-                Text(status).font(.caption).foregroundStyle(.secondary)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .background(.bar)
     }
 
     private var status: String {

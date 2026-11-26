@@ -26,16 +26,19 @@ enum DesignExport {
 
 /// Loads a page offscreen and prints it to PDF pages of `size`.
 @MainActor
-private final class PrintRenderer: NSObject, WKNavigationDelegate {
+private final class PrintRenderer: NSObject, WKNavigationDelegate, WKUIDelegate {
     let size: CGSize
     private var view: WKWebView?
     private var finished: CheckedContinuation<Void, Error>?
+    private var allowed: URL?
 
     init(size: CGSize) { self.size = size }
 
     func pdf(of url: URL) async throws -> Data {
-        let view = WKWebView(frame: CGRect(origin: .zero, size: size))
+        let view = WKWebView(frame: CGRect(origin: .zero, size: size), configuration: UntrustedWeb.configuration())
         view.navigationDelegate = self
+        view.uiDelegate = self
+        allowed = url
         self.view = view
         try await withCheckedThrowingContinuation { continuation in
             finished = continuation
@@ -59,6 +62,14 @@ private final class PrintRenderer: NSObject, WKNavigationDelegate {
         self.view = nil
         return data as Data
     }
+
+    /// The print page only (`UntrustedWeb`).
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
+        UntrustedWeb.policy(for: action, allowed: allowed)
+    }
+
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { nil }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         finished?.resume()

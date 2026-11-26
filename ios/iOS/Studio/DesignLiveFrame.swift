@@ -49,17 +49,20 @@ struct DesignLiveFrame: UIViewRepresentable {
     var event: (DesignFrameEvent) -> Void
 
     func makeUIView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
+        let configuration = UntrustedWeb.configuration()
         configuration.allowsInlineMediaPlayback = true
         configuration.ignoresViewportScaleLimits = true
         let scripts = configuration.userContentController
         scripts.addUserScript(Self.viewport(width: pageWidth))
-        scripts.addUserScript(WKUserScript(source: Self.bridge, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
-        scripts.add(context.coordinator, name: "bbDesign")
+        // The bridge and its handler live in the app's own script world: the screen's
+        // scripts share the page's DOM but can't call `bbDesign` or `bbNative`.
+        scripts.addUserScript(WKUserScript(source: Self.bridge, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: .defaultClient))
+        scripts.add(context.coordinator, contentWorld: .defaultClient, name: "bbDesign")
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.scrollView.contentInsetAdjustmentBehavior = .never
         view.isOpaque = false
         view.navigationDelegate = context.coordinator
+        view.uiDelegate = context.coordinator
         view.accessibilityIdentifier = "designPlayerPage"
         context.coordinator.view = view
         context.coordinator.parent = self
@@ -79,31 +82,55 @@ struct DesignLiveFrame: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ view: WKWebView, coordinator: Coordinator) {
-        view.configuration.userContentController.removeScriptMessageHandler(forName: "bbDesign")
+        view.configuration.userContentController.removeScriptMessageHandler(forName: "bbDesign", contentWorld: .defaultClient)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
         let loader = DesignPageLoader()
         weak var view: WKWebView?
         var parent: DesignLiveFrame?
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { apply() }
 
+        /// The screen's own page only (`UntrustedWeb`); a tapped link leaves for Safari.
+        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
+            await UntrustedWeb.policy(for: action, allowed: loader.allowed)
+        }
+
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                     for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            MainActor.assumeIsolated { UntrustedWeb.newWindow(for: action) }
+            return nil
+        }
+
         /// Tells the page the mode and the pins.
         func apply() {
             guard let view, let parent else { return }
             let pins = (try? String(data: JSONEncoder().encode(parent.pins), encoding: .utf8)) ?? "[]"
             let comment = parent.mode == .comment, edit = parent.mode == .edit
-            view.evaluateJavaScript("window.bbNative && bbNative.mode(\(comment), \(edit)); window.bbNative && bbNative.pins(\(pins));")
+            view.evaluateJavaScript("window.bbNative && bbNative.mode(\(comment), \(edit)); window.bbNative && bbNative.pins(\(pins));",
+                                    in: nil, in: .defaultClient, completionHandler: nil)
         }
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
             guard let text = message.body as? String, let data = text.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let event = DesignLiveFrame.event(json) else { return }
-            parent?.event(event)
+                  let event = DesignLiveFrame.event(json), let parent,
+                  DesignLiveFrame.accepts(event, in: parent.mode) else { return }
+            parent.event(event)
+        }
+    }
+
+    /// Whether the page may say this in this mode. The page is untrusted and can post
+    /// what the screen script posts: a pick counts only while commenting, typed text
+    /// only while editing text, a pin's tap only where pins show.
+    static func accepts(_ event: DesignFrameEvent, in mode: DesignMode) -> Bool {
+        switch event {
+        case .pick: mode == .comment
+        case .pin: mode == .comment || mode == .play
+        case .text, .notEditable: mode == .edit
         }
     }
 
@@ -192,7 +219,11 @@ struct DesignLiveFrame: UIViewRepresentable {
                 metas.forEach(function (meta) { if (meta.content !== content) meta.content = content; });
               }
               apply();
-              new MutationObserver(apply).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['content'] });
+              // Only the head, where the viewport is: not every change in the prototype.
+              var watch = function () {
+                if (document.head) new MutationObserver(apply).observe(document.head, { childList: true, subtree: true, attributes: true, attributeFilter: ['content'] });
+              };
+              if (document.head) watch(); else document.addEventListener('DOMContentLoaded', function () { apply(); watch(); });
             })();
             """, injectionTime: .atDocumentStart, forMainFrameOnly: true)
     }
