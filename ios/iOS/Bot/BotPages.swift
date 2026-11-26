@@ -1,29 +1,5 @@
 import SwiftUI
 
-struct BotPageScreen: View {
-    let page: BotPage
-    let bot: BotSpace?
-    var open: (BotShellItem) -> Void
-    var openMain: () -> Void
-    var refresh: () -> Void
-
-    var body: some View {
-        switch page {
-        case .memory:
-            MemoryPageView(botId: bot?.id, open: open)
-        case .library:
-            LibraryPageView(botId: bot?.id, open: open)
-        case .strands:
-            StrandsOverviewView(botId: bot?.id) { open(.conversation($0)) }
-        case .automations:
-            BotAutomationsSheet(botId: bot?.id, botName: bot?.name ?? BotInfo.defaultName, embedded: true)
-                .id(bot?.id)
-        case .archive:
-            ArchivePageView(botId: bot?.id, open: open, refresh: refresh)
-        }
-    }
-}
-
 struct BotPageChips<Value: Hashable>: View {
     let choices: [(value: Value, label: String)]
     @Binding var selection: Value
@@ -58,8 +34,6 @@ struct MemoryPageView: View {
     let botId: String?
     var open: (BotShellItem) -> Void
     @EnvironmentObject private var app: AppModel
-    @Environment(\.showDetail) private var showDetail
-    @Environment(\.shownDetail) private var shownDetail
     @State private var overviewLoad = PageLoad<MemoryOverview>()
     @State private var recordsLoad = PageLoad<(records: [MemoryRecord], total: Int)>()
     @State private var query = ""
@@ -183,24 +157,12 @@ struct MemoryPageView: View {
     }
 
     @ViewBuilder private func row(_ record: MemoryRecord) -> some View {
-        if let showDetail {
-            Button {
-                showDetail(RoomDetail(id: record.id, view: AnyView(MemoryRecordScreen(record: record, topics: overview?.topics.map(\.topic) ?? [], open: open) { await reload() })))
-            } label: {
-                recordLabel(record).contentShape(.rect)
-            }
-            .tint(.primary)
-            .listRowBackground(shownDetail == record.id ? Color.accentColor.opacity(0.16) : nil)
-            .accessibilityAddTraits(shownDetail == record.id ? .isSelected : [])
-            .accessibilityIdentifier("memory-record-\(record.id)")
-        } else {
-            NavigationLink {
-                MemoryRecordScreen(record: record, topics: overview?.topics.map(\.topic) ?? [], open: open) { await reload() }
-            } label: {
-                recordLabel(record)
-            }
-            .accessibilityIdentifier("memory-record-\(record.id)")
+        NavigationLink {
+            MemoryRecordScreen(record: record, topics: overview?.topics.map(\.topic) ?? [], open: open) { await reload() }
+        } label: {
+            recordLabel(record)
         }
+        .accessibilityIdentifier("memory-record-\(record.id)")
     }
 
     private func recordLabel(_ record: MemoryRecord) -> some View {

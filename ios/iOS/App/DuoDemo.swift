@@ -77,7 +77,6 @@ enum DuoDemo {
         return ["width": window.bounds.width, "height": window.bounds.height,
                 "composers": (window.windowScene?.windows ?? [window]).flatMap(composers),
                 "transcripts": transcripts(window),
-                "pane": DuoPaneState.shared.pane.rawValue,
                 "safeRight": window.safeAreaInsets.right, "safeBottom": window.safeAreaInsets.bottom,
                 "keyboardTop": keyboardTop ?? window.bounds.height,
                 "scrolls": scrolls(window),
@@ -154,11 +153,16 @@ enum DuoDemo {
             screenSize = size
         case "tab":
             switch url.query() {
-            case "bot": Router.shared.tab = .bot
-            case "studio": Router.shared.tab = .studio
-            case "settings": Router.shared.tab = .settings
+            case "bot": Router.shared.path = []
+            case "studio": Router.shared.path = [.studio]
+            case "settings": Router.shared.path = [.settings]
             default: return false
             }
+            return true
+        case "posture":
+            // A posture the simulator can't make (it has no hinge); `?auto` goes back to measuring.
+            ShellQA.override = url.query().flatMap(ShellPosture.init(rawValue:))
+            Router.shared.objectWillChange.send()
             return true
         case "replies-end":
             func revealEnd(_ view: UIView) -> Bool {
@@ -173,10 +177,6 @@ enum DuoDemo {
                 return view.subviews.contains(where: revealEnd)
             }
             _ = revealEnd(window)
-            return true
-        case "pane":
-            guard let pane = url.query().flatMap(DuoPane.init) else { return false }
-            DuoPaneState.shared.set(pane)
             return true
         case "layout":
             window.layoutIfNeeded()

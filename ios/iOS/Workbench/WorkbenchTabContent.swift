@@ -12,6 +12,8 @@ struct WorkbenchContext {
 
 extension EnvironmentValues {
     @Entry var workbenchContext: WorkbenchContext?
+    /// Library's tiles laid out for a Workbench-wide page.
+    @Entry var workbenchPane = false
 }
 
 /// The shell's one entry point for a tab's content: the Workbench container

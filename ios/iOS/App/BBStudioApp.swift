@@ -149,12 +149,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                     completionHandler()
                     return
                 }
-                if let route = NotificationActions.taskRoute(userInfo) {
-                    // A loop's push: its conversation, else the Strands screen.
-                    await MainActor.run {
-                        if let conversation = route.conversation { AppModel.shared.open(.conversation(conversation)) } else { AppModel.shared.open(.place(.strands, botId: nil)) }
-                    }
-                } else if let threadId = userInfo["threadId"] as? String {
+                if let threadId = userInfo["threadId"] as? String {
                     await MainActor.run { AppModel.shared.open(.conversation(threadId)) }
                 }
             }

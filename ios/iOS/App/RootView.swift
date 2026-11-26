@@ -1,14 +1,7 @@
 import SwiftUI
 
 struct RootView: View {
-    @ObservedObject private var router = Router.shared
     @EnvironmentObject private var model: AppModel
-
-    @State private var windowSize = CGSize.zero
-    @State private var windowLeadingInset: CGFloat = 0
-    @State private var windowTrailingInset: CGFloat = 0
-    @State private var innerScreen = false
-    @State private var pane = DuoPaneState.shared
     @ObservedObject private var spaces = BotSpacesStore.shared
     @State private var timedOut = false
     @State private var attempt = 0
@@ -17,40 +10,25 @@ struct RootView: View {
         #if DEBUG
         let _ = RenderCount.bump("root.body")
         #endif
-        let layout = DuoLayout(size: windowSize, leadingInset: windowLeadingInset, trailingInset: windowTrailingInset,
-                               pane: pane.pane, dragWidth: pane.dragWidth, innerScreen: innerScreen)
         let shown = StudioLaunch.shown(support: spaces.support, failed: spaces.answeredWithError, timedOut: timedOut)
         Group {
             switch shown {
             case .room:
-                BotSpacesRoot(store: spaces)
-                    .transformEnvironment(\.horizontalSizeClass) { if layout.twoPages { $0 = .regular } }
+                ShellRoot(store: spaces)
             case .loading:
                 SpacesLoadingView(serverURL: spaces.serverURL)
                     .transition(.opacity)
             case .unreachable:
-                StudioUnreachableView(unavailable: spaces.support == .unavailable, error: spaces.error,
-                                      serverURL: spaces.serverURL, retry: retry, settings: { router.tab = .settings })
-                    .transition(.opacity)
+                NavigationStack {
+                    StudioUnreachableView(unavailable: spaces.support == .unavailable, error: spaces.error,
+                                          serverURL: spaces.serverURL, retry: retry)
+                }
+                .transition(.opacity)
             }
         }
         .modifier(RootNotice())
         // Capture, dictation, Write and the rest work while Studio loads, too.
-        .modifier(RootSheets(active: router.tab == .bot))
-        .sheet(item: secondary) { tab in
-            Group {
-                switch tab {
-                case .studio: StudioTab()
-                case .settings: SettingsTab()
-                case .bot: EmptyView()
-                }
-            }
-            .environment(\.duoLayout, DuoLayout(size: .zero))
-            .environment(\.horizontalSizeClass, .compact)
-            .presentationDragIndicator(.visible)
-            .presentationSizing(.page)
-            .modifier(RootSheets(active: true))
-        }
+        .modifier(RootSheets())
         .animation(.easeInOut(duration: 0.25), value: shown)
         .onChange(of: shown) { old, _ in
             if old == .loading { UIAccessibility.post(notification: .screenChanged, argument: nil) }
@@ -60,29 +38,6 @@ struct RootView: View {
             try? await Task.sleep(for: timeout)
             timedOut = true
         }
-        .background {
-            if layout.twoPages {
-                RegularSurfaceBackground(name: "root", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)), fullWidth: true)
-            }
-        }
-        .overlay(alignment: .top) {
-            // The status-bar tap strip runs the header button under it.
-            if layout.twoPages {
-                StatusBarStripView()
-                    .frame(height: StatusBarStrip.depth)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            }
-        }
-        .environment(\.duoLayout, layout)
-        .environment(pane)
-        .lookRoot(bot: spaces.spaces?.current)
-        .background(WindowGeometry { size, leading, trailing, inner in
-            windowSize = size
-            windowLeadingInset = leading
-            windowTrailingInset = trailing
-            innerScreen = inner
-        })
     }
 
     private func retry() {
@@ -97,10 +52,6 @@ struct RootView: View {
         #endif
         return StudioLaunch.timeout
     }
-
-    private var secondary: Binding<Tab?> {
-        Binding(get: { router.tab == .bot ? nil : router.tab }, set: { if $0 == nil { router.tab = .bot } })
-    }
 }
 
 /// Studio's Bots didn't answer: it isn't installed on this server, the server
@@ -110,7 +61,6 @@ struct StudioUnreachableView: View {
     let error: String?
     let serverURL: URL
     let retry: () -> Void
-    let settings: () -> Void
 
     var body: some View {
         ContentUnavailableView {
@@ -123,16 +73,12 @@ struct StudioUnreachableView: View {
             Button("Try Again", action: retry)
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("studioRetry")
-            Button("Settings", action: settings)
+            NavigationLink("Settings") { SettingsView() }
                 .accessibilityIdentifier("studioSettings")
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("studioUnreachable")
     }
-}
-
-extension Tab: Identifiable {
-    var id: Self { self }
 }
 
 private struct RootNotice: ViewModifier {
@@ -169,11 +115,10 @@ private struct RootNotice: ViewModifier {
 private struct RootSheets: ViewModifier {
     @ObservedObject private var router = Router.shared
     @EnvironmentObject private var model: AppModel
-    let active: Bool
 
     func body(content: Content) -> some View {
         content
-        .sheet(item: active ? $router.sheet : .constant(nil)) { sheet in
+        .sheet(item: $router.sheet) { sheet in
             switch sheet {
             case .capture:
                 CaptureSheet()
@@ -186,9 +131,6 @@ private struct RootSheets: ViewModifier {
             case .handsFree(let autoStart, let threadId):
                 VoiceLiveView(controller: VoiceLiveController.make(client: model.client, threadId: threadId), autoStart: autoStart)
                     .presentationDragIndicator(.hidden)
-            case .task(let id):
-                TaskSheet(id: id)
-                    .presentationDragIndicator(.visible)
             }
         }
     }
@@ -203,7 +145,7 @@ struct RouteDestination: View {
     var body: some View {
         switch route {
         case .page: threadsAndTools.studioStar(route)
-        case .thread, .pages, .automations, .automation, .usage, .archived, .memoryRecord, .roomPlace: threadsAndTools
+        case .thread, .pages, .automations, .automation, .usage, .archived, .memoryRecord: threadsAndTools
         case .visualChats, .visualChat: visualChat
         case .terminals: studioItems
         default: studioItems.studioStar(route)
@@ -212,7 +154,7 @@ struct RouteDestination: View {
 
     @ViewBuilder private var threadsAndTools: some View {
         switch route {
-        case .thread(let id): ThreadView(threadId: id).id(id)
+        case .thread(let id): ConversationScreen(threadId: id).id(id)
         case .pages: PagesView()
         case .page(let id): PageView(pageId: id).id(id)
         case .automations: AutomationsView()

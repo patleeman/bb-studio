@@ -87,7 +87,8 @@ struct VisualChatScreen: View {
     @Environment(\.dismiss) private var dismiss
     /// The folded Duo's outer screen: iOS puts a navigation bar's buttons in a column at the right edge there,
     /// so this screen hides the bar and draws its own header row (back beside the title), as on an iPhone.
-    private let folded = FoldedChrome.foldedDuo
+    @Environment(\.shellPosture) private var posture
+    private var folded: Bool { posture == .folded }
     @State private var geometry = ""
     @StateObject private var model: VisualChatModel
     @State private var host: VisualChatBoardHost?

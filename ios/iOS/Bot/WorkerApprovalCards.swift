@@ -63,6 +63,8 @@ final class ConversationApprovals: ObservableObject {
     }
 }
 
+/// A worker's approval, inline at the end of its conversation's transcript (round 7):
+/// who asks, what, the whole command, and its decisions.
 struct WorkerApprovalCard: View {
     let card: ConversationApprovals.Card
     let openWorker: () -> Void
@@ -74,9 +76,8 @@ struct WorkerApprovalCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                if approval.state.waiting { Circle().fill(look.needsYou).frame(width: 8, height: 8) }
                 Button(action: openWorker) {
-                    Text(approval.worker.title).lineLimit(1).foregroundStyle(look.needsYou)
+                    Text(approval.worker.title).lineLimit(1).foregroundStyle(look.accent)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Open \(approval.worker.title)")
@@ -117,8 +118,8 @@ struct WorkerApprovalCard: View {
             }
         }
         .padding(14)
-        .background(look.needsYou.opacity(approval.state.waiting ? 0.09 : 0.04), in: .rect(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(look.needsYou.opacity(approval.state.waiting ? 0.34 : 0.15)))
+        .background(look.stackFill, in: .rect(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.separator))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Approval for \(approval.worker.title)")
         .accessibilityIdentifier("workerApproval")
@@ -146,23 +147,6 @@ struct WorkerApprovalCard: View {
     }
 }
 
-struct WorkerApprovalCards: View {
-    @ObservedObject var approvals: ConversationApprovals
-    let openWorker: (String) -> Void
-    let decide: (String, WorkerApproval.Decision) -> Void
-
-    var body: some View {
-        if !approvals.cards.isEmpty {
-            VStack(spacing: 8) {
-                ForEach(approvals.cards) { card in
-                    WorkerApprovalCard(card: card, openWorker: { openWorker(card.approval.worker.threadId) },
-                                       decide: { decide(card.id, $0) })
-                }
-            }
-        }
-    }
-}
-
 struct WorkerPendingApproval: View {
     let title: String
     let owner: String
@@ -171,7 +155,6 @@ struct WorkerPendingApproval: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Circle().fill(look.needsYou).frame(width: 8, height: 8)
             Text(title).font(.subheadline).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
             Button(action: open) {
                 HStack(spacing: 4) {
@@ -179,7 +162,7 @@ struct WorkerPendingApproval: View {
                     Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
                 }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(look.needsYou)
+                .foregroundStyle(look.accent)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -188,8 +171,8 @@ struct WorkerPendingApproval: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .background(look.needsYou.opacity(0.09), in: .rect(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(look.needsYou.opacity(0.3)))
+        .background(look.stackFill, in: .rect(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.separator))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("workerPendingApproval")
     }

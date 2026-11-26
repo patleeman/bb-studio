@@ -33,7 +33,7 @@ private struct SpacesLoadingScene: View {
         .background {
             ZStack {
                 SceneBackdrop(theme: look.theme)
-                RoomShade()
+                Color.black.opacity(0.45).ignoresSafeArea()
             }
             .allowsHitTesting(false)
         }

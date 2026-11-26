@@ -832,7 +832,7 @@ struct StudioView: View {
 
     /// Visual Chat (its own plugin): its chats and New chat.
     private var visualChatCard: some View {
-        Button { router.studioPath.append(.visualChats) } label: {
+        Button { router.path.append(.visualChats) } label: {
             HStack(spacing: 12) {
                 Image(systemName: "rectangle.3.group.bubble").font(.title2).foregroundStyle(.purple)
                 VStack(alignment: .leading, spacing: 2) {
@@ -1005,11 +1005,11 @@ struct StudioView: View {
     private func opener(_ item: StudioItem, id: String, @ViewBuilder content: () -> some View) -> some View {
         if !selecting, let route = item.route {
             if selectsDetail {
-                Button { router.studioPath = [route] } label: {
+                Button { router.path.append(route) } label: {
                     content().frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .listRowBackground(SidebarSelectionBackground(selected: router.studioPath.first == route))
+                .listRowBackground(SidebarSelectionBackground(selected: router.path.last == route))
                 .accessibilityIdentifier(id)
             } else {
                 NavigationLink(value: route) { content() }
@@ -1208,7 +1208,7 @@ struct StudioView: View {
     private func createPage(_ text: String) async {
         do {
             let page = try await client.createPage(title: PageTitle.from(text), markdown: text)
-            operation.complete(on: app) { router.studioPath.append(.page(id: page.id)) }
+            operation.complete(on: app) { router.path.append(.page(id: page.id)) }
             await store.load(client)
         } catch {
             store.error = BBClient.describe(error, server: client.baseURL)
@@ -1219,7 +1219,7 @@ struct StudioView: View {
         let projectId = project.isEmpty || project == "none" ? nil : project
         do {
             let item = try await store.create(kind, projectId: projectId, client: client)
-            if let route = item.route { operation.complete(on: app) { router.studioPath.append(route) } }
+            if let route = item.route { operation.complete(on: app) { router.path.append(route) } }
         } catch {
             flash(BBClient.describe(error, server: client.baseURL))
         }

@@ -7,7 +7,7 @@ import SwiftUI
 /// ✕ (when it has one) undoes it.
 struct ComposerChip: Identifiable, Equatable {
     enum Kind: String, Equatable {
-        case paused, planMode, goal, todos, background, queued, notes, editing, permission, handingOff
+        case paused, planMode, goal, todos, background, notes, editing, permission, handingOff
     }
 
     var kind: Kind
@@ -20,7 +20,7 @@ struct ComposerChip: Identifiable, Equatable {
     var id: String { kind.rawValue }
 
     /// The chips, in a fixed order, for what holds now.
-    static func chips(pause: String?, planning: Bool, goal: String?, todos: [Todos.Item], background: Int, queued: Int,
+    static func chips(pause: String?, planning: Bool, goal: String?, todos: [Todos.Item], background: Int,
                       note: Bool, editing: Bool, permission: String?, handingOff: Bool) -> [ComposerChip] {
         var out: [ComposerChip] = []
         if let pause {
@@ -34,7 +34,6 @@ struct ComposerChip: Identifiable, Equatable {
             out.append(ComposerChip(kind: .todos, icon: "checklist", text: "\(done)/\(todos.count) todos"))
         }
         if background > 0 { out.append(ComposerChip(kind: .background, icon: "terminal", text: "\(background) background", busy: true)) }
-        if queued > 0 { out.append(ComposerChip(kind: .queued, icon: "tray.full", text: "\(queued) queued")) }
         if note { out.append(ComposerChip(kind: .notes, icon: "doc.text", text: "Notes", action: "Open")) }
         if editing { out.append(ComposerChip(kind: .editing, icon: "pencil", text: "Editing last message", closes: true)) }
         if let permission { out.append(ComposerChip(kind: .permission, icon: "lock.shield", text: "Next: \(PermissionMode.label(permission))", closes: true)) }
@@ -113,5 +112,54 @@ struct ComposerChipsRow: View {
                 .accessibilityLabel([chip.text, chip.action].compactMap { $0 }.joined(separator: ", "))
                 .accessibilityIdentifier("chip-\(chip.kind.rawValue)")
         }
+    }
+}
+
+/// The composer's one small status line (round 7): working and for how long,
+/// and how many messages wait in the queue.
+struct ComposerStatus: Equatable {
+    var running: Bool
+    /// When the running turn began (the last message sent, in ms).
+    var since: Double?
+    var queued: Int
+
+    var shown: Bool { running || queued > 0 }
+
+    /// "Working · 1m 12s", "Working · 40s", or "Working" without a start.
+    static func working(since: Double?, now: Date) -> String {
+        guard let since else { return "Working" }
+        let seconds = max(0, Int(now.timeIntervalSince1970 - since / 1000))
+        if seconds < 60 { return "Working · \(seconds)s" }
+        if seconds < 3600 { return "Working · \(seconds / 60)m \(seconds % 60)s" }
+        return "Working · \(seconds / 3600)h \(seconds % 3600 / 60)m"
+    }
+}
+
+struct ComposerStatusLine: View {
+    let status: ComposerStatus
+    let showQueue: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if status.running {
+                ProgressView().controlSize(.mini)
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(ComposerStatus.working(since: status.since, now: context.date)).monospacedDigit()
+                }
+                .accessibilityIdentifier("composerWorking")
+            }
+            Spacer(minLength: 8)
+            if status.queued > 0 {
+                Button(action: showQueue) { Text("\(status.queued) queued").frame(minHeight: 28).contentShape(.rect) }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("composerQueued")
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 12)
+        .frame(minHeight: 28)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("composerStatus")
     }
 }

@@ -12,14 +12,9 @@ enum BotSpacesDemo {
 
     static let sideThreadId = "thr_demo_side_m3"
 
-    /// `-qaStrandsDemo`: Studio answers `strands.*`, and the Bot's view nests more workers (a worker's worker, runners under Main).
+    /// `-qaStrandsDemo`: Studio answers `strands.tags` (the footer's strand tag), and the Bot's view nests more workers (a worker's worker, runners under Main).
     static var strands: Bool { ProcessInfo.processInfo.arguments.contains("-qaStrandsDemo") }
 
-    /// `-qaReplyAskDemo` (with `-qaStrandsDemo`): Main's newest reply needs the user (`strands.tags` replies),
-    /// and a strand waits on it first, with Show.
-    static var replyAsk: Bool { ProcessInfo.processInfo.arguments.contains("-qaReplyAskDemo") }
-    /// The reply's message in the demo Main (m5, after the quiet [PASS] check).
-    static let replyAskSeq = 7
 
     /// `-qaRouterDemo`: Studio answers the model router's notice for Main (a usage limit with Hand off).
     static var router: Bool { ProcessInfo.processInfo.arguments.contains("-qaRouterDemo") }
@@ -331,7 +326,6 @@ enum BotSpacesDemo {
         }
 
         private var chosenTheme: String?
-        private var strandsResolved = false
         /// Juniper's state for Pause, Resume and Stop (`-qaSpacesDemo`).
         private var juniperState = "active"
         private var routerHandedOff = false
@@ -347,96 +341,9 @@ enum BotSpacesDemo {
             ]
             let names: [[String: Any]] = [["id": "str_lisbon", "title": "Lisbon trip"], ["id": "str_fork", "title": "Studio-native BB fork"],
                                           ["id": "str_stills", "title": "Theme stills"]]
-            let replies: [[String: Any]] = BotSpacesDemo.replyAsk
-                ? [["turnId": "t1", "seq": 1, "tag": "status", "ask": NSNull(), "resolved": false],
-                   ["turnId": "t3", "seq": BotSpacesDemo.replyAskSeq, "tag": "needs-you", "ask": "Want me to draft the approval note?", "resolved": false]]
-                : []
-            return ["tags": tags, "strands": names, "replies": replies]
+            return ["tags": tags, "strands": names]
         }
 
-        /// `strands.list` for the demo's Main and Launch prep: two asks, two running strands with workers, a finished one, a quiet one.
-        static func strandsJSON(_ threadId: String, now: Double, resolved: Bool) -> [String: Any] {
-            func strand(_ id: String, _ title: String, _ summary: String, _ state: String, seq: Double, asks: [[String: Any]] = [], workers: [[String: Any]] = []) -> [String: Any] {
-                let lastAt: Double = now - (100 - seq) * 60_000
-                var out: [String: Any] = ["id": id, "title": title, "summary": summary, "named": true, "state": state, "detail": NSNull()]
-                out["asks"] = asks
-                out["workers"] = workers
-                out["lastAt"] = lastAt
-                out["latestSeq"] = seq
-                out["messages"] = 3
-                out["pinned"] = false
-                out["origin"] = "jev"
-                return out
-            }
-            func worker(_ id: String, _ title: String, _ status: String, endedAgo: Double? = nil) -> [String: Any] {
-                let ended: Any = endedAgo.map { now - $0 } ?? NSNull()
-                return ["threadId": id, "title": title, "status": status, "endedAt": ended]
-            }
-            var strands: [[String: Any]]
-            if threadId == "thr_demo_interview" {
-                strands = [strand("str_notes", "Release notes", "Short changelog or the full list?", "needs-you", seq: 9,
-                                  asks: [["id": "ask_notes", "kind": "question", "threadId": threadId, "label": "Short changelog or the full list?", "details": [Any](), "turnId": NSNull(), "decisions": [Any]()]]),
-                           strand("str_bank", "Question bank", "The worker stopped on a fixture", "active", seq: 6, workers: [worker("thr_demo_w3", "Mock question bank", "failed", endedAgo: 3_600_000)])]
-            } else {
-                var push = strand("str_fork", "Studio-native BB fork", "Wants to push the branch", "needs-you", seq: 40,
-                                  asks: [["id": "ask_demo_push", "kind": "approval", "threadId": "thr_demo_w1", "label": "Push to origin",
-                                          "details": ["git push origin bb-studio-native", "in ~/workingdir/bb-studio-native"], "turnId": NSNull(),
-                                          "decisions": ["allow_once", "allow_for_session", "deny"]]],
-                                  workers: [worker("thr_demo_w1", "Studio-native BB fork", "needs-you")])
-                if resolved {
-                    push["state"] = "running"
-                    push["asks"] = [Any]()
-                    push["workers"] = [worker("thr_demo_w1", "Studio-native BB fork", "running")]
-                }
-                strands = [
-                    push,
-                    strand("str_gateway", "Calendar access", "A tool wants your calendar", "needs-you", seq: 38,
-                           asks: [["id": "ask_gw", "kind": "gateway", "threadId": threadId, "label": "Google Calendar: read events", "details": [Any](), "turnId": NSNull(), "decisions": [Any]()]]),
-                    strand("str_stills", "Theme stills", "Rendering the release page stills", "running", seq: 44,
-                           workers: [worker("thr_demo_w2", "Theme stills renderer", "running"), worker("thr_demo_w5", "Crop stills", "done", endedAgo: 300_000)]),
-                    strand("str_disk", "Disk space", "Finding what else is big", "running", seq: 42, workers: [worker("thr_demo_w6", "Disk scan", "running")]),
-                    strand("str_lisbon", "Lisbon trip", "Passport is in the bag", "done-unseen", seq: 36),
-                    strand("str_notes", "Release notes", "Shipped yesterday", "quiet", seq: 12, workers: [worker("thr_demo_w4", "Release notes", "done", endedAgo: 86_400_000)]),
-                ]
-                if BotSpacesDemo.replyAsk {
-                    strands.insert(strand("str_budget", "Lisbon offsite budget", "Wants your sign-off by 3pm", "needs-you", seq: 46,
-                                          asks: [["id": "ask_reply_budget", "kind": "reply", "threadId": threadId, "label": "Want me to draft the approval note?",
-                                                  "details": [Any](), "turnId": "t3", "decisions": [Any](), "seq": BotSpacesDemo.replyAskSeq]]), at: 0)
-                }
-            }
-            let stray: [Any] = threadId == "thr_demo_interview" ? [] : [worker("thr_demo_w9", "Flaky fixture hunt", "failed", endedAgo: 3_600_000)]
-            let backfill: [String: Any] = ["done": true, "at": now, "messages": 40, "sorted": 40]
-            var out: [String: Any] = ["threadId": threadId, "enabled": true, "backfill": backfill, "jevCallsToday": 3, "jevDailyCap": 200]
-            out["sortingTurn"] = false
-            out["strands"] = strands
-            out["earlier"] = [Any]()
-            out["strayWorkers"] = stray
-            return out
-        }
-        /// `strands.overview` for Juniper: Launch prep's question, Main's asks and running strands, and Budget sign-off gone quiet.
-        static func strandsOverviewJSON(_ botId: String, now: Double, resolved: Bool) -> [String: Any] {
-            guard botId == "bot_juniper" else { return ["conversations": [Any](), "needs": 0, "running": 0] }
-            func strands(_ threadId: String) -> [[String: Any]] { strandsJSON(threadId, now: now, resolved: resolved)["strands"] as? [[String: Any]] ?? [] }
-            let budget: [String: Any] = ["id": "str_budget", "title": "Q4 budget", "summary": "Sent Dana the numbers", "named": true, "state": "quiet",
-                                         "detail": NSNull(), "asks": [Any](), "workers": [Any](), "lastAt": now - 900_000, "latestSeq": 3, "messages": 3,
-                                         "pinned": false, "origin": "jev"]
-            var conversations: [[String: Any]] = [
-                ["threadId": "thr_demo_interview", "title": "Launch prep", "isMain": false, "lastActiveAt": now - 7_200_000, "strands": strands("thr_demo_interview")],
-                ["threadId": BotDemo.threadId, "title": "Main", "isMain": true, "lastActiveAt": now - 30_000, "strands": strands(BotDemo.threadId)],
-                ["threadId": "thr_demo_thread", "title": "Budget sign-off", "isMain": false, "lastActiveAt": now - 900_000, "strands": [budget]],
-            ]
-            func count(_ row: [String: Any], _ state: String) -> Int { (row["strands"] as? [[String: Any]] ?? []).filter { $0["state"] as? String == state }.count }
-            // As Studio sorts them: needs you first, then Main, then the most recently active.
-            conversations.sort { a, b in
-                let (na, nb) = (count(a, "needs-you") > 0, count(b, "needs-you") > 0)
-                if na != nb { return na }
-                let (ma, mb) = (a["isMain"] as? Bool ?? false, b["isMain"] as? Bool ?? false)
-                if ma != mb { return ma }
-                return (a["lastActiveAt"] as? Double ?? 0) > (b["lastActiveAt"] as? Double ?? 0)
-            }
-            return ["conversations": conversations, "needs": conversations.reduce(0) { $0 + count($1, "needs-you") },
-                    "running": conversations.reduce(0) { $0 + count($1, "running") }]
-        }
 
         private(set) var appearanceCalls: [[String: Any]] = []
 
@@ -651,21 +558,10 @@ enum BotSpacesDemo {
             case "bot_make_main", "bot_new_main":
                 lock.withLock { mainMadeFrom = threadId.isEmpty ? "new" : threadId }
                 return ok(["id": "bot_juniper", "name": "Juniper"])
-            case "strands.list":
+            case "strands.tags":
                 guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
-                return ok(Self.strandsJSON(threadId, now: Self.now, resolved: lock.withLock { strandsResolved }))
-            case "strands.overview":
-                guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
-                return ok(Self.strandsOverviewJSON(input["botId"] as? String ?? "", now: Self.now, resolved: lock.withLock { strandsResolved }))
-            case "strands.opened", "strands.tags":
-                guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
-                let answer: [String: Any] = name == "strands.tags" ? Self.strandTagsJSON(threadId) : ["ok": true]
-                return ok(answer)
+                return ok(Self.strandTagsJSON(threadId))
             case "bot_worker_approval_resolve":
-                if (input["interactionId"] as? String) == "ask_demo_push" {
-                    lock.withLock { strandsResolved = true }
-                    return ok(["approval": ["id": "ask_demo_push", "state": "approved", "decisions": ["allow_once"]]])
-                }
                 let decision = input["decision"] as? String ?? ""
                 return lock.withLock {
                     guard approvalPending, threadId == "thr_demo_w1", input["interactionId"] as? String == Self.approvalId else {

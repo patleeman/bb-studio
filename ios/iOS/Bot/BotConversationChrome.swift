@@ -12,7 +12,6 @@ struct BotConversationContext {
     var conversation: BotConversation?
     var workers: WorkersLine
     var allWorkers: [BotWorker]
-    var splitsThreads: Bool
     var push: (Route) -> Void
     var openConversation: (String) -> Void
     var showList: () -> Void
@@ -127,71 +126,6 @@ struct ConversationReplyRow: View {
                 .accessibilityLabel("You")
         case nil:
             EmptyView()
-        }
-    }
-}
-
-/// A Bot conversation's title, the header's one control besides Home
-/// (round 5): its name, and under it the model and how many Workspace tabs
-/// are open, or "Writing" while a reply runs. Tapping it opens the
-/// Workspace (Info first): a sheet on the iPhone, the right screen on the
-/// unfolded Duo. The page dots are gone from view; VoiceOver still hears
-/// "Conversation 2 of 4".
-struct ConversationTitle: View {
-    let title: String
-    let model: String?
-    var writing = false
-    var tabs = 0
-    var pages: RoomChatPages? = nil
-    let open: () -> Void
-
-    /// Model and tab count; the count goes before the model would truncate (large text).
-    private var subtitle: String {
-        let lead = writing ? "Writing" : (model ?? "")
-        guard tabs > 0 else { return lead }
-        let count = "\(tabs) \(tabs == 1 ? "tab" : "tabs")"
-        return lead.isEmpty ? count : "\(lead) · \(count)"
-    }
-
-    var body: some View {
-        Button(action: open) {
-            VStack(spacing: 1) {
-                HStack(spacing: 3) {
-                    Text(title).lineLimit(1)
-                    Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
-                }
-                .font(.headline)
-                .id(title)
-                .transition(.push(from: .trailing).combined(with: .opacity))
-                if !subtitle.isEmpty {
-                    HStack(spacing: 4) {
-                        if writing { ProgressView().controlSize(.mini) }
-                        // Large text: the tab count goes before the model would truncate.
-                        ViewThatFits(in: .horizontal) {
-                            Text(subtitle).lineLimit(1)
-                            Text(writing ? "Writing" : (model ?? subtitle)).lineLimit(1)
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-            }
-            .foregroundStyle(.primary)
-            .frame(minHeight: 44)
-            .contentShape(.rect)
-        }
-        // No style of its own: in the Duo's header, `DuoHeaderButtonStyle` routes the tap.
-        .tint(.primary)
-        .accessibilityLabel([title, subtitle].filter { !$0.isEmpty }.joined(separator: ", "))
-        .accessibilityHint("Opens the conversation's Workspace")
-        .accessibilityIdentifier("conversationMore")
-        .overlay(alignment: .bottom) {
-            if let pages, pages.count > 1 {
-                Color.clear.frame(width: 1, height: 1)
-                    .accessibilityElement()
-                    .accessibilityLabel("Conversation \(pages.index + 1) of \(pages.count)")
-                    .accessibilityIdentifier("conversationPageDots")
-            }
         }
     }
 }

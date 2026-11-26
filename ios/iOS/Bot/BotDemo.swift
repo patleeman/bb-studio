@@ -359,7 +359,7 @@ enum BotDemo {
                 lead: ThreadLead(threadId: threadId), shape: "blob", color: "#2ba59a", role: "Keeps the launch on track.") : nil
             let duoActivity = args.contains("-qaDuoLong") ? activity(needs: true) : wideTitles ? activity(needs: false) : nil
             return Fixture(bot: phoneBot, activity: duoActivity, thread: thread(running: false, needs: question),
-                           rows: (args.contains("-qaDuoLong") || question ? longRows : transcript) + loopRows(), interactions: question ? questionInteractions : [])
+                           rows: (args.contains("-qaDuoLong") || question ? longRows : transcript) + relayedRows(), interactions: question ? questionInteractions : [])
         }
         let running = variant == "working"
         let bot = variant == "onboarding" ? nil : BotInfo(
@@ -373,19 +373,14 @@ enum BotDemo {
                            rows: longRows, interactions: questionInteractions)
         }
         return Fixture(bot: bot, activity: activity(needs: variant == "needs"), thread: thread(running: running, needs: variant == "needs"),
-                       rows: (served != nil && variant == "chat" ? longRows : rows(variant)) + loopRows(), interactions: variant == "needs" ? interactions : [])
+                       rows: (served != nil && variant == "chat" ? longRows : rows(variant)) + relayedRows(), interactions: variant == "needs" ? interactions : [])
     }
 
     /// The Bots list: Juniper alone, or with two more for `-qaBotDemo list`.
-    /// `-qaLoopsDemo`: the morning card and loop cards at the end of the chat.
-    private static func loopRows() -> [TimelineRow] {
-        let start = now - 300_000
-        let loops = (LoopsDemo.messages() + TasksDemo.messages()).enumerated().map { index, message in
-            row(id: "loop-\(index)", role: message.role, text: message.text, at: start + Double(index) * 1_000)
-        }
-        guard relayedFixture, !loops.isEmpty else { return loops }
-        let relayed: [TimelineRow] = decode("[" + relayedJSON(start + 60_000).joined(separator: ",") + "]")
-        return loops + relayed
+    /// `-qaRelayed`: relayed messages at the end of the chat.
+    private static func relayedRows() -> [TimelineRow] {
+        guard relayedFixture else { return [] }
+        return decode("[" + relayedJSON(now - 240_000).joined(separator: ",") + "]")
     }
 
     static var relayedFixture: Bool { ProcessInfo.processInfo.arguments.contains("-qaRelayed") }
@@ -464,7 +459,6 @@ enum BotDemo {
             items.append(message("m5", "assistant", "Just one thing: the **Lisbon offsite budget** needs your sign-off by 3pm. The PRs are merged and the deck is final.\n\nWant me to draft the approval note?\n\n::next{reply=\"👍 Draft it|🕒 Remind me at 2|🙅 Not today\" do=\"📅 Block focus time\"}", today + 30_000))
         }
         if spaceFixture { items += spaceRows(today + 60_000, message: message, work: work) }
-        if relayedFixture, LoopsDemo.messages().isEmpty { items += relayedJSON(today + 90_000) }
         return decode("[" + items.joined(separator: ",") + "]")
     }
 

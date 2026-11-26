@@ -4,8 +4,6 @@ import UIKit
 /// What a row in the new transcript needs from its thread to act: the
 /// same closures the SwiftUI transcript passes its rows.
 struct ThreadTranscriptActions {
-    /// Shows only one strand (a divider tapped); nil where strands don't run.
-    var onlyStrand: ((String) -> Void)? = nil
     var projectId: String?
     var reactionItems: [String]
     var cached: Bool
@@ -26,6 +24,8 @@ struct ThreadTranscriptActions {
     var openWeb: () -> Void
     /// A one-shot notice's action (a Bot conversation's lines at the end).
     var notice: (TranscriptNotice.Action) -> Void = { _ in }
+    /// A worker's approval answered inline.
+    var decide: (String, WorkerApproval.Decision) -> Void = { _, _ in }
     var threadTitle: (String) -> String? = { _ in nil }
 }
 
@@ -40,8 +40,8 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
     case pending(Outbox.Message)
     case interaction(PendingInteraction)
     case working(thinking: String?)
-    /// Strands in the timeline: a divider where the strand changes, or "N other messages" under a filter.
-    case strand(StrandTimeline.Mark, key: String)
+    /// A worker's approval, answered here (a Bot conversation's, at the end).
+    case approval(ConversationApprovals.Card)
     /// Something that happened once, as a quiet line at the end (a Bot conversation).
     case notice(TranscriptNotice)
 
@@ -53,8 +53,8 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         var sameTurn = false
         var relayed: RelayedMessage?
         var quiet = false
-        /// A reply that needs the user: its asking sentence marked (its turn's newest message).
-        var ask: ReplyAskMark?
+        /// The strand its turn is in, on the turn's last reply: the footer's small tag.
+        var strand: String?
     }
 
     var id: String {
@@ -65,7 +65,7 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         case .pending(let message): "pending-message:\(message.id)"
         case .interaction(let interaction): interaction.id
         case .working: "transcript:working"
-        case .strand(_, let key): "strand:\(key)"
+        case .approval(let card): "approval:\(card.id)"
         case .notice(let notice): "notice:\(notice.id)"
         }
     }
@@ -78,7 +78,7 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         case let (.pending(x), .pending(y)): x == y
         case let (.interaction(x), .interaction(y)): x == y
         case let (.working(x), .working(y)): x == y
-        case let (.strand(x, k), .strand(y, l)): x == y && k == l
+        case let (.approval(x), .approval(y)): x == y
         case let (.notice(x), .notice(y)): x == y
         default: false
         }
@@ -162,7 +162,7 @@ struct ThreadTranscriptRowView: View {
                             saveFiles: actions.saveFiles, thread: state.sideThread, replier: actions.replier,
                             replyInThread: actions.messageThread.flatMap { open in ConversationReplies.canThread(row) ? { open(row) } : nil },
                             fork: actions.forkConversation.flatMap { fork in ConversationReplies.canFork(row) ? { fork(row) } : nil },
-                            openSideThread: actions.openSideThread, ask: state.ask)
+                            openSideThread: actions.openSideThread, strand: state.strand)
                     case .activity(let rows):
                         ActivityGroup(rows: rows)
                     }
@@ -181,10 +181,9 @@ struct ThreadTranscriptRowView: View {
                             openWeb: actions.openWeb)
         case .working(let thinking):
             WorkingIndicator(thinking: thinking)
-        case .strand(.divider(let strandId, let title), _):
-            StrandDividerRow(title: title, only: actions.onlyStrand.map { only in { only(strandId) } })
-        case .strand(.gap(let count), _):
-            StrandGapRow(count: count)
+        case .approval(let card):
+            WorkerApprovalCard(card: card, openWorker: { actions.openThread(card.approval.worker.threadId) },
+                               decide: { actions.decide(card.id, $0) })
         case .notice(let notice):
             TranscriptNoticeRow(notice: notice, act: actions.notice)
         }
@@ -192,44 +191,20 @@ struct ThreadTranscriptRowView: View {
 }
 
 extension ThreadTranscriptRow {
-    /// Strands in a conversation's rows (`StrandTimeline.plan`): dividers where
-    /// the strand changes, or, showing only one strand, its rows with the others
-    /// folded into "N other messages". Rows that aren't from a turn stay.
-    static func strands(_ rows: [Self], tags: StrandTags?, only: String?, flash: Double? = nil) -> [Self] {
+    /// The strand tag in a conversation's footers: on each turn's last reply,
+    /// the name of the strand the turn is in (`strands.tags`).
+    static func strandTags(_ rows: [Self], tags: StrandTags?) -> [Self] {
         guard let tags, !tags.tags.isEmpty else { return rows }
-        let seqs: [Double?] = rows.map { row in
-            if case .item(let item, _) = row { return item.rows.compactMap(\.sourceSeqEnd).max() }
-            return nil
-        }
-        let rows = asks(rows, seqs: seqs, tags: tags, flash: flash)
-        let messages: [Bool] = rows.map { row in
-            if case .item(.message, _) = row { return true }
-            return false
-        }
-        let plan = StrandTimeline.plan(seqs: seqs, messages: messages, tags: tags, only: only)
-        var out: [Self] = []
-        out.reserveCapacity(rows.count + plan.marks.count)
-        for (index, row) in rows.enumerated() {
-            for (n, mark) in (plan.marks[index] ?? []).enumerated() { out.append(.strand(mark, key: "\(row.id):\(n)")) }
-            if plan.keep[index] { out.append(row) }
-        }
-        for (n, mark) in (plan.marks[rows.count] ?? []).enumerated() { out.append(.strand(mark, key: "end:\(n)")) }
-        return out
-    }
-
-    /// Replies that still need the user (`strands.tags` replies): each is marked
-    /// in its turn's newest reply message; `flash` is the reply Jump to reply flashes.
-    static func asks(_ rows: [Self], seqs: [Double?], tags: StrandTags, flash: Double?) -> [Self] {
-        guard tags.replies.contains(where: \.open) else { return rows }
-        var newest: [String: Int] = [:]
-        for (index, row) in rows.enumerated() {
-            guard case .item(.message(let message), _) = row, !message.isUser, let turn = tags.turn(atSeq: seqs[index]) else { continue }
-            newest[turn.turnId] = index
-        }
         var out = rows
-        for (turnId, index) in newest {
-            guard let reply = tags.openReply(turnId: turnId), case .item(let item, var state) = out[index] else { continue }
-            state.ask = ReplyAskMark(ask: reply.ask, seq: reply.seq, flash: flash == reply.seq)
+        var lastReply: [String: Int] = [:]
+        for (index, row) in rows.enumerated() {
+            guard case .item(.message(let message), _) = row, !message.isUser,
+                  let turn = tags.turn(atSeq: message.sourceSeqEnd), turn.strandId != nil else { continue }
+            lastReply[turn.turnId] = index
+        }
+        for index in lastReply.values {
+            guard case .item(let item, var state) = out[index], case .message(let message) = item else { continue }
+            state.strand = tags.strandTitle(atSeq: message.sourceSeqEnd)
             out[index] = .item(item, state)
         }
         return out
