@@ -567,9 +567,9 @@
       "budget": 4
     },
     "apps/app/src/views/thread-detail/ThreadContextCardCore.tsx": {
-      "seam": "host-copy",
-      "intent": "The Info card's parent row takes its icon and label from parentRowIcon and parentRowLabel (parentRelationship.fork.ts, imported at the top of the file), so a reply reads \"Reply to: <title>\".",
-      "budget": 5
+      "seam": "host-copy, no-child-threads-card",
+      "intent": "The Info card's parent row takes its icon and label from parentRowIcon and parentRowLabel (parentRelationship.fork.ts, imported at the top of the file), so a reply reads \"Reply to: <title>\". Both exported lists go through studioCoreCardEntries (threadContextCardCore.fork.ts, imported at the top of the file), which drops the \"childThreads\" section: the card shows no Child threads list; plugin rows and sections are untouched.",
+      "budget": 14
     },
     "apps/app/src/components/thread/timeline/GeneratedConversationMessage.tsx": {
       "seam": "host-copy, quiet-turns",
