@@ -50,7 +50,7 @@ struct ShellRoot: View {
     }
 
     private func theme(_ bot: BotSpace) -> LookTheme {
-        RoomTheme.resolve(botThemeId: router.themeOverride[bot.id] ?? bot.appearance?.themeId, phoneThemeId: looks.themeId,
+        BotTheme.resolve(botThemeId: router.themeOverride[bot.id] ?? bot.appearance?.themeId, phoneThemeId: looks.themeId,
                           catalog: looks.catalog)
     }
 
@@ -86,7 +86,7 @@ enum ShellMemory {
 
     static func opening(main: String, botId: String, store: BotSpacesStore) -> String {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-qaRoomForget") { return main }
+        if ProcessInfo.processInfo.arguments.contains("-qaForgetConversation") { return main }
         #endif
         guard let last = AppGroup.defaults.string(forKey: key + "." + botId),
               store.view(for: botId)?.conversations.contains(where: { $0.threadId == last }) == true else { return main }
@@ -101,10 +101,10 @@ enum ShellMemory {
     /// Once a launch: Home stays Home after the test goes back to it.
     static var qaOpened = false
 
-    /// `-qaRoomConversation <id>`: the UI tests open on a conversation, pushed over Home.
+    /// `-qaConversation <id>`: the UI tests open on a conversation, pushed over Home.
     static var qaConversation: String? {
         let arguments = ProcessInfo.processInfo.arguments
-        guard let at = arguments.firstIndex(of: "-qaRoomConversation"), arguments.indices.contains(at + 1) else { return nil }
+        guard let at = arguments.firstIndex(of: "-qaConversation"), arguments.indices.contains(at + 1) else { return nil }
         return arguments[at + 1]
     }
     #endif
@@ -180,7 +180,14 @@ struct ShellDestination: View {
     @Environment(\.shellPosture) private var posture
     @EnvironmentObject private var app: AppModel
 
+    @Environment(\.shellCovered) private var covered
+
     var body: some View {
+        // Inside the column's navigation stack, SwiftUI's own hiding outside it doesn't reach.
+        destination.accessibilityHidden(covered)
+    }
+
+    @ViewBuilder private var destination: some View {
         switch route {
         case .conversation(let id):
             ConversationScreen(threadId: id, pane: pane)
@@ -198,11 +205,13 @@ struct ShellDestination: View {
         switch route {
         case .place(let page): ShellPlace(page: page, bot: bot, store: store)
         case .theme:
-            RoomThemePicker(bot: bot, current: router.themeOverride[bot.id] ?? bot.appearance?.themeId ?? "") { themeId in
-                RoomTheme.choose(themeId, bot: bot, router: router, store: store, app: app)
+            BotThemePicker(bot: bot, current: router.themeOverride[bot.id] ?? bot.appearance?.themeId ?? "") { themeId in
+                BotTheme.choose(themeId, bot: bot, router: router, store: store, app: app)
             }
         case .studio: StudioView()
         case .settings: SettingsView()
+        case .memorySkill(let botId, let name): MemorySkillRoute(botId: botId, name: name)
+        case .memoryNewSkill(let botId): NewSkillScreen(store: MemoryStore.shared(botId: botId, client: app.client))
         default:
             RouteDestination(route: route)
                 .environment(\.botConversation, ShellContext.make(BotShell.mainThreadId(bot, view: store.view(for: bot.id)) ?? "",
@@ -257,7 +266,6 @@ private struct ShellPages: View {
     @ObservedObject var store: BotSpacesStore
     let window: CGSize
     @ObservedObject private var router = Router.shared
-    @EnvironmentObject private var app: AppModel
     @Environment(\.shellPosture) private var posture
     /// What's pushed over the left page's conversation offers: in the right page's rail.
     @State private var paneActions: [ScreenAction] = []
@@ -286,26 +294,6 @@ private struct ShellPages: View {
             }
         }
         .animation(.snappy(duration: 0.25), value: homeShown)
-        .onAppear { hold(heldConversation, releasing: nil) }
-        .onChange(of: heldConversation) { old, new in hold(new, releasing: old) }
-        .onDisappear { hold(nil, releasing: heldConversation) }
-    }
-
-    /// Book with Home over the conversation: its Workbench still shows on the
-    /// right page, so the thread stays attached and its Workbench marked shown.
-    private var heldConversation: String? {
-        posture == .book && homeShown && !conversation.isEmpty ? conversation : nil
-    }
-
-    private func hold(_ id: String?, releasing old: String?) {
-        if let id, id != old {
-            ConversationSessions.shared.session(id).hold(app)
-            WorkbenchShown.shared.show(id)
-        }
-        if let old, old != id {
-            ConversationSessions.shared.session(old).stop()
-            WorkbenchShown.shared.hide(old)
-        }
     }
 
     @ViewBuilder private func left(width: CGFloat) -> some View {
@@ -317,12 +305,19 @@ private struct ShellPages: View {
                 }
                 conversationColumn
             }
-        } else if homeShown {
-            // Home takes the page; the conversation's thread stays held (`holdsConversation`).
-            homeColumn
         } else {
-            conversationColumn
-                .overlay(alignment: .leading) { HomeEdge() }
+            // Home over the conversation, which stays mounted (its thread, its
+            // place, its Workbench on the right page), out of sight, touch and
+            // VoiceOver's reach (`shellCovered` reaches the UIKit hosts too).
+            ZStack {
+                conversationColumn
+                    .overlay(alignment: .leading) { HomeEdge() }
+                    .opacity(homeShown ? 0 : 1)
+                    .allowsHitTesting(!homeShown)
+                    .accessibilityHidden(homeShown)
+                    .environment(\.shellCovered, homeShown)
+                if homeShown { homeColumn }
+            }
         }
     }
 

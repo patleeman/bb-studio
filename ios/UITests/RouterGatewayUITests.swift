@@ -10,7 +10,7 @@ final class RouterGatewayUITests: ServerIsolatedUITestCase {
 
     private func launch() {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaRouterDemo",
-                               "-qaRoomConversation", "thr_botdemo01"]
+                               "-qaConversation", "thr_botdemo01"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
     }

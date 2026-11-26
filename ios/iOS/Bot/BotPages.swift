@@ -88,8 +88,8 @@ struct ArchivePageView: View {
         } message: { _ in
             Text(ConversationFinish.deleteMessage)
         }
-        .modifier(PageChrome(title: "Archive", query: $query, prompt: "Search the archive"))
-        .navigationBarTitleDisplayMode(.large)
+        .shellSearchable(text: $query, prompt: "Search the archive")
+        .screenToolbar("Archive", actions: [], displayMode: .large)
         .refreshable { await load.reload() }
         .task(id: scope) { start() }
         .accessibilityIdentifier("archive-page")
@@ -99,6 +99,7 @@ struct ArchivePageView: View {
         if row.finished {
             NavigationLink {
                 FinishedConversationScreen(threadId: row.threadId, title: row.title, open: open) { await reopened() }
+                    .modifier(PushedChrome(title: row.title))
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.circle").foregroundStyle(.green).frame(width: 22)

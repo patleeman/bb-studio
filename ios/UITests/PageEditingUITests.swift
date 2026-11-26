@@ -19,7 +19,7 @@ final class PageEditingUITests: ServerIsolatedUITestCase {
     func testPageEditorIsOneContinuousText() {
         let app = XCUIApplication()
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
-                               "-qaRoomConversation", "thr_botdemo01", "-qaPageDemo"]
+                               "-qaConversation", "thr_botdemo01", "-qaPageDemo"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
         XCUIDevice.shared.system.open(URL(string: "bbstudio://page/qa-demo")!)

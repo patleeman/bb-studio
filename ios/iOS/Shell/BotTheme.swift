@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A Bot's scene theme: its own, else the phone's, else the default.
-enum RoomTheme {
+enum BotTheme {
     static let fallback = "aurora-fjord"
 
     static func resolve(botThemeId: String?, phoneThemeId: String?, catalog: LookCatalog) -> LookTheme {

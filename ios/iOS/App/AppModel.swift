@@ -25,6 +25,9 @@ enum Route: Hashable {
     case conversation(id: String)
     /// One of the Bot's places: Memory, Library, Schedules, Archive.
     case place(BotPage)
+    /// A Memory skill, or a new one: pushed on the shell's stack (the rail's Back and actions on the Duo).
+    case memorySkill(botId: String?, name: String)
+    case memoryNewSkill(botId: String?)
     /// Studio's list of everything made.
     case studio
     case settings

@@ -240,7 +240,7 @@ struct VisualChatScreen: View {
         return VStack(alignment: .leading, spacing: 8) {
             if let caption = model.caption {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    if caption.asking, model.working { ProgressView().controlSize(.mini) }
+                    if caption.asking, model.working { RunningGlyph().accessibilityHidden(true) }
                     Text(caption.text)
                         .font(.subheadline)
                         .foregroundStyle(caption.asking ? .secondary : .primary)

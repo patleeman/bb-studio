@@ -33,6 +33,9 @@ extension EnvironmentValues {
     @Entry var shellReservedColumn: CGFloat = 0
     /// The window is on the Duo's inner screen (see `ShellGeometry.innerScreen`).
     @Entry var shellInnerScreen = false
+    /// Under another page (the book's Home over its conversation): kept
+    /// mounted, out of VoiceOver's reach, UIKit hosts too.
+    @Entry var shellCovered = false
 }
 
 enum ShellQA {

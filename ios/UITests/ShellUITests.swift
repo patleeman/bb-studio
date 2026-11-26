@@ -16,7 +16,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
     }
 
     private func launchConversation(_ extra: [String] = []) {
-        launch(["-qaRoomConversation", "thr_botdemo01"] + extra)
+        launch(["-qaConversation", "thr_botdemo01"] + extra)
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")
     }
 
@@ -51,15 +51,15 @@ final class ShellUITests: ServerIsolatedUITestCase {
     /// A conversation at rest runs no animation forever (phone heat; XCUITest
     /// waited 60 s a step on the folded Duo): every repeating animation left
     /// after it settles, other than the text caret's blink, is a bug.
-    func testTheConversationGoesIdle() { expectIdle(["-qaRoomConversation", "thr_botdemo01"]) }
-    func testTheConversationWithChipsGoesIdle() { expectIdle(["-qaRoomConversation", "thr_botdemo01", "-qaShelfDemo"]) }
+    func testTheConversationGoesIdle() { expectIdle(["-qaConversation", "thr_botdemo01"]) }
+    func testTheConversationWithChipsGoesIdle() { expectIdle(["-qaConversation", "thr_botdemo01", "-qaShelfDemo"]) }
     /// While the Bot works (its turn, a running worker on Home, background
     /// work): still marks, not spinners that would run for hours.
     func testAWorkingBotGoesIdle() { expectIdle(["-qaShelfDemo", "-openURL", "bbstudio://bot"], bot: "working") }
     func testHomeWithARunningWorkerGoesIdle() { expectIdle([], home: true) }
     /// Live scene on: the shell's backdrop stays a still (no scene web view).
     func testTheBackdropStaysStillWithLiveSceneOn() {
-        expectIdle(["-qaRoomConversation", "thr_botdemo01", "-qaLiveScene", "-qaRoomTheme", "tonights-sky"])
+        expectIdle(["-qaConversation", "thr_botdemo01", "-qaLiveScene", "-qaBotTheme", "tonights-sky"])
         XCTAssertFalse((app.windows.firstMatch.value as? String ?? "").contains("webview"), "no live scene behind the shell")
     }
     func testTheBotChatGoesIdleAfterAStream() {

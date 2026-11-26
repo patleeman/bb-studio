@@ -8,7 +8,7 @@ final class PageViewerUITests: ServerIsolatedUITestCase {
 
     private func openPage() {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
-                               "-qaRoomConversation", "thr_botdemo01", "-qaPageDemo"]
+                               "-qaConversation", "thr_botdemo01", "-qaPageDemo"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
         XCUIDevice.shared.system.open(URL(string: "bbstudio://page/qa-demo")!)
@@ -133,7 +133,7 @@ final class PageViewerUITests: ServerIsolatedUITestCase {
     /// and no Work bar; its actions are at the top of the conversation's More.
     func testAPageTabHasNoBarAndHandsItsActionsToMore() {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
-                               "-qaRoomConversation", "thr_botdemo01", "-qaWorkbenchDemo", "-qaPageDemo"]
+                               "-qaConversation", "thr_botdemo01", "-qaWorkbenchDemo", "-qaPageDemo"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
         let either = { (ids: [String]) in self.app.buttons.matching(NSPredicate(format: "identifier IN %@", ids)).firstMatch }

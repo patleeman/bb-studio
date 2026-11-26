@@ -16,7 +16,7 @@ struct HistoryLayerView: View {
     var body: some View {
         let words = MemoryHistory.words(query)
         List {
-            MemorySearchField(text: $query, prompt: mode == .summaries ? "Search summaries" : "Search every message", id: "memoryHistorySearch")
+            ShellSearchField(text: $query, prompt: mode == .summaries ? "Search summaries" : "Search every message", id: "memoryHistorySearch")
                 .listRowSeparator(.hidden)
             BotPageChips(choices: Mode.allCases.map { ($0, $0.title) }, selection: $mode)
             switch mode {
@@ -169,33 +169,6 @@ private struct ConversationRow: View {
     }
 }
 
-struct MemorySearchField: View {
-    @Binding var text: String
-    let prompt: String
-    let id: String
-    var focus = false
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField(prompt, text: $text)
-                .submitLabel(.search)
-                .autocorrectionDisabled()
-                .focused($focused)
-                .accessibilityIdentifier(id)
-            if !text.isEmpty {
-                Button { text = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Clear search")
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(minHeight: 38)
-        .background(.background.secondary, in: .rect(cornerRadius: 10))
-        .onAppear { if focus { focused = true } }
-    }
-}
 
 /// Search across all three layers: Core's lines, the skills, the summaries
 /// and every conversation's messages.
@@ -209,7 +182,7 @@ struct MemorySearchView: View {
     var body: some View {
         let words = MemoryHistory.words(query)
         List {
-            MemorySearchField(text: $query, prompt: "Search memory", id: "memorySearchField", focus: true)
+            ShellSearchField(text: $query, prompt: "Search memory", id: "memorySearchField", focusOnAppear: true)
                 .listRowSeparator(.hidden)
             if !words.isEmpty {
                 CoreMatches(store: store, words: words, show: show)
@@ -268,12 +241,13 @@ private struct SkillMatches: View {
         if !skills.isEmpty {
             Section("Skills") {
                 ForEach(skills) { skill in
-                    NavigationLink { SkillScreen(store: store, skill: skill) } label: {
+                    Button { Router.shared.push(.memorySkill(botId: store.botId, name: skill.name)) } label: {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(skill.name)
                             Text(skill.description).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                         }
                     }
+                    .tint(.primary)
                     .accessibilityIdentifier("memorySkill-\(skill.name)")
                 }
             }

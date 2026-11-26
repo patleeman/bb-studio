@@ -49,14 +49,8 @@ final class ConversationSession: ObservableObject {
     private var attached = 0
     private var isAttached = false
 
-    /// Each screen showing the thread attaches once; the last to go detaches.
-    func start(_ app: AppModel) async {
-        hold(app)
-        await model.load()
-    }
-
-    /// Keeps the thread attached without loading it again: the book's Home
-    /// over a conversation whose Workbench still shows (`ShellPages`).
+    /// Each screen showing the thread holds it once, as it appears (and loads
+    /// it in its task); the last to go detaches.
     func hold(_ app: AppModel) {
         attached += 1
         guard !isAttached else { return }

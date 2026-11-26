@@ -75,32 +75,12 @@ struct WorkerApprovalCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Button(action: openWorker) {
-                    Text(approval.worker.title).lineLimit(1).foregroundStyle(look.accent)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open \(approval.worker.title)")
-                .accessibilityIdentifier("approvalWorker")
-                Text(approval.askLine).foregroundStyle(.secondary).lineLimit(1).layoutPriority(-1)
-                Spacer(minLength: 0)
-            }
-            .font(.subheadline.weight(.semibold))
+            ApprovalHeader(approval: approval, openWorker: openWorker)
             Text(approval.title)
                 .font(.headline)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("approvalTitle")
-            if let detail = approval.detail {
-                Text(detail)
-                    .font(.footnote.monospaced())
-                    .lineLimit(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 9)
-                    .background(.fill.tertiary, in: .rect(cornerRadius: 10))
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier("approvalLines")
-            }
+            if let detail = approval.detail { ApprovalDetail(detail: detail) }
             if let settled = approval.state.settledLabel {
                 Label(settled, systemImage: approval.state == .denied ? "xmark" : "checkmark")
                     .font(.footnote.weight(.semibold))
@@ -175,5 +155,43 @@ struct WorkerPendingApproval: View {
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.separator))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("workerPendingApproval")
+    }
+}
+
+/// The card's first line: the worker (opens it) and what it asks.
+private struct ApprovalHeader: View {
+    let approval: WorkerApproval
+    let openWorker: () -> Void
+    @Environment(\.look) private var look
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: openWorker) {
+                Text(approval.worker.title).lineLimit(1).foregroundStyle(look.accent)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open \(approval.worker.title)")
+            .accessibilityIdentifier("approvalWorker")
+            Text(approval.askLine).foregroundStyle(.secondary).lineLimit(1).layoutPriority(-1)
+            Spacer(minLength: 0)
+        }
+        .font(.subheadline.weight(.semibold))
+    }
+}
+
+/// What the approval would run, in a box.
+private struct ApprovalDetail: View {
+    let detail: String
+
+    var body: some View {
+        Text(detail)
+            .font(.footnote.monospaced())
+            .lineLimit(6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
+            .background(.fill.tertiary, in: .rect(cornerRadius: 10))
+            .textSelection(.enabled)
+            .accessibilityIdentifier("approvalLines")
     }
 }

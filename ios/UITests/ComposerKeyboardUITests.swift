@@ -9,7 +9,7 @@ final class ComposerKeyboardUITests: ServerIsolatedUITestCase {
     private func launch(room: Bool) {
         variant = room ? "room" : "chat"
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat"]
-            + (room ? ["-qaSpacesDemo", "list", "-qaRoomTheme", ProcessInfo.processInfo.environment["ROOM_THEME"] ?? "forest"] : [])
+            + (room ? ["-qaSpacesDemo", "list", "-qaBotTheme", ProcessInfo.processInfo.environment["ROOM_THEME"] ?? "forest"] : [])
         app.launchOffline()
         // The app opens on Home: Main from there.
         XCTAssertTrue(app.waitForRoom(timeout: 60) && field.waitForExistence(timeout: 10), "Main opens from Home")

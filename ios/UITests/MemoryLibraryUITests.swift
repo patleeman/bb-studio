@@ -6,6 +6,11 @@ import XCTest
 final class MemoryLibraryUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
+    /// A screen's control: in the iPhone's bar, or the Duo's rail (Review S7).
+    private func control(_ id: String) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "identifier IN %@", [id, "screenAction-" + id, "rail-action-" + id])).firstMatch
+    }
+
     private func launch(_ extra: [String] = []) {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list"] + extra
         app.launchOffline()
@@ -117,17 +122,22 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("skillBody").waitForExistence(timeout: 10), "the skill opens pushed")
         XCTAssertTrue(any("skillBody").label.contains("Weekly review"))
         XCTAssertTrue(any("skillVersion-2").exists, "with its versions")
+        if app.isFoldedDuo {
+            // Review S7: the Duo's one rail, no bar of its own.
+            XCTAssertTrue(app.buttons["rail-back"].exists && app.buttons["rail-action-skillEdit"].exists, "Back and Edit in the rail")
+            XCTAssertFalse(app.navigationBars.firstMatch.exists, "no bar on the skill")
+        }
         shot("skill")
-        app.buttons["skillEdit"].tap()
+        control("skillEdit").tap()
         let body = field("skillBodyField")
         XCTAssertTrue(body.waitForExistence(timeout: 10))
         body.tap()
         body.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.95)).tap()
         body.typeText("\n4. Share the page.")
-        app.buttons["skillSave"].tap()
+        control("skillSave").tap()
         XCTAssertTrue(any("skillBody").waitForExistence(timeout: 10))
         XCTAssertTrue(text("Share the page.").waitForExistence(timeout: 10), "the edit saved")
-        app.buttons["BackButton"].firstMatch.tap()
+        app.goBack()
 
         app.buttons["memorySkillNew"].tap()
         let name = app.textFields["newSkillName"]
@@ -138,7 +148,7 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
         field("newSkillDescription").typeText("Records planting by bed.")
         field("newSkillBody").tap()
         field("newSkillBody").typeText("1. Note the bed and the date.")
-        app.buttons["newSkillSave"].tap()
+        control("newSkillSave").tap()
         XCTAssertTrue(app.buttons["memorySkill-garden-log"].waitForExistence(timeout: 10), "the new skill is listed")
     }
 

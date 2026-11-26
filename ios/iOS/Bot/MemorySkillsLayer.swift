@@ -35,7 +35,7 @@ private struct SkillRows: View {
 
     var body: some View {
         if newSkillRow {
-            NavigationLink { NewSkillScreen(store: store) } label: {
+            Button { Router.shared.push(.memoryNewSkill(botId: store.botId)) } label: {
                 Label("New skill", systemImage: "plus").foregroundStyle(.tint)
             }
             .accessibilityIdentifier("memorySkillNew")
@@ -46,8 +46,16 @@ private struct SkillRows: View {
                 .listRowSeparator(.hidden)
         }
         ForEach(skills) { skill in
-            NavigationLink { SkillScreen(store: store, skill: skill) } label: { SkillRow(skill: skill) }
-                .accessibilityIdentifier("memorySkill-\(skill.name)")
+            // On the shell's stack, from either page: its title line and rail on the Duo.
+            Button { Router.shared.push(.memorySkill(botId: store.botId, name: skill.name)) } label: {
+                HStack {
+                    SkillRow(skill: skill)
+                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                }
+                .contentShape(.rect)
+            }
+            .tint(.primary)
+            .accessibilityIdentifier("memorySkill-\(skill.name)")
         }
     }
 }
@@ -124,14 +132,9 @@ struct SkillScreen: View {
                 SkillReader(store: store, skill: skill, history: history)
             }
         }
-        .navigationTitle(skill.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
-        .toolbar {
-            if !editing, currentText != nil {
-                Button("Edit") { editing = true }.accessibilityIdentifier("skillEdit")
-            }
-        }
+        // Edit in the iPhone's bar, the Duo's rail; the editor's own actions replace it while editing.
+        .screenToolbar(skill.name, actions: !editing && currentText != nil
+            ? [ScreenAction(id: "skillEdit", title: "Edit", systemImage: "pencil") { editing = true }] : [])
         .task { load() }
         .accessibilityIdentifier("skill-page")
     }
@@ -262,6 +265,10 @@ private struct SkillEditor: View {
             }
             if let error { Section { Text(error).foregroundStyle(.red).font(.footnote) } }
         }
+        .screenActions([
+            ScreenAction(id: "skillSave", title: conflict == nil ? "Save" : "Replace", systemImage: "checkmark", disabled: !ready) { Task { await save() } },
+            ScreenAction(id: "skillCancel", title: "Cancel", systemImage: "xmark") { done(false) },
+        ])
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("Cancel") { done(false) } }
             ToolbarItem(placement: .confirmationAction) {
@@ -353,12 +360,13 @@ struct NewSkillScreen: View {
         }
         .navigationTitle("New skill")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") { Task { await save() } }.disabled(!ready).accessibilityIdentifier("newSkillSave")
             }
         }
+        // On the Duo the bar hides: Save is in the rail.
+        .screenActions([ScreenAction(id: "newSkillSave", title: "Save", systemImage: "checkmark", disabled: !ready) { Task { await save() } }])
     }
 
     private func save() async {
@@ -366,5 +374,22 @@ struct NewSkillScreen: View {
         defer { saving = false }
         error = await store.addSkill(name: name, description: description.trimmingCharacters(in: .whitespacesAndNewlines), body: text)
         if error == nil { dismiss() }
+    }
+}
+
+/// A skill by name, pushed on the shell's stack: found in its Bot's Memory.
+struct MemorySkillRoute: View {
+    let botId: String?
+    let name: String
+    @EnvironmentObject private var app: AppModel
+
+    var body: some View {
+        let store = MemoryStore.shared(botId: botId, client: app.client)
+        if let skill = store.skills.value?.first(where: { $0.name == name }) {
+            SkillScreen(store: store, skill: skill)
+        } else {
+            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                .task { if store.skills.value == nil { store.loadSkills() } }
+        }
     }
 }

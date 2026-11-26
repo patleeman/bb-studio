@@ -27,7 +27,7 @@ struct HomeView: View {
     var body: some View {
         List {
             Section {
-                HomeSearchField(query: $query, focused: $searchFocused)
+                ShellSearchField(text: $query, prompt: "Search conversations, Memory and Library", id: "homeSearch", focused: $searchFocused)
             }
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
@@ -172,31 +172,6 @@ private struct HomeListStyle: ViewModifier {
 }
 
 /// Search, as Home's first row (9d: not a bar button).
-private struct HomeSearchField: View {
-    @Binding var query: String
-    var focused: FocusState<Bool>.Binding
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Search conversations, Memory and Library", text: $query)
-                .focused(focused)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .accessibilityIdentifier("homeSearch")
-            if !query.isEmpty {
-                Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
-                    .buttonStyle(.borderless)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .accessibilityLabel("Clear search")
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(minHeight: 38)
-        .background(.fill.tertiary, in: .rect(cornerRadius: 10, style: .continuous))
-    }
-}
 
 /// The Bot (8a): its still, its name (a menu: switch Bot, Schedules, Theme,
 /// Settings) and the one status line.

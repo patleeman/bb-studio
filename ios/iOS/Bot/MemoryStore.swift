@@ -17,6 +17,18 @@ final class MemoryStore {
     var notice: String?
     var busy = false
 
+    private static var stores: [String: MemoryStore] = [:]
+
+    /// One store per Bot and server: the page and the skill screens pushed
+    /// from it (on the shell's stack, from either page) share its state.
+    static func shared(botId: String?, client: BBClient) -> MemoryStore {
+        let key = client.baseURL.absoluteString + "|" + (botId ?? "")
+        if let store = stores[key], store.client === client { return store }
+        let store = MemoryStore(botId: botId, client: client)
+        stores[key] = store
+        return store
+    }
+
     init(botId: String?, client: BBClient) {
         self.botId = botId
         self.client = client

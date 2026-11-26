@@ -11,7 +11,7 @@ final class LaunchStackUITests: ServerIsolatedUITestCase {
 
     private func launchConversation(_ extra: [String] = []) {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaStrandsDemo",
-                               "-qaRoomConversation", "thr_botdemo01"] + extra
+                               "-qaConversation", "thr_botdemo01"] + extra
         app.launchOffline()
     }
 

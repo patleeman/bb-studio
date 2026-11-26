@@ -14,7 +14,7 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
 
     private func launch(_ extra: [String] = []) {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
-                               "-qaRoomConversation", "thr_botdemo01"] + extra
+                               "-qaConversation", "thr_botdemo01"] + extra
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")
     }

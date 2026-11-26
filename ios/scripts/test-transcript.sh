@@ -44,7 +44,7 @@ step "phone: state machine, replay, TranscriptV2UITests" env TEST_RUNNER_TRANSCR
   -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO \
   -only-testing:BBStudioTests/TranscriptFollowTests -only-testing:BBStudioTests/TranscriptReplayTests \
   -only-testing:BBStudioUITests/TranscriptV2UITests
-# Taps never move the transcript (Patrick, Oct 27), on the new one.
+# Taps never move the transcript (a user, Oct 27), on the new one.
 step "phone: TranscriptScrollHoldUITests" env TEST_RUNNER_TRANSCRIPT_V2=1 xcodebuild test-without-building -scheme BBStudio -destination "id=$phone" \
   -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/TranscriptScrollHoldUITests
 

@@ -33,7 +33,7 @@ final class LookUITests: ServerIsolatedUITestCase {
         launch(theme: "on-air")
         shot("on-air-main")
         toList()
-        // A Classic phone theme has no scene of its own: the shell's default one (RoomTheme.fallback).
+        // A Classic phone theme has no scene of its own: the shell's default one (BotTheme.fallback).
         XCTAssertTrue(scene.waitForExistence(timeout: 20))
         XCTAssertEqual(scene.value as? String, "aurora-fjord", "a classic theme falls back to the default scene")
         shot("on-air-home")

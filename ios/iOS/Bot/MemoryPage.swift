@@ -25,7 +25,7 @@ struct MemoryPageView: View {
             if let store, store.botId == botId {
                 if posture.splitsWorkbench {
                     CoreLayerView(store: store)
-                        .screenCompanion(id: "memory-browse") { MemoryBrowsePane(store: store, open: open) }
+                        .screenCompanion(id: "memory-browse-\(botId ?? "")") { MemoryBrowsePane(store: store, open: open) }
                 } else {
                     MemoryLayeredPage(store: store, open: open)
                 }
@@ -35,7 +35,7 @@ struct MemoryPageView: View {
         }
         .task(id: "\(app.client.baseURL.absoluteString)|\(botId ?? "")") {
             // Kept across pushes and pops: only another Bot or server makes a new one.
-            if store?.botId != botId || store?.client !== app.client { store = MemoryStore(botId: botId, client: app.client) }
+            if store?.botId != botId || store?.client !== app.client { store = MemoryStore.shared(botId: botId, client: app.client) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("memory-page")
@@ -183,7 +183,7 @@ private struct MemoryBrowseBar: View {
         ZStack {
             MemoryLayerPicker(layer: $layer, layers: [.skills, .history]).frame(maxWidth: 240)
             if layer == .skills {
-                NavigationLink { NewSkillScreen(store: store) } label: {
+                Button { Router.shared.push(.memoryNewSkill(botId: store.botId)) } label: {
                     Image(systemName: "plus").font(.body.weight(.medium)).frame(width: 44, height: 44).contentShape(.rect)
                 }
                 .accessibilityLabel("New skill")

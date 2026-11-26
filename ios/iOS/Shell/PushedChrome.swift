@@ -43,13 +43,15 @@ private struct PushedRail: ViewModifier {
     let depth: Int
     @ObservedObject private var router = Router.shared
     @Environment(\.shellPosture) private var posture
+    /// Back pops this screen however it was pushed (a route, or a link inside a page).
+    @Environment(\.dismiss) private var dismiss
 
     func body(content: Content) -> some View {
         if enabled {
             content.rail(RailLayout.slots(posture, screen: .pushed(actions: actions, depth: depth), tabs: 0, homeShown: false),
                          actions: RailActions(tap: { slot in
                              switch slot {
-                             case .back: if !router.path.isEmpty { router.path.removeLast() }
+                             case .back: dismiss()
                              case .home: router.path = []
                              default: break
                              }
@@ -66,6 +68,8 @@ extension Route {
     var shellTitle: String {
         switch self {
         case .place(let page): page.title
+        case .memorySkill(_, let name): name
+        case .memoryNewSkill: "New skill"
         case .studio: "Studio"
         case .settings: "Settings"
         case .theme: "Theme"

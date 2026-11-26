@@ -12,7 +12,7 @@ final class ComposerChipsUITests: ServerIsolatedUITestCase {
 
     func testLastingStatesAreChipsAndTheFallbackIsALine() {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
-                               "-qaRoomConversation", "thr_botdemo01", "-qaShelfDemo"]
+                               "-qaConversation", "thr_botdemo01", "-qaShelfDemo"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")
 

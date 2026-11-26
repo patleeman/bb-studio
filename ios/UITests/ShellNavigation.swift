@@ -5,7 +5,7 @@ import XCTest
 /// Duo's rail.
 extension XCUIApplication {
     /// A conversation shows (its composer). The app opens on Home: a test that
-    /// starts in a conversation opens its Main from there (`-qaRoomConversation`
+    /// starts in a conversation opens its Main from there (`-qaConversation`
     /// opens another one directly).
     func waitForRoom(timeout: TimeInterval = 30) -> Bool {
         let composer = textViews["Message"]

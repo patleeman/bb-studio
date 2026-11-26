@@ -85,7 +85,7 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
     /// above the keyboard everywhere.
     func testComposerGapInEveryLayout() throws {
         // As on a real phone: the room reopens the conversation it showed when the layout changes.
-        app.launchArguments = ["-qaRoomRemember", "-skipPushPrompt", "YES",
+        app.launchArguments = ["-qaRememberConversation", "-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles", "-qaDark",
             "-openURL", "bbstudio://bot"]
         app.launchOffline()

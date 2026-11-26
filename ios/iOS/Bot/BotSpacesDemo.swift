@@ -74,7 +74,7 @@ enum BotSpacesDemo {
 
     static func themed(_ json: String, chosen: String? = nil) -> String {
         let arguments = ProcessInfo.processInfo.arguments
-        let given = arguments.firstIndex(of: "-qaRoomTheme").flatMap { arguments.indices.contains($0 + 1) && arguments[$0 + 1] != "none" ? arguments[$0 + 1] : nil }
+        let given = arguments.firstIndex(of: "-qaBotTheme").flatMap { arguments.indices.contains($0 + 1) && arguments[$0 + 1] != "none" ? arguments[$0 + 1] : nil }
         guard let theme = chosen ?? given else { return json }
         return json.replacingOccurrences(of: #""id":"bot_juniper","#, with: #""id":"bot_juniper","appearance":{"themeId":"\#(theme)"},"#)
     }

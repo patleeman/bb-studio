@@ -12,7 +12,7 @@ extension BBClient {
     }
 }
 
-struct RoomThemePicker: View {
+struct BotThemePicker: View {
     let bot: BotSpace
     let current: String
     var choose: (String) -> Void

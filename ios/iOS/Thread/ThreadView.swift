@@ -71,6 +71,7 @@ struct ThreadView: View {
     @Environment(\.look) private var look
     @Environment(\.shellPosture) private var posture
     @Environment(\.shellInnerScreen) private var innerScreen
+    @Environment(\.shellCovered) private var covered
     @ObservedObject private var router = Router.shared
     /// The Workbench over the rows (between the title and the composer); nil shows the chat.
     private let workbench: (() -> AnyView)?
@@ -145,30 +146,26 @@ struct ThreadView: View {
     /// Dictation and hold to talk.
     private var withTalk: some View {
         withLoading
-        .onChange(of: canUseNotes) { _, can in if can { notes.attach(app) } }
         .modifier(TalkLifecycle(talk: talk))
-        .onAppear {
-            ScrollLog.observeKeyboard()
-            talk.send = { [model] text in
-                if isWorker { return askWorker(text) }
-                Task { if await !model.send(text, mentions: [], attachments: []) { restoreDraft(text, []) } }
-            }
-            talk.insert = { [model] text in
-                let next = TalkDraft.finished(text, typed: &talkTyped, draft: draft)
-                draft = next
-                // Saved here too: a dictation finished as the thread closes lands after its view is gone.
-                Drafts.save(model.threadId, text: next, mentions: mentions, serverURL: model.serverURL)
-            }
-        }
-        .onChange(of: talk.error) { _, error in
-            if let error { app.flash(error) }
-        }
-        .onChange(of: router.focusRequests) { _, _ in
-            if router.conversation == model.threadId { composerFocused = true }
-        }
-        .onChange(of: session.command) { _, _ in
-            if let command = session.take() { perform(command) }
-        }
+        .modifier(ThreadHooks(
+            canUseNotes: canUseNotes, talkError: talk.error, focusRequests: router.focusRequests, command: session.command,
+            notesAllowed: { notes.attach(app) },
+            appear: {
+                ScrollLog.observeKeyboard()
+                talk.send = { [model] text in
+                    if isWorker { return askWorker(text) }
+                    Task { if await !model.send(text, mentions: [], attachments: []) { restoreDraft(text, []) } }
+                }
+                talk.insert = { [model] text in
+                    let next = TalkDraft.finished(text, typed: &talkTyped, draft: draft)
+                    draft = next
+                    // Saved here too: a dictation finished as the thread closes lands after its view is gone.
+                    Drafts.save(model.threadId, text: next, mentions: mentions, serverURL: model.serverURL)
+                }
+            },
+            talkFailed: { app.flash($0) },
+            focus: { if router.conversation == model.threadId { composerFocused = true } },
+            take: { if let command = session.take() { perform(command) } }))
     }
 
     // `body` in parts, so each type-checks in well under a second (as one
@@ -396,8 +393,12 @@ struct ThreadView: View {
             if runningPlugins.split(separator: ",").contains("studio") {
                 Task { session.sourcePage = try? await client.chatPage(model.threadId) }
             }
-            await session.start(app)
+            await model.load()
         }
+        // Attached as it appears, in step with `onDisappear`'s stop: a screen
+        // that replaces another in the same update takes over before the
+        // deferred detach looks (no async start racing it).
+        .onAppear { session.hold(app) }
         // Open where the reader left off. Waits a beat for the rows to be laid out.
         .task(id: model.unreadFrom) {
             guard model.unreadFrom != nil else { return }
@@ -1436,6 +1437,29 @@ struct WorkingIndicator: View {
     }
 }
 
+/// A thread's hooks: Notes once allowed, talk's wiring, its failures, focus
+/// requests and the menu's commands. One level of the view's type.
+private struct ThreadHooks: ViewModifier {
+    let canUseNotes: Bool
+    let talkError: String?
+    let focusRequests: Int
+    let command: ConversationCommand?
+    let notesAllowed: @MainActor () -> Void
+    let appear: @MainActor () -> Void
+    let talkFailed: @MainActor (String) -> Void
+    let focus: @MainActor () -> Void
+    let take: @MainActor () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: canUseNotes) { _, can in if can { notesAllowed() } }
+            .onAppear(perform: appear)
+            .onChange(of: talkError) { _, error in if let error { talkFailed(error) } }
+            .onChange(of: focusRequests) { _, _ in focus() }
+            .onChange(of: command) { _, _ in take() }
+    }
+}
+
 /// A thread's haptics, its keyboard commands and its Handoff activity: one
 /// modifier, one level of the view's type rather than seven (the Release
 /// main-thread stack, `LaunchStackUITests`).
@@ -1655,6 +1679,7 @@ extension ThreadView {
                     guard let predicted, predicted < -ThreadView.flipDistance else { return }
                     withAnimation(.snappy(duration: 0.25)) { session.showsWorkbench = true }
                 },
+                rowsHidden: covered,
                 cover: workbench,
                 onPillChange: { state in
                     let next = TranscriptPillState(shown: state.shown, unseen: min(state.unseen, 1), note: state.note)

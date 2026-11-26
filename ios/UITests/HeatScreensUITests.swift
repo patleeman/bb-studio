@@ -65,14 +65,14 @@ final class HeatScreensUITests: ServerIsolatedUITestCase {
     }
 
     func test2Conversation() {
-        launch(["-qaRoomConversation", ProcessInfo.processInfo.environment["HEAT_THREAD"] ?? "thr_botdemo01"])
+        launch(["-qaConversation", ProcessInfo.processInfo.environment["HEAT_THREAD"] ?? "thr_botdemo01"])
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 40), "the conversation")
         hold("conversation")
     }
 
     func test4DesignPlayer() {
         guard server == nil else { return }
-        launch(["-qaRoomConversation", "thr_botdemo01", "-qaDesignDemo"])
+        launch(["-qaConversation", "thr_botdemo01", "-qaDesignDemo"])
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 40))
         XCUIDevice.shared.system.open(URL(string: "bbstudio://design/dsn_demo")!)
         let screen = app.buttons["designScreen-1b"]
@@ -84,7 +84,7 @@ final class HeatScreensUITests: ServerIsolatedUITestCase {
 
     func test5PendingApproval() {
         guard server == nil else { return }
-        launch(["-qaRoomConversation", "thr_botdemo01"], variant: "needs")
+        launch(["-qaConversation", "thr_botdemo01"], variant: "needs")
         // No assertion: on a build where a waiting approval hangs the app, nothing ever shows.
         _ = app.textViews["Message"].waitForExistence(timeout: 40)
         hold("approval")

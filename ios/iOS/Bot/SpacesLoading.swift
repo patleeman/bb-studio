@@ -12,7 +12,7 @@ struct SpacesLoadingView: View {
     }
 
     var body: some View {
-        let theme = RoomTheme.resolve(botThemeId: bot?.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog)
+        let theme = BotTheme.resolve(botThemeId: bot?.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog)
         SpacesLoadingScene(bot: bot ?? Self.placeholder)
             .lookRoot(bot: bot, theme: theme)
     }
@@ -32,7 +32,7 @@ private struct SpacesLoadingScene: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
             ZStack {
-                SceneBackdrop(theme: look.theme)
+                SceneBackdrop(theme: look.theme, stillOnly: true)
                 Color.black.opacity(0.45).ignoresSafeArea()
             }
             .allowsHitTesting(false)
