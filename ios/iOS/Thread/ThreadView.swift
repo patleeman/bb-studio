@@ -516,7 +516,7 @@ struct ThreadView: View {
                 if count > 0 {
                     Text("\(count)").font(.caption2.weight(.bold)).monospacedDigit()
                         .padding(.horizontal, 5).frame(minWidth: 18, minHeight: 18)
-                        .background(.primary, in: .capsule).foregroundStyle(Color(uiColor: .systemBackground))
+                        .background(look.ink, in: .capsule).foregroundStyle(look.canvas)
                         .offset(x: 4, y: -4).allowsHitTesting(false)
                 }
             }
