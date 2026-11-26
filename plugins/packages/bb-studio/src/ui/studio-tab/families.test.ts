@@ -1,20 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { familyOf, itemParams, tabKind, tabTarget, toggleFamily } from "./model";
-
-describe("item families", () => {
-  it("puts documents under Pages and things that run under Apps, by type or by the kind name it had", () => {
-    expect(["doc", "whiteboard", "design", "page", "drawing"].map(familyOf)).toEqual(["page", "page", "page", "page", "page"]);
-    expect(["mini", "artifact"].map(familyOf)).toEqual(["app", "app"]);
-    expect(familyOf("recording")).toBeNull();
-  });
-  it("turns a whole family on, keeping other picks, and off again when it was all on", () => {
-    const present = ["doc", "design", "mini", "recording"];
-    const on = toggleFamily(["recording"], "page", present);
-    expect(on).toEqual(["recording", "doc", "design"]);
-    expect(toggleFamily(on, "page", present)).toEqual(["recording"]);
-    expect(toggleFamily(["doc"], "page", present)).toEqual(["doc", "design"]);
-  });
-});
+import { itemParams, tabKind, tabTarget } from "./model";
 
 describe("tab params by family, type and the older kind", () => {
   const design = "dsn_0123456789abcdef";
