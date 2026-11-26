@@ -361,7 +361,6 @@ try {
   }
   const longRunningPlugins = new Set([
     "plugins/provider-pi",
-    "plugins/tasks",
     "plugins/provider-codex",
   ]);
   const queue = [...pluginDirs].sort(

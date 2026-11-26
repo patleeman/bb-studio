@@ -193,17 +193,9 @@ Each bundled plugin documents its commands and behavior in its own skill.
 - MCP server (builtin, disabled by default): `bb plugin enable bb--mcp` lets
   ChatGPT, Claude, or another MCP client control this bb; an approved app can
   run any `bb` command. `bb mcp status|clients|revoke`; see the `mcp` skill.
-- Storage & retention (builtin, disabled by default): enable with
-  `bb plugin enable bb--storage-retention`. Owns thread retention policies
-  and machine storage cleanup through its sidebar panel and `bb storage`
-  commands; see the `storage-retention` skill.
 - Automations (builtin): recurring or one-shot agent prompts and stored
   server scripts. `bb automation create|list|show|update|pause|resume|run|runs|delete`;
   see the `automations` skill.
-- Workflows (builtin, off by default): durable JavaScript orchestration of
-  worker threads. Run `bb plugin enable workflows`, then
-  `bb workflows validate|run|status|history|list|stop`; see the `workflows`
-  skill.
 - Memory (official, `bb plugin install memory`): durable cross-provider
   agent memory. `bb memory catalog|search|get|add|update|forget|history`;
   see the `memory` skill.
