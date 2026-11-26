@@ -113,90 +113,14 @@ struct WorkspaceView<Info: View, Strands: View>: View {
             }
             // Heavy views stay loaded (hidden) while among the two newest; the rest load when shown.
             ForEach(tabs.filter { $0.heavy && store.mounted.contains($0.id) && $0.id != selected }) { tab in
-                TabContent(tab: tab, threadId: threadId, webURL: webURL, openThread: openThread)
+                WorkbenchTabBody(tab: tab, threadId: threadId, webURL: webURL, openThread: openThread)
                     .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
             }
             if let tab = tabs.first(where: { $0.id == selected }) {
-                TabContent(tab: tab, threadId: threadId, webURL: webURL, openThread: openThread)
+                WorkbenchTabBody(tab: tab, threadId: threadId, webURL: webURL, openThread: openThread)
                     .id(tab.id)
             }
         }
-    }
-}
-
-/// One tab's view: native where the phone has one, the in-app web view where
-/// Studio says `web`, and a card for what only the desktop opens.
-private struct TabContent: View {
-    let tab: WorkspaceTab
-    let threadId: String
-    let webURL: URL?
-    let openThread: (String) -> Void
-    @EnvironmentObject private var app: AppModel
-
-    var body: some View {
-        Group {
-            switch tab.support {
-            case .desktopOnly:
-                card("Open on the desktop", detail: "\(tab.title) opens in BB Studio on your Mac.", systemImage: "desktopcomputer")
-            case .web:
-                web
-            case .native:
-                native
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("workspaceContent-\(tab.id)")
-    }
-
-    @ViewBuilder private var native: some View {
-        let ref = tab.ref
-        switch ref.kind {
-        case "page": if let id = ref.id { NavigationStack { PageView(pageId: id) } } else { missing }
-        case "design": if let id = ref.id { NavigationStack { DesignView(id: id) } } else { missing }
-        case "whiteboard": if let id = ref.id { NavigationStack { DrawingView(id: id) } } else { missing }
-        case "app": if let id = ref.id { NavigationStack { MiniAppView(id: id) } } else { missing }
-        case "artifact": if let id = ref.id { NavigationStack { ArtifactView(id: id) } } else { missing }
-        case "recording": if let id = ref.id { NavigationStack { RecordingDetailView(id: id) } } else { missing }
-        case "file", "diff":
-            if let environmentId = ref.environmentId { FilesView(environmentId: environmentId) } else { missing }
-        case "terminal":
-            NavigationStack { TerminalsView(scope: .thread(threadId), title: tab.title) }
-        case "conversation", "worker":
-            if let id = ref.id {
-                card(tab.title, detail: ref.kind == "worker" ? "A worker's transcript." : "A conversation.", systemImage: "bubble.left.and.text.bubble.right",
-                     action: ("Open", { openThread(id) }))
-            } else { missing }
-        default:
-            web
-        }
-    }
-
-    @ViewBuilder private var web: some View {
-        if tab.ref.kind == "browser" {
-            if let url = tab.safeURL { WebView(url: url) } else {
-                card("Not opened", detail: "Only http and https links open on the phone.", systemImage: "exclamationmark.shield")
-            }
-        } else {
-            WebView(url: webURL ?? app.client.baseURL)
-        }
-    }
-
-    private var missing: some View {
-        card("Can't open this tab", detail: "Studio sent it without what the phone needs to show it.", systemImage: "questionmark.square.dashed")
-    }
-
-    private func card(_ title: String, detail: String, systemImage: String, action: (String, () -> Void)? = nil) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: systemImage).font(.title2).foregroundStyle(.secondary)
-            Text(title).font(.headline)
-            Text(detail).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            if let action {
-                Button(action.0, action: action.1).buttonStyle(.bordered).frame(minHeight: 44)
-            }
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity)
-        .padding(.top, 40)
     }
 }
 
