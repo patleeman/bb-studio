@@ -348,7 +348,8 @@ export function registerStudioRpc({
       const skills = bots.alwaysOnSkills(botId).map((skill) => ({ ...skill, warnings: bots.skillLint({ name: skill.name, body: skill.body, alwaysOn: true }, botId) }));
       return { skills, ...bots.skillBudget(botId) };
     },
-    bot_skill_write: ({ botId, ...input }) => { bots.requireStudio(botId, "skills"); return bots.writeSkill(input, botId); },
+    // The user's own write (Studio's UI): an edit to the core skill marks its text as theirs (Maintenance may tidy it from then on).
+    bot_skill_write: ({ botId, ...input }) => { bots.requireStudio(botId, "skills"); const view = bots.writeSkill(input, botId); bots.userEditedSkill(input.name, botId); return view; },
     bot_skill_share: ({ botId, name }) => bots.shareSkill(name, botId),
     bot_skill_delete: ({ botId, name }) => ({ deleted: bots.deleteSkill(name, botId) }),
     bot_skill_pin: ({ botId, name, pinned }) => ({ changed: bots.pinSkill(name, pinned, botId) }),

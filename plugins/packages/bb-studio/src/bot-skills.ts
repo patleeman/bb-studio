@@ -76,10 +76,12 @@ export class BotSkillStore {
     return [...notes.filter((note) => !note.startsWith("It's ")), ...lintAlwaysOn(skill.body, others + alwaysOnChars(skill.body))];
   }
 
-  /** The Bot's always-on skills that aren't archived, with their bodies, by name. */
-  alwaysOn(botId: string): { name: string; description: string; body: string; updatedAt: number }[] {
-    return (this.deps.db.prepare("SELECT name, description, body, updated_at FROM bot_skills WHERE bot_id = ? AND always_on = 1 AND state != 'archived' ORDER BY name = 'core-profile' DESC, name").all(botId) as { name: string; description: string; body: string; updated_at: number }[])
-      .map((row) => ({ name: row.name, description: row.description, body: row.body, updatedAt: row.updated_at }));
+  /** The Bot's always-on skills that aren't archived, with their bodies: its core skill (by its marker, bot_core_skills) first, then by name. */
+  alwaysOn(botId: string): { name: string; description: string; body: string; updatedAt: number; core: boolean }[] {
+    return (this.deps.db.prepare(`SELECT s.name, s.description, s.body, s.updated_at, c.bot_id IS NOT NULL AS core FROM bot_skills s
+      LEFT JOIN bot_core_skills c ON c.bot_id = s.bot_id AND c.skill_name = s.name
+      WHERE s.bot_id = ? AND s.always_on = 1 AND s.state != 'archived' ORDER BY core DESC, s.name`).all(botId) as { name: string; description: string; body: string; updated_at: number; core: number }[])
+      .map((row) => ({ name: row.name, description: row.description, body: row.body, updatedAt: row.updated_at, core: row.core === 1 }));
   }
 
   /** The always-on budget: characters used by all always-on skills together, and the cap. */

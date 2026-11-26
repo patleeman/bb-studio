@@ -1106,7 +1106,8 @@ export default async function plugin(bb: BbPluginApi) {
   const maintenance = new BotMaintenance({
     db, sdk: bb.sdk, scheduler, changed: tagsChanged,
     bots: () => bots.list(), owned: (id) => ownedThreads.owned(id), refreshOwned: () => ownedThreads.sweep(),
-    memory: (id) => { const all = bots.alwaysOnSkills(id); const core = all[0]; return core ? { id: core.name, markdown: core.body, updatedAt: core.updatedAt, totalChars: bots.skillBudget(id).chars } : null; },
+    memory: (id) => { const core = bots.coreSkill(id); return core ? { id: core.name, markdown: core.body, updatedAt: core.updatedAt, totalChars: bots.skillBudget(id).chars, migrated: core.migrated, askedAt: core.tidyAskedAt } : null; },
+    tidyAsked: (id, now) => bots.noteCoreTidyAsked(id, now),
     curate: (id, dryRun) => learning.curate(id, { dryRun }),
     automationPause: (id, botId) => automations.setState(id, "paused", botId),
     automationDelete: (id, botId) => automations.delete(id, botId),

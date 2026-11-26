@@ -72,7 +72,7 @@ it("upgrades an install with memory records and a core profile without losing an
   expect(skill).toMatchObject({ alwaysOn: true, pinned: true });
   expect(skill.body.length).toBeGreaterThan(ALWAYS_ON_CAP);
   expect(bots.skillBudget("bot_main")).toMatchObject({ over: true });
-  expect(bots.skillLint({ name: "core-profile", body: skill.body }, "bot_main")).toEqual(expect.arrayContaining([expect.stringContaining("over the 3,000 budget")]));
+  expect(bots.skillLint({ name: "core-profile", body: skill.body }, "bot_main")).toEqual(expect.arrayContaining([expect.stringContaining("over the 2,000 budget")]));
   // Its check-in section is what the check-in reads.
   expect(skill.body).toContain("## Check-in\n\n- Anything waiting on the user?\n- Garage sensor battery on the 1st.");
 

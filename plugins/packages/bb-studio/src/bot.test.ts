@@ -930,8 +930,14 @@ it("moves a Bot's core profile page into its always-on skill once, whole, even o
   const skill = x.bots.skill("core-profile")!;
   // Not cut: the whole text, flagged over budget.
   expect(skill.body.trim()).toBe(long.trim());
-  expect(x.bots.skillBudget()).toMatchObject({ over: true, cap: 3000 });
-  expect(x.bots.skillLint({ name: "core-profile", body: skill.body })).toEqual(expect.arrayContaining([expect.stringContaining("over the 3,000 budget")]));
+  expect(x.bots.skillBudget()).toMatchObject({ over: true, cap: 2000 });
+  // Moved text is the user's: Maintenance leaves it until the user edits it in Studio.
+  expect(x.bots.coreSkill()).toMatchObject({ name: "core-profile", migrated: true });
+  x.bots.userEditedSkill("weekly-review");
+  expect(x.bots.coreSkill()).toMatchObject({ migrated: true });
+  x.bots.userEditedSkill("core-profile");
+  expect(x.bots.coreSkill()).toMatchObject({ migrated: false });
+  expect(x.bots.skillLint({ name: "core-profile", body: skill.body })).toEqual(expect.arrayContaining([expect.stringContaining("over the 2,000 budget")]));
   // Once: a second run, or an edit to the page afterwards, changes nothing.
   x.pages.set("pg_profile", { title: "Dot's core profile", markdown: "## Check-in\n\n- Something else." });
   expect(x.bots.ensureCore()).toEqual({ state: "done" });
@@ -1687,4 +1693,26 @@ it("restorePaused() restores surviving items, keeps failed ones, and throws the 
   expect(x.automations.find((a) => a.id === "auto_1")?.enabled).toBe(true);
   const remaining = (x.db.prepare("SELECT item_id FROM bot_stop_paused WHERE bot_id = ? ORDER BY rowid").all(BOT_ID) as { item_id: string }[]).map((r) => r.item_id);
   expect(remaining).toEqual(["auto_2", "auto_3"]);
+});
+
+it("finds the core skill by its marker, never by name or order: check-ins and Memory follow it", async () => {
+  const x = await setup();
+  const scout = await x.bots.create({ name: "Scout", avatar: "🛰️" });
+  const id = scout.bot!.id;
+  // The user already had an on-demand "core-profile", so the core skill is made as core-profile-moved.
+  x.bots.writeSkill({ name: "core-profile", description: "Mine", body: "Not a profile." }, id);
+  expect(x.bots.ensureCore(id)).toMatchObject({ skill: "core-profile-moved" });
+  // Another always-on skill that sorts first by name.
+  x.bots.writeSkill({ name: "aaa-notes", description: "Also always on", body: "## Notes\n\n- One.\n", alwaysOn: true }, id);
+  expect(x.bots.alwaysOnSkills(id).map((skill) => [skill.name, skill.core])).toEqual([["core-profile-moved", true], ["aaa-notes", false]]);
+  expect(x.bots.coreSkill(id)).toMatchObject({ name: "core-profile-moved", migrated: false });
+  expect(x.bots.addCheckin(id, "Every Friday: the weekly review.")).toBe(true);
+  expect(x.bots.skill("core-profile-moved", id)!.body).toContain("- Every Friday: the weekly review.");
+  expect(x.bots.skill("aaa-notes", id)!.body).not.toContain("Friday");
+  expect(x.bots.skill("core-profile", id)!.body).toBe("Not a profile.");
+  // Without its core skill, a check-in line goes nowhere rather than into another skill.
+  x.bots.deleteSkill("core-profile-moved", id);
+  expect(x.bots.coreSkill(id)).toBeNull();
+  expect(x.bots.addCheckin(id, "Another line.")).toBe(false);
+  expect(x.bots.skill("aaa-notes", id)!.body).not.toContain("Another line.");
 });

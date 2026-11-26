@@ -157,7 +157,7 @@ History):
   one, `core-profile`, has `## Preferences` (at most 25 one-line rules),
   `## Right now` (at most 10 temporary constraints, pruned weekly) and
   `## Check-in` (the check-in list). All always-on skills share a
-  3,000-character budget. Change one with `bot_skill (op: edit, change:
+  2,000-character budget. Change one with `bot_skill (op: edit, change:
   "patch")` only when a standing rule changed, and quote the new line in your
   reply so the user can veto it.
 - **On-demand skills**: procedures, tool gotchas and topic preferences,

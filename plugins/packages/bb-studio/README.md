@@ -3919,7 +3919,7 @@ A Studio Bot's memory has three layers, all on its Memory page
   `bot_skills.always_on` set go in full into the instructions of every
   conversation and worker of the Bot, at each session start
   (`src/memory/service.ts`, `withMemory`), core first, between
-  `<always-on skill="…">` tags. They share a 3,000-character budget
+  `<always-on skill="…">` tags. They share a 2,000-character budget
   (`ALWAYS_ON_CAP`). The default one, `core-profile`, has three sections:
   `## Preferences` (at most 25 one-line rules), `## Right now` (at most 10
   temporary constraints, pruned weekly by Maintenance) and `## Check-in` (the
@@ -3940,7 +3940,7 @@ A Studio Bot's memory has three layers, all on its Memory page
   the conversation and posts the card to Main; nothing is copied elsewhere.
 
 On the page: Core's sections are edited in place, with a quiet
-"1,420 / 3,000 chars" budget. Skills has + New skill, each skill's editor
+"1,420 / 2,000 chars" budget. Skills has + New skill, each skill's editor
 and version history, and one row for Auto-learn (Daily + on archive) with
 Run now. History switches between Summaries (cards, searchable) and Past
 conversations (full-text search).

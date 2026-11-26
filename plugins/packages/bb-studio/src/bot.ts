@@ -1167,8 +1167,8 @@ export class Bots {
     return migrateCoreSkill({ db: this.deps.db, skills: this.skillStore, pageMarkdown: (pageId) => this.deps.memory?.markdown?.(pageId) ?? null }, row.id);
   }
 
-  /** The Bot's always-on skills (made on first need), core first. */
-  alwaysOnSkills(botId?: string): { name: string; description: string; body: string; updatedAt: number }[] {
+  /** The Bot's always-on skills (made on first need), its core skill first. */
+  alwaysOnSkills(botId?: string): { name: string; description: string; body: string; updatedAt: number; core: boolean }[] {
     const row = this.row(botId);
     if (!row || botKind(row.provider_id) === "external") return [];
     this.ensureCore(row.id);
@@ -1191,9 +1191,33 @@ export class Bots {
     return row ? this.skillStore.setAlwaysOn(row.id, name, on) : false;
   }
 
-  /** Adds a line to the core skill's "## Check-in" section; false when it was there already. */
+  /**
+   * The Bot's core skill: the one its marker (bot_core_skills.skill_name)
+   * names, while it exists and is always on; never picked by name or order.
+   * `migrated`: its text came from a core profile page and the user hasn't
+   * edited it since. Null without one (made on first need).
+   */
+  coreSkill(botId?: string): { name: string; description: string; body: string; updatedAt: number; migrated: boolean; tidyAskedAt: number | null } | null {
+    const core = this.alwaysOnSkills(botId).find((skill) => skill.core);
+    if (!core) return null;
+    const mark = this.deps.db.prepare("SELECT source_page_id, user_edited_at, tidy_asked_at FROM bot_core_skills WHERE bot_id = ?").get(this.need(botId).id) as { source_page_id: string | null; user_edited_at: number | null; tidy_asked_at: number | null } | undefined;
+    return { name: core.name, description: core.description, body: core.body, updatedAt: core.updatedAt, migrated: !!mark?.source_page_id && !mark.user_edited_at, tidyAskedAt: mark?.tidy_asked_at ?? null };
+  }
+
+  /** The user edited a skill in Studio's UI: an edit to the core skill makes its text theirs, so Maintenance may tidy it. */
+  userEditedSkill(name: string, botId?: string, now = Date.now()): void {
+    const row = this.row(botId);
+    if (row) this.deps.db.prepare("UPDATE bot_core_skills SET user_edited_at = ? WHERE bot_id = ? AND skill_name = ?").run(now, row.id, name);
+  }
+
+  /** Maintenance asked the Bot to tidy its core skill (at most weekly). */
+  noteCoreTidyAsked(botId: string, now = Date.now()): void {
+    this.deps.db.prepare("UPDATE bot_core_skills SET tidy_asked_at = ? WHERE bot_id = ?").run(now, botId);
+  }
+
+  /** Adds a line to the core skill's "## Check-in" section; false when it was there already, or there's no core skill. */
   addCheckin(botId: string, line: string): boolean {
-    const core = this.alwaysOnSkills(botId)[0];
+    const core = this.coreSkill(botId);
     if (!core) return false;
     const body = addCheckinLine(core.body, line);
     if (body === null) return false;

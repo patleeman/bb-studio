@@ -24,7 +24,7 @@ describe("always-on core skill text", () => {
 
   it("lints the shared budget and the section caps, advisory only", () => {
     expect(lintAlwaysOn(CORE_TEMPLATE, CORE_TEMPLATE.length)).toEqual([]);
-    expect(lintAlwaysOn(CORE_TEMPLATE, 3001)).toEqual([expect.stringContaining("over the 3,000 budget")]);
+    expect(lintAlwaysOn(CORE_TEMPLATE, 2001)).toEqual([expect.stringContaining("over the 2,000 budget")]);
     const many = (n: number) => Array.from({ length: n }, (_, i) => `- Line ${i}`).join("\n");
     expect(lintAlwaysOn(`## Preferences\n\n${many(25)}\n\n## Right now\n\n${many(10)}`, 100)).toEqual([]);
     expect(lintAlwaysOn(`## Preferences\n\n${many(26)}\n\n## Right now\n\n${many(11)}`, 100)).toEqual([

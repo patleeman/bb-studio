@@ -80,7 +80,7 @@ it("shows three layers: Core with its budget and sections, Skills with Auto-lear
   render(<MemoryView botId="bot_main" />);
   expect($("[data-testid=memory-view]")?.getAttribute("data-bot-page")).toBe("Memory");
   expect(qa("[data-testid=bot-page-group] > * h2, [data-testid=memory-core], [data-testid=memory-skills], [data-testid=memory-history]").map((each) => each.dataset.testid)).toEqual(["memory-core", "memory-skills", "memory-history"]);
-  expect($("[data-testid=memory-budget]")?.textContent).toBe(`${CORE_TEMPLATE.trim().length} / 3,000 chars`);
+  expect($("[data-testid=memory-budget]")?.textContent).toBe(`${CORE_TEMPLATE.trim().length} / 2,000 chars`);
   expect(qa("[data-testid=memory-core-section]").map((each) => each.dataset.section)).toEqual(["Preferences", "Right now", "Check-in"]);
   expect(qa("[data-testid=memory-section-lines]").map((each) => each.textContent)).toEqual(["0 / 25", "0 / 10"]);
   // The core skill is Core's, not a row among the on-demand skills.

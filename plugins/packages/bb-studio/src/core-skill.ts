@@ -1,7 +1,9 @@
 // Always-on skills (plan "BB Studio Memory & Skills Architecture"): a Bot's
 // skills with `always_on` set go in full into the instructions of every
 // conversation and worker of the Bot, where the core profile page went
-// before. The default one is `core-profile`, with three sections:
+// before. The default one, the Bot's core skill, is found by its marker
+// (bot_core_skills.skill_name), never by name; it is made as `core-profile`
+// with three sections:
 //
 // - `## Preferences`: one-line rules for working with the user (at most 25).
 // - `## Right now`: temporary constraints true this month (at most 10).
@@ -15,7 +17,7 @@
 export const CORE_SKILL = "core-profile";
 export const CORE_SKILL_DESCRIPTION = "Always on: how to work with the user, what is true right now, and the check-in list.";
 /** The most characters of always-on skills, all together, that go into every prompt. */
-export const ALWAYS_ON_CAP = 3000;
+export const ALWAYS_ON_CAP = 2000;
 /** Bullets each capped section may hold. */
 export const SECTION_CAPS: Readonly<Record<string, number>> = { Preferences: 25, "Right now": 10 };
 /** The core skill's sections, in order. */

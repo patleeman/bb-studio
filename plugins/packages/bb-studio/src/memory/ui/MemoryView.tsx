@@ -5,7 +5,7 @@
 // 1. Core: its always-on skills (src/core-skill.ts), in every prompt. The
 //    core skill's sections (Preferences, Right now, Check-in, and any others
 //    it has) are edited in place, with the shared character budget beside
-//    the heading ("1,420 / 3,000 chars") and each capped section's lines.
+//    the heading ("1,420 / 2,000 chars") and each capped section's lines.
 // 2. Skills: the on-demand skills, loaded when a task matches. A row opens
 //    its editor and version history; + New skill adds one. One control row:
 //    Auto-learn (daily and when a conversation is archived), with Run now.

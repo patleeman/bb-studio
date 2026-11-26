@@ -618,7 +618,7 @@ export const rpcContract = defineRpcContract({
   bot_checkin_preset: { input: z.object({ botId, preset: z.enum(["morning", "evening", "working", "off"]) }), output: botView },
   /** The Bot's own skills. */
   bot_skills: { input: forBot, output: z.object({ skills: z.array(botSkill) }) },
-  /** The Bot's always-on skills (src/core-skill.ts) in full, core-profile first, with their advisory notes and the shared character budget: Memory's Core layer. */
+  /** The Bot's always-on skills (src/core-skill.ts) in full, the core skill first, with their advisory notes and the shared character budget: Memory's Core layer. */
   bot_core: { input: forBot, output: z.object({
     skills: z.array(z.object({ name: z.string(), description: z.string(), body: z.string(), updatedAt: z.number(), warnings: z.array(z.string()) })),
     chars: z.number(), cap: z.number(), over: z.boolean(),

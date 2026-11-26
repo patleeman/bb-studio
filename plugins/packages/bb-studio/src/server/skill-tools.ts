@@ -91,7 +91,7 @@ export function registerBotSkillTools({ bb, bots, learning, ownBot }: BotSkillTo
       find: z.string().min(1).max(20_000).optional().describe("patch: exact text to replace"),
       replace: z.string().max(20_000).optional().describe("patch: replacement text (empty removes)"),
       all: z.boolean().optional().describe("patch: replace every occurrence"),
-      alwaysOn: z.boolean().optional().describe("write: inject it in full into every prompt (keep always-on skills under 3,000 characters together); default keeps the skill's setting, on demand for a new one"),
+      alwaysOn: z.boolean().optional().describe("write: inject it in full into every prompt (keep always-on skills under 2,000 characters together); default keeps the skill's setting, on demand for a new one"),
     }),
     execute: ({ op, name, description, body, find, replace, all, alwaysOn }, ctx) => {
       const botId = ownBot(ctx.threadId);

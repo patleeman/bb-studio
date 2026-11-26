@@ -26,7 +26,7 @@ const WORKING = new Set(["active", "starting", "stopping"]);
 
 /** The Bot's check-in prompt. What to look at is the "## Check-in" section of its always-on core skill (src/core-skill.ts), not here. */
 export function botHeartbeat(name: string): string {
-  return `Check-in for ${JSON.stringify(name)}: do what the "## Check-in" section of your always-on skill (core-profile, in your instructions) says. Do the checks yourself; if a worker thread really helps, reuse the one you used before (bb thread tell) instead of starting a new one each time. Reply only if something changed or needs the user; otherwise reply exactly [PASS]: no "✓", "nothing new" or other filler.`;
+  return `Check-in for ${JSON.stringify(name)}: do what the "## Check-in" section of your always-on skills (in your instructions) says. Do the checks yourself; if a worker thread really helps, reuse the one you used before (bb thread tell) instead of starting a new one each time. Reply only if something changed or needs the user; otherwise reply exactly [PASS]: no "✓", "nothing new" or other filler.`;
 }
 
 /** An external bot's check-in: it has no Memory page, so the message carries the ask. */
