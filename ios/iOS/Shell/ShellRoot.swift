@@ -29,6 +29,7 @@ struct ShellRoot: View {
         }
         .environment(\.shellPosture, posture)
         .environment(\.shellReservedColumn, geometry.trailingInset)
+        .environment(\.shellInnerScreen, geometry.innerScreen || posture.innerScreen)
         .background { ShellBackground() }
         // The vertical Duo is a big iPhone: type a step up (9f: 18 pt body), never down.
         .dynamicTypeSize(posture.largeType ? .xLarge ... .accessibility5 : .xSmall ... .accessibility5)

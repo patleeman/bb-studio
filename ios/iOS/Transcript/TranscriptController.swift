@@ -135,6 +135,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private let pillHost = TranscriptHost()
     /// Over the rows, from the header to the composer: the Workbench, with the composer kept below it.
     private let coverHost = TranscriptCoverHost()
+    /// Active only while the cover shows: hidden, it must not hold the composer up.
+    private var coverConstraints: [NSLayoutConstraint] = []
     private var composerHeight: NSLayoutConstraint!
     private var topHeight: NSLayoutConstraint!
     private var composerBottom: NSLayoutConstraint!
@@ -266,6 +268,12 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         band.translatesAutoresizingMaskIntoConstraints = false
         view.insertSubview(band, aboveSubview: collectionView)
         bandToComposer = band.topAnchor.constraint(equalTo: composerHost.view.topAnchor)
+        coverConstraints = [
+            coverHost.view.topAnchor.constraint(equalTo: topHost.view.bottomAnchor),
+            coverHost.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            coverHost.view.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            coverHost.view.bottomAnchor.constraint(equalTo: composerHost.view.topAnchor),
+        ]
         bandToPill = band.topAnchor.constraint(equalTo: pillHost.view.topAnchor)
 
         // The keyboard: the container's bottom is the keyboard's top. Its
@@ -293,10 +301,6 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             topHost.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
             topHost.view.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             pillHost.view.bottomAnchor.constraint(equalTo: composerHost.view.topAnchor),
-            coverHost.view.topAnchor.constraint(equalTo: topHost.view.bottomAnchor),
-            coverHost.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
-            coverHost.view.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
-            coverHost.view.bottomAnchor.constraint(equalTo: composerHost.view.topAnchor),
             backdropTop, backdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             backdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             backdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -440,6 +444,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         coverHost.rootView = cover ?? AnyView(EmptyView())
         guard coverHost.view.isHidden == covered else { return }
         coverHost.view.isHidden = !covered
+        if covered { NSLayoutConstraint.activate(coverConstraints) } else { NSLayoutConstraint.deactivate(coverConstraints) }
         collectionView.isHidden = covered
         collectionView.accessibilityElementsHidden = covered || rowsHidden
         pillHost.view.isHidden = covered
@@ -1200,6 +1205,9 @@ final class TranscriptCoverHost: UIHostingController<AnyView> {
         super.viewDidLoad()
         view.backgroundColor = .clear
         view.isHidden = true
+        // Its size is its constraints': it never pulls the composer toward the header.
+        view.setContentHuggingPriority(.fittingSizeLevel, for: .vertical)
+        view.setContentCompressionResistancePriority(.fittingSizeLevel, for: .vertical)
     }
 }
 

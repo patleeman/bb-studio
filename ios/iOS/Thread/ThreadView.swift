@@ -70,6 +70,7 @@ struct ThreadView: View {
     @Environment(\.botConversation) private var shell
     @Environment(\.look) private var look
     @Environment(\.shellPosture) private var posture
+    @Environment(\.shellInnerScreen) private var innerScreen
     @ObservedObject private var router = Router.shared
     /// The Workbench over the rows (between the title and the composer); nil shows the chat.
     private let workbench: (() -> AnyView)?
@@ -1768,7 +1769,7 @@ extension ThreadView {
         // The composer's own 8 pt padding is the gap above the keyboard or the edge.
         chrome.composerGap = 0
         // The Duo's inner screen draws no home indicator (its 34-point inset is reported anyway).
-        chrome.composerIgnoresBottomSafeArea = posture.innerScreen && UIDevice.current.userInterfaceIdiom == .phone
+        chrome.composerIgnoresBottomSafeArea = innerScreen && UIDevice.current.userInterfaceIdiom == .phone
         // Over a home indicator alone (the folded Duo, a phone's thread),
         // the card rests on its inset: its own 8 pt padding goes inside it.
         chrome.composerRestDrop = 8

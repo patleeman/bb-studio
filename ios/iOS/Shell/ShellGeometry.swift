@@ -14,12 +14,18 @@ struct ShellGeometry: Equatable {
     @MainActor var posture: ShellPosture {
         ShellPosture.resolve(window: window, screen: screen, phone: phone, hinge: hinge, forced: ShellQA.posture)
     }
+
+    /// On the Duo's inner screen, whatever the window: it draws no home
+    /// indicator, though iOS reports one (also beside another app).
+    var innerScreen: Bool { DuoLayout.isInnerScreen(screen, phone: phone) }
 }
 
 extension EnvironmentValues {
     @Entry var shellPosture: ShellPosture = .phone
     /// The column the system reserves at the window's trailing edge, which the rail fills.
     @Entry var shellReservedColumn: CGFloat = 0
+    /// The window is on the Duo's inner screen (see `ShellGeometry.innerScreen`).
+    @Entry var shellInnerScreen = false
 }
 
 enum ShellQA {
@@ -83,6 +89,10 @@ struct ShellGeometryReader: UIViewRepresentable {
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
+            #if DEBUG
+            // The Duo fixture's window hooks (keyboard frames, -qaDark, a cold wide window).
+            if let window { DuoDemo.configure(window) }
+            #endif
             report()
         }
 
