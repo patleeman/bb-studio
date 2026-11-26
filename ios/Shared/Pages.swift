@@ -35,6 +35,20 @@ public struct PageRequest: Decodable, Identifiable, Sendable {
     public var updatedAt: Double
 }
 
+/// `pages.linkPreview`: what a bookmark embed shows for its link.
+public struct LinkPreview: Decodable, Hashable, Sendable {
+    public var title: String
+    public var description: String
+    public var image: String
+}
+
+/// One file of an `exportItem`, its bytes in base64.
+public struct ExportedFile: Decodable, Sendable {
+    public var name: String
+    public var mime: String
+    public var data: String
+}
+
 /// A saved version of a page.
 public struct PageSnapshot: Decodable, Identifiable, Hashable, Sendable {
     public var id: String
@@ -137,12 +151,55 @@ extension BBClient {
         return result.page
     }
 
-    public func updatePage(_ id: String, title: String? = nil, icon: String? = nil, archived: Bool? = nil) async throws {
+    /// `expectedTitle` guards a rename: Studio refuses it when someone renamed the page meanwhile.
+    /// `parentId: .some(nil)` moves the page to the top level.
+    public func updatePage(_ id: String, title: String? = nil, expectedTitle: String? = nil, icon: String? = nil,
+                           parentId: String?? = nil, archived: Bool? = nil) async throws {
         var input: [String: JSONValue] = ["id": .string(id)]
         if let title { input["title"] = .string(String(title.prefix(200))) }
+        if let expectedTitle { input["expectedTitle"] = .string(String(expectedTitle.prefix(200))) }
         if let icon { input["icon"] = .string(String(icon.prefix(16))) }
+        if let parentId { input["parentId"] = parentId.map(JSONValue.string) ?? .null }
         if let archived { input["archived"] = .bool(archived) }
         let _: JSONValue = try await self.rpc("studio", Studio.Method.pages_update, .object(input))
+    }
+
+    /// A new empty page, inside `parentId` when given.
+    public func createPage(projectId: String?, parentId: String?, title: String = "") async throws -> PageMeta {
+        struct Envelope: Decodable { var page: PageMeta }
+        let input: JSONValue = ["projectId": projectId.map(JSONValue.string) ?? .null, "parentId": parentId.map(JSONValue.string) ?? .null,
+                                "title": .string(String(title.prefix(200)))]
+        let envelope: Envelope = try await self.rpc("studio", Studio.Method.pages_create, input)
+        return envelope.page
+    }
+
+    /// Deletes the page and every page inside it; returns their ids.
+    public func removePage(_ id: String) async throws -> [String] {
+        struct Result: Decodable { var deleted: [String] }
+        let result: Result = try await self.rpc("studio", Studio.Method.pages_remove, ["id": .string(id)])
+        return result.deleted
+    }
+
+    /// A web link's title, description and image, as the bookmark embed shows it.
+    public func linkPreview(_ url: URL) async throws -> LinkPreview {
+        try await self.rpc("studio", Studio.Method.pages_linkPreview, ["url": .string(url.absoluteString)])
+    }
+
+    /// Adds a file to the page (15 MB at most); returns the address to put in its Markdown.
+    public func uploadPageFile(_ pageId: String, name: String, mime: String, data: Data) async throws -> String {
+        struct Result: Decodable { var url: String }
+        let body: JSONValue = ["pageId": .string(pageId), "name": .string(name), "mime": .string(mime),
+                               "dataBase64": .string(data.base64EncodedString())]
+        let result: Result = try await post("/api/v1/plugins/studio/http/pages/upload", body)
+        return result.url
+    }
+
+    /// A Studio item exported as files (`markdown`, `html` or `pdf` for a page).
+    public func exportItem(pluginId: String, id: String, format: String) async throws -> [ExportedFile] {
+        struct Result: Decodable { var files: [ExportedFile] }
+        let result: Result = try await self.rpc("studio", Studio.Method.exportItem,
+                                                ["pluginId": .string(pluginId), "id": .string(id), "format": .string(format)])
+        return result.files
     }
 
     public func pageSnapshots(_ id: String) async throws -> [PageSnapshot] {
@@ -177,8 +234,11 @@ extension BBClient {
     }
 
     /// Starts a page comment thread as you.
-    public func commentOnPage(_ id: String, block: String, text: String) async throws {
-        let _: JSONValue = try await self.rpc("studio", Studio.Method.pages_commentCreate, ["id": .string(id), "block": .string(block), "text": .string(String(text.prefix(8000)))])
+    /// `quote` is the exact text in the block the comment marks; nil marks the whole block.
+    public func commentOnPage(_ id: String, block: String, quote: String? = nil, text: String) async throws {
+        var input: [String: JSONValue] = ["id": .string(id), "block": .string(block), "text": .string(String(text.prefix(8000)))]
+        if let quote, !quote.isEmpty { input["quote"] = .string(String(quote.prefix(500))) }
+        let _: JSONValue = try await self.rpc("studio", Studio.Method.pages_commentCreate, .object(input))
     }
 
     public func replyToPageComment(_ id: String, thread: String, text: String) async throws {

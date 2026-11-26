@@ -41,6 +41,21 @@ extension DesignScreen {
     }
 }
 
+/// An element the design screen script picked: the anchor of a comment.
+public struct DesignPick: Hashable, Sendable {
+    public var selector: String
+    public var html: String
+    public var text: String
+    public var rect: CGRect
+
+    public init(selector: String, html: String, text: String, rect: CGRect) {
+        self.selector = selector
+        self.html = html
+        self.text = text
+        self.rect = rect
+    }
+}
+
 extension BBClient {
     public func design(_ id: String) async throws -> StudioDesign? {
         let input: JSONValue = ["id": .string(id)]
@@ -71,9 +86,46 @@ extension BBClient {
         let _: JSONValue = try await rpc("studio", Studio.Method.designs_renameDesign, ["id": .string(id), "name": .string(name)])
     }
 
-    /// Resolving hides the comment, as on desktop.
-    public func resolveDesignComment(_ id: String) async throws {
-        let _: JSONValue = try await rpc("studio", Studio.Method.designs_resolveComment, ["id": .string(id), "resolved": true])
+    /// Resolving moves the comment to Resolved, as on desktop; `false` reopens it.
+    public func resolveDesignComment(_ id: String, resolved: Bool = true) async throws {
+        let _: JSONValue = try await rpc("studio", Studio.Method.designs_resolveComment, ["id": .string(id), "resolved": .bool(resolved)])
+    }
+
+    /// A comment pinned to an element the screen script picked; `send` also posts it to the design's conversation.
+    @discardableResult
+    public func addDesignComment(_ designId: String, screenId: String, step: String, pick: DesignPick, body: String, send: Bool) async throws -> Bool {
+        struct Result: Decodable { var sent: Bool }
+        let input: JSONValue = [
+            "designId": .string(designId), "screenId": .string(screenId), "step": .string(step),
+            "selector": .string(String(pick.selector.prefix(2000))), "elementHtml": .string(String(pick.html.prefix(5000))),
+            "elementText": .string(String(pick.text.prefix(400))), "body": .string(String(body.prefix(4000))), "send": .bool(send),
+        ]
+        let result: Result = try await rpc("studio", Studio.Method.designs_addComment, input)
+        return result.sent
+    }
+
+    /// Saves text typed over a screen's element (inner HTML before and after). Nil when saved, else Studio's reason.
+    public func editDesignText(_ designId: String, screenId: String, before: String, after: String) async throws -> String? {
+        struct Result: Decodable { var ok: Bool; var reason: String? }
+        let result: Result = try await rpc("studio", Studio.Method.designs_editText,
+                                           ["designId": .string(designId), "screenId": .string(screenId), "before": .string(before), "after": .string(after)])
+        return result.ok ? nil : (result.reason ?? "missing")
+    }
+
+    public func deleteDesign(_ id: String) async throws {
+        let _: JSONValue = try await rpc("studio", Studio.Method.designs_deleteDesign, ["id": .string(id)])
+    }
+
+    /// The screen's raw HTML (`download=1`), or its steps as printable pages (`print`).
+    public func designScreenFileURL(_ designId: String, _ screen: DesignScreen, print: Bool) -> URL {
+        var components = URLComponents(url: designScreenURL(designId, screen), resolvingAgainstBaseURL: false)!
+        if print {
+            components.path = "/api/v1/plugins/studio/http/designs/print"
+        } else {
+            components.queryItems = (components.queryItems ?? []) + [URLQueryItem(name: "download", value: "1")]
+        }
+        components.fragment = nil
+        return components.url!
     }
 
     public func deleteDesignComment(_ id: String) async throws {
