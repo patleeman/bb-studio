@@ -1,3 +1,4 @@
+import { FORK_THREAD_OF_EVENT } from "./thread-event-gate.fork.js";
 import type {
   PluginThreadEventName,
   PluginThreadEventPayloads,
@@ -36,6 +37,7 @@ function fromThreadId(threadId: string): ThreadEventThread {
 }
 
 const THREAD_OF_EVENT: ThreadOfEvent = {
+  ...FORK_THREAD_OF_EVENT,
   "experimental_environment.removed": () => null,
   "experimental_thread.events": ({ thread }) => fromThread(thread),
   "experimental_thread.parentChanged": ({ thread }) => fromThread(thread),

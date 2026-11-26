@@ -102,6 +102,7 @@ function Panel({ panel }: { panel: AppPanelController }) {
       activeTabId={tabs.selectedKey ?? INFO.key}
       fixedTabIds={[INFO.key]}
       isFullScreen={false}
+      isTabListReady
       onActivateTab={(key) => panel.selectTab(key)}
       onGlobalTabReorder={vi.fn()}
       onToggleFullScreen={vi.fn()}
