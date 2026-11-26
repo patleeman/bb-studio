@@ -1,6 +1,6 @@
 import XCTest
 
-/// Patrick, Oct 27: "I can't seem to stay scrolled up. I scroll up, touch
+/// A user, Oct 27: "I can't seem to stay scrolled up. I scroll up, touch
 /// something and it scrolls down." Taps never move the transcript: only a
 /// send, the jump button or the pill go to the end.
 ///
@@ -88,7 +88,7 @@ final class TranscriptScrollHoldUITests: ServerIsolatedUITestCase {
         finish()
     }
 
-    /// Patrick, Oct 27, the Chief of Staff mid-turn: "I can't scroll up. It
+    /// A user, Oct 27, the Chief of Staff mid-turn: "I can't scroll up. It
     /// keeps pulling the chat transcript to the end", and later a blank
     /// screen, scrolled far past the end, with "Thinking..." in the header
     /// and a running task above the composer. A busy turn (`busy`): a reply
@@ -96,7 +96,7 @@ final class TranscriptScrollHoldUITests: ServerIsolatedUITestCase {
     /// and goes. At the end the view stays at the end and never past it; a
     /// drag up holds where it lands, and nothing streams it back down.
     func testDragWhileBusy() {
-        // `TEST_RUNNER_TRANSCRIPT_LAYOUT=outer`: the Duo's outer screen, Patrick's.
+        // `TEST_RUNNER_TRANSCRIPT_LAYOUT=outer`: the Duo's outer screen, the main device.
         let outer = ProcessInfo.processInfo.environment["TRANSCRIPT_LAYOUT"] == "outer"
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog", "-qaBotDemo", outer ? "duo" : "chat", "-qaDemoLatency", "50",
                                "-qaDemoMessages", "300", "-qaDark", "-openURL", "bbstudio://bot"] + (outer ? ["-qaDuoPhone", "-qaDuoLong"] : [])

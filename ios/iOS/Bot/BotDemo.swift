@@ -244,7 +244,7 @@ enum BotDemo {
 
         static let streamChunks = 8
 
-        /// QA: a busy turn for `seconds`, as Patrick's Chief of Staff was
+        /// QA: a busy turn for `seconds`, as a user's Bot was
         /// (Oct 27): "Thinking" on and off, a running task above the composer
         /// that comes and goes, and a reply growing every 80 ms. Then it all ends.
         func busy(_ seconds: Double) {

@@ -36,7 +36,7 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("newConversationWith").waitForExistence(timeout: 10), "the New conversation sheet")
     }
 
-    /// The phone's, and the folded Duo's (Patrick's) too.
+    /// The phone's, and the folded Duo's (the main device) too.
     func testNewConversationSaysWhoItIsWithAndStartsOnThePickedModel() throws {
         launch()
         openNewConversation()

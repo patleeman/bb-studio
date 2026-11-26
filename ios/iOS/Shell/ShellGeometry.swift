@@ -17,7 +17,14 @@ struct ShellGeometry: Equatable {
 
     /// On the Duo's inner screen, whatever the window: it draws no home
     /// indicator, though iOS reports one (also beside another app).
-    var innerScreen: Bool { DuoLayout.isInnerScreen(screen, phone: phone) }
+    var innerScreen: Bool { Self.isInnerScreen(screen, phone: phone) }
+
+    /// The Duo's inner screen, landscape, from the screen rather than the
+    /// window: our window there may be a page wide, beside another app. No
+    /// iPhone screen is this tall in landscape, and an iPad is not a phone.
+    static func isInnerScreen(_ screen: CGSize, phone: Bool) -> Bool {
+        phone && screen.width >= 900 && screen.height >= 600 && screen.width > screen.height
+    }
 }
 
 extension EnvironmentValues {
@@ -87,6 +94,12 @@ struct ShellGeometryReader: UIViewRepresentable {
             report()
         }
 
+        /// The reserved column can change without a resize (Review S5).
+        override func safeAreaInsetsDidChange() {
+            super.safeAreaInsetsDidChange()
+            report()
+        }
+
         override func didMoveToWindow() {
             super.didMoveToWindow()
             #if DEBUG
@@ -107,6 +120,14 @@ struct ShellGeometryReader: UIViewRepresentable {
                                      phone: traitCollection.userInterfaceIdiom == .phone, hinge: hinge,
                                      trailingInset: window.safeAreaInsets.right)
             guard next != last else { return }
+            if next.window != last?.window || next.trailingInset != last?.trailingInset {
+                // Keyboard work waits for the window to settle (crash 3, `ResizeSettling`).
+                ResizeSettling.shared.changed()
+                Breadcrumbs.shared.record(String(format: "window %.0fx%.0f safe %.0f", next.window.width, next.window.height, next.trailingInset))
+                #if DEBUG
+                RenderCount.bump("write.window")
+                #endif
+            }
             last = next
             Breadcrumbs.shared.record("posture \(next.posture.rawValue) \(Int(next.window.width))x\(Int(next.window.height))")
             DispatchQueue.main.async { [weak self] in self?.changed(next) }

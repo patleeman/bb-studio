@@ -1,6 +1,6 @@
 import XCTest
 
-/// Patrick, Nov 1: he couldn't type into a secret request's field in the Bot
+/// A user, Nov 1: they couldn't type into a secret request's field in the Bot
 /// chat. A tap on a field in a pending interaction (a secret request, a
 /// question's typed answer, the ask-user-question plugin's form) takes the
 /// keyboard and keeps it, and what's typed stays. A tap on the transcript's
@@ -62,7 +62,7 @@ final class InteractionFieldUITests: ServerIsolatedUITestCase {
 
     /// Taps the field, checks it kept the keyboard, and types.
     private func type(_ text: String, into field: XCUIElement) {
-        // As Patrick had it: the composer has the keyboard, then the field is tapped.
+        // As a user had it: the composer has the keyboard, then the field is tapped.
         let composer = app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
         if !app.keyboards.firstMatch.exists {
             composer.tap()

@@ -129,17 +129,10 @@ struct ThreadView: View {
         let _ = RenderCount.bump("thread.body")
         #endif
         withTalk
-        .focusedSceneValue(\.thread, actions)
-        .sensoryFeedback(.success, trigger: model.confirmations)
-        .sensoryFeedback(.impact(weight: .medium), trigger: sends)
-        .sensoryFeedback(.warning, trigger: model.interactions.count, condition: Self.grew)
-        .sensoryFeedback(.error, trigger: model.error) { (_: String?, new: String?) in new != nil }
-        .sensoryFeedback(.selection, trigger: attachments.count, condition: Self.grew)
-        .userActivity(Spotlight.threadActivityType, isActive: model.thread != nil, describeActivity)
+        .modifier(ThreadFeedback(actions: actions, confirmations: model.confirmations, sends: sends,
+                                 interactions: model.interactions.count, error: model.error, attachments: attachments.count,
+                                 hasThread: model.thread != nil, describe: describeActivity))
     }
-
-    /// For the haptics on a count: it went up.
-    private static func grew(_ old: Int, _ new: Int) -> Bool { new > old }
 
     /// Handoff and Spotlight: the thread's title and web link.
     private func describeActivity(_ activity: NSUserActivity) {
@@ -1185,7 +1178,7 @@ struct ThreadView: View {
                 if let status = handoffStatus {
                     ShelfCard(icon: status.working ? "arrow.triangle.2.circlepath" : "checkmark.circle", tint: status.working ? .secondary : .green) {
                         HStack(spacing: 6) {
-                            if status.working { ProgressView().controlSize(.mini) }
+                            if status.working { RunningGlyph().accessibilityHidden(true) }
                             Text(status.text).lineLimit(1)
                         }
                     } trailing: { EmptyView() }
@@ -1425,7 +1418,8 @@ struct WorkingIndicator: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            ProgressView().controlSize(.small)
+            // Still, not a spinner: a turn can run for many minutes.
+            RunningGlyph().accessibilityHidden(true)
             Text(summary)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -1440,6 +1434,34 @@ struct WorkingIndicator: View {
         guard let line, !line.trimmingCharacters(in: .whitespaces).isEmpty else { return "Working…" }
         return line.replacingOccurrences(of: "**", with: "")
     }
+}
+
+/// A thread's haptics, its keyboard commands and its Handoff activity: one
+/// modifier, one level of the view's type rather than seven (the Release
+/// main-thread stack, `LaunchStackUITests`).
+private struct ThreadFeedback: ViewModifier {
+    let actions: ThreadActions
+    let confirmations: Int
+    let sends: Int
+    let interactions: Int
+    let error: String?
+    let attachments: Int
+    let hasThread: Bool
+    let describe: (NSUserActivity) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .focusedSceneValue(\.thread, actions)
+            .sensoryFeedback(.success, trigger: confirmations)
+            .sensoryFeedback(.impact(weight: .medium), trigger: sends)
+            .sensoryFeedback(.warning, trigger: interactions, condition: Self.grew)
+            .sensoryFeedback(.error, trigger: error) { (_: String?, new: String?) in new != nil }
+            .sensoryFeedback(.selection, trigger: attachments, condition: Self.grew)
+            .userActivity(Spotlight.threadActivityType, isActive: hasThread, describe)
+    }
+
+    /// For the haptics on a count: it went up.
+    private static func grew(_ old: Int, _ new: Int) -> Bool { new > old }
 }
 
 /// Where the reader left off: everything below arrived since they last looked.

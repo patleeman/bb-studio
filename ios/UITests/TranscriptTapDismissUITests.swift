@@ -1,6 +1,6 @@
 import XCTest
 
-/// Patrick, Oct 26: a tap anywhere in the chat's transcript closes the
+/// A user, Oct 26: a tap anywhere in the chat's transcript closes the
 /// keyboard. Taps on links and buttons in it still do what they did, the draft
 /// and its photo stay, and the transcript doesn't jump: at the end it stays at
 /// the end, with nothing past it; scrolled up, the same rows stay in view.
