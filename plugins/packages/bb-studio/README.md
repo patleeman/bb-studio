@@ -4567,8 +4567,11 @@ Earlier after 3 more quiet days unless pinned.
   workers keep both. Where Studio replaces the composer (a
   Main mirrored from bb), the box is drawn inside the replacement. Nothing
   open, no box.
-- **Above each message**: a divider with the strand's name where the strand
-  changes, else the name, muted. On hover, **Move to…** moves the message's
+- **In each message's footer row**, after its time: the strand's name, muted
+  (click filters to the strand, again clears), and **Move to…**. Both show
+  with the time, on hover or keyboard focus of the message
+  (`slots.experimental_messageMetadata` with `placement: "actionRow"`);
+  nothing is drawn above the message. **Move to…** moves the message's
   turn to another strand, or **New strand from here** starts one with it and
   the later messages of its strand. Your moves are never re-sorted, and a
   move can be undone for 10 seconds.

@@ -103,9 +103,10 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
 vi.mock("../../ui/live", () => ({
   useLive: (method: string) => ({ data: method === "strands.list" ? state.list : method === "strands.tags" ? state.tags : method === "strands.overview" ? state.overview : null, error: state.error, loading: false, refresh: state.refresh }),
   useCall: () => state.call,
+  peekLive: (method: string) => (method === "strands.list" ? state.list : null),
 }));
 vi.mock("../../kit/ui/index", async () => ({ ...(await import("../../loops/ui/test-kit")).kitUi, Tooltip: ({ children }: { children?: React.ReactNode }) => <>{children}</> }));
-vi.mock("../../kit/app/route", () => ({ usePathname: () => "/threads/thr_main" }));
+vi.mock("../../kit/app/route", () => ({ usePathname: () => "/threads/thr_main", currentPathname: () => "/threads/thr_main" }));
 vi.mock("../../kit/composer", () => ({ useComposerThread: () => state.composerThread }));
 vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ values: { strandsOverview: true } }) }));
 vi.mock("../../kit/app/index", () => ({ PageColumn: ({ children }: { children?: React.ReactNode }) => <div>{children}</div> }));
@@ -116,9 +117,9 @@ const { StrandsBoxBanner } = await import("./Strip");
 const { ContextInfoSection } = await import("./ContextInfoSection");
 const { promptStackSource, resetPromptStackForTests } = await import("./prompt-stack");
 const { StrandsOverview } = await import("./Overview");
-const { StrandTag } = await import("./Tag");
+const { StrandMarks, StrandTag } = await import("./Tag");
 const { StrandsTab } = await import("./Tab");
-const { select, registerTimelineFilter, timelineFilterOf, resetSelectionForTests } = await import("./selection");
+const { select, selectionOf, registerTimelineFilter, timelineFilterOf, resetSelectionForTests } = await import("./selection");
 const { flashReply, resetAskMarksForTests, takeFlash } = await import("./ask-mark");
 
 let root: Root, container: HTMLDivElement;
@@ -139,7 +140,7 @@ const text = (element: Element | null | undefined) => element?.textContent ?? ""
 
 describe("sending a message", () => {
   it("clears the strand filter and zoom, so the new message is drawn at once", async () => {
-    const { setZoom, zoomOf, selectionOf } = await import("./selection");
+    const { setZoom, zoomOf } = await import("./selection");
     render(<StrandsBoxBanner />);
     act(() => { select("thr_main", { strandId: "s1", seq: 3, turnIds: ["turn_1"] }); setZoom("thr_main", 1); });
     expect(timelineFilterOf("thr_main")).not.toBeNull();
@@ -150,7 +151,7 @@ describe("sending a message", () => {
   });
 
   it("from another conversation's composer leaves this one's filter alone", async () => {
-    const { selectionOf } = await import("./selection");
+
     state.composerThread = "thr_other";
     render(<StrandsBoxBanner />);
     act(() => { select("thr_main", { strandId: "s1", seq: 3, turnIds: ["turn_1"] }); });
@@ -358,15 +359,32 @@ describe("the strands box above a conversation's composer", () => {
   });
 });
 
-describe("the tag above each message", () => {
+describe("the strand tag in each message's footer row", () => {
   const message = (turnId: string, role: "user" | "assistant") => ({ id: `m_${turnId}_${role}`, threadId: "thr_main", turnId, role, createdAt: NOW, ...(role === "user" ? { initiator: "user" as const } : {}) });
-  const row = (turnId: string, role: "user" | "assistant") => <div data-timeline-row-id={`${turnId}-${role}`}><StrandTag message={message(turnId, role) as never} /></div>;
+  const row = (turnId: string, role: "user" | "assistant") => (
+    <div data-timeline-row-id={`${turnId}-${role}`}>
+      <div data-above><StrandMarks message={message(turnId, role) as never} /></div>
+      <div data-footer><StrandTag message={message(turnId, role) as never} /></div>
+    </div>
+  );
 
-  it("draws a divider with the strand's name where the strand changes, and the muted name otherwise", () => {
+  it("draws the strand's name and Move to… in the footer of user and assistant messages, and nothing above them", () => {
     render(<>{row("t4", "user")}{row("t5", "user")}{row("t5", "assistant")}</>);
-    expect(container.querySelectorAll("[data-strand-divider]")).toHaveLength(1);
-    expect(text(container.querySelector('[data-strand-divider="s_hvac"] button'))).toBe("Furnace tune-up");
-    expect([...container.querySelectorAll("[data-strand-tag]")].map(text)).toEqual(["CodexBar quota", "Furnace tune-up"]);
+    expect(container.querySelectorAll("[data-strand-divider]")).toHaveLength(0);
+    for (const above of container.querySelectorAll("[data-above]")) expect(above.innerHTML).toBe("");
+    expect([...container.querySelectorAll("[data-footer] [data-strand-tag]")].map(text)).toEqual(["CodexBar quota", "Furnace tune-up", "Furnace tune-up"]);
+    expect(container.querySelectorAll("[data-footer] [data-strand-move]")).toHaveLength(3);
+    expect(container.querySelector("[data-strand-move]")!.getAttribute("aria-haspopup")).toBe("menu");
+  });
+
+  it("filters to the strand on click, and clears on a second click", () => {
+    render(row("t4", "user"));
+    const tag = container.querySelector<HTMLButtonElement>('[data-strand-tag="s_cx"]')!;
+    click(tag);
+    expect(selectionOf("thr_main")?.strandId).toBe("s_cx");
+    expect(tag.getAttribute("aria-pressed")).toBe("true");
+    click(tag);
+    expect(selectionOf("thr_main")).toBeNull();
   });
 
   it("dims the other strands' messages while one is picked, only where BB's timeline can't hide them", () => {
@@ -397,7 +415,7 @@ describe("replies that need you, marked in place (design: Replies that need you,
   const msg = (id: string, turnId: string, createdAt: number) => ({ id, threadId: "thr_main", turnId, role: "assistant" as const, createdAt });
   const row = (key: string, id: string, turnId: string, createdAt: number, text: string) => (
     <div key={key} data-timeline-row-id={key}>
-      <div aria-label="Message metadata"><StrandTag message={msg(id, turnId, createdAt) as never} /></div>
+      <div aria-label="Message metadata"><StrandMarks message={msg(id, turnId, createdAt) as never} /></div>
       <p>{text}</p>
     </div>
   );
@@ -433,7 +451,7 @@ describe("replies that need you, marked in place (design: Replies that need you,
     render(row("b", "m5b", "t5", NOW, "Ace has Saturday 9 AM open; it needs your account."));
     expect(marked()).toEqual([]);
     render(<div data-timeline-row-id="q">
-      <div aria-label="Message metadata"><StrandTag message={msg("m5q", "t5", NOW) as never} /></div>
+      <div aria-label="Message metadata"><StrandMarks message={msg("m5q", "t5", NOW) as never} /></div>
       <p>You asked: Want me to book Ace for Saturday 9 AM?</p>
       <p>Two slots are open. Want me to book Ace for Saturday 9 AM?</p>
     </div>);
@@ -538,7 +556,7 @@ describe("the filter keeps what waits for an answer, and gives the scroll back",
   });
 });
 
-describe("Move to… on a message's tag", () => {
+describe("Move to… in a message's footer", () => {
   const message = { id: "m_t4", threadId: "thr_main", turnId: "t4", role: "user" as const, initiator: "user" as const, createdAt: NOW };
 
   it("moves the message's turn to another strand, or starts a new strand from it", async () => {

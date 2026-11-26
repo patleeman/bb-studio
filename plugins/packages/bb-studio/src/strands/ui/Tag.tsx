@@ -1,15 +1,16 @@
-// Above each message in a Bot conversation (design 4a, option a): a thin
-// divider with the strand's name where the strand changes from the turn
-// before, otherwise the strand's name, muted. Text only. While a strand is
-// selected, the other strands' messages dim. On hover, "Move to…" moves the
-// message's turn to another strand, or starts a new strand from it.
+// In each message's footer row of a Bot conversation, after its time (design
+// "Strand tag in the message footer"): the strand's name, muted, which filters
+// the conversation to that strand, and "Move to…", which moves the message's
+// turn to another strand or starts a new strand from it. The footer shows on
+// hover or keyboard focus of the message, like its time. While a strand is
+// selected, the other strands' messages dim.
 //
 // A reply that needs the user (src/strands/reply.ts; design "Replies that
 // need you", round 3, option a) has its asking sentence marked in place in
 // its newest message, with a quiet Done (AskMark). It stays until Jev says a
 // message of the user's answers it, or Done.
 import { useBbNavigate, type ExperimentalMessageMetadataProps } from "@get-bb/plugin-sdk/app";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
 import { toAppPathOf } from "../../kit/app/host-sdk";
 import { currentPathname } from "../../kit/app/route";
@@ -118,25 +119,35 @@ export function AskMark({ threadId, reply }: { threadId: string; reply: Pick<Rep
   );
 }
 
-// A plain function on purpose: BB rejects a memo() object as a slot component
+// Plain functions on purpose: BB rejects a memo() object as a slot component
 // ("must be a React component function"), and that fails Studio's whole frontend.
+
+/** Above each message, nothing visible: the timeline's fold tags, the dim of other strands, and the asking sentence's mark. */
+export function StrandMarks({ message }: ExperimentalMessageMetadataProps) {
+  const bots = useIsBotThread(message.threadId);
+  if (!bots) return null;
+  return <Marks message={message} />;
+}
+
+/** In the message's footer row, after its time: the strand's name (filters on click) and "Move to…". */
 export function StrandTag({ message }: ExperimentalMessageMetadataProps) {
   const bots = useIsBotThread(message.threadId);
   if (!bots) return null;
-  return <Tag message={message} />;
+  return <FooterTag message={message} />;
 }
+
+const QUIET = "cursor-pointer rounded px-0.5 text-muted-foreground/70 outline-none hover:text-foreground focus-visible:text-foreground focus-visible:ring-1 focus-visible:ring-ring";
+const MOVE_LABEL = "Move to…";
+
+// A render helper, not a component: Radix's asChild trigger needs the button itself.
+const moveButton = (props: ComponentProps<"button"> = {}) => (
+  <button type="button" data-strand-move="" aria-haspopup="menu" aria-label="Move to strand" className={QUIET} {...props}>{MOVE_LABEL}</button>
+);
 
 /** "Move to…": mounts its Radix Popover only once clicked so closed message rows carry zero popover overhead. */
 function MoveMenu({ threadId, seq, current, strands }: { threadId: string; seq: number; current: string; strands: Tags["strands"] }) {
   const [mounted, setMounted] = useState(false);
-  if (!mounted) {
-    return (
-      <button type="button" data-strand-move="" aria-haspopup="menu" onClick={() => setMounted(true)}
-        className="cursor-pointer rounded px-0.5 text-[11px] text-muted-foreground/70 hover:text-foreground">
-        Move to…
-      </button>
-    );
-  }
+  if (!mounted) return moveButton({ onClick: () => setMounted(true) });
   return <MoveMenuPopover threadId={threadId} seq={seq} current={current} strands={strands} />;
 }
 
@@ -154,9 +165,7 @@ function MoveMenuPopover({ threadId, seq, current, strands }: { threadId: string
   const item = "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left text-[12.5px] outline-none hover:bg-accent/60 focus-visible:bg-accent/60";
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button type="button" data-strand-move="" aria-haspopup="menu" className="cursor-pointer rounded px-0.5 text-[11px] text-muted-foreground/70 hover:text-foreground">Move to…</button>
-      </PopoverTrigger>
+      <PopoverTrigger asChild>{moveButton()}</PopoverTrigger>
       <PopoverContent align="start" className="w-60 p-1"
         onOpenAutoFocus={(event) => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.querySelector<HTMLElement>("[data-strand-option]")?.focus(); }}>
         <div role="menu" aria-label="Move to strand" onKeyDown={moveFocus} data-testid="strand-move-menu">
@@ -178,18 +187,16 @@ function MoveMenuPopover({ threadId, seq, current, strands }: { threadId: string
   );
 }
 
-function Tag({ message }: ExperimentalMessageMetadataProps) {
+function Marks({ message }: ExperimentalMessageMetadataProps) {
   const tags = useLive("strands.tags", { threadId: message.threadId }, { pollMs: 60_000 });
   // BB's timeline folds the conversation's runs of status replies from these tags.
   useEffect(() => { setFoldTags(message.threadId, tags.data); }, [message.threadId, tags.data]);
   const selection = useSelection(message.threadId);
-  const call = useCall();
-  const navigate = useBbNavigate();
   const ref = useRef<HTMLElement | null>(null);
   const tag = tagOf(tags.data, message.turnId);
   const reply = message.role === "assistant" ? replyOf(tags.data, message.turnId) : null;
   const asking = reply?.tag === "needs-you" && !reply.resolved;
-  // Only the turn's newest message carries the line.
+  // Only the turn's newest message carries the mark.
   const newest = useNewestInTurn(message.threadId, message.turnId, message.id, message.createdAt, asking);
   // BB's timeline filter hides the other strands' messages; without it, they dim.
   const dim = !!selection && selection.strandId !== tag?.strandId && !timelineFiltersInHost();
@@ -201,10 +208,17 @@ function Tag({ message }: ExperimentalMessageMetadataProps) {
     return () => row.removeAttribute(DIM);
   }, [dim]);
   const ask = asking && newest && reply ? <AskMark threadId={message.threadId} reply={reply} /> : null;
-  if (!tag || !tags.data) {
-    if (ask) return <><span ref={ref} hidden />{ask}</>;
-    return selection ? <span ref={ref} hidden /> : null;
-  }
+  if (!ask && !dim) return null;
+  return <><span ref={ref} hidden />{ask}</>;
+}
+
+function FooterTag({ message }: ExperimentalMessageMetadataProps) {
+  const tags = useLive("strands.tags", { threadId: message.threadId }, { pollMs: 60_000 });
+  const selection = useSelection(message.threadId);
+  const call = useCall();
+  const navigate = useBbNavigate();
+  const tag = tagOf(tags.data, message.turnId);
+  if (!tag || !tags.data) return null;
   const open = () => {
     const threadId = message.threadId;
     const current = selectionOf(threadId);
@@ -224,29 +238,16 @@ function Tag({ message }: ExperimentalMessageMetadataProps) {
     }
     void call("strands.opened", { strandId: tag.strandId }).catch(() => undefined);
   };
-  const move = <MoveMenu threadId={message.threadId} seq={tag.seq} current={tag.strandId} strands={tags.data.strands} />;
   // Under a filter for another strand, this message is kept in view because it waits for an answer.
   const name = selection && selection.strandId !== tag.strandId ? `from ${tag.title}` : tag.title;
-  // The divider goes above the turn's first message (the user's); its reply carries the name.
-  if (tag.divider && message.role === "user") {
-    return (
-      <div ref={(element) => { ref.current = element; }} data-strand-divider={tag.strandId} className="mt-3 flex w-full items-center gap-2 text-[11px] font-semibold text-muted-foreground/70">
-        <button type="button" onClick={open} className="cursor-pointer truncate hover:text-foreground">{name}</button>
-        <span className="font-normal">{move}</span>
-        <span aria-hidden className="h-px flex-1 bg-border/70" />
-      </div>
-    );
-  }
+  const picked = selection?.strandId === tag.strandId;
   return (
-    <>
-      <span ref={(element) => { ref.current = element; }} className="inline-flex items-center gap-1.5">
-        <button type="button" data-strand-tag={tag.strandId} onClick={open} aria-label={`Strand: ${tag.title}`}
-          className="cursor-pointer text-[11px] text-muted-foreground/70 hover:text-foreground">
-          {name}
-        </button>
-        {move}
-      </span>
-      {ask}
-    </>
+    <span data-strand-footer={tag.strandId} className="inline-flex min-w-0 items-center gap-1.5">
+      <button type="button" data-strand-tag={tag.strandId} onClick={open} aria-pressed={picked} aria-label={`Strand: ${tag.title}`}
+        className={cn(QUIET, "max-w-48 truncate", picked && "text-foreground")}>
+        {name}
+      </button>
+      <MoveMenu threadId={message.threadId} seq={tag.seq} current={tag.strandId} strands={tags.data.strands} />
+    </span>
   );
 }

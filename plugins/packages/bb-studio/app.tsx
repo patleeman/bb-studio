@@ -123,7 +123,7 @@ import { STRANDS_TAB, StrandsBoxBanner } from "./src/strands/ui/Strip";
 import { ContextInfoSection } from "./src/strands/ui/ContextInfoSection";
 import { registerTimelineFilter } from "./src/strands/ui/selection";
 import { canZoom, ZoomView, zoomThreadBy } from "./src/strands/ui/Zoom";
-import { StrandTag } from "./src/strands/ui/Tag";
+import { StrandMarks, StrandTag } from "./src/strands/ui/Tag";
 import { StrandsTab } from "./src/strands/ui/Tab";
 import "./src/work/ui/work.css";
 import { TodosTabName } from "./src/loops/ui/tab-name";
@@ -401,7 +401,9 @@ export default definePluginApp((app) => {
   // BB's thread context row (parent, changed files, pull request) in a strands conversation's Info tab; hidden above its composer (prompt-stack.ts).
   const infoSection = member(app.slots, "experimental_threadInfoSection");
   if (typeof infoSection === "function") infoSection.call(app.slots, { id: "thread-context", group: "0_context", order: 10, component: ContextInfoSection });
-  app.slots.experimental_messageMetadata({ id: "strand-tag", placement: "above", component: StrandTag });
+  // A message's strand: its name and "Move to…" in the footer row after the time; the dim and the asking mark from above, with nothing drawn there.
+  app.slots.experimental_messageMetadata({ id: "strand-tag", placement: "actionRow", component: StrandTag });
+  app.slots.experimental_messageMetadata({ id: "strand-marks", placement: "above", component: StrandMarks });
   registerThreadTab(app, { id: STRANDS_TAB, title: "Strands", icon: "ListView", layout: "flush", component: StrandsTab, ...OFF_NEW_TAB });
   // The Bot's other pages as tabs (Memory, Library, Automations, the Archive) and the New Tab page's "New …" actions (src/tab-kinds.ts).
   registerTabKindTabs(app);
