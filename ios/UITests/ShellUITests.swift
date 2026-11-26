@@ -57,6 +57,17 @@ final class ShellUITests: ServerIsolatedUITestCase {
     /// work): still marks, not spinners that would run for hours.
     func testAWorkingBotGoesIdle() { expectIdle(["-qaShelfDemo", "-openURL", "bbstudio://bot"], bot: "working") }
     func testHomeWithARunningWorkerGoesIdle() { expectIdle([], home: true) }
+    /// Back to Home from a conversation (the rail's Home): Home settles too.
+    func testHomeGoesIdleAfterAConversation() {
+        launch(["-qaConversation", "thr_botdemo01"])
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")
+        app.goHome()
+        sleep(8)
+        command("animations")
+        let running = (app.windows.firstMatch.value as? String ?? "").split(separator: "\n").map(String.init)
+        print("IDLE home-after: \(running.count)\n" + running.joined(separator: "\n"))
+        XCTAssertEqual(Self.forever(running), [], "repeating animations at rest on Home")
+    }
     /// Live scene on: the shell's backdrop stays a still (no scene web view).
     func testTheBackdropStaysStillWithLiveSceneOn() {
         expectIdle(["-qaConversation", "thr_botdemo01", "-qaLiveScene", "-qaBotTheme", "tonights-sky"])
@@ -64,6 +75,14 @@ final class ShellUITests: ServerIsolatedUITestCase {
     }
     func testTheBotChatGoesIdleAfterAStream() {
         expectIdle(["-qaDemoLatency", "300", "-qaDemoColdCache", "-qaDemoStream", "-openURL", "bbstudio://bot"])
+    }
+
+    /// Repeating for good (a huge repeatCount); the caret's blink is the system's.
+    private static func forever(_ running: [String]) -> [String] {
+        running.filter { row in
+            let counts = row.components(separatedBy: "repeat=").dropFirst().compactMap { Double($0.prefix { !" ,".contains($0) }) }
+            return counts.contains { $0 > 1000 } && !row.contains("UITextSelectionView") && !row.contains("Caret")
+        }
     }
 
     private func expectIdle(_ variant: [String], bot: String = "chat", home: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
@@ -74,12 +93,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         command("animations")
         let running = (app.windows.firstMatch.value as? String ?? "").split(separator: "\n").map(String.init)
         print("IDLE \(variant): \(running.count)\n" + running.joined(separator: "\n"))
-        // Repeating for good (repeatCount is HUGE_VALF or Float.greatestFiniteMagnitude-like); the caret's blink is the system's.
-        let forever = running.filter { row in
-            let counts = row.components(separatedBy: "repeat=").dropFirst().compactMap { Double($0.prefix { !" ,".contains($0) }) }
-            return counts.contains { $0 > 1000 } && !row.contains("UITextSelectionView") && !row.contains("Caret")
-        }
-        XCTAssertEqual(forever, [], "repeating animations at rest", file: file, line: line)
+        XCTAssertEqual(Self.forever(running), [], "repeating animations at rest", file: file, line: line)
     }
 
     // MARK: iPhone

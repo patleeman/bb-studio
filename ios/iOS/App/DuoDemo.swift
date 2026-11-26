@@ -206,7 +206,10 @@ enum DuoDemo {
             return true
         case "animations":
             // Every layer with an animation running: what keeps the app from going idle.
-            window.accessibilityValue = Self.runningAnimations(window).joined(separator: "\n")
+            let running = Self.runningAnimations(window).joined(separator: "\n")
+            window.accessibilityValue = running
+            // Also a file, readable from outside while a test is stuck (simctl openurl, then the app's Documents).
+            try? Data((running.isEmpty ? "none" : running).utf8).write(to: URL.documentsDirectory.appending(path: "animations.txt"))
             return true
         case "dismiss":
             window.endEditing(true)
