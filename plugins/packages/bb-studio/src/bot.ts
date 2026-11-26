@@ -1152,10 +1152,15 @@ export class Bots {
   }
 
   /** What a Bot's own thread is told. Its always-on skills come in full through src/memory; the list here is its on-demand ones. */
-  instructions(bot: NonNullable<BotView["bot"]>): string {
+  instructions(bot: NonNullable<BotView["bot"]>, options: { skillsSlot?: boolean } = {}): string {
     if (bot.kind === "external") return externalBotInstructions(bot);
     if (bot.state !== "active") return botInstructions(bot);
-    return botInstructions({ ...bot, skills: this.skills(bot.id).filter((skill) => skill.state !== "archived" && !skill.alwaysOn) });
+    return botInstructions({ ...bot, skills: this.onDemandSkills(bot.id), ...(options.skillsSlot ? { skillsSlot: true } : {}) });
+  }
+
+  /** The skills a Bot loads when a task matches: not archived, not always on. */
+  onDemandSkills(botId?: string): BotSkillView[] {
+    return this.skills(botId).filter((skill) => skill.state !== "archived" && !skill.alwaysOn);
   }
 
   // Always-on skills (src/core-skill.ts) -------------------------------------

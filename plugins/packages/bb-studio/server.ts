@@ -534,7 +534,7 @@ export default async function plugin(bb: BbPluginApi) {
     // Short pointers for Pages, mini apps and the Next row; their long guidance is in the studio skill (src/agent-instructions.ts).
     // strand_note is Main's, a conversation's and a lead's; a lean session lists no Studio skill, so no pointer sends it to one.
     const instructions = studioInstructions({
-      bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
+      bot: bot ? bots.instructions(bot, { skillsSlot: true }) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
       pages: !off.has("page"), minis: !off.has("mini"), appCards, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
       strands: kind === "main" || kind === "conversation" || kind === "lead", skills: !lean,
     });
@@ -1054,6 +1054,7 @@ export default async function plugin(bb: BbPluginApi) {
   const memoryService: MemoryService = new MemoryService({
     bots: { list: () => bots.list() },
     alwaysOn: (botId) => bots.alwaysOnSkills(botId),
+    onDemand: (botId) => bots.onDemandSkills(botId),
     // Studio's record of conversations and workers (src/bot-threads.ts) decides a thread's Bot and role first.
     botThread: (threadId) => { const rec = botThreads.store.get(threadId); return rec ? { botId: rec.botId, kind: rec.kind, isMain: rec.isMain, title: rec.title } : null; },
     sideBot: (threadId) => sideThreads.forThread(threadId)?.botId ?? null,

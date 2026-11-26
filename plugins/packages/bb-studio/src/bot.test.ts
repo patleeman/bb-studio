@@ -1293,7 +1293,7 @@ it("lists eight skills in the Bot's instructions, pinned and recent first, and p
   expect(text).toContain("bot_skill (op: list)");
   expect(text).toContain("- task-0: Task 0");
   expect(text.match(/^- task-/gm)).toHaveLength(8);
-  expect(text).toContain("2 more: search with bot_skill (op: list).");
+  expect(text).toContain("2 more: bot_skill (op: list).");
 });
 
 it("keeps one skill's history apart, reverts to an old version and restores a deleted skill", async () => {

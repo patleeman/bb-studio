@@ -74,20 +74,38 @@ export function listedSkills<T extends { name: string; pinned?: boolean; usedAt?
   return [...skills].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || (b.usedAt ?? 0) - (a.usedAt ?? 0) || a.name.localeCompare(b.name)).slice(0, SKILLS_LISTED).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function botInstructions(bot: { name: string; state: BotState; role?: string | null; memoryPageId?: string | null; skills?: readonly { name: string; description: string; pinned?: boolean; usedAt?: number | null }[]; primary?: boolean }): string {
-  const who = `You are ${JSON.stringify(bot.name)}, ${bot.primary === false ? "one of the user's Bots: an always-on agent that sees every project" : "the user's Bot: an always-on agent that leads their personal project and sees every project"}. The user can rename, pause or stop you in Studio.${bot.role?.trim() ? `\nYour role, in the user's words: ${bot.role.trim()}` : ""}`;
+/** Where a session's on-demand skill list goes; src/memory/service.ts fills it with what's left of the host's limit. */
+export const SKILLS_SLOT = "\u0000studio-skills\u0000";
+
+type ListedSkill = { name: string; description: string; pinned?: boolean; usedAt?: number | null };
+
+/**
+ * The on-demand skill list at the most detail that fits `room` characters:
+ * names with one-line descriptions, else names only, else a count. Empty
+ * when the Bot has none and no room for the pointer line either.
+ */
+export function skillsText(all: readonly ListedSkill[], room = Number.POSITIVE_INFINITY): string {
+  const head = "Skills: bot_skill (op: list, view, edit); view one before you follow it. Past threads: bot_info (view: history).";
+  if (!all.length) return head.length <= room ? head : "";
+  const listed = listedSkills(all);
+  const more = all.length > listed.length ? `\n${all.length - listed.length} more: bot_skill (op: list).` : "";
+  const full = [head, "Yours:", ...listed.map((skill) => `- ${skill.name}: ${skill.description}`)].join("\n") + more;
+  if (full.length <= room) return full;
+  const names = `${head}\nYours: ${listed.map((skill) => skill.name).join(", ")}.${more}`;
+  if (names.length <= room) return names;
+  const count = `Skills: you have ${all.length}; bot_skill (op: list) lists them.`;
+  return count.length <= room ? count : "";
+}
+
+export function botInstructions(bot: { name: string; state: BotState; role?: string | null; memoryPageId?: string | null; skills?: readonly ListedSkill[]; primary?: boolean; skillsSlot?: boolean }): string {
+  const who = `You are ${JSON.stringify(bot.name)}, ${bot.primary === false ? "one of the user's Bots: an always-on agent that sees every project" : "the user's Bot: an always-on agent that leads their personal project and sees every project"}.${bot.role?.trim() ? `\nYour role, in the user's words: ${bot.role.trim()}` : ""}`;
   if (bot.state === "active") {
     // Progressive disclosure: names and one-line descriptions here, the full skill through bot_skill_view.
-    const all = bot.skills ?? [];
-    const listed = listedSkills(all);
-    const skills = [
-      "Manage skills with bot_skill (op: edit) (write/patch/delete) and bot_skill (op: list) (list/search). Search past threads with bot_info (view: history).",
-      ...(all.length ? ["Your skills (load one with bot_skill (op: view) before you follow it):", ...listed.map((skill) => `- ${skill.name}: ${skill.description}`)] : []),
-      ...(all.length > listed.length ? [`${all.length - listed.length} more: search with bot_skill (op: list).`] : []),
-    ].join("\n");
+    // In a session, the list is a slot: what's left after the always-on skills decides how much of it shows.
+    const skills = bot.skillsSlot ? SKILLS_SLOT : skillsText(bot.skills ?? []);
     // The Bot is the triage layer (docs/needs-you/REDO.md): reports, alerts and its threads' questions come
     // to it, and nothing else in Studio asks the user for attention.
-    const quiet = "You triage: reports, alerts and your threads' questions come to you. Your chat is the user's inbox: post only what changed or needs them (a thread waiting on them: what it needs, linked); else (nothing new, a thread finished fine) reply exactly [PASS], no \"✓\".";
+    const quiet = "You triage: reports, alerts and your threads' questions come to you. Post only what changed or needs the user (a thread waiting on them: what, linked); else (nothing new, a thread finished fine) reply exactly [PASS], no \"✓\".";
     const runners = "Schedule with schedule (op: create): check-ins, reminders, watchers, runners.";
     // Always-on skills come in full from src/memory, in every conversation and worker.
     return [who, quiet, runners, skills].filter(Boolean).join("\n");

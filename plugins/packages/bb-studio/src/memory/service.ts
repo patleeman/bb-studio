@@ -14,6 +14,7 @@
 // split) is retired: nothing reads or writes it. Its table stays as it was.
 import { ALWAYS_ON_CAP } from "../core-skill";
 import { INSTRUCTIONS_LIMIT } from "./shared";
+import { SKILLS_SLOT, skillsText } from "../bot-model";
 
 /** The Bot the memory belongs to, as Studio stores it. */
 export interface MemoryBot { id: string; name: string; kind?: "studio" | "external"; primary?: boolean }
@@ -36,6 +37,8 @@ export interface MemoryDeps {
   bots: { list(): MemoryBot[] };
   /** The Bot's always-on skills, core first (made on first need). */
   alwaysOn(botId: string): AlwaysOnSkill[];
+  /** The Bot's on-demand skills, for the list in its conversations' instructions (SKILLS_SLOT). */
+  onDemand?(botId: string): { name: string; description: string; pinned?: boolean; usedAt?: number | null }[];
   /**
    * Where Studio placed a thread (one Bot, many conversations): the first
    * answer for a thread's Bot and role. Null for a thread it hasn't placed,
@@ -75,11 +78,13 @@ export function fitText(markdown: string, room: number): { text: string; over: b
 export function memoryInstructions(input: { botName: string; role: ThreadRole["role"]; skills: readonly AlwaysOnSkill[]; room?: number }): string {
   const lines = ["## Memory"];
   if (input.role === "worker") lines.push(`You work for ${JSON.stringify(input.botName)}. Its always-on skills (the user's standing rules and what's true right now) follow; they apply to you too.`);
-  else lines.push(`Your always-on skills; core-profile's "## Check-in" is your check-in list. Patch one (bot_skill) only when a rule changed; quote the new line. History: bot_info (view: history).`);
+  else lines.push(`Always on ("## Check-in": your check-ins); patch only a changed rule, quoting it.`);
   if (!input.skills.length) return lines.join("\n");
   const total = input.skills.reduce((sum, skill) => sum + skill.body.trim().length, 0);
   const tags = input.skills.reduce((sum, skill) => sum + `<always-on skill="${skill.name}">\n\n</always-on>\n`.length, 0);
-  let room = (input.room ?? Number.POSITIVE_INFINITY) - lines.join("\n").length - tags - CUT_NOTE_ROOM;
+  // The cut note's room is kept only when they don't all fit whole.
+  const whole = lines.join("\n").length + tags + total;
+  let room = (input.room ?? Number.POSITIVE_INFINITY) - lines.join("\n").length - tags - (whole <= (input.room ?? Number.POSITIVE_INFINITY) ? 0 : CUT_NOTE_ROOM);
   const cut: string[] = [];
   for (const skill of input.skills) {
     const { text, over } = fitText(skill.body, Math.max(0, room));
@@ -128,6 +133,11 @@ export class MemoryService {
     return owned ? { botId: owned, role: "worker" } : null;
   }
 
+  /** The Bot's on-demand skill list, at the detail `room` allows (src/bot-model.ts skillsText). */
+  skillsFor(botId: string, room: number): string {
+    return skillsText(this.deps.onDemand?.(botId) ?? [], room);
+  }
+
   instructionsFor(who: ThreadRole, room?: number): string | null {
     const bot = this.studioBot(who.botId);
     if (!bot) return null;
@@ -145,12 +155,15 @@ type ConfigureContext = Parameters<MemoryService["threadRole"]>[0];
  */
 export const MEMORY_SLOT = "\u0000studio-memory\u0000";
 
-/** The instructions with the slot replaced by `block`, or dropped. */
-export function fillSlot(instructions: string, block: string | null): string {
-  const at = instructions.indexOf(MEMORY_SLOT);
-  const before = at < 0 ? instructions : instructions.slice(0, at).replace(/\n\n$/, "");
-  const after = at < 0 ? "" : instructions.slice(at + MEMORY_SLOT.length).replace(/^\n\n/, "");
-  return [before, block, after].filter(Boolean).join("\n\n");
+/** The instructions with the slot replaced by `block`, or dropped. A slot inside a paragraph (SKILLS_SLOT in the Bot's lines) is joined by one line break. */
+export function fillSlot(instructions: string, block: string | null, slot = MEMORY_SLOT): string {
+  const at = instructions.indexOf(slot);
+  if (at < 0) return [instructions, block].filter(Boolean).join("\n\n");
+  const head = instructions.slice(0, at), tail = instructions.slice(at + slot.length);
+  const sepBefore = /\n\n$/.test(head) || !head ? "\n\n" : "\n", sepAfter = /^\n\n/.test(tail) || !tail ? "\n\n" : "\n";
+  const before = head.replace(/\n{1,2}$/, ""), after = tail.replace(/^\n{1,2}/, "");
+  if (!block) return [before, after].filter(Boolean).join(sepBefore === "\n\n" || sepAfter === "\n\n" ? "\n\n" : "\n");
+  return `${before}${before ? sepBefore : ""}${block}${after ? sepAfter : ""}${after}`;
 }
 
 /**
@@ -160,24 +173,49 @@ export function fillSlot(instructions: string, block: string | null): string {
  * forks, which have their own tool list). `memory` is read when a session
  * starts, after Studio has set up. It adds no tools.
  */
+/** The text without a slot, joined as fillSlot would join an empty one. */
+const dropSlot = (text: string, slot: string) => fillSlot(text, null, slot);
+
+/**
+ * Wraps Studio's agent configuration: every conversation and worker of a
+ * Studio Bot also gets its always-on skills, at each session start or
+ * resume. `skip` leaves a session alone (Visual Chat's canvas, skill review
+ * forks, which have their own tool list). `memory` is read when a session
+ * starts, after Studio has set up. It adds no tools.
+ *
+ * The budget (INSTRUCTIONS_LIMIT): everything but the two slots is fixed and
+ * kept whole, the pointers after the memory slot included. The always-on
+ * skills get what that leaves, less a reserve for the shortest skill-list
+ * line; the on-demand skill list (SKILLS_SLOT) then gets what is left after
+ * them, at the most detail that fits (descriptions, names, or a count).
+ */
 export function withMemory<Context extends ConfigureContext, Result extends { tools: readonly unknown[]; instructions?: string }>(memory: () => MemoryService, skip: (context: Context) => boolean, inner: (context: Context) => Result): (context: Context) => Result {
   return (context) => {
     // `rescope` (Studio's tool scope, src/tool-scope.ts) is for a caller that adds tools; memory adds none.
     const { rescope: _rescope, ...plain } = inner(context) as Result & { rescope?: unknown };
     const result = plain as unknown as Result;
     const instructions = result.instructions ?? "";
-    let block: string | null = null;
+    if (!instructions.includes(MEMORY_SLOT) && !instructions.includes(SKILLS_SLOT) && skip(context)) return result;
+    let service: MemoryService | null = null;
+    let who: ThreadRole | null = null;
     if (!skip(context)) {
-      try {
-        const service = memory();
-        const who = service.threadRole(context);
-        // The skills get what the Bot's instructions and the note leave of INSTRUCTIONS_LIMIT: they stay whole before the short pointers after them.
-        const at = instructions.indexOf(MEMORY_SLOT);
-        const before = at < 0 ? instructions.length : at;
-        block = who ? service.instructionsFor(who, INSTRUCTIONS_LIMIT - before - 2) : null;
-      } catch { /* Memory unavailable: the session starts without it. */ }
+      try { service = memory(); who = service.threadRole(context); } catch { /* Memory unavailable: the session starts without it. */ }
     }
-    if (!block && !instructions.includes(MEMORY_SLOT)) return result;
-    return { ...result, instructions: fillSlot(instructions, block) };
+    const hasSkills = instructions.includes(SKILLS_SLOT);
+    const skillsReserve = hasSkills && who ? SKILLS_RESERVE : 0;
+    // The fixed text: both slots out, each block's separator counted.
+    const fixed = dropSlot(dropSlot(instructions, SKILLS_SLOT), MEMORY_SLOT).length;
+    let block: string | null = null;
+    try { block = service && who ? service.instructionsFor(who, INSTRUCTIONS_LIMIT - fixed - 2 - skillsReserve - (hasSkills ? 2 : 0)) : null; } catch { block = null; }
+    let filled = fillSlot(instructions, block);
+    if (hasSkills) {
+      const room = INSTRUCTIONS_LIMIT - dropSlot(filled, SKILLS_SLOT).length - 2;
+      const list = service && who ? service.skillsFor(who.botId, room) : "";
+      filled = fillSlot(filled, list || null, SKILLS_SLOT);
+    }
+    return filled === instructions ? result : { ...result, instructions: filled };
   };
 }
+
+/** The shortest skill-list line ("Skills: you have N; …"), kept free for it whatever the always-on skills take. */
+const SKILLS_RESERVE = 53;
