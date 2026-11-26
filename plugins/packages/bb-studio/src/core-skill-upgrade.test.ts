@@ -57,7 +57,7 @@ it("upgrades an install with memory records and a core profile without losing an
   expect(before.records).toHaveLength(274);
 
   old.bb.storage.migrate(old.db, MIGRATIONS);
-  const bots = new Bots({ db: old.db, sdk: old.bb.sdk, leads: null as never, changed: () => {}, presenceChanged: () => {}, memory: { exists: (id) => !!old.pages.store.meta(id), markdown: (id) => (old.pages.store.meta(id) ? readMarkdown(old.pages.hub.open(id).doc) : null) } } as never);
+  const bots = new Bots({ db: old.db, sdk: old.bb.sdk, leads: null as never, changed: () => {}, presenceChanged: () => {}, memory: { exists: (id: string) => !!old.pages.store.meta(id), markdown: (id: string) => (old.pages.store.meta(id) ? readMarkdown(old.pages.hub.open(id).doc) : null) } } as never);
 
   // The records, their index and the page are untouched; the records table keeps its name.
   expect(records()).toEqual(before.records);
