@@ -33,7 +33,7 @@ import { proxyFetch, RateLimit } from "./server/net";
 import { displayName, miniProvider } from "./server/provider";
 import { createMiniBackup } from "./server/backup";
 import { MiniStore, RecordConflict, type Actor, type MiniRow } from "./server/store";
-import { approvable, findSchema, LIMITS, MINIS_DOC, miniHref, PLUGIN_ID, REALTIME_CHANNEL, SHELF, type MiniEvent, type MiniRecord } from "./shared";
+import { approvable, findSchema, LIMITS, miniHref, PLUGIN_ID, REALTIME_CHANNEL, SHELF, type MiniEvent, type MiniRecord } from "./shared";
 
 /** Available in every agent session while mini apps are on (list/read/create/live go through apps_*). */
 export const MINI_TOOLS = ["minis_update", "minis_data"];
@@ -935,7 +935,3 @@ export function registerMinis(
     },
   };
 }
-
-/** Every session's instructions while mini apps are on. */
-export const MINI_INSTRUCTIONS = `${MINIS_DOC}
-When the user wants something to interact with (a tracker, board, calculator, form, poll, small tool or a visualization to play with), or data they'll come back to, make a Studio mini app with apps (op: create) (type "mini") and show it with ::mini{id="mini_…"} on its own line in your reply, rather than a playground or a one-off HTML file. Embed one in a page with an embed block {"kind":"mini","target":"mini_…"}. Change it with apps (op: update) (it compiles before saving), its data with minis_data, and drive an open copy with apps (op: live).`;

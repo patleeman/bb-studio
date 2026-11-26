@@ -11,7 +11,6 @@ export const ROUTER_CHANNEL = "studio-router";
 export const ROUTER_CALLER = "studio-router";
 
 const reasoningLevel = z.enum(["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"]);
-export type RouterReasoningLevel = z.infer<typeof reasoningLevel>;
 
 /** A real provider and model, with the names shown for it. */
 export const targetSchema = z.object({

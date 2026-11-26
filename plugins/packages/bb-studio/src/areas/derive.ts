@@ -9,8 +9,6 @@ const FLAGGED_RUN = /^\s*(DECISION)\b/i;
 
 const RANK: Record<AreaStatus, number> = { broken: 0, flagged: 1, ok: 2, unknown: 3 };
 export const statusRank = (status: AreaStatus) => RANK[status];
-const OUTCOME_RANK: Record<AreaOutcome, number> = { ok: 0, flagged: 1, broken: 2 };
-export const worse = (a: AreaOutcome, b: AreaOutcome): AreaOutcome => (OUTCOME_RANK[b] > OUTCOME_RANK[a] ? b : a);
 
 export const clip = (text: string, max = LINE_MAX) => {
   const flat = text.replace(/\s+/g, " ").trim();

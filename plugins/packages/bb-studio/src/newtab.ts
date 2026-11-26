@@ -14,7 +14,6 @@ import { shownThreadTitle } from "./reply-title";
 export const NEW_TAB_LIMIT = 8;
 /** Visual Chat's plugin and the page that shows one of its boards. */
 export const VISUAL_CHAT_PLUGIN_ID = "studio-visual-chat";
-export const boardPath = (threadId: string) => `/plugins/${VISUAL_CHAT_PLUGIN_ID}/canvas/${encodeURIComponent(threadId)}`;
 
 const KIND_IDS = TAB_KIND_REGISTRY.map((entry) => entry.id) as [TabKindId, ...TabKindId[]];
 

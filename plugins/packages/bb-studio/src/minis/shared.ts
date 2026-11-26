@@ -213,5 +213,3 @@ export const THEME_COLORS = [
   "border", "input", "ring", "state-hover", "state-active", "success", "warning", "warning-text", "attention",
   "canvas", "ink", "sidebar",
 ] as const;
-
-export const MINIS_DOC = `Mini apps are small interactive apps built into Studio. Write React (JSX) with Studio Kit components and Tailwind classes; records, state and approved network come from window.playground (Kit hooks wrap them).`;

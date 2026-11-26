@@ -61,14 +61,6 @@ export function presentedName(name: string): string {
   return ALIASES.get(name)?.merged ?? name;
 }
 
-/** The old tool a merged tool's op runs (the merged name itself for an absorb's own op). */
-export function memberOf(merged: string, op: string): string | null {
-  const merge = MERGES.find((each) => each.name === merged);
-  if (merge) return merge.ops[op] ?? null;
-  const absorbs = ABSORBS[merged];
-  return absorbs?.[op] ?? null;
-}
-
 /** Whether a tool call (an event's item) ran this old tool: by its own name, or as its merged tool's op. */
 export function callRuns(item: { tool?: string; name?: string; arguments?: unknown } | undefined, oldName: string): boolean {
   const name = item?.tool ?? item?.name ?? "";
