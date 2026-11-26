@@ -41,6 +41,8 @@ const watchIntervalMs = 1000;
 /** The standalone Smart Queue plugin decides the same messages; only one may. */
 const standaloneQueueId = "smart-queue";
 const standaloneCheckMs = 30_000;
+/** How long the dispatch hook waits for the first Smart Queue plugin check after a start. */
+const firstQueueCheckWaitMs = 5_000;
 /** A Jev failure this recent still counts against its health. */
 const jevFailureWindowMs = 30 * 60_000;
 
@@ -258,12 +260,17 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     }
     return standaloneQueue.on;
   }
-  await refreshStandaloneQueue();
+  // Not awaited: during Studio's load, `plugins.list` waits on BB's plugin
+  // loading and host connection, which wait on this load to finish, so an
+  // await here held every start until BB's 30 s load timeout.
+  const firstQueueCheck = refreshStandaloneQueue();
   // The dispatch hook runs under core's server-wide lock, so it reads the
-  // settings Studio already holds instead of BB's key files.
+  // settings Studio already holds instead of BB's key files. Until the first
+  // check has answered, it waits for it (a few seconds at most).
   const enabledNow = async () => {
     const values = settings.current?.();
     const enabled = values ? (values.decisions_enabled ?? decisionsDefaults.enabled) !== false : (await config()).enabled;
+    if (enabled && standaloneQueue.checkedAt === 0) await Promise.race([firstQueueCheck, sleep(firstQueueCheckWaitMs)]);
     return enabled && !standaloneQueue.on;
   };
   const queueEnabled = enabledNow;

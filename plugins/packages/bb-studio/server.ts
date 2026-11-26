@@ -317,7 +317,8 @@ export default async function plugin(bb: BbPluginApi) {
   // Auto reports whether its pick runs lean (Settings › Agent context); the lean settings load further down.
   const leanRef: { store: LeanStore | null } = { store: null };
   // Which providers are ACP agents (src/provider-family.ts): the router, Lean and moves ask synchronously.
-  await refreshProviderFamilies(bb.sdk.providers, true);
+  // Not awaited: BB answers `providers.list` only once every plugin has loaded, this one included.
+  void refreshProviderFamilies(bb.sdk.providers, true);
   const modelRouter = await registerRouter(bb, { systemOne: decisions.ask.systemOne }, { lean: (providerId, model) => leanFor(leanRef.store?.current ?? {}, providerId, model) });
   let settingValues: Record<string, unknown> = await settings.get();
   appCards = settingValues.appCards === true;

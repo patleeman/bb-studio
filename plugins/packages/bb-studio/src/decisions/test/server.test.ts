@@ -218,6 +218,28 @@ test("the standalone Smart Queue plugin still suppresses Studio's queue", async 
   }), { action: "proceed" });
 });
 
+test("registration finishes while BB can't answer yet (no host during plugin load), and dispatch waits for the first check", async () => {
+  // During Studio's load, plugins.list waits on BB's plugin loading and host
+  // connection, which wait on this load: awaiting it held every start 30 s.
+  const { bb, hooks } = setup();
+  bb.settings.define = () => ({ get: async () => ({ enabled: true, jevProvider: "custom" }) });
+  let answer!: (value: { plugins: { id: string; enabled: boolean }[] }) => void;
+  const list = vi.fn(() => new Promise<{ plugins: { id: string; enabled: boolean }[] }>((resolve) => { answer = resolve; }));
+  bb.sdk.plugins.list = list as never;
+  const registered = await Promise.race([plugin(bb as never).then(() => true), new Promise((resolve) => setTimeout(() => resolve(false), 1_000))]);
+  assert.equal(registered, true, "registerDecisions must not wait on plugins.list");
+  expect(list).toHaveBeenCalledTimes(1);
+  // Once BB answers, the standalone Smart Queue plugin still suppresses Studio's queue, from the first dispatch on.
+  const decided = hooks["message.dispatch"]!({
+    attempt: "join-turn", initiator: "user", senderThreadId: null,
+    experimental_submission: null, queuedMessages: [],
+    thread: { id: "thr_1", status: "active", visibility: "visible", originPluginId: null },
+  });
+  answer({ plugins: [{ id: "smart-queue", enabled: true }] });
+  assert.deepEqual(await decided, { action: "proceed" });
+  expect(list).toHaveBeenCalledTimes(1);
+});
+
 test("recovery cleans hidden classifier sessions owned by both IDs and preserves visible work", async () => {
   const { bb } = setup();
   const services: Record<string, { start(signal: AbortSignal): Promise<void> }> = {};
