@@ -118,8 +118,8 @@ final class MermaidScript {
 }
 
 /// HTML in a page, sized to its content (80–2400 pt like the desktop's
-/// frame). It scrolls with the page, keeps nothing between pages, and opens
-/// links outside, in Safari.
+/// frame). It scrolls with the page, keeps nothing between pages, never
+/// leaves its own HTML, and opens tapped links in Safari (`UntrustedWeb`).
 struct PageWebBlock: View {
     let html: String
     @State private var height: CGFloat = 80
@@ -148,16 +148,17 @@ private struct PageWebFrame: UIViewRepresentable {
         """
 
     func makeUIView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .nonPersistent()
-        configuration.userContentController.add(context.coordinator, name: "height")
+        let configuration = UntrustedWeb.configuration()
+        // The app's own script world: the block's scripts can't post sizes of their own.
+        configuration.userContentController.add(context.coordinator, contentWorld: .defaultClient, name: "height")
         configuration.userContentController.addUserScript(
-            WKUserScript(source: Self.sizeScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+            WKUserScript(source: Self.sizeScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: .defaultClient))
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.isOpaque = false
         view.backgroundColor = .clear
         view.scrollView.isScrollEnabled = false
         view.navigationDelegate = context.coordinator
+        view.uiDelegate = context.coordinator
         context.coordinator.loaded = html
         view.loadHTMLString(html, baseURL: nil)
         return view
@@ -171,12 +172,12 @@ private struct PageWebFrame: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ view: WKWebView, coordinator: Coordinator) {
-        view.configuration.userContentController.removeScriptMessageHandler(forName: "height")
+        view.configuration.userContentController.removeScriptMessageHandler(forName: "height", contentWorld: .defaultClient)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(height: $height) }
 
-    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
         var height: Binding<CGFloat>
         var loaded: String?
 
@@ -188,11 +189,16 @@ private struct PageWebFrame: UIViewRepresentable {
             if abs(height.wrappedValue - clamped) > 1 { height.wrappedValue = clamped }
         }
 
-        /// The block's own document loads; any link it follows opens in Safari instead.
+        /// Only the block's own HTML (about:blank): a tapped link opens in Safari; a script,
+        /// a meta refresh or a form can't take the block anywhere (`UntrustedWeb`).
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
-            guard action.navigationType == .linkActivated, let url = action.request.url else { return .allow }
-            if ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "") { await UIApplication.shared.open(url) }
-            return .cancel
+            await UntrustedWeb.policy(for: action, allowed: nil)
+        }
+
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                     for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            MainActor.assumeIsolated { UntrustedWeb.newWindow(for: action) }
+            return nil
         }
     }
 }

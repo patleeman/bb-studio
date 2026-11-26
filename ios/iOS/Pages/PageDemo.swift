@@ -64,6 +64,7 @@ enum PageDemo {
     <!-- ^aaaa0014 -->
     ```html
     <div style="font:15px -apple-system;padding:12px;background:#eef;border-radius:8px">An HTML block</div>
+    <script>setTimeout(function () { location.href = "https://elsewhere.invalid/away"; }, 500);</script>
     ```
 
     <!-- ^aaaa0015 -->

@@ -83,6 +83,26 @@ final class DesignViewerUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["Download HTML"].exists)
     }
 
+    /// Screen 1b tries what an agent's screen could: post a pick and a text edit itself,
+    /// open a window and leave for another site. Playing it, none of that may work.
+    func testAScreenCantLeaveOrForgeEditsOrPicks() {
+        launch()
+        app.buttons["designScreen-1b"].coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5)).tap()
+        let modes = app.segmentedControls["designMode"]
+        XCTAssertTrue(modes.waitForExistence(timeout: 15))
+        modes.buttons["Play"].tap()
+        let live = app.webViews["designPlayerPage"]
+        XCTAssertTrue(live.staticTexts["Desktop home"].waitForExistence(timeout: 15), "the screen plays")
+        sleep(3)
+        XCTAssertTrue(live.staticTexts["Desktop home"].exists, "still on its own page: the script's navigation was refused")
+        XCTAssertFalse(app.navigationBars["New Comment"].exists, "a forged pick outside Comment mode opens nothing")
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["designScreen-1b"].waitForExistence(timeout: 10))
+        sleep(2)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Edited:'")).firstMatch.exists,
+                       "a forged text edit outside Edit text never reached the server")
+    }
+
     private func shot(_ name: String) {
         guard let folder = ProcessInfo.processInfo.environment["VIEWERS_OUT"] else { return }
         sleep(1)

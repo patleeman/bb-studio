@@ -406,25 +406,26 @@ private struct DesignScreenThumb: View {
     }
 }
 
-/// A page shown without touches, so the card around it takes them.
+/// A design screen shown without touches, so the card around it takes them.
+/// Agent-written HTML: its own store, and it stays on its page (`UntrustedWeb`).
 private struct StaticWebView: UIViewRepresentable {
     let url: URL
 
     func makeUIView(context: Context) -> WKWebView {
-        let view = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let view = WKWebView(frame: .zero, configuration: UntrustedWeb.configuration())
         view.isUserInteractionEnabled = false
         view.scrollView.contentInsetAdjustmentBehavior = .never
         view.isOpaque = false
-        view.load(URLRequest(url: url))
-        context.coordinator.loaded = url
+        view.navigationDelegate = context.coordinator
+        view.uiDelegate = context.coordinator
+        context.coordinator.load(url, in: view)
         return view
     }
 
     func updateUIView(_ view: WKWebView, context: Context) {
         guard context.coordinator.loaded != url else { return }
-        context.coordinator.loaded = url
-        view.load(URLRequest(url: url))
+        context.coordinator.load(url, in: view)
     }
 
-    func makeCoordinator() -> WebView.Coordinator { WebView.Coordinator() }
+    func makeCoordinator() -> DesignPageLoader { DesignPageLoader() }
 }

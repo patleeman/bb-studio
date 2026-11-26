@@ -32,7 +32,11 @@ final class PageViewerUITests: ServerIsolatedUITestCase {
         shot("page-blocks")
         scroll.swipeUp()
         scroll.swipeUp()
-        XCTAssertTrue(app.descendants(matching: .any)["pageHTML"].waitForExistence(timeout: 5), "an html block")
+        let html = app.descendants(matching: .any)["pageHTML"]
+        XCTAssertTrue(html.waitForExistence(timeout: 5), "an html block")
+        XCTAssertTrue(html.staticTexts["An HTML block"].waitForExistence(timeout: 5))
+        sleep(2)
+        XCTAssertTrue(html.staticTexts["An HTML block"].exists, "its script couldn't take the block to another site")
         shot("page-blocks-2")
     }
 

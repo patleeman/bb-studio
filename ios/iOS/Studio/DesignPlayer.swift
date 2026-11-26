@@ -126,6 +126,8 @@ struct DesignPlayer: View {
     }
 
     private func handle(_ event: DesignFrameEvent) {
+        // The page is untrusted: a pick only while commenting, typed text only in Edit text.
+        guard DesignLiveFrame.accepts(event, in: mode) else { return }
         switch event {
         case .pick(let pick): picked = pick
         case .pin(let id):
