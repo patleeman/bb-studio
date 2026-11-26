@@ -20,11 +20,6 @@
     "icon": "MessageSquare"
   },
   {
-    "id": "bb-ai",
-    "name": "bb cloud AI",
-    "icon": "AiBrain01"
-  },
-  {
     "id": "browser-automation",
     "name": "Browser Automation",
     "icon": "Globe"
@@ -35,29 +30,9 @@
     "icon": "Limitation"
   },
   {
-    "id": "custom-instructions",
-    "name": "Custom instructions",
-    "icon": "EditFile"
-  },
-  {
-    "id": "simple-notes",
-    "name": "Docs",
-    "icon": "FileText"
-  },
-  {
     "id": "drafts",
     "name": "Drafts",
     "icon": "EditFile"
-  },
-  {
-    "id": "monaco-editor",
-    "name": "File Editor",
-    "icon": "Code"
-  },
-  {
-    "id": "github",
-    "name": "GitHub",
-    "icon": "Github"
   },
   {
     "id": "bb--git",
@@ -70,19 +45,9 @@
     "icon": "GitPullRequest"
   },
   {
-    "id": "inline-vis",
-    "name": "Inline visualizations",
-    "icon": "AppWindow"
-  },
-  {
     "id": "keep-awake",
     "name": "Keep Awake",
     "icon": "Coffee"
-  },
-  {
-    "id": "bb--github-star",
-    "name": "GitHub Star",
-    "icon": "Star"
   },
   {
     "id": "bb--server-switcher",
@@ -90,19 +55,9 @@
     "icon": "ComputerCloud"
   },
   {
-    "id": "memory",
-    "name": "Memory",
-    "icon": "Brain"
-  },
-  {
     "id": "navigation",
     "name": "Navigation",
     "icon": "PanelLeft"
-  },
-  {
-    "id": "environment-modal-sandbox",
-    "name": "Modal Sandbox [Experimental]",
-    "icon": null
   },
   {
     "id": "environment-personal-workspace",
@@ -130,11 +85,6 @@
     "icon": "BellDot"
   },
   {
-    "id": "connect",
-    "name": "bb connect",
-    "icon": "ComputerCloud"
-  },
-  {
     "id": "secrets",
     "name": "Secrets",
     "icon": "Lock"
@@ -143,26 +93,6 @@
     "id": "scheduled-send",
     "name": "Send later",
     "icon": "Calendar"
-  },
-  {
-    "id": "side-chat",
-    "name": "Side chat",
-    "icon": "SideChat"
-  },
-  {
-    "id": "bb--storage-retention",
-    "name": "Storage & retention [Experimental]",
-    "icon": null
-  },
-  {
-    "id": "tasks",
-    "name": "Tasks",
-    "icon": "ListTodo"
-  },
-  {
-    "id": "workflows",
-    "name": "Workflows",
-    "icon": "Workflow"
   },
   {
     "id": "environment-git-worktree",
@@ -190,16 +120,6 @@
     "icon": null
   },
   {
-    "id": "agent-annotations",
-    "name": "Agent Annotations",
-    "icon": "MessageSquarePlus"
-  },
-  {
-    "id": "bb-account",
-    "name": "bb account",
-    "icon": "UserRound"
-  },
-  {
     "id": "bb-guide",
     "name": "BB guide",
     "icon": "Explore"
@@ -208,11 +128,6 @@
     "id": "pdf-preview",
     "name": "PDF preview",
     "icon": "FileText"
-  },
-  {
-    "id": "theme-preview",
-    "name": "Theme Preview",
-    "icon": "Palette"
   },
   {
     "id": "thread-list",
