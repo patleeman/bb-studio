@@ -51,24 +51,6 @@ final class BotPagesTests: XCTestCase {
         XCTAssertNil(input["query"], "an empty search sends no query, not null")
     }
 
-    func testMemoryWritesSendTheirInputs() async throws {
-        let (client, calls) = makeClient { method, input in
-            if method == "memory.update" { return ["record": Self.record("r9", text: input["text"] as? String ?? ""), "replaced": Self.record("r1", replacedBy: "r9")] }
-            return ["record": Self.record(input["id"] as? String ?? "r8", archived: input["archived"] as? Bool ?? false)]
-        }
-        let added = try await client.memoryAdd(botId: "bot_a", topic: "Food", text: "No cilantro.")
-        XCTAssertEqual(added?.id, "r8")
-        let updated = try await client.memoryUpdate(botId: "bot_a", id: "r1", text: "New text", topic: nil)
-        XCTAssertEqual(updated?.text, "New text")
-        let archived = try await client.memoryArchive(botId: "bot_a", id: "r1", archived: true)
-        XCTAssertEqual(archived?.archived, true)
-        let sent = calls()
-        XCTAssertEqual(sent.map(\.0), ["memory.add", "memory.update", "memory.archive"])
-        XCTAssertEqual(sent[0].1["topic"] as? String, "Food")
-        XCTAssertNil(sent[1].1["topic"], "an unchanged topic stays out")
-        XCTAssertEqual(sent[2].1["archived"] as? Bool, true)
-    }
-
     func testSourceLabelsAndTargetsMatchDesktop() throws {
         func record(_ source: [String: Any], state: Any = NSNull()) throws -> MemoryRecord {
             let data = try JSONSerialization.data(withJSONObject: Self.record("r", source: source, state: state))
@@ -238,12 +220,19 @@ final class BotPagesTests: XCTestCase {
 
     // MARK: Demo
 
-    func testDemoFiltersMemoryByTopic() async throws {
+    func testDemoAnswersMemoryAsStudioDoesNow() async throws {
+        // Studio retired memory records: the demo, like Studio, lists none and serves the always-on skill as the profile.
         let client = BBClient(baseURL: URL(string: "https://pages-demo.invalid")!)
         client.transport = { method, path, body in
             BotSpacesDemo.State.shared.respond(method, path, body) ?? (404, Data())
         }
         let home = try await client.memoryRecords(botId: "bot_juniper", query: "", topic: "Home", sort: .newest)
-        XCTAssertEqual(home.records.map(\.topic), ["Home"])
+        XCTAssertEqual(home.records.count, 0)
+        XCTAssertEqual(home.total, 0)
+        let overview = try await client.memoryOverview(botId: "bot_juniper")
+        XCTAssertEqual(overview.profile?.cap, 2000)
+        XCTAssertEqual(overview.topics.count, 0)
+        let profile = try await client.memoryProfile(botId: "bot_juniper")
+        XCTAssertTrue(profile?.contains("## Check-in") == true)
     }
 }

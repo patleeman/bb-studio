@@ -201,6 +201,8 @@ enum Links {
 
     static func needsResolution(_ ref: LinkRef) -> Bool {
         guard ref.kind.ref != .none, ref.kind != .browser else { return false }
+        // Memory records are retired: an old record link just opens Memory, with nothing to look up.
+        if ref.kind == .record { return false }
         return ref.id != nil
     }
 
@@ -217,7 +219,7 @@ enum Links {
         case .archive: return .botPage(.archive, botId: id)
         case .automation: return id.map(LinkDestination.automation) ?? .botPage(.automations, botId: nil)
         case .todo: return id.map(LinkDestination.todo) ?? .botPage(.strands, botId: nil)
-        case .record: return id.map(LinkDestination.record) ?? .botPage(.memory, botId: nil)
+        case .record: return .botPage(.memory, botId: nil)
         case .page: return id.map { .route(.page(id: $0)) } ?? .elsewhere("That link names no page.")
         case .whiteboard: return id.map { .route(.drawing(id: $0)) } ?? .elsewhere("That link names no whiteboard.")
         case .design: return id.map { .route(.design(id: $0)) } ?? .elsewhere("That link names no design.")

@@ -934,24 +934,6 @@
     {
       "file": "ios/iOS/Bot/BotPagesModel.swift",
       "plugin": "studio",
-      "method": "memory.add",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Bot/BotPagesModel.swift",
-      "plugin": "studio",
-      "method": "memory.update",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Bot/BotPagesModel.swift",
-      "plugin": "studio",
-      "method": "memory.archive",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Bot/BotPagesModel.swift",
-      "plugin": "studio",
       "method": "bot_library",
       "coverage": "generated method"
     },

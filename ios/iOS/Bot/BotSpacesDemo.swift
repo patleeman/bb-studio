@@ -170,8 +170,6 @@ enum BotSpacesDemo {
         private var finished: Set<String> = ["thr_demo_lisbon"]
         private var gone: Set<String> = []
         private var finishedAt: [String: (at: Double, summary: String)] = [:]
-        private var memory: [[String: Any]] = []
-        private var memoryMade = 0
         private var made = 0
         /// Each conversation New conversation started: the model it asked for, as the list and header name it.
         private var startedModels: [String: (providerId: String, name: String)] = [:]
@@ -223,16 +221,6 @@ enum BotSpacesDemo {
                 Self.row("kit-a1", "assistant", "Three quotes in. The middle one is the best value.", now - 2_000_000_000, seq: 1),
             ])
             threads["thr_demo_w9"] = Self.workerThread(Worker(id: "thr_demo_w9", title: "Flaky fixture hunt", status: "failed", owner: main, ago: 900_000_000), now: now)
-            memory = [
-                Self.record("mem_1", "Travel", "Prefers aisle seats and morning flights.", now - 400_000_000, source: ["kind": "conversation", "id": BotDemo.threadId, "title": "Main", "section": NSNull()]),
-                Self.record("mem_2", "Travel", "Lisbon: the Alfama flat, 14–18 Nov.", now - 90_000_000, source: ["kind": "conversation", "id": "thr_demo_lisbon", "title": "Lisbon trip planning", "section": NSNull()], state: "finished"),
-                Self.record("mem_3", "Work", "Interview with Sam is Friday 10:00.", now - 7_000_000, source: ["kind": "conversation", "id": "thr_demo_interview", "title": "Launch prep", "section": NSNull()]),
-                Self.record("mem_4", "Home", "The plumber is Dana, call before 9.", now - 800_000_000, source: ["kind": "manual", "id": NSNull(), "title": "Added by you", "section": NSNull()]),
-                Self.record("mem_0", "Work", "Interview with Sam is Thursday 15:00.", now - 9_000_000, source: ["kind": "conversation", "id": "thr_demo_interview", "title": "Launch prep", "section": NSNull()],
-                            replacedBy: "mem_3", replacedAt: now - 7_000_000),
-            ]
-            memory[2]["replacesId"] = "mem_0"
-            memory[2]["replaces"] = ["id": "mem_0", "text": "Interview with Sam is Thursday 15:00.", "createdAt": now - 9_000_000]
             sides = [Side(threadId: BotSpacesDemo.sideThreadId, sourceThreadId: BotDemo.threadId, messageId: "m3",
                           replies: 2, lastReplyAt: now - 300_000, lastReplyRole: "assistant")]
             threads[BotSpacesDemo.sideThreadId] = Thread(title: "PR review", rows: [
@@ -694,81 +682,26 @@ enum BotSpacesDemo {
                     }
                     return ok(["approval": approvalView(decision == "deny" ? "denied" : "approved")])
                 }
+            // Studio retired memory records: its memory RPC (src/memory/register.ts) answers from the Bot's always-on skill,
+            // lists no records and refuses writes. The demo answers the same way.
             case "memory.overview":
-                return lock.withLock {
-                    let current = memory.filter { $0["replacedById"] is NSNull && $0["archived"] as? Bool != true }
-                    var topics: [String: Int] = [:]
-                    for record in current { topics[record["topic"] as? String ?? "", default: 0] += 1 }
-                    return ok([
-                        "bot": ["id": "bot_juniper", "name": "Juniper"],
-                        "profile": ["pageId": "pg_demo_profile", "title": "Juniper's core profile", "updatedAt": Self.now - 3_600_000,
-                                    "chars": Self.profile.count, "cap": 2500, "over": false],
-                        "split": ["state": "done", "legacyPageId": NSNull(), "legacyTitle": NSNull(), "splitAt": NSNull()],
-                        "counts": ["current": current.count, "replaced": memory.filter { !($0["replacedById"] is NSNull) }.count,
-                                   "archived": memory.filter { $0["archived"] as? Bool == true }.count],
-                        "topics": topics.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }.map { ["topic": $0.key, "count": $0.value] },
-                    ] as [String: Any])
-                }
+                return ok([
+                    "bot": ["id": "bot_juniper", "name": "Juniper"],
+                    "profile": ["pageId": "", "title": "Always on", "updatedAt": Self.now - 3_600_000,
+                                "chars": Self.profile.count, "cap": 2000, "over": false],
+                    "split": ["state": "none", "legacyPageId": NSNull(), "legacyTitle": NSNull(), "splitAt": NSNull()],
+                    "counts": ["current": 0, "replaced": 0, "archived": 0],
+                    "topics": [] as [Any],
+                ] as [String: Any])
             case "memory.profile":
-                return ok(["profile": ["pageId": "pg_demo_profile", "title": "Juniper's core profile", "updatedAt": Self.now - 3_600_000,
-                                       "chars": Self.profile.count, "cap": 2500, "over": false, "markdown": Self.profile] as [String: Any]])
+                return ok(["profile": ["pageId": "", "title": "Always on", "updatedAt": Self.now - 3_600_000,
+                                       "chars": Self.profile.count, "cap": 2000, "over": false, "markdown": Self.profile] as [String: Any]])
             case "memory.list":
-                let query = (input["query"] as? String ?? "").lowercased()
-                let topic = (input["topic"] as? String)?.lowercased()
-                let sort = input["sort"] as? String ?? "newest"
-                return lock.withLock {
-                    var list = memory.filter { record in
-                        record["archived"] as? Bool != true
-                            && (topic == nil || (record["topic"] as? String)?.lowercased() == topic)
-                            && (query.isEmpty || "\(record["topic"] ?? "") \(record["text"] ?? "")".lowercased().contains(query))
-                    }
-                    list.sort { a, b in
-                        let ar = !(a["replacedById"] is NSNull), br = !(b["replacedById"] is NSNull)
-                        if ar != br { return !ar }
-                        switch sort {
-                        case "oldest": return (a["createdAt"] as? Double ?? 0) < (b["createdAt"] as? Double ?? 0)
-                        case "topic": return (a["topic"] as? String ?? "") < (b["topic"] as? String ?? "")
-                        default: return (a["createdAt"] as? Double ?? 0) > (b["createdAt"] as? Double ?? 0)
-                        }
-                    }
-                    return ok(["records": list, "total": list.count])
-                }
+                return ok(["records": [] as [Any], "total": 0])
             case "memory.get":
-                return lock.withLock { ok(["record": (memory.first { $0["id"] as? String == input["id"] as? String }).map { $0 as Any } ?? NSNull()]) }
-            case "memory.add":
-                return lock.withLock {
-                    memoryMade += 1
-                    let record = Self.record("mem_new\(memoryMade)", input["topic"] as? String ?? "", input["text"] as? String ?? "", Self.now,
-                                             source: ["kind": "manual", "id": NSNull(), "title": "Added by you", "section": NSNull()])
-                    memory.append(record)
-                    return ok(["record": record])
-                }
-            case "memory.update":
-                let id = input["id"] as? String ?? ""
-                return lock.withLock {
-                    guard let index = memory.firstIndex(where: { $0["id"] as? String == id }) else {
-                        return (400, Data(#"{"ok":false,"error":{"message":"No such record."}}"#.utf8))
-                    }
-                    memoryMade += 1
-                    let old = memory[index]
-                    var record = Self.record("mem_new\(memoryMade)", input["topic"] as? String ?? old["topic"] as? String ?? "", input["text"] as? String ?? "", Self.now,
-                                             source: ["kind": "manual", "id": NSNull(), "title": "Added by you", "section": NSNull()])
-                    record["replacesId"] = id
-                    record["replaces"] = ["id": id, "text": old["text"] ?? "", "createdAt": old["createdAt"] ?? 0]
-                    memory[index]["replacedById"] = record["id"]
-                    memory[index]["replacedAt"] = Self.now
-                    memory.append(record)
-                    return ok(["record": record, "replaced": memory[index]])
-                }
-            case "memory.archive":
-                let id = input["id"] as? String ?? ""
-                return lock.withLock {
-                    guard let index = memory.firstIndex(where: { $0["id"] as? String == id }) else {
-                        return (400, Data(#"{"ok":false,"error":{"message":"No such record."}}"#.utf8))
-                    }
-                    memory[index]["archived"] = input["archived"] as? Bool ?? true
-                    return ok(["record": memory[index]])
-                }
+                return ok(["record": NSNull()])
+            case "memory.add", "memory.update", "memory.archive":
+                return (400, Data(#"{"ok":false,"error":{"message":"Memory records are retired. Standing rules go in the Bot's always-on skill (Memory → Core), procedures in a skill, and what happened stays in the conversation history."}}"#.utf8))
             case "bot_library":
                 return ok(["botId": "bot_juniper", "items": libraryJSON()])
             case "bot_threads_older":
@@ -818,8 +751,8 @@ enum BotSpacesDemo {
                         let title = threads[id]?.title ?? conversations.values.flatMap { $0 }.first { $0.id == id }?.title
                         return ok(["found": title != nil, "title": title ?? NSNull(), "spec": NSNull()])
                     case "record":
-                        let record = memory.first { $0["id"] as? String == id }
-                        return ok(["found": record != nil, "title": record?["topic"] ?? NSNull(), "spec": NSNull()])
+                        // Memory records are retired: none resolves.
+                        return ok(["found": false, "title": NSNull(), "spec": NSNull()])
                     default:
                         return ok(["found": true, "title": NSNull(), "spec": NSNull()])
                     }
@@ -911,18 +844,12 @@ enum BotSpacesDemo {
         }
 
         static let profile = """
-            ## Who I work for
-            Lives in Brooklyn. Likes short answers, then detail on request.
-            ## How to help
-            Ask before pushing or sending anything outside.
+            ## Preferences
+            - Short answers first, then detail on request.
+            - Ask before pushing or sending anything outside.
+            ## Check-in
+            - Anything waiting on me?
             """
-
-        private static func record(_ id: String, _ topic: String, _ text: String, _ at: Double, source: [String: Any], state: String? = nil,
-                                   replacedBy: String? = nil, replacedAt: Double? = nil) -> [String: Any] {
-            ["id": id, "botId": "bot_juniper", "topic": topic, "text": text, "createdAt": at, "updatedAt": at, "source": source,
-             "sourceState": state ?? NSNull(), "replacesId": NSNull(), "replaces": NSNull(), "replacedById": replacedBy ?? NSNull(),
-             "replacedAt": replacedAt ?? NSNull(), "archived": false]
-        }
 
         private func libraryJSON() -> [[String: Any]] {
             let now = Self.now

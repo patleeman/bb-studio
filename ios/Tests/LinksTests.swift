@@ -113,7 +113,9 @@ final class LinksTests: XCTestCase {
         XCTAssertEqual(Links.destination(LinkRef(kind: .app, id: "mini_1")), .route(.mini(id: "mini_1")))
         XCTAssertEqual(Links.destination(LinkRef(kind: .dashboard, id: "dsh_0123456789abcdef")), .elsewhere("Dashboards open in BB on your Mac."))
         XCTAssertEqual(Links.destination(LinkRef(kind: .board, id: "thr_v")), .route(.visualChat(threadId: "thr_v")))
-        XCTAssertEqual(Links.destination(LinkRef(kind: .record, id: "mem_1")), .record("mem_1"))
+        // Memory records are retired: an old record link opens Memory, with nothing to look up.
+        XCTAssertEqual(Links.destination(LinkRef(kind: .record, id: "mem_1")), .botPage(.memory, botId: nil))
+        XCTAssertFalse(Links.needsResolution(LinkRef(kind: .record, id: "mem_1")))
         XCTAssertEqual(Links.destination(LinkRef(kind: .browser, id: "https://a.b")), .safari(URL(string: "https://a.b")!))
         XCTAssertEqual(Links.destination(LinkRef(kind: .diff, id: "a.swift")), .threadFiles)
         if case .elsewhere = Links.destination(LinkRef(kind: .vscode, id: nil)) {} else { XCTFail("VS Code opens on the Mac") }

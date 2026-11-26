@@ -560,27 +560,6 @@ extension BBClient {
         return output.profile?.markdown
     }
 
-    @discardableResult
-    func memoryAdd(botId: String?, topic: String, text: String) async throws -> MemoryRecord? {
-        let output: Studio.MemoryAddOutput = try await rpc("studio", Studio.Method.memory_add,
-                                                           Self.scoped(botId, ["topic": .string(topic), "text": .string(text)]))
-        return output.record.flatMap { MemoryRecord(converting: $0) }
-    }
-
-    @discardableResult
-    func memoryUpdate(botId: String?, id: String, text: String, topic: String?) async throws -> MemoryRecord? {
-        let output: Studio.MemoryUpdateOutput = try await rpc("studio", Studio.Method.memory_update,
-                                                              Self.scoped(botId, ["id": .string(id), "text": .string(text), "topic": topic.map(JSONValue.string)]))
-        return output.record.flatMap { MemoryRecord(converting: $0) }
-    }
-
-    @discardableResult
-    func memoryArchive(botId: String?, id: String, archived: Bool) async throws -> MemoryRecord? {
-        let output: Studio.MemoryArchiveOutput = try await rpc("studio", Studio.Method.memory_archive,
-                                                               Self.scoped(botId, ["id": .string(id), "archived": .bool(archived)]))
-        return output.record.flatMap { MemoryRecord(converting: $0) }
-    }
-
     func botLibrary(botId: String?) async throws -> [BotLibraryItem] {
         let output: Studio.BotLibraryOutput = try await rpc("studio", Studio.Method.bot_library, Self.scoped(botId))
         return (output.items ?? []).compactMap(BotLibraryItem.init).filter { $0.pluginId != "dashboards" }

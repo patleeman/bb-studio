@@ -41,7 +41,7 @@ final class HomeUITests: ServerIsolatedUITestCase {
         XCTAssertFalse(app.buttons["roomPlace-tasks"].exists, "no Tasks")
         shot("3-list-places")
         app.botMenuItem("memory").tap()
-        XCTAssertTrue(app.buttons["memoryAdd"].waitForExistence(timeout: 10), "Memory opens in the list")
+        XCTAssertTrue(app.descendants(matching: .any)["memoryProfile"].firstMatch.waitForExistence(timeout: 10), "Memory opens in the list")
         app.goBack()
 
         app.swipeDown()
