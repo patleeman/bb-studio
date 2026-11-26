@@ -1236,4 +1236,20 @@ export const MIGRATIONS: string[] = [
        chars INTEGER NOT NULL,
        migrated_at INTEGER NOT NULL
      );`,
+  // Skill reviews run once a day and when a conversation is archived (src/skill-learning.ts), not every N turns.
+  // The turn counters in bot_learning stay, unread.
+  `ALTER TABLE bot_learning ADD COLUMN daily_at INTEGER;
+   ALTER TABLE bot_skill_reviews ADD COLUMN source_thread_id TEXT;
+   CREATE TABLE bot_skill_review_queue (
+       thread_id TEXT PRIMARY KEY,
+       bot_id TEXT NOT NULL,
+       reason TEXT NOT NULL,
+       queued_at INTEGER NOT NULL
+     );
+   CREATE TABLE bot_skill_review_marks (
+       thread_id TEXT PRIMARY KEY,
+       bot_id TEXT NOT NULL,
+       seq INTEGER NOT NULL,
+       at INTEGER NOT NULL
+     );`,
 ];

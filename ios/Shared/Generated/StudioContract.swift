@@ -14952,29 +14952,29 @@ public enum Studio {
 
   public struct BotLearningOutput: Sendable, Hashable, Codable {
     public var enabled: Bool?
-    public var interval: Double?
     public var reviewModel: String?
     public var defaultModel: String?
     public var models: [String]?
     public var modelNames: [String: String]?
     public var consolidate: Bool?
-    public var toolTurns: Double?
-    public var userTurns: Double?
+    public var cadence: String?
     public var reviewing: Bool?
+    public var queued: Double?
+    public var lastSweepAt: Double?
     public var lastReview: BotLearningOutputLastReview?
     public var lastCurator: BotLearningOutputLastCurator?
 
-    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, modelNames: [String: String]? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningOutputLastReview? = nil, lastCurator: BotLearningOutputLastCurator? = nil) {
+    public init(enabled: Bool? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, modelNames: [String: String]? = nil, consolidate: Bool? = nil, cadence: String? = nil, reviewing: Bool? = nil, queued: Double? = nil, lastSweepAt: Double? = nil, lastReview: BotLearningOutputLastReview? = nil, lastCurator: BotLearningOutputLastCurator? = nil) {
       self.enabled = enabled
-      self.interval = interval
       self.reviewModel = reviewModel
       self.defaultModel = defaultModel
       self.models = models
       self.modelNames = modelNames
       self.consolidate = consolidate
-      self.toolTurns = toolTurns
-      self.userTurns = userTurns
+      self.cadence = cadence
       self.reviewing = reviewing
+      self.queued = queued
+      self.lastSweepAt = lastSweepAt
       self.lastReview = lastReview
       self.lastCurator = lastCurator
     }
@@ -14983,14 +14983,12 @@ public enum Studio {
   public struct BotLearningSetInput: Sendable, Hashable, Codable {
     public var botId: String?
     public var enabled: Bool?
-    public var interval: Int?
     public var reviewModel: String?
     public var consolidate: Bool?
 
-    public init(botId: String? = nil, enabled: Bool? = nil, interval: Int? = nil, reviewModel: String? = nil, consolidate: Bool? = nil) {
+    public init(botId: String? = nil, enabled: Bool? = nil, reviewModel: String? = nil, consolidate: Bool? = nil) {
       self.botId = botId
       self.enabled = enabled
-      self.interval = interval
       self.reviewModel = reviewModel
       self.consolidate = consolidate
     }
@@ -15018,29 +15016,29 @@ public enum Studio {
 
   public struct BotLearningSetOutput: Sendable, Hashable, Codable {
     public var enabled: Bool?
-    public var interval: Double?
     public var reviewModel: String?
     public var defaultModel: String?
     public var models: [String]?
     public var modelNames: [String: String]?
     public var consolidate: Bool?
-    public var toolTurns: Double?
-    public var userTurns: Double?
+    public var cadence: String?
     public var reviewing: Bool?
+    public var queued: Double?
+    public var lastSweepAt: Double?
     public var lastReview: BotLearningSetOutputLastReview?
     public var lastCurator: BotLearningSetOutputLastCurator?
 
-    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, modelNames: [String: String]? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningSetOutputLastReview? = nil, lastCurator: BotLearningSetOutputLastCurator? = nil) {
+    public init(enabled: Bool? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, modelNames: [String: String]? = nil, consolidate: Bool? = nil, cadence: String? = nil, reviewing: Bool? = nil, queued: Double? = nil, lastSweepAt: Double? = nil, lastReview: BotLearningSetOutputLastReview? = nil, lastCurator: BotLearningSetOutputLastCurator? = nil) {
       self.enabled = enabled
-      self.interval = interval
       self.reviewModel = reviewModel
       self.defaultModel = defaultModel
       self.models = models
       self.modelNames = modelNames
       self.consolidate = consolidate
-      self.toolTurns = toolTurns
-      self.userTurns = userTurns
+      self.cadence = cadence
       self.reviewing = reviewing
+      self.queued = queued
+      self.lastSweepAt = lastSweepAt
       self.lastReview = lastReview
       self.lastCurator = lastCurator
     }

@@ -5,25 +5,23 @@
 // adapted to Studio's Bot skills (the bot_skills table). External bots learn
 // on their own provider, so none of this runs for them.
 //
-// Counters. Studio watches each Studio Bot's thread. When it goes idle
-// (thread.idle) Studio reads the events since the last ones it counted
-// (threads.events.list after that sequence): a turn/completed closes a turn,
-// and a turn with any tool item (commandExecution, toolCall, mcpToolCall,
-// fileChange, ...) counts as a tool turn; a client/turn/requested whose
-// initiator is the user counts as a user turn. A bot_skill_edit call (or the older bot_skill_write,
-// _patch or _delete) resets the tool count (the Bot just saved what it learned).
-// The first look at a thread only takes a baseline: old history never trips.
+// When. A review runs at two boundaries, never by turn count:
+// - when a conversation is archived (BotFinish calls `archived`): one pass
+//   over the finished conversation;
+// - once a day: a sweep over the Bot's Main and its unarchived conversations,
+//   queuing each that has new events since its last review.
+// Reviews wait in bot_skill_review_queue (so a restart keeps them) and run one
+// at a time per Bot, from the minute tick, when the Bot is active and the
+// thread idle.
 //
-// Review. When either count reaches the interval (10 by default) and the Bot
-// is active and idle, Studio forks the Bot's thread (threads.fork with
+// Review. Studio forks the thread under review (threads.fork with
 // sourceThreadId; hidden, so it posts no notice), switches the fork to a
 // cheap model on the same provider (a thread keeps its provider), and sends
-// it the review prompt. Its tools are only the bot skill tools and the
-// Memory page's pages_read and pages_edit (agents.configure). It replies
-// [PASS] when there's nothing to save. When it goes idle Studio records what
-// it did and archives it. One review per Bot at a time; a new turn in the
-// Bot's thread, Pause or Stop stops it; one still running after 20 minutes is
-// stopped.
+// it the review prompt. Its tools are only the bot skill tools and pages_read
+// (agents.configure). It patches on-demand skills or the always-on skill
+// (src/core-skill.ts), or replies [PASS]. When it goes idle Studio records
+// what it did and archives it. A new turn in the reviewed thread, Pause or
+// Stop stops it; one still running after 20 minutes is stopped.
 //
 // Curator. The Bot's built-in Maintenance runs skill curation:
 // a skill unused for 30 days becomes stale, for 90 days archived (hidden
@@ -32,56 +30,32 @@
 // starts a consolidation fork that merges overlapping skills (off by default).
 //
 // Saves apply immediately. Advisory lint findings never block them.
-import { callRuns, presentScope } from "./merged-tools";
+import { presentScope } from "./merged-tools";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { isPassOutput } from "./kit/silent";
-import { isPingRequest } from "./bot-cache";
 import { formatModelName } from "./model-names";
 
 type Sdk = BbPluginApi["sdk"];
 type ThreadLike = { id: string; status?: string; updatedAt?: number | null; archivedAt?: number | null };
 
-export const LEARN_INTERVAL = 10;
 export const STALE_AFTER_MS = 30 * 86_400_000;
 export const ARCHIVE_AFTER_MS = 90 * 86_400_000;
 export const REVIEW_TIMEOUT_MS = 20 * 60_000;
 export const SKILL_SOFT_LIMIT = 8000;
-/** BB's largest page of thread events. */
-const EVENT_PAGE = 100;
+/** When the daily sweep may run (local hour) and how far apart sweeps are at least. */
+const DAILY_HOUR = 3;
+const DAY_MS = 86_400_000;
 /** The tools a review fork gets, and nothing else of Studio's. */
-export const REVIEW_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_edit", "bot_skill_lint", "pages_read", "memory_search", "memory_add", "memory_update"] as const;
-const SKILL_WRITE_TOOL = /bot_skill_(write|patch|delete|edit)$/;
-/** The names a review fork's session offers (merged: bot_skill, pages_read, memory). */
+export const REVIEW_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_edit", "bot_skill_lint", "pages_read"] as const;
+/** The names a review fork's session offers (merged: bot_skill, pages_read). */
 const REVIEW_NAMES = presentScope({ loaded: REVIEW_TOOLS, onDemand: [] }).loaded;
-const wroteSkill = (item: { tool?: string; name?: string; arguments?: unknown } | undefined) => SKILL_WRITE_TOOL.test(String(item?.tool ?? item?.name ?? "")) || callRuns(item, "bot_skill_edit");
-/** Items that aren't tool work. Everything else an agent does in a turn is. */
-const NOT_TOOLS = new Set(["agentMessage", "reasoning", "userMessage", "plan", "contextCompaction", "error"]);
 
 export type SkillState = "active" | "stale" | "archived";
 
 // ---- Pure parts ----
 
 type EventRow = { seq?: number; type: string; data?: Record<string, unknown> | null };
-
-/** Counts tool turns and user turns in events, oldest first; `skillWrite` says the Bot saved a skill (tool turns count from after it). */
-export function tallyTurns(events: readonly EventRow[], inTurn = 0): { toolTurns: number; userTurns: number; skillWrite: boolean; lastSeq: number; inTurn: number } {
-  let toolTurns = 0, userTurns = 0, skillWrite = false, lastSeq = 0;
-  for (const event of events) {
-    lastSeq = Math.max(lastSeq, event.seq ?? 0);
-    const data = (event.data ?? {}) as { initiator?: string; item?: { type?: string; tool?: string; name?: string; arguments?: unknown } };
-    // Studio's cache-warming pings (src/bot-cache.ts) are sent as the user but aren't from them.
-    if (event.type === "client/turn/requested" && data.initiator === "user" && !isPingRequest(data)) userTurns++;
-    else if (event.type === "item/completed" && data.item?.type && !NOT_TOOLS.has(data.item.type)) {
-      inTurn++;
-      if (wroteSkill(data.item)) { skillWrite = true; toolTurns = 0; inTurn = 0; }
-    } else if (event.type === "turn/completed") {
-      if (inTurn) toolTurns++;
-      inTurn = 0;
-    }
-  }
-  return { toolTurns, userTurns, skillWrite, lastSeq, inTurn };
-}
 
 /**
  * The cheapest model in a provider's list: by the price in its description
@@ -187,28 +161,43 @@ export function gaveUpOnTools(text: string | null): boolean {
   return !!text && /\b(disconnected|not (?:available|connected)|unavailable|no longer available|can'?t (?:access|reach|use|call) (?:the |my )?(?:skill|tools|bb-bridge))/i.test(text);
 }
 
+/** Why a review runs: a conversation was archived, the daily sweep, or the user asked (Run now). */
+export type ReviewReason = "archive" | "daily" | "manual";
+
+/** What to save and where, and what never to save: the rules every skill write follows (plan "Internal agent guide"). */
+export const SAVE_RULES = [
+  "Where it goes:",
+  "- A standing rule for working with the user, or a personal boundary: one line in your always-on skill's \"## Preferences\" (at most 25 lines).",
+  "- A temporary constraint true this month across projects that an agent could easily break: one line in \"## Right now\" (at most 10 lines).",
+  "- A repeatable procedure, a tool or CLI gotcha, or a topic-specific preference: an on-demand skill.",
+  "- Repo paths, setup and architecture: the repo's own docs (AGENTS.md), not a skill.",
+  "- What happened, was decided or shipped: nowhere. It stays in the conversation history (bot_info (view: history)).",
+  "Never save: build, deploy or release logs (build numbers, commit hashes, PR numbers); conversation summaries; thread, automation or other volatile ids and live state; dated stories of what happened (\"On Nov 24 we tried X\"); tombstones (\"Retired …\"); copies of repo docs or pages.",
+  "Default to saving nothing: reply [PASS] unless a future session would repeat a mistake without it. Write one-line rules that say how to behave or what boundary applies. Patch in place: replace or delete the old line, never append one that contradicts it. At a cap, prune or merge a line before you add one.",
+].join("\n");
+
 /** The review fork's prompt. */
-export function reviewPrompt(input: { name: string; memoryPageId: string | null; reason: "tools" | "user" | "both" | "manual" }): string {
-  const why = input.reason === "user" ? "You've had a run of turns with the user since the last review." : input.reason === "manual" ? "The user asked for a review." : "You did a run of tool work since you last saved a skill.";
+export function reviewPrompt(input: { name: string; reason: ReviewReason; since?: number | null }): string {
+  const since = input.since ? ` Focus on what happened since the last review (${new Date(input.since).toISOString().slice(0, 10)}); older turns were reviewed already.` : "";
+  const why = input.reason === "archive" ? "The user just archived this conversation: look back over all of it." : input.reason === "manual" ? `The user asked for a review.${since}` : `This is the daily review of this conversation.${since}`;
   return [
-    `Background skill review for ${JSON.stringify(input.name)}. ${why} The user doesn't see this thread. Look back over the conversation above and save what the next session should already know.`,
+    `Background skill review for ${JSON.stringify(input.name)}. ${why} The user doesn't see this thread. Save only what the next session should already know.`,
     "",
     "What to look for:",
     "- The user correcting you (tone, format, length, approach, the order of steps), or saying \"remember this\". These matter most: put them where the next run will follow them.",
     "- A technique, fix, workaround or tool pattern that took effort to find and will come up again.",
     "- A skill you used that turned out wrong, missing a step or out of date. Fix it now.",
-    `- Facts about the user, their people or their setup, and decisions: those are memory records (memory op search, then op add, or op update to correct one), not a skill.${input.memoryPageId ? ` Your core profile is page ${input.memoryPageId} (pages_read); don't edit it here.` : ""}`,
+    "",
+    SAVE_RULES,
     "",
     "How to write:",
-    "- Lessons, not logs. Write the rule a future run follows, not the story of today: no dates, PR numbers or \"we tried\".",
-    "- One skill per kind of task, not per incident. Check what you have first (bot_skill op list, op view) and prefer bot_skill op edit with change \"patch\" on the skill that covers it over a new skill.",
-    "- When the same lesson shows up again, merge it into one rule. Fix a wrong line in place; don't add one that contradicts it.",
-    "- Keep each skill short: when to use it, the steps, the pitfalls. The tool result may carry notes on shape; heed them.",
+    "- One skill per kind of task, not per incident. Check what you have first (bot_skill op list, op view) and prefer bot_skill op edit with change \"patch\" on the skill that covers it over a new skill. Your always-on skill is core-profile (view it before you patch it).",
+    "- Keep each skill short: when to use it, the steps, the pitfalls. The tool result may carry notes on shape and caps; heed them.",
     "",
     `Use only ${REVIEW_NAMES.join(", ")}. Don't run commands, edit files, message anyone or start threads. Skill changes apply immediately. After saving, inspect the saved versions with bot_skill op lint and attach any quality or safety warnings to the exact version you inspected; warnings never block saving.`,
     TOOLS_CONNECTED,
     "When you're done, reply with one short line saying what you saved. If nothing is worth saving, reply exactly [PASS].",
-  ].filter((line) => line !== null).join("\n");
+  ].join("\n");
 }
 
 /** The curator's consolidation prompt. */
@@ -225,13 +214,14 @@ export function consolidatePrompt(name: string): string {
 // ---- The service ----
 
 type LearningRow = {
-  bot_id: string; enabled: number; every_turns: number; review_model: string | null; consolidate: number;
-  thread_id: string | null; seen_seq: number; in_tool_turn: number; tool_turns: number; user_turns: number;
+  bot_id: string; enabled: number; review_model: string | null; consolidate: number;
   last_review_at: number | null; last_review_result: string | null; curator_last_at: number | null; curator_last_result: string | null;
+  daily_at: number | null;
 };
-type ReviewRow = { thread_id: string; bot_id: string; kind: "review" | "consolidate"; status: "running" | "done"; saved: number; memory: number; started_at: number; finished_at: number | null; result: string | null };
+type ReviewRow = { thread_id: string; bot_id: string; kind: "review" | "consolidate"; status: "running" | "done"; saved: number; memory: number; started_at: number; finished_at: number | null; result: string | null; source_thread_id: string | null };
+type QueueRow = { thread_id: string; bot_id: string; reason: ReviewReason; queued_at: number };
 
-export interface LearningBot { id: string; name: string; threadId: string | null; state: string; kind?: string; memoryPageId?: string | null }
+export interface LearningBot { id: string; name: string; threadId: string | null; state: string; kind?: string }
 export interface LearningSkill { name: string; description: string; body: string; state: SkillState; pinned: boolean; usedAt: number | null; updatedAt: number; alwaysOn?: boolean }
 export interface LearningDeps {
   db: Database.Database;
@@ -239,8 +229,8 @@ export interface LearningDeps {
   changed(): void;
   bots(): LearningBot[];
   bot(botId: string): LearningBot | null;
-  /** The Bot's Memory page id (made on first need); null when there's none. */
-  memoryPage(botId: string): string | null;
+  /** The Bot's unarchived conversations' threads (Main among them): what the daily sweep looks at. */
+  conversations(botId: string): string[];
   skills(botId: string): LearningSkill[];
   setState(botId: string, name: string, state: SkillState): void;
   log?(message: string): void;
@@ -249,13 +239,28 @@ export interface LearningDeps {
 }
 
 export type LearningView = {
-  enabled: boolean; interval: number; reviewModel: string | null; defaultModel: string | null; models: string[];
+  enabled: boolean; reviewModel: string | null; defaultModel: string | null; models: string[];
   modelNames: Record<string, string>;
   consolidate: boolean;
-  toolTurns: number; userTurns: number; reviewing: boolean;
+  /** When reviews run: once a day and when a conversation is archived. */
+  cadence: "daily-and-archive";
+  reviewing: boolean;
+  /** Conversations waiting for their review. */
+  queued: number;
+  lastSweepAt: number | null;
   lastReview: { at: number; result: string } | null;
   lastCurator: { at: number; result: string } | null;
 };
+
+/** The local day a time falls on, as "YYYY-M-D". */
+const localDay = (at: number) => { const date = new Date(at); return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`; };
+
+/** Whether the daily sweep is due: never ran, or last ran on an earlier local day and it's past DAILY_HOUR. */
+export function sweepDue(lastAt: number | null, now: number): boolean {
+  if (!lastAt) return true;
+  if (now - lastAt >= 2 * DAY_MS) return true;
+  return localDay(lastAt) !== localDay(now) && new Date(now).getHours() >= DAILY_HOUR;
+}
 
 export class SkillLearning {
   /** Bots a review is being started for, before its row exists. */
@@ -264,8 +269,6 @@ export class SkillLearning {
   private readonly started = new Set<string>();
   /** Review forks already told once that their tools are connected. */
   private readonly retried = new Set<string>();
-  /** Threads being counted now, so two idles don't count the same events. */
-  private readonly counting = new Set<string>();
 
   constructor(private readonly deps: LearningDeps) {}
 
@@ -317,102 +320,142 @@ export class SkillLearning {
     }
     if (row.review_model && !modelNames[row.review_model]) modelNames[row.review_model] = formatModelName(row.review_model);
     return {
-      enabled: !!row.enabled, interval: row.every_turns, reviewModel: row.review_model, defaultModel, models, modelNames,
-      consolidate: !!row.consolidate,
-      toolTurns: row.tool_turns, userTurns: row.user_turns, reviewing: !!this.running(botId),
+      enabled: !!row.enabled, reviewModel: row.review_model, defaultModel, models, modelNames,
+      consolidate: !!row.consolidate, cadence: "daily-and-archive",
+      reviewing: !!this.running(botId), queued: this.queued(botId).length, lastSweepAt: row.daily_at,
       lastReview: row.last_review_at && row.last_review_result ? { at: row.last_review_at, result: row.last_review_result } : null,
       lastCurator: row.curator_last_at && row.curator_last_result ? { at: row.curator_last_at, result: row.curator_last_result } : null,
     };
   }
 
-  async set(botId: string, input: { enabled?: boolean; interval?: number; reviewModel?: string | null; consolidate?: boolean }): Promise<LearningView> {
-    if (input.interval !== undefined && (!Number.isInteger(input.interval) || input.interval < 2 || input.interval > 200)) throw new Error("The interval is 2 to 200 turns.");
+  async set(botId: string, input: { enabled?: boolean; reviewModel?: string | null; consolidate?: boolean }): Promise<LearningView> {
     this.save(botId, {
       ...(input.enabled !== undefined ? { enabled: input.enabled ? 1 : 0 } : {}),
-      ...(input.interval !== undefined ? { every_turns: input.interval } : {}),
       ...(input.reviewModel !== undefined ? { review_model: input.reviewModel || null } : {}),
       ...(input.consolidate !== undefined ? { consolidate: input.consolidate ? 1 : 0 } : {}),
     });
+    // Off: what was waiting won't run.
+    if (input.enabled === false) this.deps.db.prepare("DELETE FROM bot_skill_review_queue WHERE bot_id = ?").run(botId);
     this.deps.changed();
     return this.view(botId);
   }
 
-  // ---- Counting ----
+  // ---- When reviews run ----
 
-  /** A thread went idle: a review fork finishes; a Bot's thread is counted and may start a review. */
+  private queued(botId: string): QueueRow[] {
+    return this.deps.db.prepare("SELECT * FROM bot_skill_review_queue WHERE bot_id = ? ORDER BY reason = 'archive' DESC, queued_at, thread_id").all(botId) as QueueRow[];
+  }
+
+  private enqueue(botId: string, threadId: string, reason: ReviewReason, now = Date.now()): void {
+    // An archive pass outranks a daily one for the same thread; otherwise the first queued stays.
+    this.deps.db.prepare(`INSERT INTO bot_skill_review_queue (thread_id, bot_id, reason, queued_at) VALUES (?, ?, ?, ?)
+      ON CONFLICT (thread_id) DO UPDATE SET reason = CASE WHEN excluded.reason = 'archive' THEN 'archive' ELSE bot_skill_review_queue.reason END`).run(threadId, botId, reason, now);
+  }
+
+  /** The last event a thread has, or null when it can't be read. */
+  private async tip(threadId: string): Promise<number | null> {
+    const events = await this.deps.sdk.threads.events.list({ threadId, order: "desc", limit: "1" }).catch(() => null) as EventRow[] | null;
+    return events ? events[0]?.seq ?? 0 : null;
+  }
+
+  /** A conversation was archived (src/bot-finish.ts): one review pass over it, when learning is on. */
+  archived(botId: string, threadId: string, now = Date.now()): boolean {
+    const bot = this.studioBot(botId);
+    if (!bot || !this.row(botId).enabled) return false;
+    this.enqueue(botId, threadId, "archive", now);
+    this.deps.changed();
+    return true;
+  }
+
+  /**
+   * The daily sweep: Main and each unarchived conversation with events since
+   * its last review are queued. `reason` "manual" is Run now. Returns how
+   * many it queued.
+   */
+  async sweep(botId: string, now = Date.now(), reason: ReviewReason = "daily"): Promise<number> {
+    const bot = this.studioBot(botId);
+    if (!bot) return 0;
+    this.save(botId, { daily_at: now });
+    const threads = [...new Set([...(bot.threadId ? [bot.threadId] : []), ...this.deps.conversations(botId)])];
+    let queued = 0;
+    for (const threadId of threads) {
+      const tip = await this.tip(threadId);
+      if (tip === null) continue;
+      const mark = this.deps.db.prepare("SELECT seq FROM bot_skill_review_marks WHERE thread_id = ?").get(threadId) as { seq: number } | undefined;
+      if (mark && tip <= mark.seq) continue;
+      this.enqueue(botId, threadId, reason, now);
+      queued++;
+    }
+    if (queued) this.deps.changed();
+    return queued;
+  }
+
+  /** Run now: the sweep at once, and the first review starts. True when something was queued or is running. */
+  async runNow(botId: string, now = Date.now()): Promise<boolean> {
+    const queued = await this.sweep(botId, now, "manual");
+    await this.next(botId);
+    return queued > 0 || !!this.running(botId);
+  }
+
+  /** Starts the Bot's next queued review, when none is running. */
+  async next(botId: string): Promise<boolean> {
+    if (this.running(botId) || this.starting.has(botId)) return false;
+    const bot = this.studioBot(botId);
+    if (!bot || bot.state !== "active") return false;
+    for (const entry of this.queued(botId)) {
+      const thread = await this.deps.sdk.threads.get({ threadId: entry.thread_id }).catch(() => null) as ThreadLike | null;
+      // Gone: nothing to review. Busy: it waits for a later tick.
+      if (!thread) { this.dequeue(entry.thread_id); continue; }
+      if (thread.status && thread.status !== "idle" && !thread.archivedAt) continue;
+      this.dequeue(entry.thread_id);
+      return this.start(botId, "review", entry.reason, entry.thread_id).catch((error: unknown) => { this.deps.log?.(`Skill review of ${entry.thread_id}: ${error instanceof Error ? error.message : String(error)}`); return false; });
+    }
+    return false;
+  }
+
+  private dequeue(threadId: string): void {
+    this.deps.db.prepare("DELETE FROM bot_skill_review_queue WHERE thread_id = ?").run(threadId);
+  }
+
+  /** A thread went idle: a review fork finishes. */
   async idle(thread: ThreadLike, lastAssistantText: string | null): Promise<void> {
     const review = this.review(thread.id);
-    if (review) {
-      if (review.status === "running" && this.started.delete(thread.id)) await this.finish(review, lastAssistantText);
-      return;
+    if (review?.status === "running" && this.started.delete(thread.id)) {
+      await this.finish(review, lastAssistantText);
+      await this.next(review.bot_id);
     }
-    const bot = this.deps.bots().find((each) => each.threadId === thread.id);
-    if (!bot || bot.kind === "external") return;
-    await this.count(bot);
-    await this.maybeReview(bot.id);
-  }
-
-  /** Reads the Bot thread's new events and adds them to its counters. */
-  async count(bot: LearningBot): Promise<void> {
-    if (!bot.threadId || this.counting.has(bot.threadId)) return;
-    this.counting.add(bot.threadId);
-    try {
-      const row = this.row(bot.id);
-      const threadId = bot.threadId;
-      if (row.thread_id !== threadId) {
-        // A new thread (first look or a handoff): start from its tip, keep the counts.
-        const tip = await this.deps.sdk.threads.events.list({ threadId, order: "desc", limit: "1" }).catch(() => []);
-        this.save(bot.id, { thread_id: threadId, seen_seq: (tip as EventRow[])[0]?.seq ?? 0, in_tool_turn: 0 });
-        return;
-      }
-      let after = row.seen_seq;
-      let tools = row.tool_turns, users = row.user_turns, inTurn = row.in_tool_turn;
-      // BB pages events 100 at a time.
-      for (let page = 0; page < 100; page++) {
-        const events = await this.deps.sdk.threads.events.list({ threadId, afterSeq: String(after), order: "asc", limit: String(EVENT_PAGE), types: ["client/turn/requested", "item/completed", "turn/completed"] }) as EventRow[];
-        if (!events.length) break;
-        const tally = tallyTurns(events, inTurn);
-        inTurn = tally.inTurn;
-        tools = tally.skillWrite ? tally.toolTurns : tools + tally.toolTurns;
-        users += tally.userTurns;
-        after = Math.max(after, tally.lastSeq);
-        if (events.length < EVENT_PAGE) break;
-      }
-      this.save(bot.id, { seen_seq: after, tool_turns: tools, user_turns: users, in_tool_turn: inTurn });
-    } finally {
-      this.counting.delete(bot.threadId);
-    }
-  }
-
-  /** Starts a review when a counter tripped, learning is on, the Bot is active and idle, and none is running. */
-  async maybeReview(botId: string): Promise<boolean> {
-    const row = this.row(botId);
-    if (!row.enabled) return false;
-    const tools = row.tool_turns >= row.every_turns, users = row.user_turns >= row.every_turns;
-    if (!tools && !users) return false;
-    return this.start(botId, "review", tools && users ? "both" : tools ? "tools" : "user");
   }
 
   // ---- The review fork ----
 
-  /** Forks the Bot's thread for a review or consolidation. False when one is running or the Bot isn't ready. */
-  async start(botId: string, kind: "review" | "consolidate", reason: "tools" | "user" | "both" | "manual" = "manual"): Promise<boolean> {
+  /**
+   * Forks a thread for a review (the queued thread, else the Bot's Main) or
+   * the Bot's Main for a consolidation. False when one is running or the Bot
+   * or thread isn't ready. An archived conversation can be forked: its
+   * archive pass runs after it is archived.
+   */
+  async start(botId: string, kind: "review" | "consolidate", reason: ReviewReason = "manual", threadId?: string): Promise<boolean> {
     const bot = this.studioBot(botId);
-    if (!bot?.threadId || bot.state !== "active" || this.starting.has(botId) || this.running(botId)) return false;
+    const sourceId = threadId ?? bot?.threadId;
+    if (!bot || !sourceId || bot.state !== "active" || this.starting.has(botId) || this.running(botId)) return false;
     this.starting.add(botId);
     try {
-      const source = await this.deps.sdk.threads.get({ threadId: bot.threadId });
-      if (source.status !== "idle" || source.archivedAt) return false;
+      const source = await this.deps.sdk.threads.get({ threadId: sourceId }) as ThreadLike;
+      if (source.status && source.status !== "idle" && !source.archivedAt) return false;
+      if (source.archivedAt && reason !== "archive") return false;
       const row = this.row(botId);
-      const models = await this.providerModels(bot.threadId).catch(() => null);
+      const models = await this.providerModels(sourceId).catch(() => null);
       const model = row.review_model ?? (models ? cheapestModel(models) : null);
+      const mark = this.deps.db.prepare("SELECT at FROM bot_skill_review_marks WHERE thread_id = ?").get(sourceId) as { at: number } | undefined;
+      const tip = await this.tip(sourceId);
       const fork = await this.deps.sdk.threads.fork({
-        sourceThreadId: bot.threadId, title: `${bot.name} · ${kind === "review" ? "skill review" : "skill curator"}`,
+        sourceThreadId: sourceId, title: `${bot.name} · ${kind === "review" ? "skill review" : "skill curator"}`,
         visibility: "hidden", pluginMetadata: { botReview: botId },
       } as never);
       const now = Date.now();
-      this.deps.db.prepare("INSERT INTO bot_skill_reviews (thread_id, bot_id, kind, status, started_at) VALUES (?, ?, ?, 'running', ?)").run(fork.id, botId, kind, now);
-      if (kind === "review") this.save(botId, { tool_turns: 0, user_turns: 0 });
+      this.deps.db.prepare("INSERT INTO bot_skill_reviews (thread_id, bot_id, kind, status, started_at, source_thread_id) VALUES (?, ?, ?, 'running', ?, ?)").run(fork.id, botId, kind, now, sourceId);
+      if (kind === "review" && tip !== null) this.deps.db.prepare(`INSERT INTO bot_skill_review_marks (thread_id, bot_id, seq, at) VALUES (?, ?, ?, ?)
+        ON CONFLICT (thread_id) DO UPDATE SET seq = excluded.seq, at = excluded.at`).run(sourceId, botId, tip, now);
       try {
         // A message sent while the fork's workspace is still provisioning waits in its queue and
         // isn't sent on its own: wait until it's ready.
@@ -423,9 +466,7 @@ export class SkillLearning {
           const low = ["none", "low", "medium"].find((each) => efforts.includes(each));
           await this.deps.sdk.threads.update({ threadId: fork.id, model, ...(low ? { reasoningLevel: low } : {}) } as never);
         }
-        const prompt = kind === "review"
-          ? reviewPrompt({ name: bot.name, memoryPageId: this.deps.memoryPage(botId), reason })
-          : consolidatePrompt(bot.name);
+        const prompt = kind === "review" ? reviewPrompt({ name: bot.name, reason, since: reason === "archive" ? null : mark?.at ?? null }) : consolidatePrompt(bot.name);
         await this.deps.sdk.threads.send({ threadId: fork.id, mode: "auto", input: [{ type: "text", text: prompt, mentions: [] }] } as never);
       } catch (error) {
         await this.close(this.review(fork.id)!, `Couldn't start: ${error instanceof Error ? error.message : String(error)}`, true);
@@ -456,31 +497,15 @@ export class SkillLearning {
     return (await this.deps.sdk.providers.models({ providerId: thread.providerId })).models as { model: string; description?: string | null; displayName?: string | null; supportedReasoningEfforts?: { reasoningEffort: string }[] }[];
   }
 
-  /** A review's tool wrote something: counted for its result line. */
-  noteWrite(threadId: string | undefined, what: "saved" | "memory"): void {
+  /** A review's tool saved a skill: counted for its result line. */
+  noteWrite(threadId: string | undefined, _what: "saved" = "saved"): void {
     const review = this.review(threadId);
-    if (review?.status === "running") this.deps.db.prepare(`UPDATE bot_skill_reviews SET ${what} = ${what} + 1 WHERE thread_id = ?`).run(review.thread_id);
+    if (review?.status === "running") this.deps.db.prepare("UPDATE bot_skill_reviews SET saved = saved + 1 WHERE thread_id = ?").run(review.thread_id);
   }
 
   private async finish(review: ReviewRow, text: string | null): Promise<void> {
-    // Memory edits go through Pages' own tool: read them off the fork's events.
-    const events: EventRow[] = [];
-    for (let page = 0, after = 0; page < 20; page++) {
-      const batch = await this.deps.sdk.threads.events.list({ threadId: review.thread_id, afterSeq: String(after), order: "asc", limit: String(EVENT_PAGE), types: ["item/completed"] }).catch(() => []) as EventRow[];
-      events.push(...batch);
-      after = batch.at(-1)?.seq ?? after;
-      if (batch.length < EVENT_PAGE) break;
-    }
-    const memory = events.filter((event) => {
-      const item = (event.data as { item?: { tool?: string; arguments?: unknown } } | undefined)?.item;
-      return /pages_edit$/.test(String(item?.tool ?? "")) || callRuns(item, "memory_add") || callRuns(item, "memory_update");
-    }).length;
-    if (memory) this.deps.db.prepare("UPDATE bot_skill_reviews SET memory = ? WHERE thread_id = ?").run(memory, review.thread_id);
     const fresh = this.review(review.thread_id)!;
-    const parts = [
-      fresh.saved ? `Saved ${fresh.saved} skill${fresh.saved === 1 ? "" : "s"}` : "",
-      fresh.memory ? "Updated Memory" : "",
-    ].filter(Boolean);
+    const parts = fresh.saved ? [`Saved ${fresh.saved} skill${fresh.saved === 1 ? "" : "s"}`] : [];
     // [PASS] (or any reply without a write) saved nothing; the writes are what count.
     // The tools looked disconnected to it (TOOLS_CONNECTED): tell it once they're there, and wait for that turn.
     if (!parts.length && gaveUpOnTools(text) && !this.retried.has(fresh.thread_id)) {
@@ -505,12 +530,15 @@ export class SkillLearning {
     this.deps.changed();
   }
 
-  /** A thread became active: a new turn in a Bot's thread stops its running review. */
+  /** A thread became active: a new turn in the thread under review stops its review (the next sweep picks it up again). */
   async active(threadId: string): Promise<void> {
     if (this.review(threadId)?.status === "running") { this.started.add(threadId); return; }
-    const bot = this.deps.bots().find((each) => each.threadId === threadId);
-    const review = bot ? this.running(bot.id) : undefined;
-    if (review) await this.close(review, "Stopped: you started a turn", true);
+    const review = this.deps.db.prepare("SELECT * FROM bot_skill_reviews WHERE status = 'running' AND source_thread_id = ?").get(threadId) as ReviewRow | undefined;
+    if (review) {
+      // Its mark goes back, so what it didn't finish is reviewed next time.
+      this.deps.db.prepare("DELETE FROM bot_skill_review_marks WHERE thread_id = ? AND at >= ?").run(threadId, review.started_at);
+      await this.close(review, "Stopped: you started a turn", true);
+    }
   }
 
   /** A review fork failed. */
@@ -539,13 +567,19 @@ export class SkillLearning {
     return { changes: plan, consolidating, result };
   }
 
-  /** The minute tick: times out stuck reviews and stops reviews of paused Bots. */
+  /** The minute tick: times out stuck reviews, stops reviews of paused Bots, runs the daily sweep and starts queued reviews. */
   async tick(now = Date.now()): Promise<void> {
     for (const review of this.deps.db.prepare("SELECT * FROM bot_skill_reviews WHERE status = 'running'").all() as ReviewRow[]) {
       const bot = this.deps.bot(review.bot_id);
       if (!bot || bot.state !== "active") await this.close(review, `Stopped: ${bot?.name ?? "the bot"} is ${bot?.state ?? "gone"}`, true);
       else if (now - review.started_at > REVIEW_TIMEOUT_MS) await this.close(review, "Stopped: took too long", true);
     }
-
+    for (const bot of this.deps.bots()) {
+      if (bot.kind === "external" || bot.state !== "active") continue;
+      const row = this.row(bot.id);
+      if (!row.enabled) continue;
+      if (sweepDue(row.daily_at, now)) await this.sweep(bot.id, now).catch((error: unknown) => this.deps.log?.(`Skill sweep for ${bot.id}: ${error instanceof Error ? error.message : String(error)}`));
+      await this.next(bot.id);
+    }
   }
 }

@@ -350,7 +350,7 @@ export function registerStudioRpc({
     bot_skill_restore: ({ botId, name }) => ({ changed: bots.setSkillState(name, "active", botId) }),
     bot_learning: ({ botId }) => learning.view(learnerId(botId)),
     bot_learning_set: ({ botId, ...input }) => learning.set(learnerId(botId), input),
-    bot_learning_review: async ({ botId }) => ({ started: await learning.start(learnerId(botId), "review", "manual") }),
+    bot_learning_review: async ({ botId }) => ({ started: await learning.runNow(learnerId(botId)) }),
     bot_skill_curate: ({ botId, dryRun }) => learning.curate(learnerId(botId), { dryRun }),
     // Deprecated for one release: old iOS clients receive an empty pending list.
     bot_skill_history: ({ botId, before, name }) => ({ versions: bots.skillHistory(botId, before, name) }),

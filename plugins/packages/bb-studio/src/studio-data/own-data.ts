@@ -37,6 +37,8 @@ export const HOUSEKEEPING_TABLES: ReadonlySet<string> = new Set([
   "bot_maintenance_settings",
   "bot_maintenance_runs",
   "bot_learning",
+  "bot_skill_review_queue",
+  "bot_skill_review_marks",
   "bot_hidden_threads",
   "bot_nudges",
   "bot_run_dismissals",

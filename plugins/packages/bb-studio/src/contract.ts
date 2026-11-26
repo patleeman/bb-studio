@@ -187,12 +187,17 @@ const botSkill = z.object({
   /** Always on: injected in full into every conversation and worker of the Bot (src/core-skill.ts). */
   alwaysOn: z.boolean().optional(),
 });
-/** A Bot's skill learning (src/skill-learning.ts): background reviews and the curator. */
+/** A Bot's skill learning (src/skill-learning.ts): reviews once a day and when a conversation is archived, and the curator. */
 const botLearning = z.object({
-  enabled: z.boolean(), interval: z.number(), reviewModel: z.string().nullable(), defaultModel: z.string().nullable(), models: z.array(z.string()),
+  enabled: z.boolean(), reviewModel: z.string().nullable(), defaultModel: z.string().nullable(), models: z.array(z.string()),
   modelNames: z.record(z.string(), z.string()).optional(),
   consolidate: z.boolean(),
-  toolTurns: z.number(), userTurns: z.number(), reviewing: z.boolean(),
+  /** When reviews run: once a day (Main and unarchived conversations with new turns) and when a conversation is archived. */
+  cadence: z.literal("daily-and-archive"),
+  reviewing: z.boolean(),
+  /** Conversations waiting for their review. */
+  queued: z.number(),
+  lastSweepAt: z.number().nullable(),
   lastReview: z.object({ at: z.number(), result: z.string() }).nullable(),
   lastCurator: z.object({ at: z.number(), result: z.string() }).nullable(),
 });
@@ -626,7 +631,7 @@ export const rpcContract = defineRpcContract({
   /** The Bot's skill learning: settings, counters, the last review and curator run. */
   bot_learning: { input: forBot, output: botLearning },
   /** Changes the Bot's skill learning settings. */
-  bot_learning_set: { input: z.object({ botId, enabled: z.boolean().optional(), interval: z.number().int().min(2).max(200).optional(), reviewModel: z.string().max(200).nullable().optional(), consolidate: z.boolean().optional() }), output: botLearning },
+  bot_learning_set: { input: z.object({ botId, enabled: z.boolean().optional(), reviewModel: z.string().max(200).nullable().optional(), consolidate: z.boolean().optional() }), output: botLearning },
   /** Starts a skill review now (a fork of the Bot's idle thread); started is false when one is running or the Bot is busy. */
   bot_learning_review: { input: forBot, output: z.object({ started: z.boolean() }) },
   /** Runs the skill curator now; dryRun lists what it would change. */

@@ -266,7 +266,7 @@ it("uses Maintenance's Skills rule for real curation, ignoring legacy curator Pa
   const x = await setup();
   const skill = { name: "old", description: "Old skill", body: "Old steps", state: "active" as SkillState, pinned: false, usedAt: 0, updatedAt: 0 };
   const bot = { ...x.bot, name: "Dot" };
-  const learning = new SkillLearning({ db: x.db, sdk: x.bb.sdk, changed: () => {}, bots: () => [bot], bot: () => bot, memoryPage: () => null, skills: () => [skill], setState: (_bot, _name, state) => { skill.state = state; } });
+  const learning = new SkillLearning({ db: x.db, sdk: x.bb.sdk, changed: () => {}, bots: () => [bot], bot: () => bot, conversations: () => [], skills: () => [skill], setState: (_bot, _name, state) => { skill.state = state; } });
   await learning.view("bot");
   x.db.prepare("UPDATE bot_learning SET curator_paused = 1 WHERE bot_id = 'bot'").run();
   const maintenance = new BotMaintenance({ ...(x.maintenance as unknown as { deps: ConstructorParameters<typeof BotMaintenance>[0] }).deps, curate: (id, dryRun) => learning.curate(id, { dryRun, now }) });

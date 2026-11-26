@@ -17075,9 +17075,6 @@
           "enabled": {
             "type": "boolean"
           },
-          "interval": {
-            "type": "number"
-          },
           "reviewModel": {
             "type": [
               "string",
@@ -17108,14 +17105,21 @@
           "consolidate": {
             "type": "boolean"
           },
-          "toolTurns": {
-            "type": "number"
-          },
-          "userTurns": {
-            "type": "number"
+          "cadence": {
+            "type": "string",
+            "const": "daily-and-archive"
           },
           "reviewing": {
             "type": "boolean"
+          },
+          "queued": {
+            "type": "number"
+          },
+          "lastSweepAt": {
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "lastReview": {
             "anyOf": [
@@ -17166,14 +17170,14 @@
         },
         "required": [
           "enabled",
-          "interval",
           "reviewModel",
           "defaultModel",
           "models",
           "consolidate",
-          "toolTurns",
-          "userTurns",
+          "cadence",
           "reviewing",
+          "queued",
+          "lastSweepAt",
           "lastReview",
           "lastCurator"
         ],
@@ -17192,11 +17196,6 @@
           },
           "enabled": {
             "type": "boolean"
-          },
-          "interval": {
-            "type": "integer",
-            "minimum": 2,
-            "maximum": 200
           },
           "reviewModel": {
             "anyOf": [
@@ -17221,9 +17220,6 @@
           "enabled": {
             "type": "boolean"
           },
-          "interval": {
-            "type": "number"
-          },
           "reviewModel": {
             "type": [
               "string",
@@ -17254,14 +17250,21 @@
           "consolidate": {
             "type": "boolean"
           },
-          "toolTurns": {
-            "type": "number"
-          },
-          "userTurns": {
-            "type": "number"
+          "cadence": {
+            "type": "string",
+            "const": "daily-and-archive"
           },
           "reviewing": {
             "type": "boolean"
+          },
+          "queued": {
+            "type": "number"
+          },
+          "lastSweepAt": {
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "lastReview": {
             "anyOf": [
@@ -17312,14 +17315,14 @@
         },
         "required": [
           "enabled",
-          "interval",
           "reviewModel",
           "defaultModel",
           "models",
           "consolidate",
-          "toolTurns",
-          "userTurns",
+          "cadence",
           "reviewing",
+          "queued",
+          "lastSweepAt",
           "lastReview",
           "lastCurator"
         ],

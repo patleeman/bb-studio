@@ -160,6 +160,8 @@ export interface FinishDeps {
   now?(): number;
   providerReady?(providerId: string): Promise<boolean>;
   summarize?(input: { threadId: string; title: string; prompt: string }): Promise<string | null>;
+  /** The conversation is archived with its summary: its one skill review pass (src/skill-learning.ts). */
+  reviewArchived?(botId: string, threadId: string): void;
 }
 
 export class BotFinish {
@@ -312,6 +314,9 @@ export class BotFinish {
       } as never).catch((error: unknown) => this.deps.log(`Finish: posting to Main failed: ${error instanceof Error ? error.message : String(error)}`));
     }
     await this.archiveIfIdle(threadId);
+    if (!options.quiet) {
+      try { this.deps.reviewArchived?.(rec.botId, threadId); } catch (error) { this.deps.log(`Finish: queuing the skill review failed: ${error instanceof Error ? error.message : String(error)}`); }
+    }
     this.deps.changed([{ botId: rec.botId, kinds: ["conversations"] }]);
     return this.view(threadId)!;
   }

@@ -4,11 +4,11 @@ import { MIGRATIONS } from "./migrations";
 import { rpcContract } from "./contract";
 import {
   ARCHIVE_AFTER_MS, cheapestModel, curatorPlan, lineDiff, lintSkill, patchText, REVIEW_TOOLS, RETRY_PROMPT, reviewPrompt, gaveUpOnTools,
-  SkillLearning, STALE_AFTER_MS, tallyTurns, type LearningSkill, type SkillState,
+  SAVE_RULES, SkillLearning, STALE_AFTER_MS, sweepDue, type LearningSkill, type SkillState,
 } from "./skill-learning";
 
 const dispose: (() => Promise<void>)[] = [];
-afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
+afterEach(async () => { vi.useRealTimers(); for (const fn of dispose.splice(0)) await fn(); });
 
 const DAY = 86_400_000;
 const turn = (seq: number, items: string[], opts: { user?: boolean; tool?: string } = {}) => [
@@ -16,15 +16,6 @@ const turn = (seq: number, items: string[], opts: { user?: boolean; tool?: strin
   ...items.map((type, i) => ({ seq: seq + 1 + i, type: "item/completed", data: { item: { type, ...(type === "toolCall" && opts.tool ? { tool: opts.tool } : {}) } } })),
   { seq: seq + 1 + items.length, type: "turn/completed", data: { status: "completed" } },
 ];
-
-it("counts tool turns and user turns, and a skill write resets the tool count", () => {
-  const events = [...turn(1, ["reasoning", "commandExecution", "agentMessage"], { user: true }), ...turn(10, ["agentMessage"], { user: true }), ...turn(20, ["fileRead", "mcpToolCall"])];
-  expect(tallyTurns(events)).toEqual({ toolTurns: 2, userTurns: 2, skillWrite: false, lastSeq: 23, inTurn: 0 });
-  const reset = [...turn(1, ["commandExecution"]), ...turn(10, ["toolCall"], { tool: "mcp__bb-bridge__bot_skill_patch" }), ...turn(20, ["commandExecution"])];
-  expect(tallyTurns(reset)).toMatchObject({ toolTurns: 1, skillWrite: true });
-  // An automation's turn isn't the user's.
-  expect(tallyTurns([{ seq: 1, type: "client/turn/requested", data: { initiator: "automation" } }]).userTurns).toBe(0);
-});
 
 it("picks the cheapest model by price, else by name", () => {
   expect(cheapestModel([
@@ -64,21 +55,23 @@ it("moves unused skills active → stale → archived; pinned and used ones stay
   expect(ARCHIVE_AFTER_MS).toBe(90 * DAY);
 });
 
-it("gives a review fork only the skill tools, the profile's pages_read and the memory tools, and a lessons-not-logs prompt", () => {
-  expect([...REVIEW_TOOLS]).toEqual(["bot_skill_list", "bot_skill_view", "bot_skill_edit", "bot_skill_lint", "pages_read", "memory_search", "memory_add", "memory_update"]);
-  const prompt = reviewPrompt({ name: "Dot", memoryPageId: "pg1", reason: "tools" });
-  expect(prompt).toMatch(/Lessons, not logs/);
+it("gives a review fork only the skill tools and pages_read, and the where-it-goes and never-save rules", () => {
+  expect([...REVIEW_TOOLS]).toEqual(["bot_skill_list", "bot_skill_view", "bot_skill_edit", "bot_skill_lint", "pages_read"]);
+  const prompt = reviewPrompt({ name: "Dot", reason: "daily", since: Date.UTC(2026, 10, 20) });
+  expect(prompt).toContain(SAVE_RULES);
+  expect(prompt).toMatch(/daily review of this conversation\. Focus on what happened since the last review \(2026-11-20\)/);
   expect(prompt).toMatch(/remember this/);
-  expect(prompt).toMatch(/merge it into one rule/);
+  expect(prompt).toMatch(/"## Preferences" \(at most 25 lines\)/);
+  expect(prompt).toMatch(/Never save: build, deploy or release logs/);
+  expect(prompt).toMatch(/Default to saving nothing/);
   expect(prompt).toMatch(/reply exactly \[PASS\]/);
-  expect(prompt).toMatch(/pg1/);
-  expect(prompt).toMatch(/memory records \(memory op search, then op add/);
-  expect(prompt).not.toMatch(/pages_edit/);
+  expect(prompt).not.toMatch(/memory \(op|memory_add|pages_edit/);
+  expect(reviewPrompt({ name: "Dot", reason: "archive" })).toMatch(/just archived this conversation: look back over all of it/);
 });
 
 it("tells a review its bridge tools work even when Claude Code calls them disconnected", () => {
-  const prompt = reviewPrompt({ name: "Dot", memoryPageId: "pg1", reason: "tools" });
-  expect(prompt).toMatch(/ToolSearch \("select:mcp__bb-bridge__bot_skill,mcp__bb-bridge__pages_read,mcp__bb-bridge__memory"\)/);
+  const prompt = reviewPrompt({ name: "Dot", reason: "daily" });
+  expect(prompt).toMatch(/ToolSearch \("select:mcp__bb-bridge__bot_skill,mcp__bb-bridge__pages_read"\)/);
   expect(gaveUpOnTools("I couldn't save anything: the skill and Memory page tools are disconnected in this session, so nothing was written.")).toBe(true);
   expect(gaveUpOnTools("Couldn't save anything: the bot skill and Pages tools are disconnected in this session.")).toBe(true);
   expect(gaveUpOnTools("[PASS]")).toBe(false);
@@ -161,72 +154,96 @@ async function setup() {
   const writeSkill = (_botId: string, input: { name: string; description: string; body: string }) => {
     db.prepare("INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at) VALUES ('bot_main', ?, ?, ?, 0, 0) ON CONFLICT (bot_id, name) DO UPDATE SET body = excluded.body").run(input.name, input.description, input.body);
   };
+  const conversations: string[] = [];
   const learning = new SkillLearning({
-    db, sdk: bb.sdk, changed: () => {}, bots: () => [bot], bot: (id) => id === bot.id ? bot : null, memoryPage: () => "pg_mem",
+    db, sdk: bb.sdk, changed: () => {}, bots: () => [bot], bot: (id) => id === bot.id ? bot : null, conversations: () => conversations,
     skills: () => skills(),
     setState: (_botId, name, state) => { db.prepare("UPDATE bot_skills SET state = ? WHERE name = ?").run(state, name); },
   });
   const work = (n: number, user = false) => { for (let i = 0; i < n; i++) events.push(...turn((events.at(-1)?.seq ?? 0) + 1, ["commandExecution"], { user })); };
-  return { db, bot, threads, learning, fork, update, send, stop, archive, work, skills, writeSkill, setEvents: (next: typeof events) => { events = next; } };
+  return { db, bot, threads, learning, conversations, fork, update, send, stop, archive, work, skills, writeSkill, setEvents: (next: typeof events) => { events = next; } };
 }
 
-it("takes a baseline first, then forks a review on a cheap model after 10 tool turns", async () => {
+it("sweeps once a day: forks a review of each thread with new events on a cheap model, one at a time", async () => {
   const x = await setup();
-  x.work(30);
-  // First look: old history doesn't count.
-  await x.learning.idle(x.threads.get("bot1")!, "done");
-  expect((await x.learning.view("bot_main")).toolTurns).toBe(0);
-  x.work(9);
+  x.threads.set("conv1", makeThreadResponse({ id: "conv1", projectId: "proj_personal", providerId: "claude-code", status: "idle", updatedAt: 0 }));
+  x.conversations.push("bot1", "conv1");
+  x.work(3);
+  const morning = new Date(2026, 10, 26, 9).getTime();
+  vi.useFakeTimers({ toFake: ["Date"] });
+  const at = (time: number) => { vi.setSystemTime(time); return time; };
+  at(morning);
+  // Idle turns don't start reviews any more.
   await x.learning.idle(x.threads.get("bot1")!, "done");
   expect(x.fork).not.toHaveBeenCalled();
-  expect((await x.learning.view("bot_main")).toolTurns).toBe(9);
-  x.work(1);
-  await x.learning.idle(x.threads.get("bot1")!, "done");
+  await x.learning.tick(morning);
+  expect(x.fork).toHaveBeenCalledTimes(1);
   expect(x.fork).toHaveBeenCalledWith(expect.objectContaining({ sourceThreadId: "bot1", visibility: "hidden", pluginMetadata: { botReview: "bot_main" } }));
   expect(x.update).toHaveBeenCalledWith({ threadId: "fork1", model: "claude-haiku", reasoningLevel: "low" });
-  expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ threadId: "fork1", input: [expect.objectContaining({ text: expect.stringMatching(/Background skill review for "Dot"/) })] }));
-  const view = await x.learning.view("bot_main");
-  expect(view).toMatchObject({ reviewing: true, toolTurns: 0, defaultModel: "claude-haiku", modelNames: { "claude-opus": "Opus", "claude-haiku": "Haiku Fast" } });
+  expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ threadId: "fork1", input: [expect.objectContaining({ text: expect.stringMatching(/Background skill review for "Dot"\. This is the daily review/) })] }));
+  expect(await x.learning.view("bot_main")).toMatchObject({ reviewing: true, queued: 1, cadence: "daily-and-archive", lastSweepAt: morning, defaultModel: "claude-haiku", modelNames: { "claude-opus": "Opus", "claude-haiku": "Haiku Fast" } });
   expect(x.learning.reviewThreads()).toEqual(new Set(["fork1"]));
-
   // Single flight: no second review while one runs.
   expect(await x.learning.start("bot_main", "review")).toBe(false);
+  await x.learning.tick(at(morning + 60_000));
+  expect(x.fork).toHaveBeenCalledTimes(1);
 
   // A fork is idle before its prompt lands: that idle isn't the end.
   await x.learning.idle(x.threads.get("fork1")!, null);
   expect((await x.learning.view("bot_main")).reviewing).toBe(true);
-  // The fork runs, saves a skill and finishes: recorded; Maintenance owns archiving.
+  // The fork saves a skill and finishes; the next queued thread starts.
   await x.learning.active("fork1");
   x.learning.noteWrite("fork1", "saved");
   await x.learning.idle(x.threads.get("fork1")!, "Saved deploy-check.");
   expect(x.archive).not.toHaveBeenCalled();
-  expect(await x.learning.view("bot_main")).toMatchObject({ reviewing: false, lastReview: { result: "Saved 1 skill" } });
+  expect(x.fork).toHaveBeenLastCalledWith(expect.objectContaining({ sourceThreadId: "conv1" }));
+  await x.learning.active("fork2");
+  await x.learning.idle(x.threads.get("fork2")!, "[PASS]");
+  expect(await x.learning.view("bot_main")).toMatchObject({ reviewing: false, queued: 0, lastReview: { result: "Nothing to save" } });
+
+  // The same day: no second sweep. The next day: only threads with new events.
+  await x.learning.tick(at(morning + 3_600_000));
+  expect(x.fork).toHaveBeenCalledTimes(2);
+  x.work(1);
+  await x.learning.tick(at(morning + 86_400_000));
+  expect(x.fork).toHaveBeenCalledTimes(3);
+  expect(x.fork).toHaveBeenLastCalledWith(expect.objectContaining({ sourceThreadId: "bot1" }));
+  expect(x.send).toHaveBeenLastCalledWith(expect.objectContaining({ input: [expect.objectContaining({ text: expect.stringMatching(/since the last review/) })] }));
 });
 
-it("records [PASS] as nothing to save, trips on user turns, and stays off when turned off or paused", async () => {
+it("runs the daily sweep after 3 AM local, once per day", () => {
+  const at = (day: number, hour: number) => new Date(2026, 10, day, hour).getTime();
+  expect(sweepDue(null, at(26, 1))).toBe(true);
+  expect(sweepDue(at(26, 9), at(26, 23))).toBe(false);
+  expect(sweepDue(at(26, 9), at(27, 2))).toBe(false);
+  expect(sweepDue(at(26, 9), at(27, 3))).toBe(true);
+  expect(sweepDue(at(20, 9), at(26, 1))).toBe(true);
+});
+
+it("reviews an archived conversation once, first in the queue, and stays off when turned off, paused or external", async () => {
   const x = await setup();
-  await x.learning.idle(x.threads.get("bot1")!, null);
-  await x.learning.set("bot_main", { interval: 3 });
-  for (let i = 0; i < 3; i++) x.setEvents([]);
-  x.setEvents([...turn(1, ["agentMessage"], { user: true }), ...turn(5, ["agentMessage"], { user: true }), ...turn(9, ["agentMessage"], { user: true })]);
-  x.db.prepare("UPDATE bot_learning SET seen_seq = 0").run();
-  await x.learning.idle(x.threads.get("bot1")!, null);
-  expect(x.fork).toHaveBeenCalledTimes(1);
-  expect(x.send.mock.calls[0]![0]).toMatchObject({ input: [{ text: expect.stringMatching(/run of turns with the user/) }] });
+  x.threads.set("conv2", { ...makeThreadResponse({ id: "conv2", projectId: "proj_personal", providerId: "claude-code", status: "idle", updatedAt: 0 }), archivedAt: 9 });
+  await x.learning.sweep("bot_main", Date.now());
+  expect(x.learning.archived("bot_main", "conv2")).toBe(true);
+  await x.learning.next("bot_main");
+  expect(x.fork).toHaveBeenCalledWith(expect.objectContaining({ sourceThreadId: "conv2" }));
+  expect(x.send.mock.calls[0]![0]).toMatchObject({ input: [{ text: expect.stringMatching(/just archived this conversation/) }] });
   await x.learning.active("fork1");
   await x.learning.idle(x.threads.get("fork1")!, "[PASS]");
-  expect((await x.learning.view("bot_main")).lastReview?.result).toBe("Nothing to save");
+  // The archived thread isn't reviewed again by a sweep or Run now's day pass unless it moves.
+  expect(x.fork).toHaveBeenCalledTimes(2);
+  expect(x.fork).toHaveBeenLastCalledWith(expect.objectContaining({ sourceThreadId: "bot1" }));
 
   await x.learning.set("bot_main", { enabled: false });
-  x.db.prepare("UPDATE bot_learning SET tool_turns = 50").run();
-  expect(await x.learning.maybeReview("bot_main")).toBe(false);
+  expect(x.learning.archived("bot_main", "conv2")).toBe(false);
+  await x.learning.tick(Date.now() + 3 * 86_400_000);
   await x.learning.set("bot_main", { enabled: true });
   x.bot.state = "paused";
-  expect(await x.learning.maybeReview("bot_main")).toBe(false);
+  expect(await x.learning.runNow("bot_main")).toBe(false);
   x.bot.kind = "external";
   x.bot.state = "active";
   expect(await x.learning.start("bot_main", "review")).toBe(false);
-  expect(x.fork).toHaveBeenCalledTimes(1);
+  expect(x.fork).toHaveBeenCalledTimes(2);
 });
 
 it("stops the review when the user starts a turn, when the bot pauses, or after 20 minutes", async () => {
@@ -261,7 +278,7 @@ it("removes retired approval and pending skill fields from the RPC contract", as
   expect(rpcContract).not.toHaveProperty("bot_skill_pending_resolve");
   expect(await x.learning.view("bot_main")).not.toHaveProperty("approval");
   expect(await x.learning.view("bot_main")).not.toHaveProperty("pending");
-  expect(reviewPrompt({ name: "Dot", memoryPageId: null, reason: "manual" })).toContain("apply immediately");
+  expect(reviewPrompt({ name: "Dot", reason: "manual" })).toContain("apply immediately");
 });
 
 it("runs the curator explicitly from maintenance, with a dry run, pins exempt, and optional consolidation", async () => {
@@ -278,7 +295,8 @@ it("runs the curator explicitly from maintenance, with a dry run, pins exempt, a
   expect(dry).toMatchObject({ changes: [{ name: "old", from: "active", to: "archived" }], result: "Dry run: 1 archived" });
   expect(x.skills().find((skill) => skill.name === "old")?.state).toBe("active");
 
-  // The old minute tick no longer curates; built-in Maintenance owns the pass.
+  // The minute tick doesn't curate; built-in Maintenance owns the pass.
+  await x.learning.set("bot_main", { enabled: false });
   await x.learning.tick(now + 100 * DAY);
   expect(x.skills().find((skill) => skill.name === "old")?.state).toBe("active");
   await x.learning.set("bot_main", { consolidate: true });
@@ -289,42 +307,11 @@ it("runs the curator explicitly from maintenance, with a dry run, pins exempt, a
   expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ input: [expect.objectContaining({ text: expect.stringMatching(/Skill curator for "Dot"/) })] }));
 });
 
-it("pages through more than 100 new events", async () => {
-  const x = await setup();
-  await x.learning.idle(x.threads.get("bot1")!, null);
-  await x.learning.set("bot_main", { enabled: false });
-  x.work(45);
-  await x.learning.idle(x.threads.get("bot1")!, null);
-  expect((await x.learning.view("bot_main")).toolTurns).toBe(45);
-});
-
 it("bounds diff memory while retaining all lines for long skills", () => {
   const before = "old\n".repeat(1100), after = "new\n".repeat(1100);
   const diff = lineDiff(before, after);
   expect(diff.split("\n").filter((line) => line === "- old")).toHaveLength(1100);
   expect(diff.split("\n").filter((line) => line === "+ new")).toHaveLength(1100);
-});
-
-it("counts a tool turn split across event pages", async () => {
-  const x = await setup();
-  await x.learning.count(x.bot);
-  const filler = Array.from({ length: 99 }, (_, i) => ({ seq: i + 1, type: "item/completed", data: { item: { type: "reasoning" } } }));
-  x.setEvents([...filler, ...turn(99, ["commandExecution"])]);
-  await x.learning.count(x.bot);
-  expect((await x.learning.view("bot_main")).toolTurns).toBe(1);
-});
-it("keeps an unfinished tool turn across count calls and service restarts", async () => {
-  const x = await setup();
-  await x.learning.count(x.bot);
-  x.setEvents([{ seq: 1, type: "item/completed", data: { item: { type: "commandExecution" } } }]);
-  await x.learning.count(x.bot);
-  expect((await x.learning.view("bot_main")).toolTurns).toBe(0);
-  x.setEvents([{ seq: 2, type: "turn/completed", data: {} }]);
-  const learning = new SkillLearning({ ...(x.learning as unknown as { deps: ConstructorParameters<typeof SkillLearning>[0] }).deps });
-  await learning.count(x.bot);
-  expect((await learning.view("bot_main")).toolTurns).toBe(1);
-  await learning.count(x.bot);
-  expect((await learning.view("bot_main")).toolTurns).toBe(1);
 });
 
 it("removes curator Pause from RPC settings and views while retaining legacy data", async () => {

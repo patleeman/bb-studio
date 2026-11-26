@@ -1047,7 +1047,7 @@ export default async function plugin(bb: BbPluginApi) {
     db, sdk: bb.sdk, changed: tagsChanged,
     bots: () => bots.list().map(learningBot),
     bot: (botId) => { const bot = bots.stored(botId); return bot ? learningBot(bot) : null; },
-    memoryPage: (botId) => { try { return bots.memoryPage(botId); } catch { return null; } },
+    conversations: (botId) => botThreads.store.conversations(botId).map((rec) => rec.threadId),
     skills: (botId) => bots.skills(botId).map((skill) => ({ name: skill.name, description: skill.description, body: bots.skill(skill.name, botId)?.body ?? "", state: skill.state ?? "active", pinned: !!skill.pinned, usedAt: skill.usedAt ?? null, updatedAt: skill.updatedAt, alwaysOn: !!skill.alwaysOn })),
     setState: (botId, name, state) => { bots.setSkillState(name, state, botId); },
     log: (message) => bb.log.warn(message),
@@ -1378,6 +1378,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     changed: botThreadsChanged,
     log: (message) => bb.log.warn(message),
+    reviewArchived: (botId, threadId) => { learning.archived(botId, threadId); },
     providerReady: async (providerId) => {
       const { primaryHostId } = await bb.sdk.system.config();
       const state = (await bb.sdk.system.providerStates(primaryHostId ? { hostId: primaryHostId } : undefined)).providers.find((each) => each.providerId === providerId);

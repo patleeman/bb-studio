@@ -36,6 +36,7 @@ async function setup(options: { isBotThread?: (threadId: string) => boolean; pro
   const store = new BotThreads({ db, sdk: bb.sdk, signals: () => signals, changed: () => {}, now: () => now });
   await store.backfill();
   const records: { botId: string; topic: string; text: string; threadId: string; title: string; at: number }[] = [];
+  const reviewed: [string, string][] = [];
   const finish = registerBotFinish(bb, {
     db, threads: store, mainOf: (botId) => (botId === "dot" ? "thr_main" : null), isBotThread: options.isBotThread,
     memory: {
@@ -43,8 +44,9 @@ async function setup(options: { isBotThread?: (threadId: string) => boolean; pro
       count: (botId, threadId, since) => records.filter((each) => each.botId === botId && each.threadId === threadId && each.at >= (since ?? 0)).length,
     },
     changed: () => {}, log: () => {}, now: () => now, providerReady: options.providerReady, summarize: options.summarize,
+    reviewArchived: (botId, threadId) => { reviewed.push([botId, threadId]); },
   });
-  return { bb, harness, db, store, finish, threads, send, archive, unarchive, events, records, tick: (ms: number) => { now += ms; } };
+  return { bb, harness, db, store, finish, threads, send, archive, unarchive, events, records, reviewed, tick: (ms: number) => { now += ms; } };
 }
 
 it("sends the finishing turn into the conversation as agent-only steps, with no user bubble", async () => {
@@ -91,6 +93,8 @@ it("bot_finish_done archives the conversation with its summary, posts the card t
   expect(post.input[0]!.text).toContain('::finished{thread="prep"}');
   expect(post.input[0]!.text).not.toContain("summary saved");
   expect(x.store.get("thr_main")!.latest?.text).toBe("Archived “Launch prep”");
+  // Its one skill review pass is queued.
+  expect(x.reviewed).toEqual([["dot", "prep"]]);
   // BB's archive waits for the turn to end.
   expect(x.archive).not.toHaveBeenCalled();
   x.threads.set("prep", { ...x.threads.get("prep")!, status: "idle" });
