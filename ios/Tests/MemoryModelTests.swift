@@ -72,7 +72,9 @@ final class MemoryModelTests: XCTestCase {
         XCTAssertEqual(core.coreSkill?.name, "mine")
         XCTAssertEqual(core.otherSkills.map(\.name), ["house-rules"])
         XCTAssertEqual(core.warnings, ["Over budget", "Too many lines"], "each note once")
-        XCTAssertEqual(MemoryCore(skills: [skill("only", false, [])], chars: 0, cap: 2000, over: false).coreSkill?.name, "only")
+        let unmarked = MemoryCore(skills: [skill("only", false, [])], chars: 0, cap: 2000, over: false)
+        XCTAssertNil(unmarked.coreSkill, "found by its marker, never by position")
+        XCTAssertEqual(unmarked.otherSkills.map(\.name), ["only"], "shown whole")
     }
 
     // MARK: Saving without overwriting the Bot

@@ -36,6 +36,7 @@ struct MemoryPageView: View {
             // Kept across pushes and pops: only another Bot or server makes a new one.
             if store?.botId != botId || store?.client !== app.client { store = MemoryStore(botId: botId, client: app.client) }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("memory-page")
     }
 }
@@ -134,25 +135,31 @@ private struct FoldedMemoryChrome<Content: View>: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 MemoryLayerPicker(layer: $layer)
                     .padding(.horizontal, 16)
-                    .frame(height: 44)
+                    .padding(.top, 12)
+                    .frame(height: 56)
             }
             .toolbar(.hidden, for: .navigationBar)
-            .overlay { DuoRail(items: railItems) }
+            .overlay(alignment: .bottomTrailing) {
+                // In the right column iOS keeps for its status: only the rail's own frame, so nothing over the page.
+                DuoRail(items: railItems).ignoresSafeArea(.container, edges: [.trailing, .bottom])
+            }
     }
 
+    /// Lowest first: Search, then Home.
     private var railItems: [DuoRail.Item] {
         [
-            .init(id: "memoryHome", title: "Home", symbol: "house") { dismiss() },
             .init(id: "memorySearch", title: searching ? "Close" : "Search", symbol: searching ? "xmark" : "magnifyingglass") {
                 withAnimation(.snappy) { searching.toggle() }
             },
+            .init(id: "memoryHome", title: "Home", symbol: "house") { dismiss() },
         ]
     }
 }
 
 /// The folded Duo's controls at the bottom of the right column (the 84 points
 /// iOS keeps for its status): line icons with a word under each, the first
-/// item lowest, where the thumb rests.
+/// item lowest, where the thumb rests. Place it in the bottom-trailing corner,
+/// ignoring the trailing and bottom safe area.
 struct DuoRail: View {
     struct Item: Identifiable {
         var id: String
@@ -164,28 +171,24 @@ struct DuoRail: View {
     let items: [Item]
 
     var body: some View {
-        GeometryReader { proxy in
-            VStack(spacing: 4) {
-                ForEach(items.reversed()) { item in
-                    Button(action: item.action) {
-                        VStack(spacing: 2) {
-                            Image(systemName: item.symbol).font(.system(size: 19, weight: .regular))
-                            Text(item.title).font(.caption2)
-                        }
-                        .frame(width: 64, height: 56)
-                        .contentShape(.rect)
+        VStack(spacing: 4) {
+            ForEach(items.reversed()) { item in
+                Button(action: item.action) {
+                    VStack(spacing: 2) {
+                        Image(systemName: item.symbol).font(.system(size: 19, weight: .regular))
+                        Text(item.title).font(.caption2)
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.primary)
-                    .accessibilityLabel(item.title)
-                    .accessibilityIdentifier(item.id)
+                    .frame(width: 64, height: 56)
+                    .contentShape(.rect)
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+                .accessibilityLabel(item.title)
+                .accessibilityIdentifier(item.id)
             }
-            .padding(.bottom, 16)
-            .frame(width: FoldedChrome.column, height: proxy.size.height + proxy.safeAreaInsets.bottom, alignment: .bottom)
-            .position(x: proxy.size.width + proxy.safeAreaInsets.trailing - FoldedChrome.column / 2,
-                      y: (proxy.size.height + proxy.safeAreaInsets.bottom) / 2)
         }
+        .padding(.bottom, 16)
+        .frame(width: FoldedChrome.column)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("duoRail")
     }
@@ -215,9 +218,11 @@ struct MemoryBrowsePane: View {
         Group {
             if layer == .skills { SkillsLayerView(store: store, newSkillRow: false) } else { HistoryLayerView(store: store, open: open) }
         }
+        .scrollContentBackground(.hidden)
         .safeAreaInset(edge: .top, spacing: 0) { MemoryBrowseBar(store: store, layer: $layer) }
         .toolbar(.hidden, for: .navigationBar)
         .sensoryFeedback(.selection, trigger: layer)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("memory-browse")
     }
 }

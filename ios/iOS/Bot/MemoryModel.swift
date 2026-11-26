@@ -154,8 +154,8 @@ struct MemoryCore: Equatable {
     var cap: Int
     var over: Bool
 
-    /// The core skill: the one the server marks, else the only one.
-    var coreSkill: Skill? { skills.first(where: \.core) ?? (skills.count == 1 ? skills.first : nil) }
+    /// The core skill, by the server's marker: its sections are Core's. Every other always-on skill shows whole.
+    var coreSkill: Skill? { skills.first(where: \.core) }
     var otherSkills: [Skill] { skills.filter { $0.name != coreSkill?.name } }
     var warnings: [String] {
         var seen = Set<String>()

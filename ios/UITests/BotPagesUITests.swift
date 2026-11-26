@@ -24,6 +24,17 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
 
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
+    /// Back to the room. On the folded Duo Memory's title line takes the sheet's top, so its Home (in the rail) goes back to the list first.
+    private func closeMemory() {
+        let home = app.buttons["memoryHome"]
+        if home.exists, home.isHittable {
+            home.tap()
+            XCTAssertTrue(any("RoomSheet-conversations").waitForExistence(timeout: 10), "Home goes back to the list")
+        }
+        app.closeRoomSheet()
+        XCTAssertTrue(app.waitForRoom(timeout: 15))
+    }
+
     private func text(_ contains: String) -> XCUIElement {
         app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", contains)).firstMatch
     }
@@ -81,14 +92,14 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
     func testSlowMemoryAndLibraryLoadThroughTheBotFlip() {
         launch(["-qaDemoPageLatency", ProcessInfo.processInfo.environment["PAGE_LATENCY"] ?? "2500", "-qaDemoCachedBot"])
         openPage("memory")
-        XCTAssertTrue(app.navigationBars["Memory"].waitForExistence(timeout: 5))
+        XCTAssertTrue(any("memory-page").waitForExistence(timeout: 5))
         XCTAssertFalse(any("memoryBudget").exists, "still loading while the answer is slow")
         shot("slow-memory-loading")
         XCTAssertTrue(any("memoryBudget").waitForExistence(timeout: 20), "Memory loads after the Bot's id changes under it")
         XCTAssertTrue(any("memorySection-Preferences").waitForExistence(timeout: 20), "and its Core")
         XCTAssertFalse(any("memoryLoading").exists, "no spinner left")
         shot("slow-memory-loaded")
-        app.closeRoomSheet()
+        closeMemory()
         openPage("library")
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'library-row-'")).firstMatch.exists,
@@ -109,7 +120,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         shot("memory-error-retry")
         retry.tap()
         XCTAssertTrue(any("memoryBudget").waitForExistence(timeout: 15), "Retry loads Memory")
-        app.closeRoomSheet()
+        closeMemory()
         openPage("library")
         let libraryRetry = app.buttons["Retry"].firstMatch
         XCTAssertTrue(libraryRetry.waitForExistence(timeout: 15), "an error with Retry, not a spinner")

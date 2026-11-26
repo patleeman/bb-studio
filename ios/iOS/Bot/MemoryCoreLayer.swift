@@ -37,7 +37,7 @@ private struct CoreSections: View {
                 CoreSectionRow(store: store, skill: skill.name, heading: section.heading, section: section.heading, text: section.text,
                                cap: CoreText.cap(for: section.heading), editing: $editing)
             }
-        } else {
+        } else if core.skills.isEmpty {
             ContentUnavailableView("No always-on skill", systemImage: "brain",
                                    description: Text("The Bot's core skill holds its preferences and check-in list."))
                 .listRowSeparator(.hidden)

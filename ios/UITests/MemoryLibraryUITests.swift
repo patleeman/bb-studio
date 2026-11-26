@@ -18,9 +18,15 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
         app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", contains)).firstMatch
     }
 
+    /// A place from the Bot menu; the menu sometimes takes the tap before it has finished opening, so once more if it didn't open.
+    private func open(_ place: String, shows id: String) {
+        app.openRoomPlace(place)
+        if !any(id).waitForExistence(timeout: 8) { app.openRoomPlace(place) }
+        XCTAssertTrue(any(id).waitForExistence(timeout: 15), place)
+    }
+
     private func openMemory() {
-        app.openRoomPlace("memory")
-        XCTAssertTrue(any("memory-page").waitForExistence(timeout: 15), "the Memory page")
+        open("memory", shows: "memory-page")
         XCTAssertTrue(any("memoryBudget").waitForExistence(timeout: 15), "Core first, with its budget")
     }
 
@@ -67,7 +73,10 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("memoryConflict").waitForExistence(timeout: 10), "the Bot changed it meanwhile: a conflict, nothing saved")
         XCTAssertTrue(any("memoryConflict").label.contains("Kitchen quotes"), "with the Bot's newer text")
         shot("core-conflict")
-        app.buttons["memorySectionSave"].tap()
+        // The folded Duo's keyboard covers it: scroll it up into view.
+        let replace = app.buttons["memorySectionSave"]
+        for _ in 0..<3 where !replace.isHittable { app.collectionViews.firstMatch.swipeUp() }
+        replace.tap()
         XCTAssertTrue(app.buttons["memorySectionSave"].waitForNonExistence(timeout: 10), "Replace saves yours")
         XCTAssertTrue(text("Mine.").waitForExistence(timeout: 10))
     }
@@ -114,7 +123,7 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
         app.buttons["skillSave"].tap()
         XCTAssertTrue(any("skillBody").waitForExistence(timeout: 10))
         XCTAssertTrue(text("Share the page.").waitForExistence(timeout: 10), "the edit saved")
-        app.navigationBars["weekly-review"].buttons.element(boundBy: 0).tap()
+        app.buttons["BackButton"].firstMatch.tap()
 
         app.buttons["memorySkillNew"].tap()
         let name = app.textFields["newSkillName"]
@@ -165,8 +174,7 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
 
     func testLibraryFiltersByKindAndOpensAnItem() {
         launch()
-        app.openRoomPlace("library")
-        XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 15))
+        open("library", shows: "library-page")
         XCTAssertTrue(app.buttons["library-row-pg_demo_trip"].waitForExistence(timeout: 15), "the Bot's things")
         XCTAssertTrue(app.staticTexts["Today"].exists, "in date sections")
         XCTAssertTrue(app.buttons["chip-Recordings"].exists && app.buttons["chip-Drawings"].exists, "the kinds")
@@ -179,12 +187,32 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.navigationBars["Library"].waitForNonExistence(timeout: 10), "the design opens pushed, in its viewer")
     }
 
+    /// The unfolded Duo (8g): Core on the left page, Skills | History on the right.
+    func testTheUnfoldedDuoSplitsCoreFromSkillsAndHistory() throws {
+        try XCTSkipUnless(UIDevice.current.name.lowercased().contains("duo"), "an iPhone Duo simulator")
+        launch()
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/landscape")!)
+        sleep(3)
+        open("memory", shows: "memoryBudget")
+        XCTAssertTrue(any("memoryBudget").waitForExistence(timeout: 15), "Core on the left page")
+        XCTAssertTrue(any("memory-browse").waitForExistence(timeout: 15), "Skills | History on the right")
+        XCTAssertTrue(app.buttons["memorySkill-weekly-review"].waitForExistence(timeout: 15), "Skills first")
+        XCTAssertFalse(app.segmentedControls["memoryLayer"].buttons["Core"].exists, "no Core in the right page's switch")
+        shot("unfolded-left")
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/split-right")!)
+        sleep(2)
+        shot("unfolded-right")
+        app.segmentedControls["memoryLayer"].buttons["History"].tap()
+        XCTAssertTrue(app.buttons["memorySummary-thr_demo_lisbon"].waitForExistence(timeout: 10), "History on the right")
+        shot("unfolded-right-history")
+    }
+
     private func shot(_ name: String) {
         guard let folder = ProcessInfo.processInfo.environment["MEMLIB_OUT"] else { return }
         sleep(1)
         let url = URL(fileURLWithPath: folder)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        let device = UIScreen.main.bounds.width > 450 ? "duo" : "iphone"
+        let device = UIDevice.current.name.lowercased().contains("duo") ? "duo" : "iphone"
         try? XCUIScreen.main.screenshot().pngRepresentation.write(to: url.appendingPathComponent("\(device)-\(name).png"))
     }
 }
