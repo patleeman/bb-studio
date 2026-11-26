@@ -85,6 +85,7 @@ function Workbench({ threadId = PANEL_STATE_ID }: { threadId?: string }) {
           <SidebarSplitContainer
             activeTabId={pages[0]!.id}
             isFullScreen={false}
+            isTabListReady
             onActivateTab={vi.fn()}
             onGlobalTabReorder={vi.fn()}
             onToggleFullScreen={vi.fn()}

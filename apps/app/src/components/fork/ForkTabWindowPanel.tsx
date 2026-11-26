@@ -153,7 +153,6 @@ export function ForkTabWindowPanel({
     activeTabId: activeTab?.id ?? null,
     close: noop,
     destinations,
-    isFocused: true,
   });
   const panelFiles = usePanelFiles({
     available: true,

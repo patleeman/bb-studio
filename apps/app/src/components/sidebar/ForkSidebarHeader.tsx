@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from "react";
-import { useAtomValue } from "jotai";
 import { cn } from "@bb/shared-ui/lib/utils";
 import {
   useCloseMobileSidebar,
@@ -10,15 +9,11 @@ import {
   MACOS_WINDOW_NO_DRAG_CLASS,
   shouldUseMacosDesktopChrome,
 } from "@/lib/bb-desktop";
-import { usePreferredReplacement } from "@/lib/plugin-replacement-preference";
-import { usePluginSlots } from "@/lib/plugin-slots";
 import { SidebarHistoryNavigationControls } from "./SidebarHistoryNavigationControls";
-import { threadListProviderAtom } from "./threadListProvider";
+import { useThreadListReplacement } from "./threadListProvider";
 
 export function useForkHidesSidebarHeader(): boolean {
-  const { threadLists } = usePluginSlots();
-  const preference = useAtomValue(threadListProviderAtom);
-  const resolved = usePreferredReplacement(threadLists, preference);
+  const resolved = useThreadListReplacement();
   return (
     resolved.kind === "plugin" &&
     resolved.registration.experimental_hideSidebarHeader === true

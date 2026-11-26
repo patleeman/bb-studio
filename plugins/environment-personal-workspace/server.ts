@@ -40,7 +40,7 @@ export default async function personalWorkspacePlugin(
       }
     },
     async restore(context) {
-      return provider.create(context);
+      return provider.create!(context);
     },
     async remove({ hostId, path, pathKey, signal }) {
       if (hostId === null) {

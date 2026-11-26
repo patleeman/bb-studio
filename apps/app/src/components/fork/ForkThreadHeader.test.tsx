@@ -78,6 +78,7 @@ function target(id: string): PluginThreadActionTarget {
     parentNotifications: "auto",
     archivedAt: null,
     pinnedAt: null,
+    isHidden: false,
     sectionId: null,
     isUnread: false,
     status: "idle",

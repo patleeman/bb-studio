@@ -1,7 +1,14 @@
 import type { Command } from "commander";
 import { action, CliExitError } from "../action.js";
 import { cliFetch } from "../client.js";
-import { outputJson } from "./helpers.js";
+import { noteJsonPayloadWritten } from "../cli-error-output.js";
+
+function outputForkJson(opts: { json?: boolean }, data: unknown): boolean {
+  if (!opts.json) return false;
+  console.log(JSON.stringify(data, null, 2));
+  noteJsonPayloadWritten();
+  return true;
+}
 
 interface MirrorOptions {
   json?: boolean;
@@ -81,7 +88,7 @@ export function registerForkImportCommands(
     .action(
       action(async (opts: MirrorOptions) => {
         const status = await call(getUrl, "GET", "");
-        if (!outputJson(opts, status)) printStatus(status);
+        if (!outputForkJson(opts, status)) printStatus(status);
       }),
     );
 
@@ -92,7 +99,7 @@ export function registerForkImportCommands(
     .action(
       action(async (opts: MirrorOptions) => {
         const summary = await call(getUrl, "POST", "/sync");
-        if (outputJson(opts, summary)) return;
+        if (outputForkJson(opts, summary)) return;
         if (typeof summary.skipped === "string") {
           console.log(`Skipped: ${summary.skipped}`);
           return;
@@ -114,7 +121,7 @@ export function registerForkImportCommands(
       .action(
         action(async (opts: MirrorOptions) => {
           const status = await call(getUrl, "POST", `/${name}`);
-          if (!outputJson(opts, status)) printStatus(status);
+          if (!outputForkJson(opts, status)) printStatus(status);
         }),
       );
   }
@@ -132,7 +139,7 @@ export function registerForkImportCommands(
           "GET",
           `/threads/${encodeURIComponent(threadId)}`,
         );
-        if (outputJson(opts, thread)) return;
+        if (outputForkJson(opts, thread)) return;
         if (thread.mirrored !== true) {
           console.log("Not mirrored: this thread belongs to this server.");
           return;
@@ -158,7 +165,7 @@ export function registerForkImportCommands(
           "POST",
           `/threads/${encodeURIComponent(threadId)}/take-over`,
         );
-        if (!outputJson(opts, result)) console.log(String(result.note));
+        if (!outputForkJson(opts, result)) console.log(String(result.note));
       }),
     );
 }

@@ -6,7 +6,14 @@ import {
 import { action, CliExitError } from "../../action.js";
 import { cliFetch } from "../../client.js";
 import { resolveContextThreadId } from "../../context-env.js";
-import { outputJson } from "../helpers.js";
+import { noteJsonPayloadWritten } from "../../cli-error-output.js";
+
+function outputForkJson(opts: { json?: boolean }, data: unknown): boolean {
+  if (!opts.json) return false;
+  console.log(JSON.stringify(data, null, 2));
+  noteJsonPayloadWritten();
+  return true;
+}
 
 // `bbs thread move-provider`: move threads to another provider in place
 // (apps/server/src/services/threads/thread-provider-move.fork.ts). Never
@@ -302,7 +309,7 @@ export function registerMoveProviderCommand(
     .action(
       action(async (ids: string[], opts: MoveProviderOptions) => {
         const outcome = await runMoveProvider(getUrl, ids, opts);
-        if (!outputJson(opts, outcome)) {
+        if (!outputForkJson(opts, outcome)) {
           for (const entry of outcome.results) {
             const detail =
               entry.result === "failed"
@@ -374,7 +381,7 @@ export function registerMoveProviderCommand(
           started: threads.filter((t) => t.state === "started").length,
           cleared: threads.filter((t) => t.state === "cleared").length,
         };
-        if (outputJson(opts, { threads, summary })) return;
+        if (outputForkJson(opts, { threads, summary })) return;
         for (const thread of threads) {
           const move = thread.move as {
             to?: { providerId?: string; model?: string };

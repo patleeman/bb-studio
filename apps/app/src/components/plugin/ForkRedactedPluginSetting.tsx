@@ -2,7 +2,7 @@ import { useId, useState, type FocusEvent, type KeyboardEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@bb/shared-ui/button";
 import { Input } from "@bb/shared-ui/input";
-import { SettingsWithControl } from "@/components/ui/settings-section.js";
+import { SettingsWithControl } from "@bb/shared-ui/settings-section";
 import { applyPluginSettingsView } from "@/hooks/cache-owners/plugin-cache-owner";
 import {
   updatePluginSettings,

@@ -1,3 +1,4 @@
+import { FORK_COMPONENT_FIELDS } from "./plugin-app-component-fields.fork.js";
 import type { CollectedPluginAppRegistrations } from "./plugin-app-registration-collector.js";
 
 type FieldOf<Registration> = Registration extends unknown
@@ -25,6 +26,7 @@ export const PLUGIN_APP_COMPONENT_FIELDS: {
     CollectedPluginAppRegistrations[K][number]
   >[];
 } = {
+  ...FORK_COMPONENT_FIELDS,
   homepageSections: ["component"],
   settingsSections: ["component"],
   appOverlays: ["component"],

@@ -919,3 +919,757 @@ index be5bfd5d01..538601f93e 100644
      "plugins/provider-codex",
    ]);
    const queue = [...pluginDirs].sort(
+diff --git a/packages/db/scripts/query-costs/cases.ts b/packages/db/scripts/query-costs/cases.ts
+index 6f7081b7f5..33d7ac5404 100644
+--- a/packages/db/scripts/query-costs/cases.ts
++++ b/packages/db/scripts/query-costs/cases.ts
+@@ -6,7 +6,6 @@ import { PLUGINS_COST_GROUP } from "./plugins-cases.js";
+ import {
+   ACCOUNT_POOL_COST_GROUP,
+   AUTOMATIONS_COST_GROUP,
+-  WORKFLOWS_COST_GROUP,
+ } from "./plugin-databases-cases.js";
+ import { QUEUED_THREAD_MESSAGES_COST_CASES } from "./queued-thread-messages-cases.js";
+ import { THREAD_FILES_COST_GROUP } from "./thread-files-cases.js";
+@@ -29,7 +28,6 @@ const ALL_GROUPS: readonly RegisteredCostGroup[] = [
+   PLUGINS_COST_GROUP,
+   ACCOUNT_POOL_COST_GROUP,
+   AUTOMATIONS_COST_GROUP,
+-  WORKFLOWS_COST_GROUP,
+   SETTINGS_MAINTENANCE_COST_GROUP,
+   CREDENTIALS_ATTACHMENTS_COST_GROUP,
+   THREAD_FILES_COST_GROUP,
+diff --git a/packages/db/scripts/query-costs/plugin-databases-cases.ts b/packages/db/scripts/query-costs/plugin-databases-cases.ts
+index 5cdbaac411..4802dc1095 100644
+--- a/packages/db/scripts/query-costs/plugin-databases-cases.ts
++++ b/packages/db/scripts/query-costs/plugin-databases-cases.ts
+@@ -23,75 +23,20 @@ import {
+   setAutomationRunThread,
+   updateAutomation,
+ } from "../../../../plugins/automations/src/data.js";
+-import {
+-  abandonOriginNotifications,
+-  activeChildThreadsForRun,
+-  attachCallThread,
+-  beginNotificationAttempt,
+-  cancelRun,
+-  claimQueuedRun,
+-  countCallsForRun,
+-  createRun,
+-  deleteTerminalRuns,
+-  getCall,
+-  getCallByChildThread,
+-  getLatestRunForOriginThread,
+-  getRun,
+-  getRunRequired,
+-  hasWorker,
+-  incrementRepairAttempts,
+-  isWorkerRetired,
+-  listActiveRunsForOriginThread,
+-  listCallsForRun,
+-  listCallsForRunPage,
+-  listExpiredTerminalRuns,
+-  listPendingNotificationRuns,
+-  listRunningCalls,
+-  listRuns,
+-  listTimedOutRuns,
+-  markCallReplayedSameRun,
+-  markNotificationSent,
+-  nextMaintenanceDueAt,
+-  ownWorker,
+-  queueCallProviderRetry,
+-  recordNotificationFailure,
+-  recordWorkerCleanup,
+-  recoverInterruptedRuns,
+-  reopenFailedCallOnWorker,
+-  retiredWorkers,
+-  settleCall,
+-  settleNotificationUndeliverable,
+-  settleRun,
+-  startCall,
+-  storeStructuredResult,
+-  updateRunPhase,
+-  workerOrigins,
+-} from "../../../../plugins/workflows/src/data.js";
+ import { registerCostGroup, type QueryCostCase } from "./case.js";
+ import {
+   POOL_AFFINITY_BINDINGS,
+   POOL_AFFINITY_IDLE_TTL_MS,
+   seedAccountPool,
+   seedAutomations,
+-  seedWorkflows,
+   type AccountPoolSeed,
+   type AutomationsSeed,
+-  type WorkflowsSeed,
+ } from "./plugin-databases-seed.js";
+ 
+ const ACCOUNT_POOL = "plugins/account-pool/src/store.ts";
+ const AUTOMATIONS = "plugins/automations/src/data.ts";
+-const WORKFLOWS = "plugins/workflows/src/data.ts";
+-const RETENTION_SWEEP_REASON =
+-  "Known linear cost: the retention sweep walks every retained run (3,000 at full scale) to keep resumed chains whole, once an expired run exists";
+-
+-let expiredRunIds: string[] = [];
+ const AUTOMATION_RUNS_PAGE = 50;
+ const DUE_AUTOMATION_BATCH = 25;
+-const WORKFLOW_RUNS_PAGE = 50;
+-const WORKFLOW_CALLS_PAGE = 50;
+-const WORKFLOW_RETENTION_SWEEP_RUNS = 20;
+-const WORKFLOW_SWEEP_LIMIT = 100;
+ 
+ const ACCOUNT_POOL_CASES: readonly QueryCostCase<AccountPoolSeed>[] = [
+   {
+@@ -332,298 +277,6 @@ const AUTOMATIONS_CASES: readonly QueryCostCase<AutomationsSeed>[] = [
+   },
+ ];
+ 
+-const WORKFLOWS_CASES: readonly QueryCostCase<WorkflowsSeed>[] = [
+-  {
+-    name: `${WORKFLOWS}#createRun`,
+-    run: (db, _fixture, seed) =>
+-      createRun(db.$client, {
+-        projectId: seed.projectId,
+-        originThreadId: seed.originThreadId,
+-        environmentId: "env_workflow",
+-        originProvider: "provider-a",
+-        originModel: "gpt-5",
+-        originReasoningLevel: "high",
+-        originPermissionMode: "accept-edits",
+-        name: "review",
+-        source: "export const meta = { name: 'review' };",
+-        sourceHash: "hash-new",
+-        argsJson: "{}",
+-        settingsJson:
+-          '{"maxActiveRuns":4,"maxConcurrentAgents":8,"maxAgentCalls":100,"totalRunTimeoutMs":86400000,"retentionDays":30,"maxNotificationBytes":16384}',
+-        resumedFromRunId: null,
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#getRun`,
+-    run: (db, _fixture, seed) => getRun(db.$client, seed.runningRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#getRunRequired`,
+-    run: (db, _fixture, seed) => getRunRequired(db.$client, seed.terminalRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#getLatestRunForOriginThread`,
+-    run: (db, _fixture, seed) =>
+-      getLatestRunForOriginThread(db.$client, seed.originThreadId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listActiveRunsForOriginThread`,
+-    run: (db, _fixture, seed) =>
+-      listActiveRunsForOriginThread(db.$client, seed.originThreadId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listRuns`,
+-    run: (db, _fixture, seed) =>
+-      listRuns(db.$client, {
+-        projectId: seed.projectId,
+-        limit: WORKFLOW_RUNS_PAGE,
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#claimQueuedRun`,
+-    run: (db) => claimQueuedRun(db.$client, 8),
+-  },
+-  {
+-    name: `${WORKFLOWS}#settleRun`,
+-    run: (db, _fixture, seed) =>
+-      settleRun(db.$client, {
+-        id: seed.runningRunId,
+-        status: "failed",
+-        result: null,
+-        error: "Workflow threw",
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#updateRunPhase`,
+-    run: (db, _fixture, seed) =>
+-      updateRunPhase(db.$client, seed.runningRunId, "Verify"),
+-  },
+-  {
+-    name: `${WORKFLOWS}#markNotificationSent`,
+-    run: (db, _fixture, seed) =>
+-      markNotificationSent(db.$client, seed.pendingNotificationRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#settleNotificationUndeliverable`,
+-    run: (db, _fixture, seed) =>
+-      settleNotificationUndeliverable(
+-        db.$client,
+-        seed.pendingNotificationRunId,
+-        "Origin thread is gone",
+-      ),
+-  },
+-  {
+-    name: `${WORKFLOWS}#recordNotificationFailure`,
+-    run: (db, _fixture, seed) =>
+-      recordNotificationFailure(db.$client, {
+-        id: seed.pendingNotificationRunId,
+-        error: "Server busy",
+-        nextAttemptAt: seed.now + 30_000,
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#beginNotificationAttempt`,
+-    run: (db, _fixture, seed) =>
+-      beginNotificationAttempt(db.$client, seed.pendingNotificationRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#recoverInterruptedRuns`,
+-    run: (db) => recoverInterruptedRuns(db.$client),
+-  },
+-  {
+-    name: `${WORKFLOWS}#getCall`,
+-    run: (db, _fixture, seed) => getCall(db.$client, seed.runningRunId, 0),
+-  },
+-  {
+-    name: `${WORKFLOWS}#getCallByChildThread`,
+-    run: (db, _fixture, seed) =>
+-      getCallByChildThread(db.$client, seed.runningChildThreadId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listCallsForRun`,
+-    run: (db, _fixture, seed) => listCallsForRun(db.$client, seed.largestRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listCallsForRunPage`,
+-    run: (db, _fixture, seed) =>
+-      listCallsForRunPage(db.$client, {
+-        runId: seed.largestRunId,
+-        afterCallIndex: 10,
+-        limit: WORKFLOW_CALLS_PAGE,
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#countCallsForRun`,
+-    run: (db, _fixture, seed) =>
+-      countCallsForRun(db.$client, seed.largestRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listRunningCalls`,
+-    run: (db) => listRunningCalls(db.$client),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listTimedOutRuns`,
+-    run: (db, _fixture, seed) =>
+-      listTimedOutRuns(
+-        db.$client,
+-        seed.now + 2 * 86_400_000,
+-        WORKFLOW_SWEEP_LIMIT,
+-      ),
+-  },
+-  {
+-    name: `${WORKFLOWS}#startCall`,
+-    run: (db, _fixture, seed) =>
+-      startCall(db.$client, {
+-        runId: seed.runningRunId,
+-        callIndex: seed.nextCallIndex,
+-        cacheKey: "cache-new",
+-        prompt: "Review the remaining files.",
+-        options: {
+-          selection: null,
+-          outputSchema: null,
+-          title: null,
+-          phase: null,
+-        },
+-        selection: {
+-          providerId: "provider-a",
+-          model: "gpt-5",
+-          reasoningLevel: "high",
+-          permissionMode: "accept-edits",
+-        },
+-        replay: null,
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#markCallReplayedSameRun`,
+-    run: (db, _fixture, seed) => {
+-      const call = getCall(db.$client, seed.largestRunId, 0);
+-      if (call === null) throw new Error("Expected a call");
+-      markCallReplayedSameRun(db.$client, call.id);
+-    },
+-  },
+-  {
+-    name: `${WORKFLOWS}#attachCallThread`,
+-    run: (db, _fixture, seed) =>
+-      attachCallThread(db.$client, seed.queuedCallId, "thr_workflow_call_new"),
+-  },
+-  {
+-    name: `${WORKFLOWS}#reopenFailedCallOnWorker`,
+-    run: (db, _fixture, seed) =>
+-      reopenFailedCallOnWorker(db.$client, seed.failedCallId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#queueCallProviderRetry`,
+-    run: (db, _fixture, seed) =>
+-      queueCallProviderRetry(
+-        db.$client,
+-        seed.failedCallId,
+-        "Provider overloaded",
+-      ),
+-  },
+-  {
+-    name: `${WORKFLOWS}#storeStructuredResult`,
+-    run: (db, _fixture, seed) =>
+-      storeStructuredResult(db.$client, seed.runningCallId, { findings: [] }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#incrementRepairAttempts`,
+-    run: (db, _fixture, seed) =>
+-      incrementRepairAttempts(db.$client, seed.runningCallId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#settleCall`,
+-    run: (db, _fixture, seed) =>
+-      settleCall(db.$client, {
+-        id: seed.runningCallId,
+-        status: "succeeded",
+-        result: { findings: [] },
+-        error: null,
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#cancelRun`,
+-    run: (db, _fixture, seed) => cancelRun(db.$client, seed.runningRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#activeChildThreadsForRun`,
+-    run: (db, _fixture, seed) =>
+-      activeChildThreadsForRun(db.$client, seed.runningRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listPendingNotificationRuns`,
+-    run: (db, _fixture, seed) =>
+-      listPendingNotificationRuns(db.$client, seed.now, WORKFLOW_SWEEP_LIMIT),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listExpiredTerminalRuns`,
+-    growsWith: { history: RETENTION_SWEEP_REASON },
+-    run: (db, _fixture, seed) =>
+-      listExpiredTerminalRuns(
+-        db.$client,
+-        seed.now,
+-        WORKFLOW_RETENTION_SWEEP_RUNS,
+-      ),
+-  },
+-  {
+-    name: `${WORKFLOWS}#deleteTerminalRuns`,
+-    prepare: (db, _fixture, seed) => {
+-      expiredRunIds = listExpiredTerminalRuns(
+-        db.$client,
+-        seed.now,
+-        WORKFLOW_RETENTION_SWEEP_RUNS,
+-      ).runIds;
+-    },
+-    run: (db) => deleteTerminalRuns(db.$client, expiredRunIds),
+-  },
+-  {
+-    name: `${WORKFLOWS}#ownWorker`,
+-    run: (db, _fixture, seed) =>
+-      ownWorker(
+-        db.$client,
+-        "thr_workflow_worker_new",
+-        seed.runningRunId,
+-        seed.runningCallId,
+-        seed.originThreadId,
+-      ),
+-  },
+-  {
+-    name: `${WORKFLOWS}#workerOrigins`,
+-    run: (db, _fixture, seed) => workerOrigins(db.$client, seed.now),
+-  },
+-  {
+-    name: `${WORKFLOWS}#retiredWorkers`,
+-    run: (db, _fixture, seed) => retiredWorkers(db.$client, seed.now),
+-  },
+-  {
+-    name: `${WORKFLOWS}#nextMaintenanceDueAt`,
+-    run: (db) => nextMaintenanceDueAt(db.$client),
+-  },
+-  {
+-    name: `${WORKFLOWS}#isWorkerRetired`,
+-    run: (db, _fixture, seed) =>
+-      isWorkerRetired(db.$client, seed.retiredWorkerThreadId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#recordWorkerCleanup`,
+-    growsWith: {
+-      history:
+-        "Known linear cost: each worker cleanup also deletes archived workers whose run is gone, which scans every archived worker",
+-    },
+-    run: (db, _fixture, seed) =>
+-      recordWorkerCleanup(db.$client, seed.retiredWorkerThreadId, true),
+-  },
+-  {
+-    name: `${WORKFLOWS}#hasWorker`,
+-    run: (db, _fixture, seed) =>
+-      hasWorker(db.$client, seed.archivedWorkerThreadId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#abandonOriginNotifications`,
+-    run: (db, _fixture, seed) =>
+-      abandonOriginNotifications(db.$client, seed.originThreadId),
+-  },
+-];
+-
+ export const ACCOUNT_POOL_COST_GROUP = registerCostGroup({
+   name: "account-pool",
+   pluginDatabase: { auditedTables: [], allowedFindings: [] },
+@@ -648,29 +301,3 @@ export const AUTOMATIONS_COST_GROUP = registerCostGroup({
+   seed: (db, _fixture, scale) => seedAutomations(db, scale),
+   cases: AUTOMATIONS_CASES,
+ });
+-
+-export const WORKFLOWS_COST_GROUP = registerCostGroup({
+-  name: "workflows",
+-  pluginDatabase: {
+-    auditedTables: ["workflow_runs", "workflow_calls", "workflow_workers"],
+-    allowedFindings: [
+-      ...(["full-scan", "correlated-subquery", "nested-loop"] as const).map(
+-        (rule) => ({
+-          rule,
+-          table: "workflow_runs",
+-          caller: `${WORKFLOWS}#listExpiredTerminalRuns`,
+-          reason: RETENTION_SWEEP_REASON,
+-        }),
+-      ),
+-      {
+-        rule: "full-scan",
+-        table: "workflow_workers",
+-        caller: `${WORKFLOWS}#recordWorkerCleanup`,
+-        reason:
+-          "Known linear cost: deleting archived workers whose run is gone scans every archived worker",
+-      },
+-    ],
+-  },
+-  seed: (db, _fixture, scale) => seedWorkflows(db, scale),
+-  cases: WORKFLOWS_CASES,
+-});
+diff --git a/packages/db/scripts/query-costs/plugin-databases-seed.ts b/packages/db/scripts/query-costs/plugin-databases-seed.ts
+index ac11a16697..c8d062efda 100644
+--- a/packages/db/scripts/query-costs/plugin-databases-seed.ts
++++ b/packages/db/scripts/query-costs/plugin-databases-seed.ts
+@@ -12,7 +12,6 @@ import {
+   QUOTA_MIGRATIONS,
+   QuotaStore,
+ } from "../../../../plugins/account-pool/src/store.js";
+-import { migrations as WORKFLOWS_MIGRATIONS } from "../../../../plugins/workflows/src/data.js";
+ import type { DbConnection } from "../../src/connection.js";
+ import { scaled } from "./case.js";
+ 
+@@ -27,19 +26,6 @@ const AUTOMATIONS = 20;
+ const AUTOMATION_RUNS = 13_000;
+ const AUTOMATION_PROJECTS = 4;
+ 
+-const WORKFLOW_PROJECTS = 8;
+-const WORKFLOW_RETAINED_RUNS = 3_000;
+-const WORKFLOW_RUNS_PER_ORIGIN_THREAD = 10;
+-const WORKFLOW_CALLS_PER_RUN = 20;
+-const WORKFLOW_LARGEST_RUN_CALLS = 100;
+-const WORKFLOW_RUNNING_RUNS = 4;
+-const WORKFLOW_RUNNING_CALLS_PER_RUN = 8;
+-const WORKFLOW_QUEUED_RUNS = 6;
+-const WORKFLOW_EXPIRED_RUNS = 40;
+-const WORKFLOW_PENDING_NOTIFICATION_RUNS = 6;
+-const WORKFLOW_UNARCHIVED_RETIRED_RUNS = 5;
+-const WORKFLOW_RETENTION_DAYS = 30;
+-const WORKFLOW_SOURCE = `export const meta = { name: "review", description: "Review the change" };\n${"const step = await agent(`Review the diff and report findings`, { label: 'review' });\n".repeat(16)}`;
+ 
+ export interface AccountPoolSeed {
+   accountId: string;
+@@ -60,23 +46,6 @@ export interface AutomationsSeed {
+   now: number;
+ }
+ 
+-export interface WorkflowsSeed {
+-  projectId: string;
+-  originThreadId: string;
+-  runningRunId: string;
+-  largestRunId: string;
+-  runningCallId: string;
+-  runningChildThreadId: string;
+-  queuedCallId: string;
+-  failedCallId: string;
+-  nextCallIndex: number;
+-  pendingNotificationRunId: string;
+-  terminalRunId: string;
+-  retiredWorkerThreadId: string;
+-  archivedWorkerThreadId: string;
+-  now: number;
+-}
+-
+ function migrateStatements(
+   client: Database.Database,
+   statements: readonly string[],
+@@ -331,268 +300,3 @@ export function seedAutomations(
+     now,
+   };
+ }
+-
+-interface SeededRun {
+-  id: string;
+-  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+-  originThreadId: string;
+-  projectId: string;
+-  createdAt: number;
+-  finishedAt: number | null;
+-  notificationSent: boolean;
+-  resumedFromRunId: string | null;
+-  calls: number;
+-  workersArchived: boolean;
+-}
+-
+-export function seedWorkflows(db: DbConnection, scale: number): WorkflowsSeed {
+-  const client = db.$client;
+-  migrateStatements(client, WORKFLOWS_MIGRATIONS);
+-  const now = Date.now();
+-  const retained = scaled(WORKFLOW_RETAINED_RUNS, scale);
+-  const originThreads = Math.max(
+-    1,
+-    Math.ceil(retained / WORKFLOW_RUNS_PER_ORIGIN_THREAD),
+-  );
+-  const runs: SeededRun[] = [];
+-  const originOf = (index: number) =>
+-    `thr_workflow_origin_${index % originThreads}`;
+-  const projectOf = (index: number) =>
+-    `proj_workflow_${index % WORKFLOW_PROJECTS}`;
+-  const retentionSpanMs = (WORKFLOW_RETENTION_DAYS - 1) * DAY_MS;
+-  for (let index = 0; index < retained; index += 1) {
+-    const finishedAt =
+-      now - retentionSpanMs + Math.floor((index / retained) * retentionSpanMs);
+-    const previous = runs[runs.length - 1];
+-    runs.push({
+-      id: `wfr_retained_${index.toString().padStart(6, "0")}`,
+-      status:
+-        index % 13 === 0
+-          ? "failed"
+-          : index % 17 === 0
+-            ? "cancelled"
+-            : "succeeded",
+-      originThreadId: originOf(index),
+-      projectId: projectOf(index),
+-      createdAt: finishedAt - 20 * MINUTE_MS,
+-      finishedAt,
+-      notificationSent: true,
+-      resumedFromRunId:
+-        index % 10 === 9 && previous !== undefined ? previous.id : null,
+-      calls: index === 0 ? WORKFLOW_LARGEST_RUN_CALLS : WORKFLOW_CALLS_PER_RUN,
+-      workersArchived: index < retained - WORKFLOW_UNARCHIVED_RETIRED_RUNS,
+-    });
+-  }
+-  for (let index = 0; index < WORKFLOW_EXPIRED_RUNS; index += 1) {
+-    const finishedAt =
+-      now - (WORKFLOW_RETENTION_DAYS + 1) * DAY_MS - index * MINUTE_MS;
+-    runs.push({
+-      id: `wfr_expired_${index.toString().padStart(6, "0")}`,
+-      status: "succeeded",
+-      originThreadId: originOf(index),
+-      projectId: projectOf(index),
+-      createdAt: finishedAt - 20 * MINUTE_MS,
+-      finishedAt,
+-      notificationSent: true,
+-      resumedFromRunId: null,
+-      calls: WORKFLOW_CALLS_PER_RUN,
+-      workersArchived: true,
+-    });
+-  }
+-  for (let index = 0; index < WORKFLOW_PENDING_NOTIFICATION_RUNS; index += 1) {
+-    runs.push({
+-      id: `wfr_pending_${index}`,
+-      status: "succeeded",
+-      originThreadId: originOf(index),
+-      projectId: projectOf(index),
+-      createdAt: now - 30 * MINUTE_MS,
+-      finishedAt: now - 5 * MINUTE_MS + index,
+-      notificationSent: false,
+-      resumedFromRunId: null,
+-      calls: WORKFLOW_CALLS_PER_RUN,
+-      workersArchived: false,
+-    });
+-  }
+-  for (let index = 0; index < WORKFLOW_RUNNING_RUNS; index += 1) {
+-    runs.push({
+-      id: `wfr_running_${index}`,
+-      status: "running",
+-      originThreadId: originOf(0),
+-      projectId: projectOf(0),
+-      createdAt: now - 10 * MINUTE_MS + index,
+-      finishedAt: null,
+-      notificationSent: false,
+-      resumedFromRunId: null,
+-      calls: WORKFLOW_CALLS_PER_RUN,
+-      workersArchived: false,
+-    });
+-  }
+-  for (let index = 0; index < WORKFLOW_QUEUED_RUNS; index += 1) {
+-    runs.push({
+-      id: `wfr_queued_${index}`,
+-      status: "queued",
+-      originThreadId: originOf(index + 1),
+-      projectId: projectOf(index + 1),
+-      createdAt: now - MINUTE_MS + index,
+-      finishedAt: null,
+-      notificationSent: false,
+-      resumedFromRunId: null,
+-      calls: 0,
+-      workersArchived: false,
+-    });
+-  }
+-  const insertRun = client.prepare(
+-    `INSERT INTO workflow_runs (
+-       id, project_id, origin_thread_id, environment_id, origin_provider,
+-       origin_model, origin_reasoning_level, origin_permission_mode, name,
+-       source, source_hash, args_json, status, resumed_from_run_id,
+-       result_json, error, phase, notification_sent, notification_outcome,
+-       replay_safety_version, created_at, started_at, finished_at
+-     ) VALUES (
+-       @id, @projectId, @originThreadId, 'env_workflow', 'provider-a', 'gpt-5',
+-       'high', 'accept-edits', 'review', @source, @sourceHash, '{"pr":42}',
+-       @status, @resumedFromRunId, @resultJson, @error, @phase,
+-       @notificationSent, @notificationOutcome, 1, @createdAt, @startedAt,
+-       @finishedAt
+-     )`,
+-  );
+-  const insertCall = client.prepare(
+-    `INSERT INTO workflow_calls (
+-       id, run_id, call_index, cache_key, prompt, options_json,
+-       resolved_provider, resolved_model, resolved_reasoning_level,
+-       resolved_permission_mode, status, child_thread_id, result_json, error,
+-       created_at, started_at, last_activity_at, finished_at
+-     ) VALUES (
+-       @id, @runId, @callIndex, @cacheKey, @prompt, @optionsJson, 'provider-a',
+-       'gpt-5', 'high', 'accept-edits', @status, @childThreadId, @resultJson,
+-       @error, @createdAt, @startedAt, @lastActivityAt, @finishedAt
+-     )`,
+-  );
+-  const insertWorker = client.prepare(
+-    `INSERT INTO workflow_workers (
+-       thread_id, run_id, call_id, origin_thread_id, archived_at, next_cleanup_at
+-     ) VALUES (?, ?, ?, ?, ?, ?)`,
+-  );
+-  const prompt = `Review the files changed in pull request 42 for correctness bugs. ${"Report each finding with the file, line and a failing scenario. ".repeat(6)}`;
+-  const resultJson = JSON.stringify({
+-    findings: [{ file: "src/a.ts", line: 12, summary: "Stale cache read" }],
+-  });
+-  let callCounter = 0;
+-  let runningCallId = "";
+-  let runningChildThreadId = "";
+-  let queuedCallId = "";
+-  let failedCallId = "";
+-  let retiredWorkerThreadId = "";
+-  let archivedWorkerThreadId = "";
+-  client.transaction(() => {
+-    for (const run of runs) {
+-      const terminal = run.status !== "queued" && run.status !== "running";
+-      insertRun.run({
+-        id: run.id,
+-        projectId: run.projectId,
+-        originThreadId: run.originThreadId,
+-        source: WORKFLOW_SOURCE,
+-        sourceHash: `hash-${run.id}`,
+-        status: run.status,
+-        resumedFromRunId: run.resumedFromRunId,
+-        resultJson: run.status === "succeeded" ? resultJson : null,
+-        error: run.status === "failed" ? "Agent call failed" : null,
+-        phase: run.status === "running" ? "Review" : null,
+-        notificationSent: run.notificationSent ? 1 : 0,
+-        notificationOutcome: run.notificationSent ? "delivered" : "pending",
+-        createdAt: run.createdAt,
+-        startedAt: run.status === "queued" ? null : run.createdAt + 1_000,
+-        finishedAt: run.finishedAt,
+-      });
+-      for (let callIndex = 0; callIndex < run.calls; callIndex += 1) {
+-        callCounter += 1;
+-        const id = `wfc_${callCounter.toString().padStart(8, "0")}`;
+-        const running = run.status === "running";
+-        const status = running
+-          ? callIndex < WORKFLOW_RUNNING_CALLS_PER_RUN
+-            ? "running"
+-            : callIndex === WORKFLOW_RUNNING_CALLS_PER_RUN
+-              ? "failed"
+-              : callIndex < WORKFLOW_CALLS_PER_RUN - 2
+-                ? "succeeded"
+-                : "queued"
+-          : run.status === "cancelled" && callIndex > 10
+-            ? "cancelled"
+-            : "succeeded";
+-        const childThreadId =
+-          status === "queued" || status === "cancelled"
+-            ? null
+-            : `thr_workflow_call_${callCounter}`;
+-        const startedAt = run.createdAt + 2_000 + callIndex * 1_000;
+-        insertCall.run({
+-          id,
+-          runId: run.id,
+-          callIndex,
+-          cacheKey: `cache-${run.id}-${callIndex}`,
+-          prompt,
+-          optionsJson: JSON.stringify({
+-            selection: null,
+-            outputSchema: null,
+-            title: `Review shard ${callIndex}`,
+-            phase: "Review",
+-          }),
+-          status,
+-          childThreadId,
+-          resultJson: status === "succeeded" ? resultJson : null,
+-          error: status === "failed" ? "Provider overloaded" : null,
+-          createdAt: startedAt,
+-          startedAt: status === "queued" ? null : startedAt,
+-          lastActivityAt: status === "running" ? now - callIndex * 1_000 : null,
+-          finishedAt:
+-            status === "running" || status === "queued"
+-              ? null
+-              : (run.finishedAt ?? now) - 1_000,
+-        });
+-        if (childThreadId !== null) {
+-          const archivedAt =
+-            terminal && run.workersArchived
+-              ? (run.finishedAt ?? now) + MINUTE_MS
+-              : null;
+-          insertWorker.run(
+-            childThreadId,
+-            run.id,
+-            id,
+-            run.originThreadId,
+-            archivedAt,
+-            archivedAt === null && terminal ? now - 1_000 : now + DAY_MS,
+-          );
+-          if (archivedAt !== null && archivedWorkerThreadId === "") {
+-            archivedWorkerThreadId = childThreadId;
+-          }
+-          if (archivedAt === null && terminal && retiredWorkerThreadId === "") {
+-            retiredWorkerThreadId = childThreadId;
+-          }
+-        }
+-        if (run.id === "wfr_running_0") {
+-          if (status === "running" && runningCallId === "") {
+-            runningCallId = id;
+-            runningChildThreadId = childThreadId ?? "";
+-          }
+-          if (status === "queued" && queuedCallId === "") queuedCallId = id;
+-          if (status === "failed") failedCallId = id;
+-        }
+-      }
+-    }
+-  })();
+-  return {
+-    projectId: projectOf(0),
+-    originThreadId: originOf(0),
+-    runningRunId: "wfr_running_0",
+-    largestRunId: "wfr_retained_000000",
+-    runningCallId,
+-    runningChildThreadId,
+-    queuedCallId,
+-    failedCallId,
+-    nextCallIndex: WORKFLOW_CALLS_PER_RUN,
+-    pendingNotificationRunId: "wfr_pending_0",
+-    terminalRunId: `wfr_retained_${(retained - 1).toString().padStart(6, "0")}`,
+-    retiredWorkerThreadId,
+-    archivedWorkerThreadId,
+-    now,
+-  };
+-}
