@@ -55,7 +55,7 @@ struct ThreadShelf: View {
                         }
                     }
                 } trailing: {
-                    ProgressView().controlSize(.mini)
+                    RunningGlyph().accessibilityHidden(true)
                 }
             }
             if !shelf.todos.isEmpty {

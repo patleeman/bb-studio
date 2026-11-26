@@ -16,6 +16,19 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertEqual(WorkspaceMounted.prune(mounted, keeping: ["c"]), ["c"])
     }
 
+    /// Review B3: the shown tab and the loaded heavy ones are one list, so
+    /// switching between two loaded tabs keeps both views (nothing rebuilt).
+    func testSwitchingKeepsBothLoadedTabsInOneList() {
+        let tabs = ["a", "b", "c"].map { WorkspaceTab(id: $0, ref: .init(kind: $0 == "c" ? "file" : "page", id: $0), title: $0) }
+        let mounted = ["b", "a"]
+        let onA = WorkspaceMounted.kept(tabs, mounted: mounted, shown: "a").map(\.id)
+        let onB = WorkspaceMounted.kept(tabs, mounted: mounted, shown: "b").map(\.id)
+        XCTAssertEqual(onA, ["a", "b"])
+        XCTAssertEqual(onA, onB, "the same views, only which one is hidden changes")
+        XCTAssertEqual(WorkspaceMounted.kept(tabs, mounted: mounted, shown: "c").map(\.id), ["a", "b", "c"], "a light tab joins while shown")
+        XCTAssertEqual(WorkspaceMounted.kept(tabs, mounted: [], shown: nil).map(\.id), [], "nothing shown, nothing loaded")
+    }
+
     func testOnlyHttpLinksOpen() {
         func tab(_ url: String) -> WorkspaceTab { WorkspaceTab(id: "t", ref: .init(kind: "browser", url: url), title: "x", support: .web) }
         XCTAssertNotNil(tab("https://example.com/a").safeURL)

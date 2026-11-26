@@ -12,6 +12,9 @@ final class ShellPostureTests: XCTestCase {
     func testPostureFromTheWindowScreenAndHinge() {
         XCTAssertEqual(ShellPosture.resolve(window: iPhone, screen: iPhone, phone: true, hinge: nil), .phone)
         XCTAssertEqual(ShellPosture.resolve(window: outer, screen: outer, phone: true, hinge: .closed), .folded)
+        // Review S4: turned sideways, still the folded Duo (not an iPhone).
+        let sideways = CGSize(width: outer.height, height: outer.width)
+        XCTAssertEqual(ShellPosture.resolve(window: sideways, screen: sideways, phone: true, hinge: nil), .folded)
         XCTAssertEqual(ShellPosture.resolve(window: inner, screen: inner, phone: true, hinge: .partiallyOpen), .book)
         XCTAssertEqual(ShellPosture.resolve(window: inner, screen: inner, phone: true, hinge: .fullyOpen), .flat)
         XCTAssertEqual(ShellPosture.resolve(window: inner, screen: inner, phone: true, hinge: nil), .book,
@@ -51,14 +54,34 @@ final class ShellPostureTests: XCTestCase {
         XCTAssertEqual(RailLayout.slots(.phone, screen: .home, tabs: 0, homeShown: false), [], "no rail on the iPhone")
     }
 
+    /// Review B1: in book, anything pushed (not only a conversation) gives the
+    /// left page back from Home, through `Router.path`.
+    @MainActor func testEveryPushTakesTheBooksPageBackFromHome() {
+        for route: Route in [.place(.memory), .thread(id: "thr_w"), .settings, .studio, .conversation(id: "thr_c")] {
+            let router = Router()
+            router.homePane.toggle(.book)
+            XCTAssertTrue(router.homePane.shown(.book))
+            router.path = [route]
+            XCTAssertFalse(router.homePane.shown(.book), "\(route) shows on the left page")
+        }
+        let router = Router()
+        router.path = [.conversation(id: "thr_c")]
+        router.homePane.toggle(.book)
+        router.openConversation("thr_c")
+        XCTAssertFalse(router.homePane.shown(.book), "the same conversation picked again")
+        router.homePane.toggle(.book)
+        router.path = []
+        XCTAssertTrue(router.homePane.shown(.book), "back to Home keeps Home")
+    }
+
     func testHomeBesideTheConversation() {
         var pane = ShellHomePane()
         XCTAssertTrue(pane.shown(.flat), "flat shows Home")
         XCTAssertFalse(pane.shown(.book), "book hides it")
         pane.toggle(.book)
         XCTAssertTrue(pane.shown(.book), "Home in the rail brings it back")
-        pane.pickedConversation()
-        XCTAssertFalse(pane.shown(.book), "a picked conversation takes the page back")
+        pane.pushed()
+        XCTAssertFalse(pane.shown(.book), "a push takes the page back")
         pane.toggle(.flat)
         XCTAssertFalse(pane.shown(.flat), "hidden by hand in flat")
         pane.postureChanged(from: .flat, to: .book)
@@ -77,5 +100,29 @@ final class ShellPostureTests: XCTestCase {
         XCTAssertEqual(ComposerStatus.working(since: nil, now: now), "Working")
         XCTAssertFalse(ComposerStatus(running: false, since: nil, queued: 0).shown)
         XCTAssertTrue(ComposerStatus(running: false, since: nil, queued: 2).shown, "the queue alone shows the line")
+    }
+
+    /// Review B2: a share action in the rail is the share sheet, not a dead button.
+    func testTheRailSharesAShareAction() {
+        let url = URL(string: "https://example.com/transcript.txt")!
+        XCTAssertEqual(RailControl(ScreenAction(id: "share", title: "Share", systemImage: "square.and.arrow.up", share: url)), .share(url))
+        XCTAssertEqual(RailControl(ScreenAction(id: "edit", title: "Edit", systemImage: "pencil")), .button)
+        XCTAssertEqual(RailControl(ScreenAction(id: "more", title: "More", systemImage: "ellipsis",
+                                                children: [ScreenAction(id: "a", title: "A", systemImage: "a.circle")])), .menu)
+    }
+
+    /// The inner screen comes from the screen, not the window: beside another
+    /// app in iOS's split our window is a page wide.
+    func testTheInnerScreen() {
+        for (screen, phone, inner) in [
+            (CGSize(width: 951, height: 669), true, true),     // Duo inner screen
+            (CGSize(width: 669, height: 951), true, false),    // inner screen, portrait
+            (CGSize(width: 466, height: 678), true, false),    // Duo outer screen
+            (CGSize(width: 402, height: 874), true, false),    // iPhone 18 Pro
+            (CGSize(width: 956, height: 440), true, false),    // iPhone Pro Max, landscape
+            (CGSize(width: 1366, height: 1024), false, false), // iPad, landscape
+        ] {
+            XCTAssertEqual(ShellGeometry.isInnerScreen(screen, phone: phone), inner, "\(screen) phone \(phone)")
+        }
     }
 }

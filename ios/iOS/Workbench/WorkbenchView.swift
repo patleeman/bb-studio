@@ -19,13 +19,13 @@ struct WorkbenchView: View {
         let tabs = store.tabs(threadId)
         let shown = store.selected(threadId)
         ZStack(alignment: .top) {
-            // Heavy views stay loaded (hidden) while among the two newest; the rest load when shown.
-            ForEach(tabs.filter { $0.heavy && store.mounted.contains($0.id) && $0.id != shown?.id }) { tab in
-                WorkbenchTabContent(tab: tab).modifier(WorkbenchHiddenTab())
+            // Heavy views stay loaded (hidden) while among the two newest; the
+            // rest load when shown. One ForEach keyed by tab: showing or hiding
+            // a tab never moves it to another branch, which would rebuild it.
+            ForEach(WorkspaceMounted.kept(tabs, mounted: store.mounted, shown: shown?.id)) { tab in
+                WorkbenchTabContent(tab: tab).modifier(WorkbenchHiddenTab(hidden: tab.id != shown?.id))
             }
-            if let shown {
-                WorkbenchTabContent(tab: shown).id(shown.id)
-            } else {
+            if shown == nil {
                 WorkbenchEmpty(unsupported: store.unsupported) { addingTab = true }
             }
         }
@@ -47,12 +47,14 @@ struct WorkbenchView: View {
 /// A heavy tab kept loaded while another shows: unseen, untouchable, and its
 /// actions don't reach the More menu (the shown tab's do).
 struct WorkbenchHiddenTab: ViewModifier {
+    var hidden = true
+
     func body(content: Content) -> some View {
         content
-            .transformPreference(ScreenActionsKey.self) { $0 = [] }
-            .opacity(0)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+            .transformPreference(ScreenActionsKey.self) { if hidden { $0 = [] } }
+            .opacity(hidden ? 0 : 1)
+            .allowsHitTesting(!hidden)
+            .accessibilityHidden(hidden)
     }
 }
 

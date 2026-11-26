@@ -10,8 +10,8 @@ final class ShellUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
     private var isDuo: Bool { UIDevice.current.name.lowercased().contains("duo") }
 
-    private func launch(_ extra: [String] = []) {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaWorkbenchDemo"] + extra
+    private func launch(_ extra: [String] = [], bot: String = "chat") {
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", bot, "-qaSpacesDemo", "list", "-qaWorkbenchDemo"] + extra
         app.launchOffline()
     }
 
@@ -45,6 +45,42 @@ final class ShellUITests: ServerIsolatedUITestCase {
     }
 
     private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id] }
+
+    // MARK: Idle
+
+    /// A conversation at rest runs no animation forever (phone heat; XCUITest
+    /// waited 60 s a step on the folded Duo): every repeating animation left
+    /// after it settles, other than the text caret's blink, is a bug.
+    func testTheConversationGoesIdle() { expectIdle(["-qaRoomConversation", "thr_botdemo01"]) }
+    func testTheConversationWithChipsGoesIdle() { expectIdle(["-qaRoomConversation", "thr_botdemo01", "-qaShelfDemo"]) }
+    /// While the Bot works (its turn, a running worker on Home, background
+    /// work): still marks, not spinners that would run for hours.
+    func testAWorkingBotGoesIdle() { expectIdle(["-qaShelfDemo", "-openURL", "bbstudio://bot"], bot: "working") }
+    func testHomeWithARunningWorkerGoesIdle() { expectIdle([], home: true) }
+    /// Live scene on: the shell's backdrop stays a still (no scene web view).
+    func testTheBackdropStaysStillWithLiveSceneOn() {
+        expectIdle(["-qaRoomConversation", "thr_botdemo01", "-qaLiveScene", "-qaRoomTheme", "tonights-sky"])
+        XCTAssertFalse((app.windows.firstMatch.value as? String ?? "").contains("webview"), "no live scene behind the shell")
+    }
+    func testTheBotChatGoesIdleAfterAStream() {
+        expectIdle(["-qaDemoLatency", "300", "-qaDemoColdCache", "-qaDemoStream", "-openURL", "bbstudio://bot"])
+    }
+
+    private func expectIdle(_ variant: [String], bot: String = "chat", home: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
+        launch(variant, bot: bot)
+        let shown = home ? app.buttons["homeWorker-thr_demo_w2"] : app.textViews["Message"]
+        XCTAssertTrue(shown.waitForExistence(timeout: 30), home ? "Home with its running worker" : "the conversation", file: file, line: line)
+        sleep(8)
+        command("animations")
+        let running = (app.windows.firstMatch.value as? String ?? "").split(separator: "\n").map(String.init)
+        print("IDLE \(variant): \(running.count)\n" + running.joined(separator: "\n"))
+        // Repeating for good (repeatCount is HUGE_VALF or Float.greatestFiniteMagnitude-like); the caret's blink is the system's.
+        let forever = running.filter { row in
+            let counts = row.components(separatedBy: "repeat=").dropFirst().compactMap { Double($0.prefix { !" ,".contains($0) }) }
+            return counts.contains { $0 > 1000 } && !row.contains("UITextSelectionView") && !row.contains("Caret")
+        }
+        XCTAssertEqual(forever, [], "repeating animations at rest", file: file, line: line)
+    }
 
     // MARK: iPhone
 
@@ -190,6 +226,32 @@ final class ShellUITests: ServerIsolatedUITestCase {
             capture("duo-folded-\(name)")
             app.goHome()
         }
+
+        // Review S6: a page made from Library's + New page is pushed on the
+        // shell's stack, with the rail's Back and the title line.
+        element("homeLibrary").tap()
+        let newPage = app.buttons["rail-action-libraryNewPage"]
+        XCTAssertTrue(newPage.waitForExistence(timeout: 10), "New page in the rail")
+        newPage.tap()
+        let title = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label != 'Library'")).firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 15), "the new page under the title line")
+        XCTAssertTrue(app.buttons["rail-back"].exists, "and Back in the rail")
+        XCTAssertFalse(app.navigationBars.firstMatch.exists, "no bar of its own")
+    }
+
+    /// Review B1: in book, a place opened from Home's column shows on the left
+    /// page (Home gives it the page), its companion on the right.
+    func testBookShowsAPlaceOpenedFromHome() throws {
+        try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
+        launchConversation(["-qaPosture", "book"])
+        resize("landscape", CGSize(width: 951, height: 669))
+        activate("rail-home")
+        XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home on the left page")
+        activate("homeMemory")
+        XCTAssertTrue(element("memory-page").waitForExistence(timeout: 10), "Memory shows")
+        XCTAssertFalse(element("homeColumn").exists, "Home gave the page back")
+        capture("duo-book-memory")
+        command("outer")
     }
 
     func testBookShowsConversationAndWorkbenchAndHomeOnRequest() throws {
@@ -202,9 +264,14 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(element("rail-tabs").exists && element("rail-home").exists && element("rail-more").exists, "Tabs, Home, More")
         capture("duo-book")
 
+        command("counts?reset")
         activate("rail-home")
         XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home takes the left page")
-        XCTAssertFalse(element("conversationColumn").exists)
+        XCTAssertFalse(app.textViews["Message"].exists, "Home replaces the conversation (out of VoiceOver's way)")
+        // Review S3: the conversation stays mounted under Home; its thread keeps running.
+        command("counts")
+        let counts = (try? JSONDecoder().decode([String: Int].self, from: Data((app.windows.firstMatch.value as? String ?? "").utf8))) ?? [:]
+        XCTAssertNil(counts["session.detach"], "opening Home detached the conversation: \(counts)")
         XCTAssertTrue(element("rail-new").exists, "More becomes New")
         capture("duo-book-home")
         activate("homeConversation-thr_botdemo01")

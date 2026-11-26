@@ -257,6 +257,7 @@ private struct ShellPages: View {
     @ObservedObject var store: BotSpacesStore
     let window: CGSize
     @ObservedObject private var router = Router.shared
+    @EnvironmentObject private var app: AppModel
     @Environment(\.shellPosture) private var posture
     /// What's pushed over the left page's conversation offers: in the right page's rail.
     @State private var paneActions: [ScreenAction] = []
@@ -285,6 +286,26 @@ private struct ShellPages: View {
             }
         }
         .animation(.snappy(duration: 0.25), value: homeShown)
+        .onAppear { hold(heldConversation, releasing: nil) }
+        .onChange(of: heldConversation) { old, new in hold(new, releasing: old) }
+        .onDisappear { hold(nil, releasing: heldConversation) }
+    }
+
+    /// Book with Home over the conversation: its Workbench still shows on the
+    /// right page, so the thread stays attached and its Workbench marked shown.
+    private var heldConversation: String? {
+        posture == .book && homeShown && !conversation.isEmpty ? conversation : nil
+    }
+
+    private func hold(_ id: String?, releasing old: String?) {
+        if let id, id != old {
+            ConversationSessions.shared.session(id).hold(app)
+            WorkbenchShown.shared.show(id)
+        }
+        if let old, old != id {
+            ConversationSessions.shared.session(old).stop()
+            WorkbenchShown.shared.hide(old)
+        }
     }
 
     @ViewBuilder private func left(width: CGFloat) -> some View {
@@ -297,6 +318,7 @@ private struct ShellPages: View {
                 conversationColumn
             }
         } else if homeShown {
+            // Home takes the page; the conversation's thread stays held (`holdsConversation`).
             homeColumn
         } else {
             conversationColumn
@@ -377,8 +399,24 @@ private struct ShellWorkbenchPage: View {
     @State private var addingTab = false
     @Environment(\.shellPosture) private var posture
     @EnvironmentObject private var app: AppModel
+    /// Observed, as on `ConversationScreen`: the tab actions in More and the
+    /// thread's web link follow them.
+    @ObservedObject private var session: ConversationSession
+    @ObservedObject private var model: ThreadModel
 
-    private var session: ConversationSession { ConversationSessions.shared.session(threadId) }
+    init(threadId: String, bot: BotSpace, store: BotSpacesStore, homeShown: Bool, pushed: Bool = false,
+         pushedActions: [ScreenAction] = [], companion: ScreenCompanion? = nil) {
+        self.threadId = threadId
+        self.bot = bot
+        self.store = store
+        self.homeShown = homeShown
+        self.pushed = pushed
+        self.pushedActions = pushedActions
+        self.companion = companion
+        let session = ConversationSessions.shared.session(threadId)
+        self.session = session
+        model = session.model
+    }
 
     var body: some View {
         Group {
@@ -387,7 +425,7 @@ private struct ShellWorkbenchPage: View {
             } else {
                 VStack(spacing: 0) {
                     ShellTitleLine(title: workbench.selected(threadId)?.title ?? "Workbench", posture: posture) { tabMenu }
-                    WorkbenchView(threadId: threadId, webURL: session.model.thread.map { app.client.webURL(forThread: $0) },
+                    WorkbenchView(threadId: threadId, webURL: model.thread.map { app.client.webURL(forThread: $0) },
                                   openThread: { router.push(.thread(id: $0)) },
                                   actionsChanged: { if session.tabActions != $0 { session.tabActions = $0 } })
                 }
@@ -452,7 +490,7 @@ struct ShellBackground: View {
         if look.showsScene {
             let bot = BotShell.shownBot(store.spaces, chosen: router.shownBotId)
             ZStack {
-                SceneBackdrop(theme: look.theme, botId: bot?.id, view: bot.flatMap { store.view(for: $0.id) }, paused: true, motion: false)
+                SceneBackdrop(theme: look.theme, botId: bot?.id, view: bot.flatMap { store.view(for: $0.id) }, stillOnly: true, paused: true, motion: false)
                 LinearGradient(stops: [.init(color: look.canvas.opacity(Self.veilTop), location: 0),
                                        .init(color: look.canvas.opacity(Self.veilMid), location: 0.4),
                                        .init(color: look.canvas.opacity(Self.veilBottom), location: 1)],

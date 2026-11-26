@@ -27,7 +27,9 @@ enum ShellPosture: String, CaseIterable, Equatable {
     static func resolve(window: CGSize, screen: CGSize, phone: Bool, hinge: Hinge?, forced: ShellPosture? = nil) -> ShellPosture {
         if let forced { return forced }
         guard phone else { return window.width >= 900 ? .flat : .phone }
-        if abs(screen.width - foldedScreen.width) < 1 && abs(screen.height - foldedScreen.height) < 1 { return .folded }
+        // The outer screen either way up: turned sideways it is still the folded Duo.
+        if abs(min(screen.width, screen.height) - foldedScreen.width) < 1,
+           abs(max(screen.width, screen.height) - foldedScreen.height) < 1 { return .folded }
         let wide = window.width >= 900 && window.height >= 600 && window.width > window.height
         if wide {
             // Half open is the Duo's resting posture in the hand; only a
@@ -221,8 +223,9 @@ struct ShellHomePane: Equatable {
         }
     }
 
-    /// A conversation picked anywhere: book gives the left page back to it.
-    mutating func pickedConversation() {
+    /// Anything pushed (a conversation, Memory, a worker, a page…): book
+    /// gives the left page back to it. `Router.path` calls this on every push.
+    mutating func pushed() {
         shownInBook = false
     }
 

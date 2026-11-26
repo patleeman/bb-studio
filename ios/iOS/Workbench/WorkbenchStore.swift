@@ -59,6 +59,7 @@ final class WorkbenchStore {
         #if DEBUG
         if let demo = WorkbenchDemo.state(threadId) {
             if states[threadId] == nil { states[threadId] = demo }
+            keepShown(threadId)
             return
         }
         #endif
@@ -66,9 +67,17 @@ final class WorkbenchStore {
             guard let next = try await client.workspace(threadId: threadId) else { return }
             if states[threadId] != next { states[threadId] = next }
             prune(threadId)
+            keepShown(threadId)
         } catch where BBClient.isUnknownRPC(error) {
             unsupported = true
         } catch {}
+    }
+
+    /// The shown tab, if heavy, is among the loaded views: the first one shown
+    /// (from the server, not picked here) stays loaded when another is picked.
+    func keepShown(_ threadId: String) {
+        guard let shown = selected(threadId), shown.heavy, !mounted.contains(shown.id) else { return }
+        mounted = WorkspaceMounted.touch(mounted, shown.id, heavy: true)
     }
 
     /// Shows a tab; a heavy one joins the loaded views, pushing out the oldest.
@@ -87,6 +96,7 @@ final class WorkbenchStore {
             picked[threadId] = rest.isEmpty ? nil : rest[min(at, rest.count - 1)].id
         }
         mounted.removeAll { $0 == id }
+        defer { keepShown(threadId) }
         if var state = states[threadId] {
             state.tabs.removeAll { $0.id == id }
             if state.activeTabId == id { state.activeTabId = nil }

@@ -84,6 +84,13 @@ public enum WorkspaceMounted {
     public static func prune(_ mounted: [String], keeping ids: Set<String>) -> [String] {
         mounted.filter(ids.contains)
     }
+
+    /// The tab views to keep in the hierarchy, in tab order: the loaded heavy
+    /// ones and the shown one. One list, so a tab keeps its view (its web view)
+    /// whether it shows or hides.
+    public static func kept(_ tabs: [WorkspaceTab], mounted: [String], shown: String?) -> [WorkspaceTab] {
+        tabs.filter { $0.id == shown || ($0.heavy && mounted.contains($0.id)) }
+    }
 }
 
 extension WorkspaceTab {

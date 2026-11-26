@@ -9,7 +9,6 @@ struct LibraryPageView: View {
     @State private var load = PageLoad<[BotLibraryItem]>()
     @State private var query = ""
     @State private var filter: LibraryPage.Filter = .all
-    @State private var created: Route?
     @State private var refreshed = 0
     @State private var making = false
 
@@ -35,7 +34,6 @@ struct LibraryPageView: View {
         .screenActions([ScreenAction(id: "libraryNewPage", title: "New page", systemImage: "plus", disabled: making) {
             Task { await makePage() }
         }])
-        .navigationDestination(item: $created) { RouteDestination(route: $0) }
         .refreshable {
             await load.reload()
             refreshed += 1
@@ -62,7 +60,8 @@ struct LibraryPageView: View {
         defer { making = false }
         do {
             let page = try await app.client.createPage(title: "Untitled", markdown: "")
-            created = .page(id: page.id)
+            // On the shell's stack, so it has the title line and rail (Review S6).
+            Router.shared.push(.page(id: page.id))
         } catch {
             app.flash("The page wasn't made: " + BBClient.describe(error, server: app.client.baseURL))
         }

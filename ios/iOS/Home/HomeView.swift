@@ -282,7 +282,7 @@ struct HomeConversationRow: View {
                     Text(line.title).font(.body.weight(.semibold)).lineLimit(1)
                     Spacer(minLength: 4)
                     if line.running {
-                        HStack(spacing: 5) { ProgressView().controlSize(.mini); Text("Working") }
+                        HStack(spacing: 5) { RunningGlyph().accessibilityHidden(true); Text("Working") }
                             .font(.footnote).foregroundStyle(.secondary)
                     } else {
                         Text(BotShell.shortAge(line.updatedAt)).font(.footnote).monospacedDigit().foregroundStyle(.secondary)
@@ -373,7 +373,7 @@ struct BotWorkerGlyph: View {
     var body: some View {
         switch status {
         case .running:
-            ProgressView().controlSize(.mini).accessibilityLabel("Running")
+            RunningGlyph().accessibilityLabel("Running")
         case .needsYou:
             Image(systemName: "pause.circle").font(.footnote).foregroundStyle(.secondary).accessibilityLabel("Waiting")
         case .failed:
@@ -558,5 +558,17 @@ final class HomeProjects: ObservableObject {
             _ = await owned
             if sidebar == nil { self.error = BBClient.describe(error, server: client.baseURL) }
         }
+    }
+}
+
+/// Something running for as long as it takes (a worker, the Bot's turn,
+/// background work): the design's ◌, still. A spinner here would animate for
+/// hours, keeping the render server busy and the phone warm, and the app
+/// never idle.
+struct RunningGlyph: View {
+    var body: some View {
+        Image(systemName: "circle.dotted")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.secondary)
     }
 }

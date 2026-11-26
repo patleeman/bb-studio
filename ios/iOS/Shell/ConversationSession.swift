@@ -47,20 +47,40 @@ final class ConversationSession: ObservableObject {
     }
 
     private var attached = 0
+    private var isAttached = false
 
     /// Each screen showing the thread attaches once; the last to go detaches.
     func start(_ app: AppModel) async {
-        attached += 1
-        if attached == 1 { model.attach(app) }
+        hold(app)
         await model.load()
     }
 
+    /// Keeps the thread attached without loading it again: the book's Home
+    /// over a conversation whose Workbench still shows (`ShellPages`).
+    func hold(_ app: AppModel) {
+        attached += 1
+        guard !isAttached else { return }
+        isAttached = true
+        model.attach(app)
+    }
+
+    /// The last holder going detaches, a run loop turn later: a screen that
+    /// replaces another in the same update (Home over the conversation, a
+    /// posture change) takes over without the thread stopping.
     func stop() {
         guard attached > 0 else { return }
         attached -= 1
-        if attached == 0 {
-            talk.end()
-            model.detach()
+        guard attached == 0 else { return }
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.attached == 0, self.isAttached else { return }
+                #if DEBUG
+                RenderCount.bump("session.detach")
+                #endif
+                self.isAttached = false
+                self.talk.end()
+                self.model.detach()
+            }
         }
     }
 }

@@ -39,6 +39,26 @@ enum DuoDemo {
         window.frame = CGRect(x: 0, y: 0, width: 951, height: 669)
     }
 
+    /// "ViewClass frame: keys" for each layer under the window with animations.
+    static func runningAnimations(_ window: UIWindow) -> [String] {
+        var out: [String] = []
+        func walk(_ layer: CALayer, _ path: String) {
+            let owner = (layer.delegate as? UIView).map { String(describing: type(of: $0)) } ?? String(describing: type(of: layer))
+            let here = path.isEmpty ? owner : path + ">" + owner
+            if let view = layer.delegate as? UIView, String(describing: type(of: view)) == "WKWebView", !view.isHidden, view.alpha > 0 {
+                out.append("webview \(here.suffix(120)) \(layer.convert(layer.bounds, to: window.layer).integral)")
+            }
+            if let keys = layer.animationKeys(), !keys.isEmpty {
+                let frame = layer.convert(layer.bounds, to: window.layer)
+                let details = keys.compactMap { key in layer.animation(forKey: key).map { "\(key) repeat=\($0.repeatCount) dur=\($0.duration)" } }
+                out.append("\(here.suffix(160)) \(frame.integral): \(details.joined(separator: ", "))")
+            }
+            for sub in layer.sublayers ?? [] { walk(sub, here) }
+        }
+        walk(window.layer, "")
+        return out
+    }
+
     private static func layoutGeometry(_ window: UIWindow) -> [String: Any] {
         func scrolls(_ view: UIView) -> [[String: Any]] {
             var result = view.subviews.flatMap(scrolls)
@@ -183,6 +203,10 @@ enum DuoDemo {
             if let data = try? JSONSerialization.data(withJSONObject: layoutGeometry(window), options: .sortedKeys) {
                 window.accessibilityValue = String(data: data, encoding: .utf8)
             }
+            return true
+        case "animations":
+            // Every layer with an animation running: what keeps the app from going idle.
+            window.accessibilityValue = Self.runningAnimations(window).joined(separator: "\n")
             return true
         case "dismiss":
             window.endEditing(true)

@@ -567,7 +567,7 @@ struct ActivityGroup: View {
         } label: {
             HStack(spacing: 6) {
                 if running {
-                    ProgressView().controlSize(.mini)
+                    RunningGlyph().accessibilityHidden(true)
                 } else if failed {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
                 }

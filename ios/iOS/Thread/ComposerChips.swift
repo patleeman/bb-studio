@@ -87,7 +87,7 @@ struct ComposerChipsRow: View {
 
     @ViewBuilder private func body(_ chip: ComposerChip) -> some View {
         let label = HStack(spacing: 5) {
-            if chip.busy { ProgressView().controlSize(.mini) } else { Image(systemName: chip.icon).foregroundStyle(.secondary) }
+            if chip.busy { RunningGlyph().accessibilityHidden(true) } else { Image(systemName: chip.icon).foregroundStyle(.secondary) }
             Text(chip.text).lineLimit(1)
             if let action = chip.action { Text(action).fontWeight(.semibold).foregroundStyle(.tint) }
         }
@@ -142,7 +142,7 @@ struct ComposerStatusLine: View {
     var body: some View {
         HStack(spacing: 6) {
             if status.running {
-                ProgressView().controlSize(.mini)
+                RunningGlyph().accessibilityHidden(true)
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     Text(ComposerStatus.working(since: status.since, now: context.date)).monospacedDigit()
                 }

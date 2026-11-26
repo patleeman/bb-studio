@@ -15,6 +15,17 @@ struct RailActions {
 /// packed at the bottom (the first slot lowest, under the thumb). The
 /// system's time and battery keep the column's top. Above the keyboard
 /// when it is up.
+/// What a screen action is in the rail: a menu of its children, the system
+/// share sheet for its URL, or a plain button (as `ScreenActionItems` decides
+/// in a menu).
+enum RailControl: Equatable {
+    case menu, share(URL), button
+
+    init(_ action: ScreenAction) {
+        if !action.children.isEmpty { self = .menu } else if let url = action.share { self = .share(url) } else { self = .button }
+    }
+}
+
 struct ShellRail: View {
     let slots: [RailSlot]
     let actions: RailActions
@@ -46,17 +57,25 @@ struct ShellRail: View {
                 .menuOrder(.fixed)
                 .tint(.primary)
                 .accessibilityIdentifier("rail-\(slot.id)")
-        case .action(let action) where !action.children.isEmpty:
-            Menu { ScreenActionItems(actions: action.children) } label: { RailLabel(slot: slot, large: large) }
-                .menuOrder(.fixed)
-                .tint(.primary)
-                .disabled(action.disabled)
-                .accessibilityIdentifier("rail-\(slot.id)")
         case .action(let action):
-            Button { action.run() } label: { RailLabel(slot: slot, large: large) }
-                .buttonStyle(.plain)
-                .disabled(action.disabled)
-                .accessibilityIdentifier("rail-\(slot.id)")
+            switch RailControl(action) {
+            case .menu:
+                Menu { ScreenActionItems(actions: action.children) } label: { RailLabel(slot: slot, large: large) }
+                    .menuOrder(.fixed)
+                    .tint(.primary)
+                    .disabled(action.disabled)
+                    .accessibilityIdentifier("rail-\(slot.id)")
+            case .share(let url):
+                ShareLink(item: url) { RailLabel(slot: slot, large: large) }
+                    .buttonStyle(.plain)
+                    .disabled(action.disabled)
+                    .accessibilityIdentifier("rail-\(slot.id)")
+            case .button:
+                Button { action.run() } label: { RailLabel(slot: slot, large: large) }
+                    .buttonStyle(.plain)
+                    .disabled(action.disabled)
+                    .accessibilityIdentifier("rail-\(slot.id)")
+            }
         default:
             Button { actions.tap(slot) } label: { RailLabel(slot: slot, large: large) }
                 .buttonStyle(.plain)

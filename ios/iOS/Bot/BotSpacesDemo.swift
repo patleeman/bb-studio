@@ -560,6 +560,10 @@ enum BotSpacesDemo {
                 ]
                 let requests: [[String: Any]] = [["id": "gwr_1", "label": "Google Calendar: read events", "why": "To find a free slot for the furnace tune-up", "createdAt": Self.now - 300_000]]
                 return ok(["servers": servers, "requests": requests])
+            case Studio.Method.pages_create:
+                // `-qaPageDemo`: a new page is the demo page (Library's + New page).
+                guard ProcessInfo.processInfo.arguments.contains("-qaPageDemo") else { return nil }
+                return ok(["page": ["id": PageDemo.id, "title": "Untitled", "icon": "", "position": 0, "createdAt": Self.now, "archived": false] as [String: Any]])
             case "bot_pause", "bot_resume", "bot_stop":
                 lock.withLock { juniperState = name == "bot_resume" ? "active" : name == "bot_pause" ? "paused" : "stopped" }
                 return ok(["id": "bot_juniper", "name": "Juniper", "state": lock.withLock { juniperState }])
