@@ -204,10 +204,8 @@ private struct DesignThumbnail: View {
         let scale = 300 / size.height
         Button(action: open) {
             VStack(alignment: .leading, spacing: 6) {
-                DesignFrame(url: model.screenURL(screen))
-                    .frame(width: size.width, height: size.height)
-                    .scaleEffect(scale, anchor: .topLeading)
-                    .frame(width: size.width * scale, height: 300, alignment: .topLeading)
+                // A picture of the screen, drawn once (`DesignThumbnails`), not a live page.
+                DesignThumbnailImage(url: model.screenURL(screen), size: CGSize(width: size.width, height: size.height), height: 300)
                     .clipShape(.rect(cornerRadius: 12))
                     .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator))
                 HStack(spacing: 6) {
@@ -221,7 +219,6 @@ private struct DesignThumbnail: View {
                 }
                 .frame(width: size.width * scale, alignment: .leading)
             }
-            // The page takes no touches: the whole card opens the screen.
             .contentShape(.rect)
         }
         .buttonStyle(.plain)

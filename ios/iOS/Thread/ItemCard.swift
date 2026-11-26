@@ -389,10 +389,7 @@ private struct DesignScreenThumb: View {
         let size = screen.size
         let scale = Self.height / size.height
         VStack(alignment: .leading, spacing: 4) {
-            StaticWebView(url: url)
-                .frame(width: size.width, height: size.height)
-                .scaleEffect(scale, anchor: .topLeading)
-                .frame(width: size.width * scale, height: Self.height, alignment: .topLeading)
+            DesignThumbnailImage(url: url, size: CGSize(width: size.width, height: size.height), height: Self.height)
                 .clipShape(.rect(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
             Text(screen.caption ?? screen.title ?? screen.id ?? "Screen")
@@ -406,26 +403,3 @@ private struct DesignScreenThumb: View {
     }
 }
 
-/// A design screen shown without touches, so the card around it takes them.
-/// Agent-written HTML: its own store, and it stays on its page (`UntrustedWeb`).
-private struct StaticWebView: UIViewRepresentable {
-    let url: URL
-
-    func makeUIView(context: Context) -> WKWebView {
-        let view = WKWebView(frame: .zero, configuration: UntrustedWeb.configuration())
-        view.isUserInteractionEnabled = false
-        view.scrollView.contentInsetAdjustmentBehavior = .never
-        view.isOpaque = false
-        view.navigationDelegate = context.coordinator
-        view.uiDelegate = context.coordinator
-        context.coordinator.load(url, in: view)
-        return view
-    }
-
-    func updateUIView(_ view: WKWebView, context: Context) {
-        guard context.coordinator.loaded != url else { return }
-        context.coordinator.load(url, in: view)
-    }
-
-    func makeCoordinator() -> DesignPageLoader { DesignPageLoader() }
-}

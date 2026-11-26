@@ -103,6 +103,17 @@ final class DesignViewerUITests: ServerIsolatedUITestCase {
                        "a forged text edit outside Edit text never reached the server")
     }
 
+    /// Thumbnails are pictures, drawn once and kept: the canvas holds no live web views.
+    func testThumbnailsArePicturesNotLivePages() {
+        launch()
+        let thumbnails = app.images.matching(identifier: "designThumbnail")
+        let until = Date().addingTimeInterval(20)
+        while thumbnails.count < 2, Date() < until { Thread.sleep(forTimeInterval: 0.5) }
+        XCTAssertEqual(thumbnails.count, 2, "both screens drawn as pictures")
+        XCTAssertEqual(app.webViews.count, 0, "no web view behind them")
+        shot("design-thumbnails")
+    }
+
     private func shot(_ name: String) {
         guard let folder = ProcessInfo.processInfo.environment["VIEWERS_OUT"] else { return }
         sleep(1)
