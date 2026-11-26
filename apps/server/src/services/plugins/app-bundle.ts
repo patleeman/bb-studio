@@ -368,7 +368,7 @@ function parsePluginArtifactMeta(raw: string): PluginArtifactMetaParseResult {
 }
 
 const PLUGIN_APP_CHUNK_FILE_PATTERN = new RegExp(
-  `^${PLUGIN_APP_CHUNK_DIRECTORY}/[A-Za-z0-9_-]+\\.js$`,
+  `^${PLUGIN_APP_CHUNK_DIRECTORY}/[A-Za-z0-9_-][A-Za-z0-9_.-]*\\.js$`,
   "u",
 );
 
