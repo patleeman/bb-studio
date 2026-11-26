@@ -110,6 +110,7 @@ import { APP_TOOLS, appTools, familyTool, ToolBook, type AgentTool } from "./src
 import { MemoryStore } from "./src/memory/store";
 import { MEMORY_TOOLS, MemoryService, setBotMemoryPage, withMemory } from "./src/memory/service";
 import { registerMemory } from "./src/memory/register";
+import { ALWAYS_ON_CAP } from "./src/core-skill";
 import { recordLine } from "./src/memory/shared";
 import { BotPageState, registerGroupTool } from "./src/bot-page-state";
 import { BotCacheWarmer } from "./src/bot-cache";
@@ -663,11 +664,9 @@ export default async function plugin(bb: BbPluginApi) {
     presenceChanged: (botId) => botSignal.add([{ botId, kinds: ["presence"] }]),
     memory: {
       exists: (pageId) => { const page = pages.store.meta(pageId); return !!page && !page.archived_at; },
-      // A new Bot's memory page is its core profile (src/memory).
-      create: ({ botId, botName }) => memoryService.newProfile(botId, botName),
-      addCheckin: (pageId, line) => pages.addCheckin(pageId, line),
+      // The old core profile page, read once to move its text into the always-on skill (src/core-skill-migrate.ts).
+      markdown: (pageId) => pages.markdown(pageId),
       retitle: (pageId, from, to) => pages.retitle(pageId, from, to),
-      unarchive: (pageId) => { const page = pages.store.meta(pageId); if (!page?.archived_at) return false; return !!pages.store.update(pageId, { archived_at: null }, "studio"); },
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
     providerStates: async () => { const { primaryHostId } = await bb.sdk.system.config(); return (await bb.sdk.system.providerStates(primaryHostId ? { hostId: primaryHostId } : undefined)).providers; },
@@ -1049,7 +1048,7 @@ export default async function plugin(bb: BbPluginApi) {
     bots: () => bots.list().map(learningBot),
     bot: (botId) => { const bot = bots.stored(botId); return bot ? learningBot(bot) : null; },
     memoryPage: (botId) => { try { return bots.memoryPage(botId); } catch { return null; } },
-    skills: (botId) => bots.skills(botId).map((skill) => ({ name: skill.name, description: skill.description, body: bots.skill(skill.name, botId)?.body ?? "", state: skill.state ?? "active", pinned: !!skill.pinned, usedAt: skill.usedAt ?? null, updatedAt: skill.updatedAt })),
+    skills: (botId) => bots.skills(botId).map((skill) => ({ name: skill.name, description: skill.description, body: bots.skill(skill.name, botId)?.body ?? "", state: skill.state ?? "active", pinned: !!skill.pinned, usedAt: skill.usedAt ?? null, updatedAt: skill.updatedAt, alwaysOn: !!skill.alwaysOn })),
     setState: (botId, name, state) => { bots.setSkillState(name, state, botId); },
     log: (message) => bb.log.warn(message),
   });
@@ -1102,11 +1101,22 @@ export default async function plugin(bb: BbPluginApi) {
   }, 3_000);
   bb.onDispose(() => clearTimeout(footerStart));
   const memorySplitStart = setTimeout(() => { if (!disposed) memoryService.autoSplitAll(); }, 2_000);
+  // Every Studio Bot gets its always-on core skill, from its core profile page when it has one (once; src/core-skill-migrate.ts).
+  const coreSkillStart = setTimeout(() => {
+    if (disposed) return;
+    for (const bot of bots.list()) {
+      try {
+        const moved = bots.ensureCore(bot.id);
+        if (moved && moved.state !== "done") bb.log.info(`Always-on skill for ${bot.id}: ${moved.state} ${moved.skill} (${moved.chars} characters${moved.chars > ALWAYS_ON_CAP ? ", over the budget: kept whole" : ""}).`);
+      } catch (error) { bb.log.warn(`Always-on skill for ${bot.id}: ${error instanceof Error ? error.message : String(error)}`); }
+    }
+  }, 2_500);
+  bb.onDispose(() => clearTimeout(coreSkillStart));
   bb.onDispose(() => clearTimeout(memorySplitStart));
   const maintenance = new BotMaintenance({
     db, sdk: bb.sdk, scheduler, changed: tagsChanged,
     bots: () => bots.list(), owned: (id) => ownedThreads.owned(id), refreshOwned: () => ownedThreads.sweep(),
-    memory: (id) => { if (memoryService.split(id).state === "needed") return null; const pageId = bots.memoryPage(id); if (!pageId) return null; const page = pages.store.meta(pageId); return page ? { id: pageId, markdown: pages.markdown(pageId) ?? "", updatedAt: page.updated_at } : null; },
+    memory: (id) => { const all = bots.alwaysOnSkills(id); const core = all[0]; return core ? { id: core.name, markdown: core.body, updatedAt: core.updatedAt, totalChars: bots.skillBudget(id).chars } : null; },
     curate: (id, dryRun) => learning.curate(id, { dryRun }),
     automationPause: (id, botId) => automations.setState(id, "paused", botId),
     automationDelete: (id, botId) => automations.delete(id, botId),

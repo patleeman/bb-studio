@@ -618,7 +618,7 @@ export class Automations {
       const automation = hbAutomation ? bb.get(hbAutomation.id) : undefined;
       views.push({
         id: HEARTBEAT_ID, kind: "checkin", name: HEARTBEAT_NAME, original: true, bbIds: hbAutomation ? [hbAutomation.id] : [],
-        instruction: "What your Memory page's Check-in section says.",
+        instruction: "What the Check-in section of your always-on skill says.",
         schedule: fromHeartbeat(heartbeat), scheduleText: describeSchedule(fromHeartbeat(heartbeat)),
         state: heartbeat.enabled ? "active" : "paused", nextRunAt: heartbeat.enabled ? automation?.nextRunAt ?? null : null, lastRunAt: automation?.lastRunAt ?? null,
         lastOutcome: this.resumedSince(hbAutomation ? [hbAutomation.id] : [], automation?.lastRunAt) ?? automation?.lastRunStatus ?? null, model: null, script: null, target: "main", targetName: bot.name, threadId: bot.threadId,
@@ -683,7 +683,7 @@ export class Automations {
       entries.push({
         id: HEARTBEAT_ID, botId: bot.id, kind: "schedule", name: HEARTBEAT_NAME, when: whenText(fromHeartbeat(heartbeat)),
         status: heartbeat.enabled ? "active" : "paused", createdAt: null, bbIds: ref ? [ref] : [], threadId: bot.threadId,
-        lastRunAt: own?.lastRunAt ?? null, lastRun: lastRunMark(own?.lastRunStatus), instruction: "What your Memory page's Check-in section says.", script: null,
+        lastRunAt: own?.lastRunAt ?? null, lastRun: lastRunMark(own?.lastRunStatus), instruction: "What the Check-in section of your always-on skill says.", script: null,
       });
     }
     const maintenance = bot.kind === "external" ? null : this.deps.maintenance?.get(bot.id) ?? null;
@@ -821,7 +821,7 @@ export class Automations {
     if (input.id === HEARTBEAT_ID) {
       const run = this.deps.heartbeat.get(bot.id);
       if (!run) throw new Error("This Bot has no original check-in.");
-      if (input.name && input.name !== HEARTBEAT_NAME) throw new Error("The original check-in keeps its name; its instruction is your Memory page's Check-in section.");
+      if (input.name && input.name !== HEARTBEAT_NAME) throw new Error("The original check-in keeps its name; its instruction is the Check-in section of your always-on skill.");
       if (input.schedule) await this.deps.heartbeat.set(bot.id, { ...run, ...runnerSchedule(input.schedule), enabled: run.enabled });
       return this.one(HEARTBEAT_ID, bot.id);
     }

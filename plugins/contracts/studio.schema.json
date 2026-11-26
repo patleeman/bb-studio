@@ -16819,6 +16819,9 @@
                     "number",
                     "null"
                   ]
+                },
+                "alwaysOn": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -16860,6 +16863,9 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 20000
+          },
+          "alwaysOn": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -16897,6 +16903,9 @@
               "number",
               "null"
             ]
+          },
+          "alwaysOn": {
+            "type": "boolean"
           }
         },
         "required": [

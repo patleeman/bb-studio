@@ -6,10 +6,10 @@ const MEMORY = "## Check-in\n- Look at the inbox\n- Chase the Larkspur lead\n\n#
 function sources(overrides: Partial<SeedSources> = {}): SeedSources {
   return {
     bots: () => [
-      { name: "Dot", role: "Keeps the week on track.", threadId: "thr_cos", memoryPageId: "pg_memory", primary: true },
-      { name: "Scout", role: "Watches flight prices.", threadId: "thr_scout", memoryPageId: null, primary: false },
+      { id: "bot_dot", name: "Dot", role: "Keeps the week on track.", threadId: "thr_cos", primary: true },
+      { id: "bot_scout", name: "Scout", role: "Watches flight prices.", threadId: "thr_scout", primary: false },
     ],
-    memory: (pageId) => (pageId === "pg_memory" ? MEMORY : null),
+    memory: (botId) => (botId === "bot_dot" ? MEMORY : null),
     leadOf: (threadId) => (threadId === "thr_larkspur" ? "Larkspur" : null),
     runnerOf: (threadId) => (threadId === "thr_runner" ? { name: "eBay fetcher", job: "Fetch new listings nightly." } : null),
     thread: async (threadId) => ({
@@ -68,7 +68,7 @@ describe("the identity seed", () => {
     const huge = "word ".repeat(20_000);
     const recent = Array.from({ length: 40 }, (_, index) => ({ role: (index % 2 ? "assistant" : "user") as "user" | "assistant", text: `Message ${index}: ${huge}` }));
     const seed = buildSeed((await gatherSeed("thr_cos", sources({
-      bots: () => [{ name: "Dot", role: huge, threadId: "thr_cos", memoryPageId: "pg_memory", primary: true }],
+      bots: () => [{ id: "bot_dot", name: "Dot", role: huge, threadId: "thr_cos", primary: true }],
       memory: () => `## Memory\n${huge}`,
       recent: async () => recent,
     })))!);

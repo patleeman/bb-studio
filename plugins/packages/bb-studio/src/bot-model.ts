@@ -24,9 +24,9 @@ export const RUNNING = new Set(["active", "starting", "pending", "stopping"]);
 /** Running now; a "pending" thread is waiting to start. */
 const WORKING = new Set(["active", "starting", "stopping"]);
 
-/** The Bot's check-in prompt. What to look at lives on its Memory page, not here. */
+/** The Bot's check-in prompt. What to look at is the "## Check-in" section of its always-on core skill (src/core-skill.ts), not here. */
 export function botHeartbeat(name: string): string {
-  return `Check-in for ${JSON.stringify(name)}: read your Memory page and do what its "## Check-in" section says. Do the checks yourself; if a worker thread really helps, reuse the one you used before (bb thread tell) instead of starting a new one each time. Reply only if something changed or needs the user; otherwise reply exactly [PASS]: no "✓", "nothing new" or other filler.`;
+  return `Check-in for ${JSON.stringify(name)}: do what the "## Check-in" section of your always-on skill (core-profile, in your instructions) says. Do the checks yourself; if a worker thread really helps, reuse the one you used before (bb thread tell) instead of starting a new one each time. Reply only if something changed or needs the user; otherwise reply exactly [PASS]: no "✓", "nothing new" or other filler.`;
 }
 
 /** An external bot's check-in: it has no Memory page, so the message carries the ask. */
@@ -89,7 +89,7 @@ export function botInstructions(bot: { name: string; state: BotState; role?: str
     // to it, and nothing else in Studio asks the user for attention.
     const quiet = "You triage: reports, alerts and your threads' questions come to you. Your chat is the user's inbox: post only what changed or needs them (a thread waiting on them: what it needs, linked); else (nothing new, a thread finished fine) reply exactly [PASS], no \"✓\".";
     const runners = "Schedule with schedule (op: create): check-ins, reminders, watchers, runners.";
-    // Memory (the core profile and records) is told by src/memory, in every conversation and worker.
+    // Always-on skills come in full from src/memory, in every conversation and worker.
     return [who, quiet, runners, skills].filter(Boolean).join("\n");
   }
   return `${who}\nYou are ${bot.state} by the user. Don't start new work: don't spawn or steer threads, change Studio items or schedule anything. Answer questions, and tell the user to resume you (Studio → Bot → Resume) for anything else.`;
@@ -221,7 +221,7 @@ export function checkSelfEdit(changes: Record<string, unknown>): Partial<Record<
 }
 
 export type SkillRow = import("./bot-skill-record").BotSkillRecord;
-export const skillView = (skill: SkillRow): BotSkillView => ({ name: skill.name, description: skill.description, updatedAt: skill.updated_at, state: skill.state, pinned: !!skill.pinned, usedAt: skill.used_at ?? null });
+export const skillView = (skill: SkillRow): BotSkillView => ({ name: skill.name, description: skill.description, updatedAt: skill.updated_at, state: skill.state, pinned: !!skill.pinned, usedAt: skill.used_at ?? null, alwaysOn: !!skill.always_on });
 
 /** A provider's display name for a handoff note. */
 export function providerName(providerId: string | null | undefined): string {
@@ -311,16 +311,16 @@ export const automationRow = z.object({
 }).passthrough();
 export type AutomationRow = z.infer<typeof automationRow>;
 
-/** The Bot's Memory page, a Studio page (src/pages). */
+/**
+ * The Bot's old core profile page, a Studio page (src/pages). Its text moved
+ * into the Bot's always-on skill (src/core-skill-migrate.ts); the page is
+ * kept, read once for that move, and no longer made for new Bots.
+ */
 export interface BotMemoryPages {
   exists(pageId: string): boolean;
-  /** Makes a page in the personal project and returns its id: the Bot's core profile (src/memory), where one is wired up. */
-  create(input: { title: string; markdown: string; botId: string; botName: string }): string;
-  /** Adds a line to the page's "## Check-in" section (made if missing); false when it was already there. */
-  addCheckin?(pageId: string, line: string): boolean;
+  /** A page's Markdown, archived pages too; null when there's no such page. */
+  markdown?(pageId: string): string | null;
   retitle?(pageId: string, from: string, to: string): boolean;
-  /** Unarchives a page that was archived (not deleted); true when it is back. */
-  unarchive?(pageId: string): boolean;
 }
 
 export interface BotDeps {

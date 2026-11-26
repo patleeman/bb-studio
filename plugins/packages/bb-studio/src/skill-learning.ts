@@ -158,10 +158,11 @@ export function lineDiff(before: string, after: string): string {
 }
 
 /** What the curator changes: unused skills go active → stale → archived; pinned ones stay. */
-export function curatorPlan(skills: readonly { name: string; state: SkillState; pinned: boolean; usedAt: number | null; updatedAt: number }[], now: number): { name: string; from: SkillState; to: SkillState }[] {
+export function curatorPlan(skills: readonly { name: string; state: SkillState; pinned: boolean; usedAt: number | null; updatedAt: number; alwaysOn?: boolean }[], now: number): { name: string; from: SkillState; to: SkillState }[] {
   const plan: { name: string; from: SkillState; to: SkillState }[] = [];
   for (const skill of skills) {
-    if (skill.pinned || skill.state === "archived") continue;
+    // Always-on skills are in every prompt, so they are always in use.
+    if (skill.pinned || skill.alwaysOn || skill.state === "archived") continue;
     const idle = now - Math.max(skill.usedAt ?? 0, skill.updatedAt);
     const to: SkillState = idle >= ARCHIVE_AFTER_MS ? "archived" : idle >= STALE_AFTER_MS ? "stale" : skill.state;
     if (to !== skill.state) plan.push({ name: skill.name, from: skill.state, to });
@@ -231,7 +232,7 @@ type LearningRow = {
 type ReviewRow = { thread_id: string; bot_id: string; kind: "review" | "consolidate"; status: "running" | "done"; saved: number; memory: number; started_at: number; finished_at: number | null; result: string | null };
 
 export interface LearningBot { id: string; name: string; threadId: string | null; state: string; kind?: string; memoryPageId?: string | null }
-export interface LearningSkill { name: string; description: string; body: string; state: SkillState; pinned: boolean; usedAt: number | null; updatedAt: number }
+export interface LearningSkill { name: string; description: string; body: string; state: SkillState; pinned: boolean; usedAt: number | null; updatedAt: number; alwaysOn?: boolean }
 export interface LearningDeps {
   db: Database.Database;
   sdk: Sdk;

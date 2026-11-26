@@ -5,6 +5,7 @@ import type Database from "better-sqlite3";
 import type { BotSkillView } from "./contract";
 import { SKILL_NAME, skillMarkdown, skillView, type SkillRow } from "./bot-model";
 import { lineDiff, lintSkill } from "./skill-learning";
+import { ALWAYS_ON_CAP, alwaysOnChars, lintAlwaysOn } from "./core-skill";
 import { rankSkills, type SearchableSkill, type SkillHit } from "./skill-search";
 
 export interface BotSkillStoreDeps {
@@ -54,15 +55,44 @@ export class BotSkillStore {
     return changed;
   }
 
-  /** Adds or replaces one of a Bot's own skills. Only its thread loads them. */
-  write(botId: string, input: { name: string; description: string; body: string }): BotSkillView {
+  /** Adds or replaces one of a Bot's own skills. A new skill is on demand unless `alwaysOn`; a rewrite keeps the flag. */
+  write(botId: string, input: { name: string; description: string; body: string; alwaysOn?: boolean }): BotSkillView {
     if (!SKILL_NAME.test(input.name)) throw new Error("A skill name is lowercase words joined by hyphens, like weekly-review.");
     const now = Date.now();
-    this.deps.db.prepare(`INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at, state, used_at, lint_warnings) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
-      ON CONFLICT (bot_id, name) DO UPDATE SET description = excluded.description, body = excluded.body, updated_at = excluded.updated_at, state = 'active', used_at = excluded.used_at, lint_warnings = excluded.lint_warnings`)
-      .run(botId, input.name, input.description.trim(), input.body, now, now, now, JSON.stringify(lintSkill(input, this.list(botId).map((skill) => skill.name))));
+    const existing = this.deps.db.prepare("SELECT always_on FROM bot_skills WHERE bot_id = ? AND name = ?").get(botId, input.name) as { always_on: number } | undefined;
+    const alwaysOn = input.alwaysOn ?? existing?.always_on === 1;
+    this.deps.db.prepare(`INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at, state, used_at, lint_warnings, always_on) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+      ON CONFLICT (bot_id, name) DO UPDATE SET description = excluded.description, body = excluded.body, updated_at = excluded.updated_at, state = 'active', used_at = excluded.used_at, lint_warnings = excluded.lint_warnings, always_on = excluded.always_on`)
+      .run(botId, input.name, input.description.trim(), input.body, now, now, now, JSON.stringify(this.lint(botId, { ...input, alwaysOn })), alwaysOn ? 1 : 0);
     this.deps.changed();
     return this.list(botId).find((skill) => skill.name === input.name)!;
+  }
+
+  /** The advisory notes a save stores: the general ones, and for an always-on skill its budget and section caps. */
+  lint(botId: string, skill: { name: string; body: string; alwaysOn?: boolean }): string[] {
+    const notes = lintSkill(skill, this.list(botId).map((each) => each.name));
+    if (!skill.alwaysOn) return notes;
+    const others = this.alwaysOn(botId).filter((each) => each.name !== skill.name).reduce((sum, each) => sum + alwaysOnChars(each.body), 0);
+    return [...notes.filter((note) => !note.startsWith("It's ")), ...lintAlwaysOn(skill.body, others + alwaysOnChars(skill.body))];
+  }
+
+  /** The Bot's always-on skills that aren't archived, with their bodies, by name. */
+  alwaysOn(botId: string): { name: string; description: string; body: string; updatedAt: number }[] {
+    return (this.deps.db.prepare("SELECT name, description, body, updated_at FROM bot_skills WHERE bot_id = ? AND always_on = 1 AND state != 'archived' ORDER BY name = 'core-profile' DESC, name").all(botId) as { name: string; description: string; body: string; updated_at: number }[])
+      .map((row) => ({ name: row.name, description: row.description, body: row.body, updatedAt: row.updated_at }));
+  }
+
+  /** The always-on budget: characters used by all always-on skills together, and the cap. */
+  budget(botId: string): { chars: number; cap: number; over: boolean } {
+    const chars = this.alwaysOn(botId).reduce((sum, each) => sum + alwaysOnChars(each.body), 0);
+    return { chars, cap: ALWAYS_ON_CAP, over: chars > ALWAYS_ON_CAP };
+  }
+
+  /** Turns a skill's always-on flag on or off; an always-on skill is pinned so the curator leaves it. */
+  setAlwaysOn(botId: string, name: string, on: boolean): boolean {
+    const changed = this.deps.db.prepare(`UPDATE bot_skills SET always_on = ?${on ? ", pinned = 1, state = 'active'" : ""} WHERE bot_id = ? AND name = ?`).run(on ? 1 : 0, botId, name).changes > 0;
+    if (changed) this.deps.changed();
+    return changed;
   }
 
   /** All content versions, including removed skills; reverting appends another version. */

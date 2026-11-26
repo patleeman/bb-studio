@@ -35,7 +35,7 @@ export function setupVoiceLive({
   bb,
   db,
   bots,
-  pages,
+  pages: _pages,
   projectLeads,
   runners,
   automations,
@@ -54,8 +54,8 @@ export function setupVoiceLive({
     seed: async (threadId) => {
       const projectNames = bb.sdk.projects.list({ includePersonal: true }).then((list) => new Map((list as { id: string; name: string }[]).map((project) => [project.id, project.name]))).catch(() => new Map<string, string>());
       return gatherSeed(threadId, {
-        bots: () => bots.list().map((bot) => ({ name: bot.name, role: bot.role ?? null, threadId: bot.threadId, memoryPageId: bot.memoryPageId ?? null, primary: !!bot.primary })),
-        memory: (pageId) => pages.markdown(pageId) ?? null,
+        bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name, role: bot.role ?? null, threadId: bot.threadId, primary: !!bot.primary })),
+        memory: (botId) => bots.alwaysOnSkills(botId).map((skill) => skill.body.trim()).join("\n\n") || null,
         leadOf: async (id) => { const lead = projectLeads.list().find((each) => each.leadThreadId === id && each.projectId !== PERSONAL_PROJECT_ID); return lead ? (await projectNames).get(lead.projectId) ?? lead.projectId : null; },
         runnerOf: (id) => { const runner = runners.forThread(id); return runner ? { name: runner.name, job: runner.job } : null; },
         thread: async (id) => {

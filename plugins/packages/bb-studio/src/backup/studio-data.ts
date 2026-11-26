@@ -87,7 +87,7 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
           leads: all<{ project_id: string; lead_thread_id: string | null; created_at: number; updated_at: number }>("SELECT project_id, lead_thread_id, created_at, updated_at FROM project_leads ORDER BY project_id")
             .map((lead) => ({ ...lead, run: (db.prepare("SELECT cadence, time, cron FROM project_runs WHERE project_id = ?").get(lead.project_id) as Data["leads"][number]["run"] | undefined) ?? null })),
           bots: all("SELECT id, name, avatar, state, thread_id, provider_id, memory_page_id, shape, color, role, created_at, updated_at FROM bots ORDER BY created_at, id"),
-          botSkills: all("SELECT bot_id, name, description, body, created_at, updated_at, state, pinned, used_at, lint_warnings FROM bot_skills ORDER BY bot_id, name"),
+          botSkills: all("SELECT bot_id, name, description, body, created_at, updated_at, state, pinned, used_at, lint_warnings, always_on FROM bot_skills ORDER BY bot_id, name"),
           links: all("SELECT * FROM item_links ORDER BY from_plugin, from_id, to_plugin, to_id"),
           threads: all("SELECT * FROM item_threads ORDER BY created_at, thread_id"),
           comments: all("SELECT * FROM item_comments ORDER BY created_at, id"),
@@ -235,10 +235,10 @@ function apply(
       .run(bot.id, bot.name, bot.avatar, bot.state, thread, bot.provider_id ?? null, bot.memory_page_id, bot.shape ?? null, bot.color ?? null, bot.role ?? null, bot.created_at, bot.updated_at);
     tally.record("created", item);
   }
-  const skill = db.prepare("INSERT OR IGNORE INTO bot_skills (bot_id, name, description, body, created_at, updated_at, state, pinned, used_at, lint_warnings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  const skill = db.prepare("INSERT OR IGNORE INTO bot_skills (bot_id, name, description, body, created_at, updated_at, state, pinned, used_at, lint_warnings, always_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   for (const row of data.botSkills) {
     if (!db.prepare("SELECT 1 FROM bots WHERE id = ?").get(row.bot_id)) continue;
-    counted(skill.run(row.bot_id, row.name, row.description, row.body, row.created_at, row.updated_at, row.state, row.pinned, row.used_at, row.lint_warnings).changes, { id: `${row.bot_id}:${row.name}`, title: row.name });
+    counted(skill.run(row.bot_id, row.name, row.description, row.body, row.created_at, row.updated_at, row.state, row.pinned, row.used_at, row.lint_warnings, row.always_on).changes, { id: `${row.bot_id}:${row.name}`, title: row.name });
   }
 
   const link = db.prepare("INSERT OR IGNORE INTO item_links (from_plugin, from_id, to_plugin, to_id, kind, source) VALUES (?, ?, ?, ?, ?, ?)");

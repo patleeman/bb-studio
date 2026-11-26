@@ -14764,14 +14764,16 @@ public enum Studio {
     public var state: BotSkillsOutputSkillsItemState?
     public var pinned: Bool?
     public var usedAt: Double?
+    public var alwaysOn: Bool?
 
-    public init(name: String? = nil, description: String? = nil, updatedAt: Double? = nil, state: BotSkillsOutputSkillsItemState? = nil, pinned: Bool? = nil, usedAt: Double? = nil) {
+    public init(name: String? = nil, description: String? = nil, updatedAt: Double? = nil, state: BotSkillsOutputSkillsItemState? = nil, pinned: Bool? = nil, usedAt: Double? = nil, alwaysOn: Bool? = nil) {
       self.name = name
       self.description = description
       self.updatedAt = updatedAt
       self.state = state
       self.pinned = pinned
       self.usedAt = usedAt
+      self.alwaysOn = alwaysOn
     }
   }
 
@@ -14788,12 +14790,14 @@ public enum Studio {
     public var name: String?
     public var description: String?
     public var body: String?
+    public var alwaysOn: Bool?
 
-    public init(botId: String? = nil, name: String? = nil, description: String? = nil, body: String? = nil) {
+    public init(botId: String? = nil, name: String? = nil, description: String? = nil, body: String? = nil, alwaysOn: Bool? = nil) {
       self.botId = botId
       self.name = name
       self.description = description
       self.body = body
+      self.alwaysOn = alwaysOn
     }
   }
 
@@ -14831,14 +14835,16 @@ public enum Studio {
     public var state: BotSkillWriteOutputState?
     public var pinned: Bool?
     public var usedAt: Double?
+    public var alwaysOn: Bool?
 
-    public init(name: String? = nil, description: String? = nil, updatedAt: Double? = nil, state: BotSkillWriteOutputState? = nil, pinned: Bool? = nil, usedAt: Double? = nil) {
+    public init(name: String? = nil, description: String? = nil, updatedAt: Double? = nil, state: BotSkillWriteOutputState? = nil, pinned: Bool? = nil, usedAt: Double? = nil, alwaysOn: Bool? = nil) {
       self.name = name
       self.description = description
       self.updatedAt = updatedAt
       self.state = state
       self.pinned = pinned
       self.usedAt = usedAt
+      self.alwaysOn = alwaysOn
     }
   }
 

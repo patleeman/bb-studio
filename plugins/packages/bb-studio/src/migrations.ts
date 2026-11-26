@@ -1225,4 +1225,15 @@ export const MIGRATIONS: string[] = [
        backfill TEXT,
        read_at INTEGER NOT NULL
      );`,
+  // Always-on skills (src/core-skill.ts): the core profile becomes a skill injected into every prompt.
+  // bot_core_skills marks each Bot whose core profile page was moved into its always-on skill (once).
+  // memory_records, its index and memory_profiles are left as they are: Studio stops reading and writing them.
+  `ALTER TABLE bot_skills ADD COLUMN always_on INTEGER NOT NULL DEFAULT 0;
+   CREATE TABLE bot_core_skills (
+       bot_id TEXT PRIMARY KEY,
+       skill_name TEXT NOT NULL,
+       source_page_id TEXT,
+       chars INTEGER NOT NULL,
+       migrated_at INTEGER NOT NULL
+     );`,
 ];

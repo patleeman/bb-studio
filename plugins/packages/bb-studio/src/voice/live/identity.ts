@@ -102,9 +102,9 @@ ${clip(speakable(latest.text), SEED_BUDGET.latestReply)}`);
 /** Where the seed's sources come from (server.ts gives Studio's real ones). */
 export interface SeedSources {
   /** Every Bot; `primary` is the Chief of Staff. */
-  bots(): { name: string; role: string | null; threadId: string | null; memoryPageId: string | null; primary: boolean }[];
-  /** A page's stored markdown, or null. */
-  memory(pageId: string): string | null;
+  bots(): { id: string; name: string; role: string | null; threadId: string | null; primary: boolean }[];
+  /** The Bot's always-on skills' text (its core profile), or null. */
+  memory(botId: string): string | null;
   /** The name of the project a thread leads, if it's a project lead. */
   leadOf(threadId: string): Promise<string | null> | string | null;
   /** The runner a thread runs, if any. */
@@ -126,7 +126,7 @@ export async function gatherSeed(threadId: string | null | undefined, sources: S
     const recent = cos.threadId ? await settle(sources.recent(cos.threadId)) : null;
     return {
       kind: "cos", name: cos.name, threadId: cos.threadId, role: cos.role,
-      memory: cos.memoryPageId ? safe(() => sources.memory(cos.memoryPageId!)) : null,
+      memory: safe(() => sources.memory(cos.id)),
       recent,
     };
   };

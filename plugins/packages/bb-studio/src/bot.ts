@@ -97,7 +97,6 @@ import {
   hiddenFork,
   mainHealDelay,
   MainProviderSignedOut,
-  MEMORY_TEMPLATE,
   modelChange,
   newMainNote,
   NoMainModel,
@@ -126,6 +125,8 @@ import {
   type SelfEditField,
 } from "./bot-model";
 import { BotSkillStore } from "./bot-skills";
+import { addCheckinLine } from "./core-skill";
+import { migrateCoreSkill, type CoreMigration } from "./core-skill-migrate";
 import { BOT_RUN_PREFIX, heartbeatCron, PERSONAL_PROJECT_ID } from "./project-lead";
 import { readyProvider, type OnboardingProviderState } from "./onboarding";
 import { rpcErrorStatus } from "./kit/server/index";
@@ -985,8 +986,7 @@ export class Bots {
       return this.get(row?.id);
     }
     const view = await this.setRun({ ...spec.run, ...(botId ? { botId } : {}) });
-    const pageId = this.memoryPage(row?.id);
-    if (pageId && spec.line) this.deps.memory?.addCheckin?.(pageId, spec.line);
+    if (row && spec.line) this.addCheckin(row.id, spec.line);
     return view;
   }
 
@@ -1143,27 +1143,62 @@ export class Bots {
     return { ...(await this.get(id)), stoppedThreadIds, pausedAutomationIds };
   }
 
-  /** A Bot's Memory page, made on first need. Null without a Bot or Pages. */
+  /** A Bot's old core profile page, when it still exists; none is made any more (its text is the always-on skill now). */
   memoryPage(botId?: string): string | null {
     const row = this.row(botId);
     const pages = this.deps.memory;
     if (!row || !pages || botKind(row.provider_id) === "external") return null;
-    if (row.memory_page_id && pages.exists(row.memory_page_id)) return row.memory_page_id;
-    // Archived, not deleted: it comes back, rather than a blank page taking its place and its memory dropping out.
-    if (row.memory_page_id && pages.unarchive?.(row.memory_page_id)) { this.deps.changed(); return row.memory_page_id; }
-    const pageId = pages.create({ title: `${row.name}'s Memory`, markdown: MEMORY_TEMPLATE, botId: row.id, botName: row.name });
-    this.deps.db.prepare("UPDATE bots SET memory_page_id = ?, updated_at = ? WHERE id = ?").run(pageId, Date.now(), row.id);
-    this.deps.changed();
-    return pageId;
+    return row.memory_page_id && pages.exists(row.memory_page_id) ? row.memory_page_id : null;
   }
 
-  /** What a Bot's own thread is told; its Memory page is made here on first need. */
+  /** What a Bot's own thread is told. Its always-on skills come in full through src/memory; the list here is its on-demand ones. */
   instructions(bot: NonNullable<BotView["bot"]>): string {
     if (bot.kind === "external") return externalBotInstructions(bot);
     if (bot.state !== "active") return botInstructions(bot);
-    let memoryPageId: string | null = null;
-    try { memoryPageId = this.memoryPage(bot.id); } catch { /* Pages unavailable: no memory line. */ }
-    return botInstructions({ ...bot, memoryPageId, skills: this.skills(bot.id).filter((skill) => skill.state !== "archived") });
+    return botInstructions({ ...bot, skills: this.skills(bot.id).filter((skill) => skill.state !== "archived" && !skill.alwaysOn) });
+  }
+
+  // Always-on skills (src/core-skill.ts) -------------------------------------
+
+  /** Gives a Studio Bot its always-on core skill once, from its core profile page when it has one. */
+  ensureCore(botId?: string): CoreMigration | null {
+    const row = this.row(botId);
+    if (!row || botKind(row.provider_id) === "external") return null;
+    return migrateCoreSkill({ db: this.deps.db, skills: this.skillStore, pageMarkdown: (pageId) => this.deps.memory?.markdown?.(pageId) ?? null }, row.id);
+  }
+
+  /** The Bot's always-on skills (made on first need), core first. */
+  alwaysOnSkills(botId?: string): { name: string; description: string; body: string; updatedAt: number }[] {
+    const row = this.row(botId);
+    if (!row || botKind(row.provider_id) === "external") return [];
+    this.ensureCore(row.id);
+    return this.skillStore.alwaysOn(row.id);
+  }
+
+  /** Characters the always-on skills use together, against ALWAYS_ON_CAP. */
+  skillBudget(botId?: string): { chars: number; cap: number; over: boolean } {
+    return this.skillStore.budget(this.need(botId).id);
+  }
+
+  /** The advisory notes a save of this skill would get (always-on budget and caps included). */
+  skillLint(input: { name: string; body: string; alwaysOn?: boolean }, botId?: string): string[] {
+    const row = this.need(botId);
+    return this.skillStore.lint(row.id, { ...input, alwaysOn: input.alwaysOn ?? !!this.skillStore.get(row.id, input.name)?.alwaysOn });
+  }
+
+  setSkillAlwaysOn(name: string, on: boolean, botId?: string): boolean {
+    const row = this.row(botId);
+    return row ? this.skillStore.setAlwaysOn(row.id, name, on) : false;
+  }
+
+  /** Adds a line to the core skill's "## Check-in" section; false when it was there already. */
+  addCheckin(botId: string, line: string): boolean {
+    const core = this.alwaysOnSkills(botId)[0];
+    if (!core) return false;
+    const body = addCheckinLine(core.body, line);
+    if (body === null) return false;
+    this.skillStore.write(botId, { name: core.name, description: core.description, body });
+    return true;
   }
 
   skills(botId?: string): BotSkillView[] {
@@ -1200,8 +1235,12 @@ export class Bots {
   }
 
   /** Adds or replaces one of a Bot's own skills. Only its thread loads them. */
-  writeSkill(input: { name: string; description: string; body: string }, botId?: string): BotSkillView {
-    return this.skillStore.write(this.need(botId).id, input);
+  writeSkill(input: { name: string; description: string; body: string; alwaysOn?: boolean }, botId?: string): BotSkillView {
+    const id = this.need(botId).id;
+    const view = this.skillStore.write(id, input);
+    // Always on means in every prompt: pinned, so the curator never retires it.
+    if (input.alwaysOn) { this.skillStore.setAlwaysOn(id, input.name, true); return this.skillStore.list(id).find((skill) => skill.name === input.name) ?? view; }
+    return view;
   }
 
   /** All content versions, including removed skills; reverting appends another version. */

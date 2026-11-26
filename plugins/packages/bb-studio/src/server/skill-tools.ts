@@ -3,7 +3,7 @@ import { z } from "zod";
 import { SKILL_NAME, type Bots } from "../bot";
 import { opNeeds } from "../op-errors";
 import { callText, clipLine, nextLine, pageByKey, pageText, staleCursor } from "../paging";
-import { lintSkill, patchText, type SkillLearning } from "../skill-learning";
+import { patchText, type SkillLearning } from "../skill-learning";
 
 /** A skill body's part (bot_skill view): measured bodies run a median 4,800 characters, p90 13,600. */
 const SKILL_PART_CHARS = 8_000;
@@ -18,11 +18,11 @@ export interface BotSkillToolsDeps {
 /** Registers the Bot's own skill tools (list, view, edit, lint). */
 export function registerBotSkillTools({ bb, bots, learning, ownBot }: BotSkillToolsDeps): void {
   /** The lint's advisory notes, after a tool's result line. */
-  const withNotes = (line: string, skill: { name: string; body: string }, botId: string) => {
-    const notes = lintSkill(skill, bots.skills(botId).filter((each) => each.state !== "archived").map((each) => each.name));
+  const withNotes = (line: string, skill: { name: string; body: string; alwaysOn?: boolean }, botId: string) => {
+    const notes = bots.skillLint(skill, botId);
     return notes.length ? `${line}\nNotes (advisory, nothing was blocked):\n${notes.map((note) => `- ${note}`).join("\n")}` : line;
   };
-  const saveSkill = (input: { name: string; description: string; body: string }, botId: string, threadId: string | undefined, verb: string) => {
+  const saveSkill = (input: { name: string; description: string; body: string; alwaysOn?: boolean }, botId: string, threadId: string | undefined, verb: string) => {
     bots.writeSkill(input, botId);
     learning.noteWrite(threadId, "saved");
     return withNotes(`${verb === "patched" ? "Patched" : "Saved"} your skill ${input.name}.`, input, botId);
@@ -91,8 +91,9 @@ export function registerBotSkillTools({ bb, bots, learning, ownBot }: BotSkillTo
       find: z.string().min(1).max(20_000).optional().describe("patch: exact text to replace"),
       replace: z.string().max(20_000).optional().describe("patch: replacement text (empty removes)"),
       all: z.boolean().optional().describe("patch: replace every occurrence"),
+      alwaysOn: z.boolean().optional().describe("write: inject it in full into every prompt (keep always-on skills under 3,000 characters together); default keeps the skill's setting, on demand for a new one"),
     }),
-    execute: ({ op, name, description, body, find, replace, all }, ctx) => {
+    execute: ({ op, name, description, body, find, replace, all, alwaysOn }, ctx) => {
       const botId = ownBot(ctx.threadId);
       if (op === "delete") {
         const skill = bots.skill(name, botId);
@@ -110,7 +111,7 @@ export function registerBotSkillTools({ bb, bots, learning, ownBot }: BotSkillTo
       }
       if (!description || !body) return opNeeds("write", ["name", "description", "body"]);
       if (!SKILL_NAME.test(name)) return { content: [{ type: "text" as const, text: "Skill name must be lowercase-with-hyphens." }], isError: true as const };
-      return saveSkill({ name, description, body }, botId, ctx.threadId, bots.skill(name, botId) ? "rewritten" : "new");
+      return saveSkill({ name, description, body, ...(alwaysOn === undefined ? {} : { alwaysOn }) }, botId, ctx.threadId, bots.skill(name, botId) ? "rewritten" : "new");
     },
   });
 }

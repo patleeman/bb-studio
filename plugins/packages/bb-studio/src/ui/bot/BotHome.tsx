@@ -30,7 +30,7 @@ export { BOT_PATH };
 /** The Bot page's path under the Studio panel. */
 export const BOT_SUBPATH = "bot";
 type Preset = "morning" | "evening" | "working" | "off";
-/** Check-in presets (bot_checkin_preset): one schedule and one line on the Memory page each. */
+/** Check-in presets (bot_checkin_preset): one schedule and one line in the always-on skill's Check-in section each. */
 export const PRESETS: { id: Preset; label: string; hint: string }[] = [
   { id: "morning", label: "Morning brief", hint: "Weekdays 8:00" },
   { id: "evening", label: "Evening wrap-up", hint: "Weekdays 18:00" },

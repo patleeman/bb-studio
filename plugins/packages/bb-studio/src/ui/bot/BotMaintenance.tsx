@@ -10,7 +10,7 @@ import type { MaintenanceRule } from "../../bot-maintenance";
 import { useCall, useLive, type Method, type RpcInput } from "../live";
 import { useOpenThread } from "./workspace";
 
-const labels: Record<MaintenanceRule, string> = { threads: "Finished threads", workers: "Hidden workers", automations: "Automations and reminders", memory: "Memory page", skills: "Skills (pinned skills exempt)", adopt: "Runner suggestions" };
+const labels: Record<MaintenanceRule, string> = { threads: "Finished threads", workers: "Hidden workers", automations: "Automations and reminders", memory: "Always-on skill (budget, weekly Right now)", skills: "Skills (pinned skills exempt)", adopt: "Runner suggestions" };
 const CHECKBOX = "size-3.5 shrink-0 accent-[var(--foreground)] disabled:opacity-50";
 const when = (at: number) => new Date(at).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 
@@ -63,11 +63,6 @@ export function BotMaintenance({ botId, heading = true }: { botId: string; headi
                     <input type="checkbox" className={CHECKBOX} disabled={busy} checked={view.settings.rules[key as MaintenanceRule]} onChange={(e) => void act("bot_maintenance_set", { rules: { [key]: e.target.checked } })} />{label}
                   </label>
                 ))}
-                <label className="flex items-center gap-2 pt-1 text-muted-foreground">Keep the Memory page under
-                  <input aria-label="Memory word budget" type="number" min={100} max={100000} defaultValue={view.settings.memoryWords} key={view.settings.memoryWords} disabled={busy}
-                    className="h-7 w-20 rounded-md border border-border bg-background px-2 text-sm text-foreground tabular-nums"
-                    onBlur={(e) => { const memoryWords = Number(e.target.value); if (memoryWords !== view.settings.memoryWords) void act("bot_maintenance_set", { memoryWords }); }} />words
-                </label>
               </div>
             ) : null}
           </div>

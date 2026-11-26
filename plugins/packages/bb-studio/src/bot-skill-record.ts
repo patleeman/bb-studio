@@ -12,5 +12,7 @@ export const botSkillRecord = z.object({
   pinned: z.union([z.literal(0), z.literal(1)]).default(0),
   used_at: z.number().int().nullable().default(null),
   lint_warnings: z.string().max(100_000).default("[]"),
+  /** Injected in full into every prompt (src/core-skill.ts). */
+  always_on: z.union([z.literal(0), z.literal(1)]).default(0),
 });
 export type BotSkillRecord = z.infer<typeof botSkillRecord>;
