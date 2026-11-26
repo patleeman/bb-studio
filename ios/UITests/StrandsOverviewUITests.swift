@@ -23,10 +23,10 @@ final class StrandsOverviewUITests: ServerIsolatedUITestCase {
         let list = app.buttons["roomList"]
         XCTAssertTrue(list.waitForExistence(timeout: 15), "the header's Bot mark")
         list.tap()
-        let row = app.buttons["roomPlace-strands"]
+        let row = app.botMenuItem("strands")
         XCTAssertTrue(any("RoomSheet-conversations").waitForExistence(timeout: 10), "the conversation list")
-        for _ in 0..<8 where !(row.exists && row.isHittable) { app.swipeUp() }
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "Strands is at the foot of the list")
+        app.openBotMenu()
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "Strands is in the Bot menu")
         shot("2-list-with-strands")
         row.tap()
         XCTAssertTrue(any("strands-overview").waitForExistence(timeout: 10), "the Strands screen")
@@ -37,12 +37,11 @@ final class StrandsOverviewUITests: ServerIsolatedUITestCase {
         let list = app.buttons["roomList"]
         XCTAssertTrue(list.waitForExistence(timeout: 15))
         list.tap()
-        let row = app.buttons["roomPlace-strands"]
+        let row = app.botMenuItem("strands")
         XCTAssertTrue(any("RoomSheet-conversations").waitForExistence(timeout: 10))
-        for _ in 0..<8 where !(row.exists && row.isHittable) { app.swipeUp() }
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "Strands is at the foot of the list")
-        let memory = app.buttons["roomPlace-memory"]
-        for _ in 0..<4 where !(memory.exists && memory.isHittable) { app.swipeUp() }
+        app.openBotMenu()
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "Strands is in the Bot menu")
+        let memory = app.botMenuItem("memory")
         if memory.exists && row.exists {
             XCTAssertLessThan(row.frame.minY, memory.frame.minY, "Strands comes before Memory")
         }

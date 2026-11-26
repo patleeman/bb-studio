@@ -32,18 +32,22 @@ final class HomeUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("roomListHeader").exists, "with the Bot")
         XCTAssertTrue(app.buttons["roomWorker-thr_demo_w2"].exists, "workers under their conversation")
         shot("2-list")
-        app.swipeUp()
-        XCTAssertTrue(app.buttons["roomPlace-memory"].waitForExistence(timeout: 5), "and the Bot's places")
-        XCTAssertTrue(app.buttons["roomSettings"].exists)
-        XCTAssertTrue(app.buttons["roomPlace-strands"].exists, "Strands, in Tasks' place")
+        XCTAssertTrue(any("homeSection-running").exists || any("homeSection-needsYou").exists, "grouped: needs you, running, earlier")
+        XCTAssertTrue(app.buttons["roomSettings"].exists, "Settings at the top")
+        XCTAssertTrue(app.buttons["roomNewConversation"].exists, "the composer starts conversations")
+        app.openBotMenu()
+        XCTAssertTrue(app.botMenuItem("memory").waitForExistence(timeout: 5), "the Bot's places are in its menu")
+        XCTAssertTrue(app.botMenuItem("strands").exists, "Strands, in Tasks' place")
         XCTAssertFalse(app.buttons["roomPlace-tasks"].exists, "no Tasks")
         shot("3-list-places")
-        app.buttons["roomPlace-memory"].tap()
+        app.botMenuItem("memory").tap()
         XCTAssertTrue(app.buttons["memoryAdd"].waitForExistence(timeout: 10), "Memory opens in the list")
         app.goBack()
 
         app.swipeDown()
         let launchPrep = app.buttons["roomConversation-thr_demo_interview"]
+        // Grouped (needs you, running, earlier), it can sit lower on a small screen.
+        for _ in 0..<4 where !(launchPrep.exists && launchPrep.isHittable) { app.swipeUp() }
         XCTAssertTrue(launchPrep.waitForExistence(timeout: 10))
         launchPrep.tap()
         XCTAssertTrue(any("RoomSheet-conversations").waitForNonExistence(timeout: 10), "the list closes")

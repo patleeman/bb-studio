@@ -76,13 +76,8 @@ struct SettingsView: View {
             } header: {
                 Text("Server").foregroundStyle(Color.primary.opacity(0.75))
             }
-            Section {
-                NavigationLink { ArchivedView() } label: {
-                    Label("Archived threads", systemImage: "archivebox")
-                }
-            } header: {
-                Text("Threads").foregroundStyle(Color.primary.opacity(0.75))
-            }
+            // Round 5: Settings holds configuration only. Archived threads is a
+            // place: Home's Quick Open (search "archive") opens it.
             if runningPlugins.split(separator: ",").contains("custom-instructions") {
                 Section("Agents") {
                     NavigationLink { CustomInstructionsView() } label: {

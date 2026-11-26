@@ -29,9 +29,7 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
     }
 
     private func openArchive() {
-        let archive = app.buttons["roomArchive"]
-        for _ in 0..<4 where !archive.isHittable { app.swipeUp() }
-        archive.tap()
+        app.openRoomPlace("archive")
         XCTAssertTrue(app.navigationBars["Archive"].waitForExistence(timeout: 15))
     }
 

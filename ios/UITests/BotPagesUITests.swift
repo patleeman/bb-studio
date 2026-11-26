@@ -17,10 +17,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         switch page {
         case "automations": app.openRoomPlace("schedules")
         case "archive":
-            app.openRoomPlace("conversations")
-            let archive = app.buttons["roomArchive"]
-            XCTAssertTrue(archive.waitForExistence(timeout: 15), "Archive in Conversations")
-            archive.tap()
+            app.openRoomPlace("archive")
         default: app.openRoomPlace(page)
         }
     }
@@ -119,8 +116,9 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         app.openRoomPlace("conversations")
         XCTAssertTrue(app.buttons["roomNewConversation"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["roomConversation-thr_demo_lisbon"].exists)
-        let archive = app.buttons["roomArchive"]
-        for _ in 0..<4 where !archive.isHittable { app.swipeUp() }
+        app.openBotMenu()
+        let archive = app.botMenuItem("archive")
+        XCTAssertTrue(archive.waitForExistence(timeout: 10), "Archive in the Bot menu")
         archive.tap()
         XCTAssertTrue(app.navigationBars["Archive"].waitForExistence(timeout: 15))
         let finished = app.buttons["archive-finished-thr_demo_lisbon"]

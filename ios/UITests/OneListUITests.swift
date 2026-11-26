@@ -39,14 +39,19 @@ final class OneListUITests: ServerIsolatedUITestCase {
         projects.tap()
         let site = app.buttons["roomProject-proj_site"]
         XCTAssertTrue(site.waitForExistence(timeout: 15), "the projects, once opened")
+        // Home's composer sits at the foot (round 5): rows under it appear once scrolled to.
+        scrollTo(app.buttons["roomProject-proj_personal"])
         XCTAssertTrue(app.buttons["roomProject-proj_personal"].exists, "No project too, for a thread of no Bot there")
         XCTAssertFalse(app.buttons["projectThread-thr_site_form"].exists, "each project closed too")
         site.tap()
         let form = app.buttons["projectThread-thr_site_form"]
         XCTAssertTrue(form.waitForExistence(timeout: 5))
+        scrollTo(app.buttons["projectThread-thr_site_mobile"])
         XCTAssertTrue(app.buttons["projectThread-thr_site_mobile"].exists, "with the thread it started under it")
         XCTAssertGreaterThan(app.buttons["projectThread-thr_site_mobile"].frame.minX + 1, form.frame.minX, "nested")
+        scrollTo(app.buttons["roomProject-proj_personal"])
         app.buttons["roomProject-proj_personal"].tap()
+        scrollTo(app.buttons["projectThread-thr_plain_receipts"])
         XCTAssertTrue(app.buttons["projectThread-thr_plain_receipts"].waitForExistence(timeout: 5))
         for botThread in [BotThreadIds.main, "thr_demo_interview", "thr_demo_w2", "thr_bot_child"] {
             XCTAssertFalse(app.buttons["projectThread-\(botThread)"].exists, "\(botThread) is a Bot's, so not under Projects")
@@ -76,8 +81,9 @@ final class OneListUITests: ServerIsolatedUITestCase {
     func testAutomationsAreInSchedules() {
         launch()
         openList()
-        let schedules = app.buttons["roomPlace-schedules"]
-        scrollTo(schedules)
+        let schedules = app.botMenuItem("schedules")
+        app.openBotMenu()
+        XCTAssertTrue(schedules.waitForExistence(timeout: 5))
         schedules.tap()
         let all = app.buttons["schedulesAllAutomations"]
         for _ in 0..<4 where !all.exists { app.swipeUp() }

@@ -35,7 +35,13 @@ struct RoomPlaceSheet: View {
                     content
                 }
             }
-                .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+                .navigationDestination(for: Route.self) { route in
+                    if case .roomPlace(let raw) = route, let place = RoomPlace(rawValue: raw) {
+                        content(for: place)
+                    } else {
+                        RouteDestination(route: route)
+                    }
+                }
         }
         .tint(look.accent)
         .accessibilityElement(children: .contain)
@@ -62,7 +68,8 @@ struct RoomPlaceSheet: View {
             RoomConversations(bot: bot, store: store, mainThreadId: mainThreadId, open: open,
                               started: startedConversation, closeToRoom: closeToRoom,
                               shown: shown ?? mainThreadId, settings: settings,
-                              placeView: { AnyView(content(for: $0)) }, switchBot: switchBot)
+                              placeView: { AnyView(content(for: $0)) }, switchBot: switchBot,
+                              pushPlace: { place in (path ?? $ownPath).wrappedValue.append(.roomPlace(place.rawValue)) })
         }
     }
 }
@@ -79,6 +86,8 @@ struct RoomConversations: View {
     var placeView: ((RoomPlace) -> AnyView)? = nil
     /// Another Bot from the header's menu (the home's list); with a conversation, that Bot opens on it.
     var switchBot: ((String, String?) -> Void)? = nil
+    /// Pushes a Bot place on the list's stack (as a route, so links inside it push too).
+    var pushPlace: ((RoomPlace) -> Void)? = nil
     @EnvironmentObject private var app: AppModel
     @State private var starting = false
     @State private var removed: Set<String> = []
@@ -92,6 +101,8 @@ struct RoomConversations: View {
     /// Projects starts closed; each project too.
     @State private var projectsOpen = false
     @State private var openProjects: Set<String> = []
+    /// Quick Open: Studio items that match the search.
+    @State private var studioMatches: [Studio.SearchAllOutputItem] = []
     @Environment(\.look) private var look
 
     private var view: BotThreadsView? { store.view(for: bot.id) }
@@ -102,20 +113,33 @@ struct RoomConversations: View {
         let lines = searching ? all.filter { $0.title.localizedCaseInsensitiveContains(query) } : all
         let nests = BotWorkerNests.make(conversations: all.map(\.threadId), workers: view?.workers ?? [])
         List {
-            Section { RoomListHeader(bot: bot, view: view, refresh: { await store.refresh() }, switchBot: switchBot.map { pick in { pick($0, nil) } }) }
+            Section {
+                RoomListHeader(bot: bot, view: view, refresh: { await store.refresh() }, switchBot: switchBot.map { pick in { pick($0, nil) } },
+                               openPlace: pushPlace)
+            }
                 .listRowBackground(Color.clear)
             Section {
                 searchField
             }
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
-            Section {
-                if !searching { newConversationRow }
-                ForEach(lines) { line in
-                    conversationRow(line, nest: searching ? nil : nests.nests[line.threadId])
+            // Home (round 5): needs you first, then what runs, then the rest.
+            if searching {
+                Section {
+                    ForEach(lines) { line in conversationRow(line, nest: nil) }
+                }
+            } else {
+                let groups = HomeGroups.make(lines)
+                ForEach(groups) { group in
+                    Section {
+                        ForEach(group.lines) { line in conversationRow(line, nest: nests.nests[line.threadId]) }
+                    } header: {
+                        HomeSectionHeader(group: group)
+                    }
                 }
             }
             if searching {
+                quickOpenSections
                 let workers = (view?.workers ?? []).filter { $0.title.localizedCaseInsensitiveContains(query) }
                 if !workers.isEmpty {
                     Section("Workers") {
@@ -130,8 +154,9 @@ struct RoomConversations: View {
                 }
             }
             projectsSection
-            if !searching { placesSection }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) { homeComposer }
+        .task(id: query) { await searchStudio() }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .refreshable {
@@ -141,10 +166,12 @@ struct RoomConversations: View {
         .task(id: projectsOpen || searching) {
             if (projectsOpen || searching) && !projects.loaded { await loadProjects() }
         }
-        .modifier(PageChrome(title: "Conversations") {
-            Button { starting = true } label: { Image(systemName: "plus") }
-                .accessibilityLabel("New conversation")
-                .accessibilityIdentifier("roomNewConversation")
+        .modifier(PageChrome(title: "Home") {
+            if let settings {
+                Button(action: settings) { Image(systemName: "gearshape") }
+                    .accessibilityLabel("Settings")
+                    .accessibilityIdentifier("roomSettings")
+            }
         })
         .onChange(of: view?.conversations.map(\.threadId)) { _, ids in
             removed.formIntersection(ids ?? [])
@@ -172,11 +199,95 @@ struct RoomConversations: View {
         }
     }
 
+    /// Home's composer (round 5): the one way to start a conversation. It opens
+    /// the new conversation's composer with its Bot, project and model line.
+    private var homeComposer: some View {
+        Button { starting = true } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "plus").font(.body.weight(.semibold)).foregroundStyle(look.accent)
+                Text("Start something with \(bot.name)").foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Image(systemName: "mic").foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 50)
+            .background(.fill.tertiary, in: .capsule)
+            .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.bar)
+        .accessibilityLabel("Start something with \(bot.name)")
+        .accessibilityIdentifier("roomNewConversation")
+    }
+
+    /// Quick Open's other results: places and Studio items that match.
+    @ViewBuilder private var quickOpenSections: some View {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        let places = (RoomPlace.homeList + [.archive]).filter { $0.title.localizedCaseInsensitiveContains(trimmed) }
+        let archivedThreads = "Archived threads".localizedCaseInsensitiveContains(trimmed)
+        if (!places.isEmpty && pushPlace != nil) || archivedThreads {
+            Section("Places") {
+                if let pushPlace {
+                    ForEach(places) { place in
+                        Button { pushPlace(place) } label: { Label(place.title, systemImage: place.symbol) }
+                            .accessibilityIdentifier("quickOpenPlace-\(place.rawValue)")
+                    }
+                }
+                if archivedThreads {
+                    // BB's own archived threads (Bot conversations are in Archive).
+                    Button {
+                        closeToRoom()
+                        Router.shared.detailPath = [.archived]
+                    } label: { Label("Archived threads", systemImage: "archivebox") }
+                        .accessibilityIdentifier("quickOpenArchivedThreads")
+                }
+            }
+        }
+        let items = studioMatches.compactMap { item -> (Studio.SearchAllOutputItem, Route)? in
+            guard item.kind != "thread", let href = item.href, let route = Route(href: href) else { return nil }
+            return (item, route)
+        }
+        if !items.isEmpty {
+            Section("Studio") {
+                ForEach(items.indices, id: \.self) { index in
+                    let (item, route) = items[index]
+                    Button {
+                        closeToRoom()
+                        Router.shared.detailPath = [route]
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title ?? "Untitled").lineLimit(1)
+                            if let text = item.snippet?.text, !text.isEmpty {
+                                Text(text).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        }
+                        .frame(minHeight: 44, alignment: .leading)
+                    }
+                    .tint(.primary)
+                    .accessibilityIdentifier("quickOpenItem-\(index)")
+                }
+            }
+        }
+    }
+
+    private func searchStudio() async {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 2 else {
+            if !studioMatches.isEmpty { studioMatches = [] }
+            return
+        }
+        try? await Task.sleep(for: .milliseconds(300))
+        guard !Task.isCancelled, let found = try? await app.client.studioSearchAll(trimmed), !Task.isCancelled else { return }
+        studioMatches = Array(found.prefix(12))
+    }
+
     /// In the list, not the navigation bar: the folded Duo's sheet has no bar to hold one.
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Search conversations and threads", text: $query)
+            TextField("Search conversations, Studio and places", text: $query)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
@@ -197,17 +308,6 @@ struct RoomConversations: View {
         await projects.load(client: app.client, bots: store.spaces?.bots ?? [bot])
     }
 
-    private var newConversationRow: some View {
-        Button { starting = true } label: {
-            Label("New conversation", systemImage: "plus.circle.fill")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(look.accent)
-                .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
-                .contentShape(.rect)
-        }
-        .buttonStyle(.borderless)
-        .accessibilityIdentifier("roomNewConversationRow")
-    }
 
     @ViewBuilder private func conversationRow(_ line: BotConversationLine, nest: BotWorkerNest?) -> some View {
         HStack(spacing: 8) {
@@ -325,27 +425,6 @@ struct RoomConversations: View {
         .accessibilityIdentifier("projectThread-\(line.thread.id)")
     }
 
-    private var placesSection: some View {
-            Section {
-                if let placeView {
-                    ForEach(RoomPlace.homeList) { place in
-                        NavigationLink { placeView(place) } label: { Label(place.title, systemImage: place.symbol) }
-                            .accessibilityIdentifier("roomPlace-\(place.rawValue)")
-                    }
-                }
-                NavigationLink {
-                    ArchivePageView(botId: bot.id, open: open, refresh: { Task { await store.refresh() } })
-                } label: {
-                    Label("Archive", systemImage: "archivebox")
-                }
-                .accessibilityIdentifier("roomArchive")
-                if let settings {
-                    Button(action: settings) { Label("Settings", systemImage: "gearshape") }
-                        .tint(.primary)
-                        .accessibilityIdentifier("roomSettings")
-                }
-            }
-    }
 
     @ViewBuilder private func removeActions(_ threadId: String, swipe: Bool) -> some View {
         if let conversation = view?.conversations.first(where: { $0.threadId == threadId }), ConversationFinish.canRemove(conversation) {
@@ -483,5 +562,39 @@ final class RoomProjects: ObservableObject {
             _ = await owned
             if sidebar == nil { self.error = BBClient.describe(error, server: client.baseURL) }
         }
+    }
+}
+
+/// Home's three groups (round 5): Needs you, Running, Earlier; empty ones left out.
+struct HomeGroups: Identifiable, Equatable {
+    enum Kind: String { case needsYou, running, earlier }
+    var kind: Kind
+    var lines: [BotConversationLine]
+    var id: String { kind.rawValue }
+
+    static func make(_ lines: [BotConversationLine]) -> [HomeGroups] {
+        [HomeGroups(kind: .needsYou, lines: lines.filter { $0.tone == .needsYou }),
+         HomeGroups(kind: .running, lines: lines.filter { $0.tone == .running }),
+         HomeGroups(kind: .earlier, lines: lines.filter { $0.tone == .quiet })].filter { !$0.lines.isEmpty }
+    }
+}
+
+/// A Home group's header: its mark and its name (shape and word, not colour alone).
+struct HomeSectionHeader: View {
+    let group: HomeGroups
+    @Environment(\.look) private var look
+
+    var body: some View {
+        HStack(spacing: 6) {
+            switch group.kind {
+            case .needsYou: Circle().fill(look.needsYou).frame(width: 7, height: 7).accessibilityHidden(true)
+            case .running: ProgressView().controlSize(.mini).accessibilityHidden(true)
+            case .earlier: EmptyView()
+            }
+            Text(group.kind == .needsYou ? "Needs you" : group.kind == .running ? "Running" : "Earlier")
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("homeSection-\(group.kind.rawValue)")
     }
 }

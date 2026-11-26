@@ -10,7 +10,7 @@ extension XCUIApplication {
     /// A place from the one conversation list (the header's Bot mark).
     /// "conversations" is the list itself.
     func openRoomPlace(_ place: String, file: StaticString = #filePath, line: UInt = #line) {
-        let row = buttons["roomPlace-\(place)"]
+        let row = botMenuItem(place)
         let list = descendants(matching: .any)["RoomSheet-conversations"].firstMatch
         if place == "conversations" {
             if !list.exists {
@@ -27,9 +27,29 @@ extension XCUIApplication {
             XCTAssertTrue(descendants(matching: .any)["RoomSheet-conversations"].firstMatch.waitForExistence(timeout: 10),
                           "the conversation list", file: file, line: line)
         }
-        for _ in 0..<4 where !row.isHittable { swipeUp() }
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "\(place) in the list", file: file, line: line)
+        // Round 5: the places are in the Bot menu (Home's name), not at the list's foot.
+        if !row.exists {
+            let menu = buttons["botSwitcher"].firstMatch
+            XCTAssertTrue(menu.waitForExistence(timeout: 10), "the Bot menu", file: file, line: line)
+            menu.tap()
+        }
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "\(place) in the Bot menu", file: file, line: line)
         row.tap()
+    }
+
+    /// A place in Home's Bot menu, by id or by its title (a menu's generated
+    /// buttons don't always keep their identifiers).
+    func botMenuItem(_ place: String) -> XCUIElement {
+        let titles = ["strands": "Strands", "memory": "Memory", "library": "Library", "schedules": "Schedules", "theme": "Theme", "archive": "Archive"]
+        let id = place == "archive" ? "roomArchive" : "roomPlace-\(place)"
+        return buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", id, titles[place] ?? place)).firstMatch
+    }
+
+    /// Home's Bot menu (round 5: the places live there), open.
+    func openBotMenu(file: StaticString = #filePath, line: UInt = #line) {
+        let menu = buttons["botSwitcher"].firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 10), "the Bot menu", file: file, line: line)
+        menu.tap()
     }
 
     /// A conversation from the one list, which closes over it.
