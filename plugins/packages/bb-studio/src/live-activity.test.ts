@@ -172,6 +172,10 @@ it("registers the digest on the per-turn context hook where BB has it, and nothi
   const hooks = { experimental_turnContext: vi.fn() };
   registerTurnContext({ experimental_hooks: hooks }, () => { throw new Error("db closed"); });
   expect((hooks.experimental_turnContext.mock.calls[0]![0] as (context: { threadId: string }) => unknown)({ threadId: "t" })).toBeNull();
+  // Only a registration with the move handoff handler opts in to the provider-move budget.
+  expect(hooks.experimental_turnContext.mock.calls[0]![1]).toBeUndefined();
+  registerTurnContext({ experimental_hooks: hooks }, () => null, { providerMove: true });
+  expect(hooks.experimental_turnContext.mock.calls[1]![1]).toEqual({ providerMove: true });
   const plain = await setup();
   expect(plain.live.hooked).toBe(false);
 });

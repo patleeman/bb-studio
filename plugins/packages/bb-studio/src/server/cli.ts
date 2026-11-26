@@ -35,6 +35,9 @@ import type { ForestWeather } from "../theme/forest/weather";
 import type { ThemeService } from "../theme/service";
 import { readPreview, readView, writePreview, writeView } from "../theme/tonight/contract";
 import type { ToolGateway } from "../tool-gateway/server/register";
+import { botCli, BOT_USAGE, moveProviderCli, MOVE_USAGE, runnerCli, RUNNER_USAGE, toolDeliveryCli, TOOL_DELIVERY_USAGE } from "../move-provider/cli";
+import type { MoveProviderService } from "../move-provider/service";
+import type { ToolDeliveryStore } from "../tool-delivery";
 
 const MAX_LISTED = 100;
 
@@ -51,6 +54,8 @@ const cliPath = (path: string, cwd: string | undefined) => (isAbsolute(path) ? p
 export interface StudioCliDeps {
   bb: BbPluginApi;
   hub: StudioHub;
+  moveProvider: MoveProviderService;
+  toolDelivery: ToolDeliveryStore;
   studioSettings: Parameters<typeof settingsCli>[1];
   decisions: Awaited<ReturnType<typeof registerDecisions>>;
   auth: AuthService;
@@ -85,6 +90,8 @@ export interface StudioCliDeps {
 export function registerStudioCli({
   bb,
   hub,
+  moveProvider,
+  toolDelivery,
   studioSettings,
   decisions,
   auth,
@@ -141,6 +148,10 @@ export function registerStudioCli({
       { name: "theme", summary: "List, show, check, create, update, apply and delete Bot themes", usage: "bb studio theme <list|show|create|update|apply|check|delete|template> …" },
       { name: "presence", summary: "List, show, check, create, update, apply and delete Bot presences", usage: "bb studio presence <list|show|create|update|apply|check|delete|template> …" },
       { name: "tool-gateway", summary: "Your MCP servers: list them, search and run their tools, and ask the user to add one", usage: "bb studio tool-gateway <list|tools|describe|call|request|status> …" },
+      { name: "move-provider", summary: "Move threads to another provider with their history; status and verify", usage: MOVE_USAGE },
+      { name: "bot", summary: "A Bot's default model for new conversations", usage: BOT_USAGE },
+      { name: "runner", summary: "Move runners' threads to another provider", usage: RUNNER_USAGE },
+      { name: "tool-delivery", summary: "How each provider's sessions get Studio's on-demand tools", usage: TOOL_DELIVERY_USAGE },
       { name: "strands", summary: "A conversation's strands (its lines of work), their live states, and how its newest messages were sorted", usage: STRANDS_USAGE },
     ],
     async run(argv, ctx) {
@@ -158,6 +169,13 @@ export function registerStudioCli({
       if (argv[0] === "presence") return runPresenceCli(argv.slice(1), { service: presenceService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)) });
       if (argv[0] === "theme") return runThemeCli(argv.slice(1), { service: themeService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)), weather: { sky: () => forestWeather.sky(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), setCity: (city) => forestWeather.setCity(city) }, sky: { place: () => forestWeather.place(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), preview: () => readPreview(bb.storage.kv), setPreview: (at) => writePreview(bb.storage.kv, at), view: () => readView(bb.storage.kv), setView: (view) => writeView(bb.storage.kv, view), now: () => Date.now(), zoneOffsetMinutes: () => -new Date().getTimezoneOffset() } });
       if (argv[0] === "strands") return strands.cli(argv.slice(1), ctx);
+      if (argv[0] === "move-provider" || argv[0] === "bot" || argv[0] === "runner" || argv[0] === "tool-delivery") {
+        const moveDeps = { service: moveProvider, toolDelivery, callerThreadId: ctx.threadId ?? null };
+        if (argv[0] === "move-provider") return moveProviderCli(argv.slice(1), moveDeps);
+        if (argv[0] === "bot") return botCli(argv.slice(1), moveDeps);
+        if (argv[0] === "tool-delivery") return toolDeliveryCli(argv.slice(1), moveDeps);
+        return runnerCli(argv.slice(1), { ...moveDeps, runners: (botRef) => moveProvider.runners(botRef) });
+      }
       if (argv[0] === "tool-gateway") return toolGateway ? toolGateway.cli(argv.slice(1), { threadId: ctx.threadId ?? null }) : { exitCode: 1, stderr: "Tool Gateway isn't loaded.\n" };
       if (argv[0] === "pages") return argv[1] === "explore" ? explore.cli(argv.slice(2), ctx) : pages.cli(argv.slice(1), ctx);
       const { command, rest: raw } = subcommand(argv);

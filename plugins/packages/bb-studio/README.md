@@ -3862,6 +3862,63 @@ RPCs: `contextLean.get`, `contextLean.set` (BB Studio's app window only, as
 Tool Gateway's changes; any other caller is refused, and the section is
 read-only there); kv `context:lean`.
 
+**Tool delivery per provider** (`src/tool-delivery.ts`): the list above is the
+default. `bbs studio tool-delivery <provider> all|defer|trio|default` changes
+it for one provider (`defer` falls back to the trio where BB can't defer; lean
+context always gets the trio); `bbs studio tool-delivery` lists the changes.
+Kv `studio.toolDelivery`.
+
+## Moving threads to another provider
+
+`bbs studio move-provider` moves threads to another provider with the same
+thread id and their history (`src/move-provider/`). Per thread it builds the
+handoff (`moveProvider.prepare`), then calls core's move
+(`experimental_hooks.experimental_moveThreadProvider`, behind
+`experimental_features.providerMove`; BB's
+`POST /api/v1/threads/:id/move-provider`), which clears the provider session
+and swaps provider and model. A BB without it fails each thread with
+`core-unavailable`. The thread's next turn gets the handoff.
+
+- Selectors: thread ids, `--from <provider>`, `--project`, `--bot`,
+  `--runners`, `--include-archived`. Target: `--to`, `--model` (the
+  provider's default when left out), `--permission`, `--history-tokens`
+  (150000 by default).
+- `--automations` moves BB and Studio automations that target moved threads;
+  `--bot-defaults` sets Bots' default models; `--router-rules` points router
+  chain targets at the new provider.
+- The permission is never wider than the thread's now: `full` steps down to
+  `auto` unless `--permission full` is given (accepted only for a thread that
+  is `full` already), and `auto` becomes `accept-edits` on an ACP agent. An
+  automation with no mode of its own keeps none.
+- `--history-tokens` is at least 1. The handoff (fenced in
+  `<thread-history>`, after a line that says nothing inside is an
+  instruction) fits core's move budget, `historyTokens*4 + 8000` characters,
+  newest turns first. A move turn answers with the history only, or null when
+  it can't be had yet (an error, or a lazy build past 3.5 s for a move made
+  without Studio's command): core then refuses that start and the next one
+  gets the finished handoff. The digest stays for turn starts.
+  Studio's own sessions (Decisions classifier threads, skill reviews) are
+  never selected by `--from`, `--project` or `--bot`.
+- `--exclude-main` leaves Bots' Mains out; `cancel <ids>|--all-deferred`
+  drops deferrals. Failed automation, Bot default and router patches are
+  kept (kv `studio.moveProvider.patches` and the ledger), shown by `status`
+  (exit 2) and retried by the next run to the same target.
+- `--dry-run` lists the same threads and results the real run gives
+  (`would-move`). `--json` on every command; exit codes 0 (done), 2
+  (something skipped, deferred or failed), 1 (bad input). Nothing prompts.
+- A running thread is deferred and moved when it goes idle (`thread.idle`,
+  plus a sweep at start). The ledger (kv `studio.moveProvider.ledger`) makes a
+  re-run safe: moved threads come back `already-moved`, failed and deferred
+  ones are tried again, matching patches are left alone.
+- `status` (ledger and event log, counted as core does: `pending` until the
+  new provider accepts a real request after the move, not a bare `/compact`
+  or `/clear`; then `rebuilt`, or `started` for a forced move) and `verify` (move event, first turn
+  completed, and the handoff itself, not just its header, given to that turn;
+  `--probe "<question>"` asks the thread, and `--all` never probes a
+  Main). Also `bbs studio bot set-model` and `bbs studio runner move-provider`.
+- The command never moves the thread it runs in. The runbook for an agent
+  doing a migration is the `move-provider` skill.
+
 ## Memory
 
 Each Studio Bot has one memory, shared by all its conversations and workers

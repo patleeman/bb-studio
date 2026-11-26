@@ -74,6 +74,9 @@ export const DEFER_LOADING_KEY = "x-bb-defer-loading";
 /** The Codex namespace Studio's deferred tools go in (Codex takes deferred tools only inside one). */
 export const DEFER_NAMESPACE = "studio";
 
+/** How a provider's sessions get the on-demand tools, per provider (src/tool-delivery.ts); "default" is the built-in choice. */
+export type ToolDeliveryMode = "default" | "all" | "defer" | "trio";
+
 export type ToolEntry = string | { name: string; parameters: Record<string, unknown> };
 
 export interface Scope {
@@ -90,7 +93,7 @@ export interface Scope {
  * Splits the tools a session would get (`full`, in order) into loaded and on
  * demand for its kind, and picks the delivery for its provider.
  */
-export function scopeTools(input: { kind: ScopeKind; full: readonly string[]; providerId: string; lean: boolean; deferSupported: boolean; extras?: readonly string[] }): Scope {
+export function scopeTools(input: { kind: ScopeKind; full: readonly string[]; providerId: string; lean: boolean; deferSupported: boolean; extras?: readonly string[]; delivery?: ToolDeliveryMode }): Scope {
   const never = NEVER[input.kind];
   const loadedSet = new Set(input.lean ? LEAN_LOADED[input.kind] : LOADED[input.kind]);
   const pool = [...new Set([...input.full, ...(input.extras ?? [])])].filter((name) => !TRIO.has(name));
@@ -103,8 +106,10 @@ export function scopeTools(input: { kind: ScopeKind; full: readonly string[]; pr
   const onDemand = studio.filter((name) => !loadedSet.has(name) && (input.lean && fullLoaded.has(name) || (never !== "all" && !never.includes(name))));
   const base = { kind: input.kind, onDemand };
   if (onDemand.length === 0) return { ...base, loaded: [...loaded, ...gatewayTools], delivery: "none", gateway: false };
-  if (!input.lean && input.providerId === "claude-code") return { ...base, loaded: [...loaded, ...gatewayTools], delivery: "all", gateway: false };
-  if (!input.lean && input.providerId === "codex" && input.deferSupported) return { ...base, loaded: [...loaded, ...gatewayTools], delivery: "defer", gateway: false };
+  // The provider's setting (src/tool-delivery.ts), else Claude Code loads every tool and Codex defers them.
+  const chosen = input.delivery && input.delivery !== "default" ? input.delivery : input.providerId === "claude-code" ? "all" : input.providerId === "codex" ? "defer" : "trio";
+  if (!input.lean && chosen === "all") return { ...base, loaded: [...loaded, ...gatewayTools], delivery: "all", gateway: false };
+  if (!input.lean && chosen === "defer" && input.deferSupported) return { ...base, loaded: [...loaded, ...gatewayTools], delivery: "defer", gateway: false };
   return { ...base, loaded, delivery: "trio", gateway: gatewayTools.length > 0 };
 }
 
