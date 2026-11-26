@@ -16875,6 +16875,9 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                "core": {
+                  "type": "boolean"
                 }
               },
               "required": [

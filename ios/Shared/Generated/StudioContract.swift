@@ -14799,13 +14799,15 @@ public enum Studio {
     public var body: String?
     public var updatedAt: Double?
     public var warnings: [String]?
+    public var core: Bool?
 
-    public init(name: String? = nil, description: String? = nil, body: String? = nil, updatedAt: Double? = nil, warnings: [String]? = nil) {
+    public init(name: String? = nil, description: String? = nil, body: String? = nil, updatedAt: Double? = nil, warnings: [String]? = nil, core: Bool? = nil) {
       self.name = name
       self.description = description
       self.body = body
       self.updatedAt = updatedAt
       self.warnings = warnings
+      self.core = core
     }
   }
 
