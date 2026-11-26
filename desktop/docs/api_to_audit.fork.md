@@ -868,6 +868,20 @@ a session is constructed.
 2. The 500 ms wait adds latency to every turn start while any provider is
    registered; decide on a per-plugin budget or a cached value.
 3. Decide whether steers and queued drains should get it too.
+4. **Provider move.** While a thread's newest `thread/provider-move`
+   operation (`thread-provider-move.fork.ts`) has no `turn/started` after
+   it, providers get `providerMove: { operationId, from, to, historyTokens,
+   at }` only for plugins registered with `{ providerMove: true }`, a 5 s
+   wait and one budget of about `historyTokens` × 4 characters shared by
+   them (ceiling 1.2M, `BB_PROVIDER_MOVE_CONTEXT_MAX_CHARS`), placed before
+   the user's message; the move stays pending until a real turn completes. Decide
+   whether a move should be a first-class event type instead of a
+   `system/operation`, and whether core should build the history itself.
+5. `experimental_moveThreadProvider(threadId, request)` on
+   `bb.experimental_hooks` runs the move in process for a plugin (Studio's
+   bulk move) and returns a result union, not typed errors. Decide whether
+   it belongs on `bb.sdk.threads` instead, and whether plugins should be
+   allowed an explicit `full`.
 
 ## Auto router (`bb.experimental_hooks.experimental_autoRouter`)
 

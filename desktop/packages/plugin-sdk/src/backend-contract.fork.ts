@@ -78,12 +78,53 @@ export interface ExperimentalApprovalDecision {
 }
 
 /**
+ * The thread's newest provider move, passed only to turn-context providers
+ * registered with `{ providerMove: true }`, on every turn start until the new
+ * provider has accepted a request with real input (not a bare /compact or
+ * /clear) made after the move: a failed start or a turn the provider never
+ * accepted gets it again; a context clear after the move cancels it. The
+ * provider session was dropped by the move; return the rebuilt history.
+ * Return null (not your ordinary per-turn digest) when you could not build
+ * it: any string, even a digest, counts as delivered and lets the move be
+ * marked rebuilt. Return an empty string only to say there is genuinely no
+ * history (an empty or just-cleared thread). Null, undefined, a throw or a
+ * timeout mean "not delivered", and a move that requires a handoff then
+ * refuses to start the turn (503 handoff_unavailable). One provider per
+ * plugin handles both jobs: without `providerMove` in the context, return
+ * the ordinary digest; with it, return history or null. All such providers
+ * share one budget of about `historyTokens` × 4 characters (capped by the
+ * server) and get 5 s; their text goes before the user's message.
+ */
+export interface ExperimentalTurnContextProviderMove {
+  operationId: string;
+  from: { providerId: string; model: string | null };
+  to: { providerId: string; model: string; permissionMode: string };
+  historyTokens: number;
+  at: string;
+}
+
+/** Options for `experimental_turnContext`. */
+export interface ExperimentalTurnContextOptions {
+  /**
+   * This plugin rebuilds history after a provider move. Only providers
+   * registered with it get `providerMove`, the move turn's larger budget
+   * (shared by all such plugins) and 5 s wait; their text goes before the
+   * user's message. A move is refused with no_handoff_handler unless at
+   * least one is registered (or the move is forced), and a move turn whose
+   * history none of them delivered fails to start (503 handoff_unavailable)
+   * so the move stays pending.
+   */
+  providerMove?: boolean;
+}
+
+/**
  * Text a plugin adds to the agent's context at the start of each turn in a
  * thread. Return null or undefined (or an empty string) to add nothing.
  * Experimental: see docs/api_to_audit.fork.md.
  */
 export type ExperimentalTurnContextProvider = (context: {
   threadId: string;
+  providerMove?: ExperimentalTurnContextProviderMove;
 }) => string | null | undefined | Promise<string | null | undefined>;
 
 export type ExperimentalSkillsRegistryOperation = "search" | "read" | "install";
@@ -103,6 +144,61 @@ export type ExperimentalSkillsRegistryPolicy = (request: {
 }) =>
   | ExperimentalSkillsRegistryDecision
   | Promise<ExperimentalSkillsRegistryDecision>;
+
+/** Request for `experimental_moveThreadProvider`. */
+export interface ExperimentalMoveThreadProviderRequest {
+  providerId: string;
+  /** Default: the target provider's default model on the thread's machine. */
+  model?: string;
+  /**
+   * Default: the thread's current mode, lowered to the best mode the target
+   * supports. Anything wider is refused, except an explicit "full".
+   */
+  permissionMode?: "accept-edits" | "auto" | "full";
+  /** History budget for the first turn after the move. Default 150000. */
+  historyTokens?: number;
+  dryRun?: boolean;
+  includeArchived?: boolean;
+  /** Move even when no plugin handles provider moves (no history rebuild). */
+  force?: boolean;
+}
+
+export interface ExperimentalMoveThreadProviderSide {
+  providerId: string;
+  model: string | null;
+  permissionMode: string | null;
+}
+
+/**
+ * The same result as `POST /threads/:id/move-provider`, as a union: refusals
+ * never throw. `httpStatus` and `code` are the route's (409 thread_busy;
+ * 422 provider_unavailable, model_unavailable, permission_widening; 404
+ * thread_not_found; 400 invalid_request; 422 permission_unsupported,
+ * no_handoff_handler); `reason` is the 409's detail (running,
+ * pending-interaction, queued-messages, archived, deleted, busy, changed).
+ */
+export type ExperimentalMoveThreadProviderResult =
+  | {
+      ok: true;
+      status: "moved" | "already-moved" | "would-move";
+      threadId: string;
+      from: ExperimentalMoveThreadProviderSide;
+      to: ExperimentalMoveThreadProviderSide & {
+        model: string;
+        permissionMode: string;
+      };
+      historyTokens: number;
+      /** "none" when the move was forced with no handler. */
+      handoff: "required" | "none";
+    }
+  | {
+      ok: false;
+      threadId: string;
+      httpStatus: number;
+      code: string;
+      message: string;
+      reason: string | null;
+    };
 
 /** Hooks the fork adds to `bb.experimental_hooks`. */
 export interface ForkPluginHooks {
@@ -125,6 +221,8 @@ export interface ForkPluginHooks {
      * other providers ignore the key.
      */
     readonly deferredAgentTools: true;
+    /** `experimental_moveThreadProvider` exists. */
+    readonly providerMove: true;
   };
   /**
    * Answer "what kind of turn was this?" for every turn that finishes. One
@@ -161,7 +259,10 @@ export interface ForkPluginHooks {
    * plugin; a second call replaces the first. Experimental: see
    * docs/api_to_audit.fork.md.
    */
-  experimental_turnContext(provider: ExperimentalTurnContextProvider): void;
+  experimental_turnContext(
+    provider: ExperimentalTurnContextProvider,
+    options?: ExperimentalTurnContextOptions,
+  ): void;
   experimental_skillsRegistryPolicy(
     policy: ExperimentalSkillsRegistryPolicy,
   ): void;
@@ -179,6 +280,16 @@ export interface ForkPluginHooks {
   experimental_threadForkPoint(
     threadId: string,
   ): Promise<ExperimentalThreadForkPoint | null>;
+  /**
+   * Move a thread to another provider in place, in process: the same
+   * service, validation and result as `POST /threads/:id/move-provider`
+   * (no loopback HTTP). The move is recorded as by `plugin:<plugin id>`.
+   * Experimental: see docs/api_to_audit.fork.md.
+   */
+  experimental_moveThreadProvider(
+    threadId: string,
+    request: ExperimentalMoveThreadProviderRequest,
+  ): Promise<ExperimentalMoveThreadProviderResult>;
   /**
    * Answer "Auto": bb lists an Auto provider (id `auto`, model `auto`) in the
    * model pickers while a router is registered and enabled, and resolves a

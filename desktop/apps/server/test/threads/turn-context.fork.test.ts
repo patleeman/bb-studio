@@ -19,6 +19,7 @@ import {
   seedHostSession,
   seedProjectWithSource,
   seedThread,
+  seedTurnStarted,
 } from "../helpers/seed.js";
 import { withTestHarness } from "../helpers/test-app.js";
 
@@ -201,6 +202,48 @@ describe("turn context providers", () => {
       expect(next.input[1]).toMatchObject(digest);
       expect(steer.input).toHaveLength(1);
       expect(asked).toEqual([thread.id, thread.id]);
+    });
+  });
+
+  it("keeps ordinary turn context start-only: an auto submit on a thread that never moved gets none", async () => {
+    await withTestHarness(async (harness) => {
+      const { host } = seedHostSession(harness.deps);
+      const { project } = seedProjectWithSource(harness.deps, {
+        hostId: host.id,
+        path: "/tmp/turn-context-auto",
+      });
+      const environment = seedEnvironment(harness.deps, {
+        hostId: host.id,
+        projectId: project.id,
+        path: "/tmp/turn-context-auto",
+      });
+      const thread = seedThread(harness.deps, {
+        projectId: project.id,
+        environmentId: environment.id,
+      });
+      provide("studio", () => "Elsewhere: two workers.");
+      const execution = await buildExecutionOptions(
+        harness.deps,
+        { model: "test-model", permissionMode: "accept-edits" },
+        { threadId: thread.id },
+      );
+      const submitAuto = () =>
+        prepareTurnSubmitCommandPayload(harness.deps, {
+          environment,
+          execution,
+          permissionEscalation: "ask",
+          input: textInput("again"),
+          providerThreadId: "provider-session",
+          target: { mode: "auto", expectedTurnId: null },
+          thread,
+        });
+      expect((await submitAuto()).input).toHaveLength(1);
+      seedTurnStarted(harness.deps, {
+        environmentId: environment.id,
+        threadId: thread.id,
+        turnId: "turn-running",
+      });
+      expect((await submitAuto()).input).toHaveLength(1);
     });
   });
 });
