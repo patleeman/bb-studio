@@ -480,15 +480,14 @@ Finish item. Studio (`src/bot-finish.ts`):
 1. unarchives it for a moment (BB takes no turn in an archived thread) and
    sends one last agent-only turn into the conversation (no user message)
    with the steps: write a summary (**Decisions**, **Left open**,
-   **Made**), save it with `memory (op: add)` (topic: the conversation's title;
-   source `{ kind: "conversation", id, title }`), then call
-   `bot_finish_done { summary }`.
+   **Made**), then call `bot_finish_done { summary }`. The summary stays on
+   the conversation; nothing is saved to memory or a skill.
 2. When `bot_finish_done` arrives, the conversation is marked finished
    (`bot_threads.archived_at`, `finished_summary`; BB archives it again
    once the turn is over), and Main gets an agent-only note with the summary
    that has the Bot reply with the card `::finished{thread="thr_…"}`:
-   "✓ Archived: <title>", its dates, the summary's sections, **Open the
-   conversation** and **See in Memory**, and how many memory records cite it.
+   "✓ Archived: <title>", its dates, the summary's sections and **Open
+   conversation**. The conversation's one skill review pass is queued.
    Neither turn shows a user message. Main's row reads "Archived “<title>”".
    Older `::finished` cards in transcripts render the same card.
 3. If the conversation can't take the turn, the turn ends or fails without
@@ -1088,7 +1087,7 @@ on every page with a toolbar (search, filter pills, the page's menus and
 **New**) and groups of one-line rows (icon and title on the left, a small
 status and meta on the right). The pages are lists: a row opens its
 item as a tab in the workbench beside the page, through the link router
-(`src/ui/bot-page/open-row.ts`): an automation, a todo, a memory record, a
+(`src/ui/bot-page/open-row.ts`): an automation, a todo, a
 Library file, or an archived thread as a conversation tab. ⌘-click opens it
 in the workbench's second pane beside a conversation (beside a page it opens
 a tab, as a click does: a page's workbench has no pane API), Shift-click in
@@ -1495,8 +1494,8 @@ once, since signals sent while the socket was down are lost.
   sidebar, unarchived in BB; its summary stays.
 - `bot_finished({ threadId })` → `{ finished: { threadId, botId, title,
   summary, startedAt, finishedAt, records, memoryHref, archived } | null }`:
-  what Main's card shows; `records` counts the memory records that cite the
-  conversation, `archived` is false once it was reopened.
+  what Main's card shows; `records` is always 0 now (memory records are
+  retired; kept for the phone), `archived` is false once it was reopened.
 - `bot_library({ botId? })` → `{ botId, items: File[] }`. A `File` is `{
   pluginId, id, title, kind: "page" | "whiteboard" | "design" | "app" |
   "artifact" | "other", type, href, updatedAt, createdAt, madeIn: { threadId,
@@ -3290,11 +3289,11 @@ of Staff", with the same thread and check-ins; rename it from its page.
   a month) shows as "Custom: <cron>".
 
   ![The schedule editor editing the Release watch watcher: its bash script and 30 s timeout, what to do with the output, Wakes: The bot; presets, the Every… mode, every day on, every 15 minutes from 0:00 to 23:59, quiet hours 10:00 PM–7:00 AM, no end date, the America/New_York timezone, and the preview "Every 15 min, every day · quiet 10:00 PM–7:00 AM" with its cron */15 7-21 * * *](assets/bot-schedule-editor.png)
-- **Memory**: a core profile page per Bot, loaded into every conversation
-  and worker, plus memory records the Bot searches; see **Memory** below.
-  The profile's `## Check-in` section is what the Bot looks at on each
-  check-in, and the check-in prompt says: do its `## Check-in`, and stay
-  silent unless something matters.
+- **Memory**: an always-on core skill per Bot, loaded in full into every
+  conversation and worker, its on-demand skills, and its conversation
+  history; see **Memory** below. The core skill's `## Check-in` section is
+  what the Bot looks at on each check-in, and the check-in prompt says: do
+  its `## Check-in`, and stay silent unless something matters.
 - **Skills**: when the Bot learns a reusable procedure it saves a skill with
   `bot_skill (op: edit)` op `write` (name, one-line description, Markdown steps),
   fixes one in place with op `patch` (exact text → new text) and removes one
@@ -3332,27 +3331,26 @@ of Staff", with the same thread and check-ins; rename it from its page.
   background review and curator). A Studio bot reviews its own work in the
   background and keeps its skills current. External bots learn on their own
   provider, so none of this runs or shows for them.
-  - **Counting.** When the bot's thread goes idle (`thread.idle`), Studio
-    reads its new events (`threads.events.list` after the last sequence it
-    counted). A `turn/completed` whose turn had any tool item
-    (`commandExecution`, `toolCall`, `mcpToolCall`, `fileChange`, ...)
-    counts as a tool turn; a `client/turn/requested` from the user counts as
-    a user turn. A `bot_skill (op: edit)` call resets the tool count. The first look at a thread only takes a baseline, so old
-    history never trips it.
-  - **Review.** When either count reaches the interval (10 by default) and
-    the bot is active and idle, Studio forks its thread (`threads.fork`,
-    hidden, so no notice reaches the bot), switches the fork to the cheapest
-    model of the same provider (a price in the model's description, else a
-    name like haiku or luna; or the model you pick) and sends it a review
-    prompt: lessons, not logs; one skill per kind of task; merge a repeated
-    lesson into one rule; fix wrong lines in place; your corrections and
-    "remember this" first; facts about you go in memory records. It has
-    only the skill tools plus `pages_read` and `memory (op: search)`,
-    `memory (op: add)` and `memory (op: update)`, and replies
+  - **When.** Never by turn count. A review runs when a conversation is
+    archived (one pass over it), and once a day after 3 AM local: a sweep
+    queues Main and each unarchived conversation with events since its last
+    review (`bot_skill_review_marks`). Queued reviews
+    (`bot_skill_review_queue`) survive a restart and run one at a time per
+    bot from the minute tick. Run now sweeps at once.
+  - **Review.** Studio forks the thread under review (`threads.fork`,
+    hidden, so no notice reaches the bot; an archived conversation can be
+    forked for its archive pass), switches the fork to the cheapest model
+    of the same provider (a price in the model's description, else a name
+    like haiku or luna; or the model you pick) and sends it a review
+    prompt: what goes where and what never to save (the studio skill's
+    "Where information goes"), lessons not logs, one skill per kind of
+    task, fix wrong lines in place, your corrections and "remember this"
+    first. It may patch on-demand skills or the always-on skill within its
+    caps. It has only the skill tools plus `pages_read`, and replies
     `[PASS]` when there's nothing to save. When it goes idle Studio records
     the result ("Saved 1 skill", "Nothing to save") and archives the fork.
-    One review per bot at a time; a new turn in the bot's thread, Pause or
-    Stop stops it, and so do 20 minutes. Review forks stay out of Activity.
+    A new turn in the thread under review, Pause or Stop stops it, and so
+    do 20 minutes. Review forks stay out of Activity.
   - **Curator.** The bot's built-in Maintenance runs skill curation:
     a skill unused for 30 days (not loaded or saved) becomes stale, for 90
     days archived. Archived skills leave the bot's list but are kept;
@@ -3487,8 +3485,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
     the Mobile relay sends no push for `[PASS]`. The send carries
     `pluginSubmission` `{ pluginId: "studio", data: { kind: "cache-keepalive" } }`
     for `message.dispatch` hooks; Smart Queue only holds human sends to busy
-    threads and pings only go to idle ones. Learn from work doesn't count a
-    ping as a user turn, and a ping doesn't stop a running review.
+    threads and pings only go to idle ones. A ping doesn't stop a running
+    skill review.
     Maintenance owns skill curation independently of these pings.
   - **Compaction before expiry**: when warming stops for the idle cutoff
     while the cache is still warm, Studio compacts the chat once, when the
@@ -3815,11 +3813,11 @@ chosen from a week of tool-call history). The rest stay reachable on demand:
 
 | Kind | Loaded | On demand |
 |---|---|---|
-| Main | pages, memory, strand_note, conversation and Bot tools, schedules, skills, areas, design, code (op: show) | everything else |
-| A Bot conversation (any thread the user starts) | pages, memory, strand_note, conversation tools | everything else |
-| Project lead | pages, memory, strand_note | everything but the Bot's own schedules and skills, themes and presence |
-| Worker | pages_read, pages_create, pages_edit, memory (op: search), memory (op: add) | designs, apps, recordings, whiteboards, memory (op: update), pages_read (no page), pages_read (comments) |
-| Runner | runner_report, pages_read, pages_edit, memory (op: search) | pages, designs, apps, recordings, whiteboards, areas, memory (never the user's screen, strands or the Bot's tools) |
+| Main | pages, strand_note, conversation and Bot tools, schedules, skills, areas, design, code (op: show) | everything else |
+| A Bot conversation (any thread the user starts) | pages, strand_note, conversation tools | everything else |
+| Project lead | pages, strand_note | everything but the Bot's own schedules and skills, themes and presence |
+| Worker | pages_read, pages_create, pages_edit | designs, apps, recordings, whiteboards, pages_read (no page), pages_read (comments) |
+| Runner | runner_report, pages_read, pages_edit | pages, designs, apps, recordings, whiteboards, areas (never the user's screen, strands or the Bot's tools) |
 | Studio Decisions classifier thread | nothing | nothing |
 
 How the on-demand tools reach the agent depends on the provider:
@@ -3914,173 +3912,81 @@ and swaps provider and model. A BB without it fails each thread with
 
 ## Memory
 
-Each Studio Bot has one memory, shared by all its conversations and workers
-(`src/memory`). It has two layers:
+A Studio Bot's memory has three layers, all on its Memory page
+(`/plugins/studio/studio/memory/<botId>`, `src/memory/ui/MemoryView.tsx`):
 
-- **Core profile**: a short Studio page you edit: who you are, how you work,
-  hard rules, people and places, and the Bot's `## Check-in` list. It is the
-  Bot's memory page (`memoryPageId` in `bot_info (view: profile)`), so the check-in,
-  Maintenance and the Bot page find it there. Its text is loaded **always**:
-  Studio's agent configuration adds it to the instructions of every
-  conversation of the Bot (its chat, side threads, forks of its chat) and
-  every worker (runners, threads it started or owns) at each session start
-  or resume, right after the Bot's own instructions.
-  Older BB hosts keep at most 4,096 characters of a plugin's instructions
-  (BB since #7050 keeps 32,768), so the profile gets at most 2,500
-  characters (`PROFILE_CAP_CHARS`) and never more than what is left after
-  the Bot's own instructions and the conversation note. After it come only
-  one-line pointers (`src/agent-instructions.ts`): Pages, mini apps, the
-  Next row or Explore, and the kinds routing; their full rules are in the
-  studio skill's "Agent guide", which every session gets and loads on
-  demand. A typical conversation (a role, eight skills, a profile split from an old page)
-  stays within 4,096 characters (`src/agent-instructions.test.ts`). A longer profile is cut
-  at a line break, and the Bot is told the rest is on the page (`pages_read`).
-  The Memory view shows the profile's length against the cap, in amber when
-  it is over. A new Bot's memory
-  page is a core profile from the start.
-- **Memory records**: facts, decisions and notes in Studio's database
-  (`memory_records`, full-text search with SQLite FTS5; the topic weighs
-  double). Each record has a topic, a date, a source (a conversation, a
-  worker, another thread, a page and its section, or you) and, when it
-  corrected another record, a `replaces` pointer. A correction never edits a
-  record: it adds a new one that replaces it, and the old one stays as
-  history, marked replaced. Archive hides a record from the Bot and the list;
-  it is kept and can be restored.
+- **Core: always-on skills** (`src/core-skill.ts`). The Bot's skills with
+  `bot_skills.always_on` set go in full into the instructions of every
+  conversation and worker of the Bot, at each session start
+  (`src/memory/service.ts`, `withMemory`), core first, between
+  `<always-on skill="…">` tags. They share a 3,000-character budget
+  (`ALWAYS_ON_CAP`). The default one, `core-profile`, has three sections:
+  `## Preferences` (at most 25 one-line rules), `## Right now` (at most 10
+  temporary constraints, pruned weekly by Maintenance) and `## Check-in` (the
+  check-in list, which the check-in prompt and the check-in presets use).
+  The caps are advisory lint on each save: nothing is blocked or cut
+  silently. When the skills don't fit what the host's 4,096-character
+  instruction limit leaves, the block is cut at a line break and says which
+  skill to read for the rest. Always-on skills are pinned, so the curator
+  never retires them, and they are left out of the on-demand list.
+- **Skills**: the on-demand skills, listed by name in the Bot's
+  instructions and loaded with `bot_skill (op: view)`. Skill review runs
+  once a day (a sweep over Main and the unarchived conversations with new
+  events) and once when a conversation is archived (`src/skill-learning.ts`).
+  It may patch on-demand skills or the always-on skill, or reply `[PASS]`.
+- **History**: everything that happened stays in the conversations and
+  their archived summaries (`bot_threads.finished_summary`), searched with
+  `bot_info (view: history)`. Archiving a conversation keeps its summary on
+  the conversation and posts the card to Main; nothing is copied elsewhere.
 
-The Bot is told to search records before it relies on what it remembers, to
-save new ones and correct old ones with the tools below, and not to keep
-facts on a page. Skill reviews save facts as records too.
+On the page: Core's sections are edited in place, with a quiet
+"1,420 / 3,000 chars" budget. Skills has + New skill, each skill's editor
+and version history, and one row for Auto-learn (Daily + on archive) with
+Run now. History switches between Summaries (cards, searchable) and Past
+conversations (full-text search).
 
-### Memory tools
+### From the core profile page
 
-Every conversation and worker of a Studio Bot has these. They act for the
-Bot of the calling thread (a thread no Bot owns counts for the primary Bot).
+Before always-on skills, a Bot's core profile was a Studio page
+(`memory_profiles.profile_page_id`, else `bots.memory_page_id`). At plugin
+start, and on first need, each Studio Bot gets its always-on skill once
+(`src/core-skill-migrate.ts`, marked in `bot_core_skills`):
 
-- `memory (op: search) { query, topic?, limit? }` (limit 1–50, default 10): returns
-  `{ total, records: [{ id, topic, date: "2026-11-07", source: { kind, id,
-  title, section?, finished? }, text, replaced, replacedBy?, replaces?,
-  archived? }] }`. Current records come first; an empty query lists the
-  newest.
-- `memory (op: add) { topic, text, source? }`: saves a record. The source defaults
-  to the calling thread, as Studio placed it (`bot_threads`): Main is
-  "Main", another conversation its title, a worker its title (a runner's
-  "Runner: <name>"). A thread Studio hasn't placed yet falls back to the
-  older guesses (the Bot's chat, a side thread, a runner, a thread the Bot
-  started). Give a source to link elsewhere, for example a finished
-  conversation's summary: `{ kind: "conversation", id: "<thread id>",
-  title?: "Launch prep" }` (the title is looked up when left out).
-  `kind` is `conversation`, `worker`, `thread`, `page` or `manual`; every
-  kind but `manual` needs an `id`.
-- `memory (op: update) { id, text, topic? }`: saves a NEW record that replaces
-  `id` (which must be current, not already replaced) and keeps the old one.
+- The page's text is copied whole into `core-profile` (or
+  `core-profile-moved` when the user already has an on-demand skill of that
+  name). Nothing is rewritten or cut. A text over the budget is kept and
+  flagged by the skill's lint, on the Memory page and in Maintenance.
+- A Bot without such a page gets the template (the three sections).
+- A Bot that already has an always-on skill is only marked.
+- The page itself is left as it was. No new core profile pages are made.
 
-### The Memory view
+### Retired: memory records
 
-`/plugins/studio/studio/memory` shows the Bot last picked in this window (or
-the primary); `/plugins/studio/studio/memory/<botId>` shows one Bot, on the
-Bot pages' template. The header reads "Memory · <Bot>". The toolbar has a
-search field ("Search N records"; `/` focuses it, Esc clears it and a second
-Esc leaves it), topic pills (All, then topics by how many records use them),
-a sort (Newest, Oldest, Topic) and **New** (a record). Then the core profile,
-a folded block with its length ("900 of 2,500 characters", amber when over)
-that opens to the page, edited in place with the page editor. Then the
-records, one line each with its topic and date (an empty list reads "No
-records"), and the replaced ones folded below. A record opens as a tab in the
-workbench beside the page (`bb://record/mem_…`): its text, topic, date, source link ("from Main", "from
-“Launch prep” (finished)", "from Runner: staff sweep") and the "replaces
-“…” (date)" line in amber, with **Edit** (it saves a new record that
-replaces the one you edited) and **Archive** (with Undo).
-
-### Splitting an old Memory page
-
-A Bot made before core profiles has one Memory page that holds everything.
-Studio splits it once, on its own: at plugin start for every Bot that still
-has an old page and no core profile, and on the first load of that Bot's
-memory (`memory.overview`) if it hasn't happened yet. There is no preview
-and nothing to confirm; the Memory view only ever shows the core profile and
-the records. The old page is only read: nothing on it is changed, moved,
-archived or deleted, and the records link to it. Until the split runs, the
-Bot is told to read the old page when it needs it and not to edit it, and
-Maintenance doesn't tidy it.
-
-How the page is split (`src/memory/split.ts`):
-
-- Every heading is a section (`##`, `###`, `####`, below a lone `#` title),
-  so a page with two top sections ("Check-in", "Memory") and many
-  subsections ("How the user works", "Standing rules", "Fork", …) treats each
-  subsection on its own. Text under a heading before its first subheading
-  is a section of its own, named after that heading; an empty one is none.
-  Text above the first heading becomes records (topic "Notes").
-- A section is named by its heading; under a parent that says something
-  ("## Projects" › "### Larkspur") the name is "Projects › Larkspur", under a
-  catch-all one ("Memory", "Notes", "Facts and decisions") just its own
-  heading. The name is the records' default topic and their source section.
-- Only two kinds of section stay in the **core profile**: the check-in list
-  and how the user works, that is a section whose heading, or a heading
-  above it, is "Check-in" or "How <name> works" ("How Sam works", "How
-  they work"; any case). Every other section (who the user is, rules,
-  people, preferences, Systems, Facts and decisions, Fork, …) becomes
-  **records**.
-- The profile must fit the 2,500-character cap (`PROFILE_CAP_CHARS`). When
-  those sections are longer, the longest goes to records, then the next,
-  until the rest fits, so a split profile is never over the cap. A page with
-  neither section gets a profile with the two empty headings.
-- Profile sections are copied word for word, in page order, into a NEW page,
-  "<Bot>'s core profile"; a subsection sits under its profile parent, else
-  under its own `##` heading.
-- In a records section, each top-level bullet (with its nested bullets),
-  paragraph, quote or table row is one record. Its topic is the nearest
-  heading above it, or a short bold label it starts with (`**homelab:** …`). Its
-  date is the first date in its text (`2026-11-07`, `Nov 7`, `7 Nov 2026`,
-  `11/7/2026`; without a year, the latest such date on or before the page's
-  last edit) unless that is after the page's last edit (a due date);
-  otherwise the page's last edit. Its source is the old page, by title and
-  id, with the section heading. A code block joins the record above it.
-
-The split makes the profile page, adds the records, records the split
-(`memory_profiles.split_at`, with the old page's id) and points the Bot's
-memory page at the new profile. That marker keeps it from ever running
-again for the Bot.
+The memory records subsystem is retired: the `memory_search`, `memory_add`
+and `memory_update` tools and the merged `memory` tool, the record tab, the
+old Memory page split, and the Conversations record archiving used to
+write. The `memory_records` table, its FTS index and `memory_profiles` are
+left untouched; nothing reads or writes them. Dropping them is a separate,
+later step.
 
 ### Memory RPC
 
-All methods are Studio RPC (`studio` plugin) and take an optional `botId`;
-without one they act on the primary Bot. External Bots (Studio Agents) keep
-their own memory, so every method refuses them. Shapes are in
-`src/memory/contract.ts`; `src/public-contract.ts` includes them, so they are
-in `contracts/studio.schema.json` and the iOS app's generated
-`StudioContract.swift` (`Studio.Method.memory_list` and the rest).
+Kept for the phone app's Memory page (`src/memory/register.ts`). All methods
+take an optional `botId` (default: the primary Bot) and refuse an external
+Bot.
 
-A record (`MemoryRecordView`):
+| Method | Response now |
+| --- | --- |
+| `memory.overview` | `{ bot, profile, split: { state: "none", … }, counts: 0, topics: [] }`; `profile` describes the always-on skills: `chars`, `cap`, `over`, `updatedAt`; `pageId` is the old profile page when it still exists, else `""` |
+| `memory.profile` | `{ profile: { …, markdown } }`: the always-on skills' text |
+| `memory.list` | `{ records: [], total: 0 }` |
+| `memory.get` | `{ record: null }` |
+| `memory.add`, `memory.update`, `memory.archive` | refused, saying where things go now |
 
-```ts
-{
-  id: string; botId: string; topic: string; text: string;
-  createdAt: number; updatedAt: number;            // ms; createdAt is the record's date
-  source: { kind: "conversation" | "worker" | "thread" | "page" | "manual"; id: string | null; title: string; section: string | null };
-  sourceState: "live" | "finished" | "missing" | null; // a thread source: archived = finished, gone = missing
-  replacesId: string | null; replaces: { id: string; text: string; createdAt: number } | null;
-  replacedById: string | null; replacedAt: number | null;
-  archived: boolean;
-}
-```
-
-| Method | Request | Response |
-| --- | --- | --- |
-| `memory.overview` | `{ botId? }` (splits the Bot's old Memory page first, if that hasn't happened) | `{ bot: { id, name }, profile: { pageId, title, updatedAt, chars, cap, over } \| null, split: { state: "needed" \| "done" \| "none", legacyPageId, legacyTitle, splitAt }, counts: { current, replaced, archived }, topics: [{ topic, count }] }` |
-| `memory.list` | `{ botId?, query?, topic?, sort?: "relevance" \| "newest" \| "oldest" \| "topic", includeReplaced? = true, includeArchived? = false, limit? = 200 (max 500) }` | `{ records: MemoryRecordView[], total }`; sort defaults to relevance with a query, newest without; current records always come first |
-| `memory.add` | `{ botId?, topic, text, source? }` (no source: "Added by you") | `{ record }` |
-| `memory.update` | `{ botId?, id, text, topic? }` | `{ record, replaced }`: the new record and the one it replaced |
-| `memory.archive` | `{ botId?, id, archived: boolean }` | `{ record }` |
-| `memory.profile` | `{ botId? }` | `{ profile: { pageId, title, updatedAt, chars, cap, over, markdown } \| null }`; edit the page with the Pages RPC |
-
-Every write publishes `studio-changed` on Studio's realtime channel.
-
-### Reminders
-
-A reminder is an automation: `schedule (op: create)` with kind `reminder` makes
-one, and it wakes the Bot when it comes due. Older reminders that were copied
-into to-dos (`loop_reminder_<automation id>`) run as their automation again.
+The Memory page's own data comes from `bot_core` (the always-on skills,
+their lint notes and the budget), `bot_skills`, `bot_learning`,
+`bot_summaries` (archived conversations with their whole summaries),
+`bot_conversations_all` and `bot_conversations_search`.
 
 ## Pages and Apps
 

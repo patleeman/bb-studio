@@ -106,7 +106,11 @@ it("describes apps, and says ::mini by default and ::app with the App cards sett
 it("moves the long guidance into the studio skill, which the pointers name", () => {
   const skill = readFileSync(new URL("../skills/studio/SKILL.md", import.meta.url), "utf8");
   expect(skill).toMatch(/^---\nname: studio\n/);
-  for (const heading of ["## Agent guide", "### Pages", "### Apps", "### The Next row", "### Explore", "### Kinds"]) expect(skill).toContain(heading);
+  for (const heading of ["## Agent guide", "### Pages", "### Apps", "### The Next row", "### Explore", "### Kinds", "## Where information goes", "### What never to save (in Preferences or skills)", "### Calibration rules", "### Links stay links"]) expect(skill).toContain(heading);
+  expect(skill).toContain("Default to saving nothing.");
+  expect(skill).toContain("code spans aren't linked");
+  // The prompt points at it, and carries the link rule itself.
+  expect(PAGE_POINTER).toContain("No @thread: or page/design ids in backticks: code isn't linked.");
   // The rules that were in every session's instructions.
   expect(skill).toContain("call those\nscheduled items, never automations");
   expect(skill).toContain("Never put `@thread:` inside a Markdown\nlink");

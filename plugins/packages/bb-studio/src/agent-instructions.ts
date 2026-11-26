@@ -12,7 +12,7 @@
 import { MEMORY_SLOT } from "./memory/service";
 
 /** Pages: the editing rule and the card; formats are in the skill. */
-export const PAGE_POINTER = 'Pages: read with pages_read, change with small pages_edit operations on block ids, and put ::page{id="pg_…"} on its own line after you make or change one. Page formats (charts, embeds, html, mentions): load the studio skill.';
+export const PAGE_POINTER = 'Pages: read with pages_read, change with small pages_edit operations on block ids, and put ::page{id="pg_…"} on its own line after you make or change one. No @thread: or page/design ids in backticks: code isn\'t linked. Page formats (charts, embeds, html, mentions) and what to save where: load the studio skill.';
 
 /** Apps: the two types, when to make an interactive one and its card line (::mini, or ::app with the App cards setting). */
 export const MINI_POINTER = 'An app is a saved output or an interactive tool with its own data; apps (op: create) makes either (type "artifact" or "mini"). For something the user will interact with or come back to, make an interactive app (type "mini") and show ::mini{id="mini_…"} on its own line; details are in the studio skill.';
@@ -64,7 +64,7 @@ export interface InstructionParts {
 
 /** The pointers' "load the studio skill" phrases, for a session without Studio's skills. */
 const SKILL_PHRASES: readonly [string, string][] = [
-  [" Page formats (charts, embeds, html, mentions): load the studio skill.", ""],
+  [" Page formats (charts, embeds, html, mentions) and what to save where: load the studio skill.", ""],
   ["; details are in the studio skill.", "."],
   ['; load the studio skill ("The Next row") for its rules before you write one.', "."],
   ['; its rules are in the studio skill ("Explore").', "."],

@@ -75,7 +75,7 @@ export function fitText(markdown: string, room: number): { text: string; over: b
 export function memoryInstructions(input: { botName: string; role: ThreadRole["role"]; skills: readonly AlwaysOnSkill[]; room?: number }): string {
   const lines = ["## Memory"];
   if (input.role === "worker") lines.push(`You work for ${JSON.stringify(input.botName)}. Its always-on skills (the user's standing rules and what's true right now) follow; they apply to you too.`);
-  else lines.push(`Your always-on skills, in all your conversations and workers; core-profile's "## Check-in" is your check-in list. Patch one (bot_skill) only when a standing rule changed, and quote the new line in your reply. Past conversations: bot_info (view: history).`);
+  else lines.push(`Your always-on skills; core-profile's "## Check-in" is your check-in list. Patch one (bot_skill) only when a rule changed; quote the new line. History: bot_info (view: history).`);
   if (!input.skills.length) return lines.join("\n");
   const total = input.skills.reduce((sum, skill) => sum + skill.body.trim().length, 0);
   const tags = input.skills.reduce((sum, skill) => sum + `<always-on skill="${skill.name}">\n\n</always-on>\n`.length, 0);
