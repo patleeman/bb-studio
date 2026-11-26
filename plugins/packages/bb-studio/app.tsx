@@ -126,7 +126,6 @@ import { canZoom, ZoomView, zoomThreadBy } from "./src/strands/ui/Zoom";
 import { StrandMarks, StrandTag } from "./src/strands/ui/Tag";
 import { StrandsTab } from "./src/strands/ui/Tab";
 import "./src/work/ui/work.css";
-import { TodosTabName } from "./src/loops/ui/tab-name";
 import { OFF_NEW_TAB, onThreadTabOpen, registerThreadTab, ThreadTabReceiver } from "./src/kit/app/thread-panel";
 import { forgetView } from "./src/ui/studio-tab/view-state";
 import { registerThreadHeader } from "./src/ui/thread-header";
@@ -370,7 +369,6 @@ export default definePluginApp((app) => {
   registerItemDrops(app.slots);
   // Main tabs kept each Bot as a fixed workbench tab; those close once.
   app.slots.experimental_appOverlay({ id: "retire-fixed-tabs", component: RetireFixedBotTabs });
-  app.slots.experimental_appOverlay({ id: "todos-tab-name", component: TodosTabName });
   // `studio/automations`: the Bot's Todos page (src/ui/automations/AutomationsPanel.tsx).
   // Its title row is the page's own, in BB's title bar (headerContent), as the Library's is: one row, not two.
   app.slots.navPanel({ id: AUTOMATIONS_PANEL, title: "Tasks", icon: "ListTodo", path: AUTOMATIONS_PANEL, component: withPageTabs(AutomationsPanel, AUTOMATIONS_PANEL), headerContent: StudioBarSlot, ...OFF_RAIL });

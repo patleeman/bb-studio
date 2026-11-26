@@ -30,7 +30,6 @@ export const TAB_IDS = {
   bot: "bot",
   studio: STUDIO_TAB,
   code: CODE_TAB,
-  todos: "loops",
   memory: "memory",
   skills: "bot-skills",
   library: "library",
@@ -47,7 +46,7 @@ export type TabKindId =
   | "conversation" | "worker" | "bot"
   | "page" | "whiteboard" | "design" | "app" | "artifact" | "recording"
   | "board"
-  | "memory" | "skills" | "library" | "automations" | "todos" | "archive"
+  | "memory" | "skills" | "library" | "automations" | "archive"
   | "automation" | "todo" | "record"
   | "vscode"
   | "file" | "diff" | "browser" | "terminal" | "workflow";
@@ -193,15 +192,14 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
     ...botPage("automations", "Scheduled", "ListTodo", TAB_IDS.automations),
     actions: [], recents: null,
     surfaces: {
-      newTab: { na: "The Strands page is the one entry; this address opens it." },
-      recent: { na: "Recent lists the Strands page once, under Strands." },
+      newTab: { na: "Scheduled has no New Tab action; a bb://automations link or workbench (op: open) opens it." },
+      recent: { na: "Recent doesn't list Scheduled." },
       sidebarDrag: "added", workbenchOpen: "added", chatLink: "had",
     },
   },
-  botPage("todos", "Strands", "LayoutList", TAB_IDS.todos),
   botPage("archive", "Conversations", "studio/conversations", TAB_IDS.archive),
   pageRow("automation", "Automation", "Automations", "Clock", TAB_IDS.automation, "Automations page"),
-  pageRow("todo", "To-do", "To-dos", "ListTodo", TAB_IDS.todo, "Strands page"),
+  pageRow("todo", "To-do", "To-dos", "ListTodo", TAB_IDS.todo, "Scheduled page"),
   pageRow("record", "Memory record", "Memory records", "Brain", TAB_IDS.record, "Memory page"),
   {
     id: "vscode", name: "VS Code", plural: "VS Code", icon: CODE_ICON, owner: "studio", ref: "none", open: { via: "studio", tabId: CODE_TAB },
@@ -241,7 +239,7 @@ export const MOBILE_SUPPORT: Readonly<Record<TabKindId, MobileSupport>> = {
   conversation: "native", worker: "native", bot: "web",
   page: "native", whiteboard: "native", design: "native", app: "native", artifact: "native", recording: "web",
   board: "web",
-  memory: "web", skills: "web", library: "web", automations: "web", todos: "web", archive: "web",
+  memory: "web", skills: "web", library: "web", automations: "web", archive: "web",
   automation: "web", todo: "web", record: "web",
   vscode: "desktopOnly",
   file: "native", diff: "native", browser: "web", terminal: "native", workflow: "web",
@@ -340,7 +338,6 @@ export function pathFor(ref: TabRef): string | null {
     case "skills": return `${STUDIO_ROOT}/skills${id ? `/${enc(id)}` : ""}`;
     case "library": return STUDIO_ROOT;
     case "automations": return "/plugins/studio/automations";
-    case "todos": return id ? `${STUDIO_ROOT}/bot/${enc(id)}/strands` : null;
     case "archive": return `${STUDIO_ROOT}/conversations${id ? `/${enc(id)}` : ""}`;
     case "vscode": return "/plugins/studio/vscode";
     case "automation": case "todo": case "record": return id ? `${STUDIO_ROOT}/${ref.kind}/${enc(id)}` : null;
@@ -378,7 +375,6 @@ export function refOfPath(pathname: string): TabRef | null {
   if (first === "automation" || first === "todo" || first === "record") return id && !third && !rest.length ? { kind: first, id } : null;
   if (first === "bot") {
     if (!id || id === "new") return null;
-    if ((third === "loops" || third === "strands") && !rest.length) return { kind: "todos", id };
     return third ? null : { kind: "bot", id };
   }
   const kind = id ? itemKindOfId(id) : null;
@@ -419,7 +415,7 @@ export function newTabFields(tabId: string): { experimental_newTabGroup?: NewTab
 }
 
 /** Kinds whose name or plural a search query names ("whiteboard", "todos"): their rows answer it. */
-const FORMER_NAMES: Partial<Record<TabKindId, readonly string[]>> = { todos: ["Todos", "Tasks"], todo: ["Todo", "Todos", "Task", "Tasks"], archive: ["Archive"] };
+const FORMER_NAMES: Partial<Record<TabKindId, readonly string[]>> = { todo: ["Todo", "Todos", "Task", "Tasks"], archive: ["Archive"] };
 
 export function kindsNamedBy(query: string): TabKindId[] {
   const text = query.trim().toLocaleLowerCase();

@@ -187,17 +187,14 @@ Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching
 "offline sync": an HTML artifact and two pages match on their title or
 content, each showing the matching text with the match in bold.
 
-### Strands: the Strands page
+### Strands
 
 Strands are each conversation's lines of work: Studio sorts every turn into
-one by itself (`src/strands`). The Bot's **Strands** page
-(`/plugins/studio/studio/bot/<botId>/strands`; the older `…/loops` address
-opens it too) lists every conversation with open strands, needs you first:
-up to two asks per conversation with their buttons, then a chip per other
-strand. A chip opens the conversation at that strand's newest message. Under
-them are the areas' cards. The page's second tab, **Scheduled**, lists the
-Bot's check-ins, reminders, watchers and runners. The sidebar's **Strands**
-row counts the strands that need you.
+one by itself (`src/strands`). A conversation shows them in its strands box
+above the composer, its **Strands** tab, the tag in each message's footer
+(with **Move to…**) and the folds in its transcript. The desktop has no
+page of every conversation's strands any more; the phone's Strands screen
+still reads them (`strands.overview`).
 
 A strand needs you when a BB question or approval waits in it, one of its
 workers needs you, a Tool Gateway request waits, an area's open item needs
@@ -529,10 +526,8 @@ with `bbs thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   "Bring over BB Studio data" no Bot is in bb: the swap brings a marker
   (`plugins/studio/from-bb.json`) in with bb's files, so every Bot is this
   install's and reads Stopped · Resume. Under it, the Bot's pages as rows:
-  **Memory** (`/plugins/studio/studio/memory/<botId>`), **Library**
-  (`/plugins/studio/studio`) and, for the primary Bot with Todos on, **Todos**
-  (`/plugins/studio/studio/bot/<botId>/loops`) with what needs you now and,
-  under **Scheduled**, what runs when, then **Conversations**
+  **Memory** (`/plugins/studio/studio/memory/<botId>`), **Skills**,
+  **Library** (`/plugins/studio/studio`) and **Conversations**
   (`/plugins/studio/studio/conversations/<botId>`, below). The
   row of the page on screen is selected. The header is clickable in the
   desktop app (no window drag).
@@ -1305,11 +1300,9 @@ title bar layout the traffic lights, back, forward and the sidebar toggle
 stay where BB has them; in the browser layout back and forward move to the
 start of the main view's header and the toggle stays.
 
-**Scheduled**, on the sidebar Bot's **Todos** page, is the one place for what
-runs when; `bb://automations` and a thread's Scheduled tab open it there.
-The Bot sidebar has one row for it, **Todos**. Todos are one list, the
-primary Bot's, so under any other Bot the row and the page are **Scheduled**:
-that Bot's automations alone. Scheduled lists every automation
+**Scheduled** (`studio/automations`, `src/ui/automations/ScheduledPage.tsx`)
+is the one place for what runs when; `bb://automations` opens it, for the
+sidebar's Bot. The Bot sidebar has no row for it. Scheduled lists every automation
 that belongs to the Bot (check-ins, reminders, watchers, runners, bb's own
 automations and maintenance), each with its next run or Paused, and has
 **New** (check-in, reminder, watcher, runner). Timed todos stay in Today,

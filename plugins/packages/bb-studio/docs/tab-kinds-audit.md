@@ -35,7 +35,6 @@ as it).
 | Skills | added | added | added | added | added |
 | Library | added | added | added | added | had |
 | Scheduled | n/a [3] | n/a [4] | added | added | had |
-| Strands | added | added | added | added | had |
 | Conversations | added | added | added | added | had |
 | Automation | added | n/a [5] | added | added | added |
 | To-do | added | n/a [6] | added | added | added |
@@ -49,27 +48,8 @@ as it).
 
 [1] The Library lists no recordings; drag one from the New Tab page's Recent or search, or Talk's Recordings page.
 [2] Boards have no row in Studio's sidebar; drag one from the New Tab page's Recent or search.
-[3] The Strands page is the one entry; this address opens it.
-[4] Recent lists the Strands page once, under Strands.
-[5] Automations change on their own and would crowd Recent; the New Tab search finds one.
-[6] To-dos change on their own and would crowd Recent; the New Tab search finds one.
-[7] Memory records change on their own and would crowd Recent; the New Tab search finds one.
-[8] VS Code has no sidebar row; drag it from the New Tab page's Recent, or open it from the launcher or a file.
-[9] bb's own: files are dragged from Finder, which bb attaches to the composer.
-[10] bb's New Tab page lists no diffs; bb's Git panel opens them.
-[11] bb keeps no recent diffs.
-[12] bb's own: no row.
-[13] Replies don't link a diff; bb's change cards open it.
-[14] bb keeps no recent browser tabs.
-[15] bb keeps no recent terminals.
-[16] A terminal opens by starting one; the agent has no terminal id to open. workbench (op: tab) action "focus" selects an open one.
-[17] Replies don't link a terminal.
-[18] bb keeps no recent workflow runs.
-
-[1] The Library lists no recordings; drag one from the New Tab page's Recent or search, or Talk's Recordings page.
-[2] Boards have no row in Studio's sidebar; drag one from the New Tab page's Recent or search.
-[3] The Strands page is the one entry; this address opens it.
-[4] Recent lists the Strands page once, under Strands.
+[3] Scheduled has no New Tab action; a bb://automations link or workbench (op: open) opens it.
+[4] Recent doesn't list Scheduled.
 [5] Automations change on their own and would crowd Recent; the New Tab search finds one.
 [6] To-dos change on their own and would crowd Recent; the New Tab search finds one.
 [7] Memory records change on their own and would crowd Recent; the New Tab search finds one.

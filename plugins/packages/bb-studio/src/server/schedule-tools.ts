@@ -155,7 +155,7 @@ export function registerScheduleTools({ bb, bots, runners, automations, getThrea
 
   runnerTool(
     "automation_list",
-    "List what you have scheduled: check-ins, reminders, watchers and runners, one short line each with schedule, state and next run; give id for one item in full (instruction or script, last outcome). The user sees them under Scheduled on the Strands page; call them scheduled items, never automations.",
+    "List what you have scheduled: check-ins, reminders, watchers and runners, one short line each with schedule, state and next run; give id for one item in full (instruction or script, last outcome). The user sees them on the Scheduled page; call them scheduled items, never automations.",
     z.object({ id: z.string().min(1).max(200).optional().describe("One item in full"), after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
     async ({ id, after }: { id?: string; after?: string }, botId) => {
       const items = await automations.list(botId);

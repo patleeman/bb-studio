@@ -217,7 +217,7 @@ export function useStudioThreadHeader({ threadId }: { threadId: string }): Threa
   const { title, detail, worker } = useThreadHeaderParts({ threadId });
   if (worker) return { after: <span className="studio-root">{detail}</span> };
   // At the header's right end, in every conversation whose strands run (and in a Bot's, disabled with the
-  // reason, when they can't): the zoom levels, the strand filter, All strands and what needs the user.
+  // reason, when they can't): the zoom levels, the strand filter and All strands.
   const end = <ZoomSwitch threadId={threadId} botConversation={!!detail} />;
   if (!detail) return { end };
   const after = (

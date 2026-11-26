@@ -1,23 +1,19 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { areasContract, areaUpdateInput } from "./contract";
+import { areaUpdateInput } from "./contract";
 import type { Areas } from "./areas";
 import { callText, clipLine, nextLine, pageByKey, staleCursor } from "../paging";
 import { statusRank } from "./derive";
 
 export const AREA_TOOLS = ["area_update", "area_list", "area_get"];
 
-const UPDATE = "Update an area card on the Strands page: status (ok/flagged/broken), now (1–2 sentences), open items, covers, cadence. Pass name to create one; runners write status.json instead.";
+const UPDATE = "Update an area: status (ok/flagged/broken), now (1–2 sentences), open items, covers, cadence. Pass name to create one; runners write status.json instead.";
 const LIST = "List the areas the user's agents look after, problems first: one short line each (status, where it stands, open items, last and next run), in parts. Read one in full with area (op: get).";
 const GET = "Read one area by id or name: where it stands, its open items and its 10 newest runs.";
 /** Runs area_get shows, newest first. */
 const GET_RUNS = 10;
 
 export function registerAreas(bb: BbPluginApi, areas: Areas, guard: <T>(work: () => T) => T = (work) => work()) {
-  bb.rpc.register(areasContract, {
-    "areas.list": async () => guard(() => ({ areas: areas.list() })),
-    "areas.get": async ({ id }) => guard(() => ({ area: areas.get(id) })),
-  });
   const tool = <S extends z.ZodTypeAny>(name: string, description: string, parameters: S, execute: (x: z.infer<S>, threadId: string | null) => unknown) => {
     bb.agents.registerTool({ name, description, parameters, execute: async (x: z.infer<S>, ctx: { threadId?: string | null }) => {
       try { return JSON.stringify(guard(() => execute(x, ctx?.threadId ?? null))); } catch (error) { return `Error: ${error instanceof Error ? error.message : String(error)}`; }

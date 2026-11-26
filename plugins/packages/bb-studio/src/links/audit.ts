@@ -16,7 +16,6 @@ export const SAMPLE_REFS: Record<TabKindId, TabRef> = {
   skills: { kind: "skills", id: "bot_main" },
   library: { kind: "library", id: null },
   automations: { kind: "automations", id: null },
-  todos: { kind: "todos", id: "bot_main" },
   archive: { kind: "archive", id: "bot_main" },
   automation: { kind: "automation", id: "bot_main:aut_0123456789abcdef" },
   todo: { kind: "todo", id: "loop_0123abcd" },
@@ -78,7 +77,7 @@ function cell(kind: TabKindId, source: LinkSource): LinkAuditCell {
   const bbKind = kind === "file" || kind === "diff" || kind === "browser" || kind === "workflow";
   switch (source) {
     case "card":
-      return ["conversation", "page", "whiteboard", "design", "app", "artifact", "recording", "todos"].includes(kind) ? "routes" : { na: NO_CARD };
+      return ["conversation", "page", "whiteboard", "design", "app", "artifact", "recording"].includes(kind) ? "routes" : { na: NO_CARD };
     case "gesture":
       return bbKind ? { na: BB_LINK_ONLY } : "routes";
     case "palette": case "launcher":

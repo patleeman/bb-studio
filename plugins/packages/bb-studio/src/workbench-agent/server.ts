@@ -204,7 +204,7 @@ export async function openOp(given: OpenInput, threadId: string, deps: Workbench
       const name = input.id ? deps.botName(input.id) : null;
       if (input.id && name === null) return `No Bot has id ${input.id}.`;
       if (kind.id === "bot" && !input.id) return "Give the Bot's id.";
-      return tab(kind.id === "todos" ? null : input.id ?? null, kind.id === "bot" ? name! : kind.name);
+      return tab(input.id ?? null, kind.id === "bot" ? name! : kind.name);
     }
     case "entry": {
       if (!input.id) return `Give the ${kind.name.toLowerCase()}'s id.`;

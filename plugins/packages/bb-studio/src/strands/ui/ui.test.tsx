@@ -85,7 +85,6 @@ const state = vi.hoisted(() => ({
   toThread: vi.fn(),
   openTab: vi.fn(() => true),
   composerThread: "thr_main" as string | null,
-  overview: null as unknown,
   error: null as string | null,
   refresh: vi.fn(),
   toast: vi.fn((_message: string, _options?: { action?: { label: string; onClick(): void } }) => undefined),
@@ -101,14 +100,13 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_InfoSection: ({ label, children }: { label: string; children?: React.ReactNode }) => <section aria-label={label}>{children}</section>,
 }));
 vi.mock("../../ui/live", () => ({
-  useLive: (method: string) => ({ data: method === "strands.list" ? state.list : method === "strands.tags" ? state.tags : method === "strands.overview" ? state.overview : null, error: state.error, loading: false, refresh: state.refresh }),
+  useLive: (method: string) => ({ data: method === "strands.list" ? state.list : method === "strands.tags" ? state.tags : null, error: state.error, loading: false, refresh: state.refresh }),
   useCall: () => state.call,
   peekLive: (method: string) => (method === "strands.list" ? state.list : null),
 }));
 vi.mock("../../kit/ui/index", async () => ({ ...(await import("../../loops/ui/test-kit")).kitUi, Tooltip: ({ children }: { children?: React.ReactNode }) => <>{children}</> }));
 vi.mock("../../kit/app/route", () => ({ usePathname: () => "/threads/thr_main", currentPathname: () => "/threads/thr_main" }));
 vi.mock("../../kit/composer", () => ({ useComposerThread: () => state.composerThread }));
-vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ values: { strandsOverview: true } }) }));
 vi.mock("../../kit/app/index", () => ({ PageColumn: ({ children }: { children?: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("../../ui/conversations/bot-thread-owners", () => ({ useIsBotThread: () => true }));
 vi.mock("sonner", () => ({ toast: Object.assign(state.toast, { error: vi.fn() }) }));
@@ -116,7 +114,6 @@ vi.mock("sonner", () => ({ toast: Object.assign(state.toast, { error: vi.fn() })
 const { StrandsBoxBanner } = await import("./Strip");
 const { ContextInfoSection } = await import("./ContextInfoSection");
 const { promptStackSource, resetPromptStackForTests } = await import("./prompt-stack");
-const { StrandsOverview } = await import("./Overview");
 const { StrandMarks, StrandTag } = await import("./Tag");
 const { StrandsTab } = await import("./Tab");
 const { select, selectionOf, registerTimelineFilter, timelineFilterOf, resetSelectionForTests } = await import("./selection");
@@ -619,32 +616,6 @@ describe("the Strands tab's row menu", () => {
   });
 });
 
-describe("the strands overview", () => {
-  it("shows each conversation with up to 2 asks, then chips; a chip opens the conversation at that strand", () => {
-    state.overview = {
-      needs: 3, running: 1,
-      conversations: [
-        { threadId: "thr_main", title: "Main", isMain: true, lastActiveAt: NOW, strands: LIST.strands },
-        { threadId: "thr_studio", title: "BB Studio", isMain: false, lastActiveAt: NOW, strands: [view("s_ws", "Workspace fix", { state: "running", latestSeq: 7 })] },
-      ],
-    };
-    render(<StrandsOverview botId="bot_1" now={NOW} />);
-    expect(text(container.querySelector("h1"))).toBe("Strands3 need you · 1 running");
-    expect(container.querySelectorAll("[data-overview-conversation]")).toHaveLength(2);
-    const main = container.querySelector('[data-overview-conversation="thr_main"]')!;
-    expect(main.querySelectorAll("[data-strand-ask]")).toHaveLength(2);
-    // Main's card says "Main" once.
-    expect(text(main.querySelector("header"))).toBe("MainOpen");
-    expect(text(main)).toContain("1 more need you");
-    expect(text(main)).toContain("Command: npm publish --tag latest --access public --otp-from-env");
-    expect([...main.querySelectorAll("[data-strand-chip]")].map((chip) => chip.getAttribute("data-strand-chip"))).toEqual(["s_cx", "s_red4", "s_macos"]);
-    click(container.querySelector('[data-overview-conversation="thr_studio"] [data-strand-chip="s_ws"]'));
-    expect(state.toAppPath.mock.calls.at(-1)?.[0]).toBe("/threads/thr_studio#msg=7");
-    click([...container.querySelectorAll('[data-overview-conversation="thr_studio"] button')].find((button) => text(button).startsWith("Open")));
-    expect(state.toThread).toHaveBeenCalledWith("thr_studio");
-  });
-});
-
 describe("the Strands tab", () => {
   it("lists a strand's finished and failed workers on its card", () => {
     state.list = { ...LIST, strands: [view("s_cx", "CodexBar quota", { state: "done-unseen", workers: [
@@ -721,9 +692,8 @@ describe("one box above the composer: what Studio hides of BB's stack, thread by
 });
 
 describe("error states with Retry", () => {
-  it("renders a Retry button on StrandsTab and StrandsOverview errors that invokes refresh()", () => {
+  it("renders a Retry button on a StrandsTab error that invokes refresh()", () => {
     state.list = null as never;
-    state.overview = null;
     state.error = "Studio is starting";
 
     render(<StrandsTab threadId="thr_main" environment={null} params={null} />);
@@ -732,11 +702,5 @@ describe("error states with Retry", () => {
     expect(container.textContent).toContain("Studio is starting");
     act(() => { tabRetry!.click(); });
     expect(state.refresh).toHaveBeenCalledTimes(1);
-
-    render(<StrandsOverview botId="bot_1" />);
-    const overviewRetry = [...container.querySelectorAll("button")].find((b) => b.textContent === "Retry");
-    expect(overviewRetry).toBeTruthy();
-    act(() => { overviewRetry!.click(); });
-    expect(state.refresh).toHaveBeenCalledTimes(2);
   });
 });

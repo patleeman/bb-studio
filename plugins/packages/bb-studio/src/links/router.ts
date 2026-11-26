@@ -48,7 +48,7 @@ export function refOf(kind: TabKindId, id: string | null): TabRef | null {
 
 const DIRECTIVE_KINDS: Record<string, TabKindId> = {
   page: "page", drawing: "whiteboard", whiteboard: "whiteboard", design: "design", mini: "app", app: "app",
-  artifact: "artifact", recording: "recording", loop: "todos", loops: "todos", "bot-thread": "conversation", board: "board",
+  artifact: "artifact", recording: "recording", "bot-thread": "conversation", board: "board",
 };
 const DIRECTIVE_OF_KIND: Partial<Record<TabKindId, string>> = {
   page: "page", whiteboard: "drawing", design: "design", app: "mini", artifact: "artifact", recording: "recording",
@@ -67,7 +67,7 @@ function parseDirective(text: string): TabRef | null | undefined {
   if (!kind) return null;
   const attributes = directiveAttributes(match[2]!);
   const id = attributes.id || attributes.threadId || null;
-  return refOf(kind, kind === "todos" ? null : id);
+  return refOf(kind, id);
 }
 
 function mentionRef(text: string): TabRef | null | undefined {

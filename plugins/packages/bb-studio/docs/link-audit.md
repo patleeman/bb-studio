@@ -72,7 +72,6 @@ registry doesn't know (Settings) parses to nothing and stays bb's.
 | Skills | `bb://skills/bot_main` | `/plugins/studio/studio/skills/bot_main` |  |
 | Library | `bb://library` | `/plugins/studio/studio` |  |
 | Scheduled | `bb://automations` | `/plugins/studio/automations` |  |
-| Strands | `bb://todos/bot_main` | `/plugins/studio/studio/bot/bot_main/strands` |  |
 | Conversations | `bb://archive/bot_main` | `/plugins/studio/studio/conversations/bot_main` |  |
 | Automation | `bb://automation/bot_main%3Aaut_0123456789abcdef` | `/plugins/studio/studio/automation/bot_main%3Aaut_0123456789abcdef` |  |
 | To-do | `bb://todo/loop_0123abcd` | `/plugins/studio/studio/todo/loop_0123abcd` |  |
@@ -105,7 +104,6 @@ the rule above; **n/a** says why it can't.
 | Skills | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Library | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Scheduled | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
-| Strands | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Conversations | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Automation | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | To-do | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |

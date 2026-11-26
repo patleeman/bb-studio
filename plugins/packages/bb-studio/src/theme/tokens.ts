@@ -212,12 +212,9 @@ export const GLASS_DIFF_CARD = `${GLASS} :is(.rounded-lg, .rounded-md)[class~="b
 export const STUDIO_CARD = `${GLASS} [data-sidebar="inset"] [data-studio-card]:not([data-studio-card-tone])`;
 export const GLASS_EDGE = "color-mix(in oklab, var(--ink) 12%, transparent)";
 export const GLASS_COMPOSER = `${GLASS} [data-sidebar="inset"] [data-promptbox]`;
-export const DENSE_CARDS_ATTRIBUTE = "data-studio-dense-cards";
-export const DENSE_CARD = `${GLASS} [data-sidebar="inset"] [${DENSE_CARDS_ATTRIBUTE}] [data-studio-card]:not([data-studio-card-tone])`;
 export const STUDIO_CARD_CSS = `
 ${STUDIO_CARD} { border-color: ${GLASS_EDGE}; background: var(--fork-panel); }
 ${STUDIO_CARD}:is(button):hover { background: color-mix(in oklab, var(--ink) 8%, var(--fork-panel)); }
-${DENSE_CARD} { background: color-mix(in oklab, var(--canvas) 88%, transparent); -webkit-backdrop-filter: blur(28px) saturate(var(--studio-glass-saturate)); backdrop-filter: blur(28px) saturate(var(--studio-glass-saturate)); }
 `;
 export const CLASSIC_FOOTER = `${ON}:not([${GLASS_ATTRIBUTE}]) [data-sidebar="inset"] [data-scroll-footer] > div`;
 

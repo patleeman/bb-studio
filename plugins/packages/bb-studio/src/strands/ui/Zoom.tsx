@@ -13,7 +13,6 @@ import { cn } from "../../kit/ui/utils";
 import type { StrandList } from "../contract";
 import { useLive } from "../../ui/live";
 import { flashReply } from "./ask-mark";
-import { countsOf, replyAskOf, strayCountsOf } from "./model";
 import { holdZoomable, keyboardModeOf, select, selectionOf, setKeyboardMode, setZoom, useKeyboardMode, useZoom, zoomInHost, zoomOf, ZOOM_MAX } from "./selection";
 import { STRANDS_POLL_MS, useJump, useOpenStrandsTab, useStrandFilter } from "./Strip";
 import { lineAt, nodeAt, stepNode, timeRange, TREE_STEP, treeMatches, zoomLines, zoomTree, type TreeNode, type TreeNodeKind, type ZoomGlyph, type ZoomLine } from "./zoom-model";
@@ -378,18 +377,17 @@ function leaveKeyboardMode(threadId: string, restore: boolean) {
   if (restore && back?.isConnected) back.focus();
 }
 
-// ---- the header: Messages · Strands · Tree, "N need you", and the gestures ----
+// ---- the header: Messages · Strands · Tree, and the gestures ----
 
 /**
  * In the conversation's header, where BB zooms and strands run: the strand
- * filter (chip, clear, previous and next), the zoom switch, the Strands tab
- * and "N need you". Nothing elsewhere: there the box above the composer shows them.
+ * filter (chip, clear, previous and next), the zoom switch and the Strands
+ * tab. Nothing elsewhere: there the box above the composer shows them.
  */
 export function ZoomSwitch({ threadId, botConversation = false }: { threadId: string; /** A Bot's conversation: show the controls (disabled) even with its strands off. */ botConversation?: boolean }) {
   const list = useLive("strands.list", { threadId }, { enabled: !!threadId, pollMs: STRANDS_POLL_MS });
   const level = useZoom(threadId);
   const zoomTo = useZoomTo(threadId);
-  const jump = useJump(threadId);
   const openTab = useOpenStrandsTab();
   const reason = zoomBlocked(list.data, zoomInHost(), botConversation);
   const enabled = reason === "";
@@ -409,16 +407,6 @@ export function ZoomSwitch({ threadId, botConversation = false }: { threadId: st
   const own = useRef<HTMLSpanElement>(null);
   useEscEsc(threadId, enabled, own);
   if (reason === null) return null;
-  const needs = countsOf(list.data).needs + strayCountsOf(list.data).needs;
-  const waiting = list.data?.strands.find((strand) => strand.state === "needs-you") ?? null;
-  // To what waits on the user: a strand's ask, else (only stray workers wait) the Strands tab, which lists them.
-  const goToAsk = () => {
-    const reply = waiting ? replyAskOf(waiting) : null;
-    const seq = reply?.seq ?? waiting?.latestSeq ?? null;
-    if (seq == null) { openTab(); return; }
-    if (reply) flashReply(threadId, reply.seq);
-    if (zoomOf(threadId) > 0) zoomTo(0, seq); else jump(seq);
-  };
   const iconButton = "grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-muted-foreground hover:bg-accent/60 hover:text-foreground disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent";
   return (
     <span ref={own} className={cn("studio-root inline-flex min-w-0 shrink items-center justify-end gap-1.5", NO_DRAG_CLASS)} style={NO_DRAG_STYLE} data-zoom-switch="" data-zoom-blocked={enabled ? undefined : reason}>
@@ -437,12 +425,6 @@ export function ZoomSwitch({ threadId, botConversation = false }: { threadId: st
         <button type="button" data-zoom-strands-tab="" onClick={openTab} style={NO_DRAG_STYLE} aria-label="All strands" title="All strands: every strand, its asks and workers"
           className={iconButton}>
           <ListIcon />
-        </button>
-      ) : null}
-      {enabled && needs > 0 ? (
-        <button type="button" data-zoom-needs="" onClick={goToAsk} style={NO_DRAG_STYLE} aria-label={`${needs} need you`} title={`${needs} need you: go to ${needs === 1 ? "it" : "the first"}`}
-          className="inline-flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-full bg-warning/10 px-1.5 text-[11.5px] font-semibold text-warning hover:bg-warning/15">
-          <span aria-hidden className="size-1.5 rounded-full bg-warning" />{needs}
         </button>
       ) : null}
     </span>

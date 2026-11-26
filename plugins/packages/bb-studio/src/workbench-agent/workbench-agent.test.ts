@@ -388,7 +388,6 @@ describe("workbench (op: open)'s types come from the tab kinds registry", () => 
     expect(await spec({ type: "board", id: "thr_b" })).toEqual({ kind: "tab", tab: { id: "board", pluginId: "studio-visual-chat" }, params: { threadId: "thr_b" }, title: "Election night" });
     expect(await spec({ type: "bot", id: "bot_main" })).toEqual({ kind: "tab", tab: { id: "bot" }, params: { botId: "bot_main" }, title: "Chief of Staff" });
     expect(await spec({ type: "archive", id: "bot_main" })).toEqual({ kind: "tab", tab: { id: "archive" }, params: { botId: "bot_main" }, title: "Conversations" });
-    expect(await spec({ type: "todos" })).toEqual({ kind: "tab", tab: { id: "loops" }, title: "Strands" });
     expect(await spec({ type: "vscode" })).toEqual({ kind: "tab", tab: { id: "code" }, title: "VS Code" });
     expect(await spec({ type: "workflow", id: "wfr_0123abcd" })).toEqual({ kind: "tab", tab: { id: "workflow-run", pluginId: "workflows" }, params: { runId: "wfr_0123abcd" }, title: "Workflow run" });
     expect(await spec({ type: "workflow", id: "nope" })).toBe("BB can't open that workflow run as a tab.");

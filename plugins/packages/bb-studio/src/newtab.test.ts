@@ -123,7 +123,7 @@ it("gives every row the drag payload its kind drops as", async () => {
 it("searches under each kind's plural, with Recent on its own registration", () => {
   expect(STUDIO_NEW_TAB_ITEMS[0]).toMatchObject({ id: "recent" });
   expect(STUDIO_NEW_TAB_ITEMS.slice(1).map((registration) => registration.title)).toEqual([...new Set(TAB_KIND_REGISTRY.filter((entry) => entry.owner !== "bb").map((entry) => entry.plural))]);
-  expect(STUDIO_NEW_TAB_ITEMS.map((registration) => registration.id)).toEqual(expect.arrayContaining(["kind-automations", "kind-todos", "kind-todo", "kind-record"]));
+  expect(STUDIO_NEW_TAB_ITEMS.map((registration) => registration.id)).toEqual(expect.arrayContaining(["kind-automations", "kind-todo", "kind-record"]));
   expect(STUDIO_NEW_TAB_ITEMS.slice(1).every((registration) => !registration.useRecents && registration.search)).toBe(true);
   expect(STUDIO_NEW_TAB_ITEMS.map((registration) => registration.title)).not.toContain("Studio");
   const titles = STUDIO_NEW_TAB_ITEMS.map((registration) => registration.title);

@@ -44,8 +44,6 @@ describe("canonical links", () => {
     expect(directiveFor(SAMPLE.page)).toBe('::page{id="pg_0123456789abcdef"}');
     expect(parseLink("::drawing{id=\"drw_0123456789abcdef\"}")).toEqual(entity(SAMPLE.whiteboard, "::drawing{id=\"drw_0123456789abcdef\"}"));
     expect(parseLink("::mini{id='mini_0123456789abcdef'}")?.type).toBe("entity");
-    expect(parseLink("::loop{id=\"loop_1\"}")).toEqual(entity({ kind: "todos", id: null }, "::loop{id=\"loop_1\"}"));
-    expect(parseLink("::loops{open=\"pane\"}")).toEqual(entity({ kind: "todos", id: null }, "::loops{open=\"pane\"}"));
     expect(parseLink("::bot-thread{threadId=\"thr_9\"}")).toEqual(entity({ kind: "conversation", id: "thr_9" }, "::bot-thread{threadId=\"thr_9\"}"));
     expect(parseLink("::finished{}")).toBeNull();
     expect(parseLink("::page{id=\"dsn_0123456789abcdef\"}")).toEqual(entity(SAMPLE.design, "::page{id=\"dsn_0123456789abcdef\"}"));

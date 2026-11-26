@@ -58,9 +58,6 @@ it("titles the window by the Bot's page, and leaves the Library's own title alon
   expect(botPageTitle("memory/bot_main")).toEqual({ title: "Memory", windowTitle: "Memory" });
   expect(botPageTitle("conversations")).toEqual({ title: "Conversations", windowTitle: "Conversations" });
   expect(botPageTitle("conversations/bot_main")).toEqual({ title: "Conversations", windowTitle: "Conversations" });
-  // Strands is under the Bot page (the older loops address too): its header named the Library before.
-  expect(botPageTitle("bot/bot_main/strands")).toEqual({ title: "Strands", windowTitle: "Strands" });
-  expect(botPageTitle("/bot/bot_main/loops/")).toEqual({ title: "Strands", windowTitle: "Strands" });
   expect(botPageTitle("bot/bot_main/controls")).toEqual({ title: "Bot settings", windowTitle: "Bot settings" });
   expect(botPageTitle("bot/bot_main")).toBeNull();
   expect(botPageTitle("bot/new")).toEqual({ title: "New Bot", windowTitle: "New Bot" });

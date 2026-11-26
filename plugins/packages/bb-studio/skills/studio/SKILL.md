@@ -23,7 +23,7 @@ a `bb://<kind>/<id>` link: `bb://page/pg_…`, `bb://whiteboard/drw_…`,
 `bb://design/dsn_…`, `bb://app/mini_…`,
 `bb://artifact/art_…`, `bb://recording/rec_…`, `bb://conversation/thr_…`,
 `bb://worker/thr_…`, `bb://bot/bot_…`, `bb://board/thr_…`,
-`bb://memory/bot_…`, `bb://todos/bot_…`, `bb://archive/bot_…`,
+`bb://memory/bot_…`, `bb://archive/bot_…`,
 `bb://library`, `bb://automations`, `bb://vscode`, `bb://file/<path>`,
 `bb://workflow/wfr_…`. Both forms open the same way in BB: a click opens
 the target beside the conversation, ⌘-click in the workbench's second pane,
@@ -143,9 +143,9 @@ tools or work cards.
   user's phone gets one push. BB's own questions and approvals count too.
 - Starting a worker: give it a clear first message with its job. It joins the
   strand of the turn that started it by itself.
-- The user sees every conversation's open strands, needs you first, on the
-  Strands page (the sidebar's **Strands**), with the areas' cards under them.
-  Old `::loop` and `::work` cards in past messages show read-only.
+- The user sees a conversation's strands in its strands box above the
+  composer, its Strands tab and the tag on each message. Old `::loop` and
+  `::work` cards in past messages show read-only.
 
 ## Memory
 
@@ -225,9 +225,8 @@ File not found.
   Otherwise a run ends by itself ([PASS] reads as "Nothing new"). A runner's
   `runner_report` lands on its run.
 - An area is a part of the user's life or work an agent looks after (a
-  runner's area, a lead's project, something the Bot keeps): one card on the
-  Strands page with its status (ok, flagged, broken), where it stands, open
-  items and recent runs. A runner writes `status.json` beside its
+  runner's area, a lead's project, something the Bot keeps), with its status
+  (ok, flagged, broken), where it stands, open items and recent runs. A runner writes `status.json` beside its
   STATUS.md each run (`status`, `now`, `open` [{title, since, needsUser}],
   `updatedAt`); Studio reads it when the run ends. An open item with
   `needsUser` shows as "needs you" on the strand that holds the area's
@@ -263,8 +262,8 @@ commands, toggles Studio's settings, opens a typed URL, and asks the Bot
 opens the same omnibar from any app. Point the user there to find an item
 quickly.
 
-Name pages as the app does. The Strands page has every conversation's
-strands and, under **Scheduled**, your check-ins, reminders, watchers and runners: call those
+Name pages as the app does. The **Scheduled** page (`bb://automations`)
+lists your check-ins, reminders, watchers and runners: call those
 scheduled items, never automations. Bot settings is the Bot's settings page.
 
 ## Themes

@@ -146,7 +146,7 @@ export function StrandsBoxFor({ threadId }: { threadId: string }) {
     ...(drawn && hasOpen(list.data) ? ["active-child-threads" as const] : []),
     ...(list.data?.enabled && hostContextSegments() ? ["thread-context" as const] : []),
   ]);
-  // Where BB zooms (the fork's zoom seam), the header's switch, filter chip, Strands button and "N need you" take the box's place.
+  // Where BB zooms (the fork's zoom seam), the header's switch, filter chip and Strands button take the box's place.
   if (!drawn) return null;
   return <StrandsBox threadId={threadId} />;
 }

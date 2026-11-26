@@ -7,8 +7,7 @@
 // <name> while it is paused or stopped, Edit <name>…, Bot settings…: its
 // Controls page, Default model: what its new conversations start on, New
 // Bot); then the Bot's pages as rows: Memory, Skills,
-// Library, Strands (every conversation's strands; the count is the strands
-// that need the user) and Conversations (every conversation, active and archived, with search). The
+// Library and Conversations (every conversation, active and archived, with search). The
 // row of the page on screen is selected.
 import type { ReactNode } from "react";
 import type { BotSpace } from "../../bot-threads-contract";
@@ -21,7 +20,7 @@ export { resumeWord } from "../bot/bot-state";
 export const STUDIO_ROOT_PATH = "/plugins/studio/studio";
 export const AUTOMATIONS_PATH = "/plugins/studio/automations";
 
-export type SpacePage = "memory" | "skills" | "library" | "automations" | "strands" | "conversations";
+export type SpacePage = "memory" | "skills" | "library" | "automations" | "conversations";
 
 /** Which of the Bot's pages the main view shows, if any. */
 export function spacePageAt(pathname: string): SpacePage | null {
@@ -30,7 +29,6 @@ export function spacePageAt(pathname: string): SpacePage | null {
   if (/^\/plugins\/studio\/studio\/memory(?:\/|$)/.test(path)) return "memory";
   if (/^\/plugins\/studio\/studio\/skills(?:\/|$)/.test(path)) return "skills";
   if (path === AUTOMATIONS_PATH || path.startsWith(`${AUTOMATIONS_PATH}/`)) return "automations";
-  if (/^\/plugins\/studio\/studio\/bot\/[^/]+\/(?:strands|loops)$/.test(path)) return "strands";
   if (/^\/plugins\/studio\/studio\/conversations(?:\/|$)/.test(path)) return "conversations";
   return null;
 }
@@ -77,7 +75,7 @@ export interface SpaceMenu {
   newBot(): void;
 }
 
-export function SpaceHeader({ bot, line, resume = null, chooseModel = false, glass, page, strands = null, onPage, menu }: {
+export function SpaceHeader({ bot, line, resume = null, chooseModel = false, glass, page, onPage, menu }: {
   /** Its new Main can't start for want of a model: Choose a model after the line opens its Default model. */
   chooseModel?: boolean;
   bot: BotSpace | null;
@@ -87,15 +85,13 @@ export function SpaceHeader({ bot, line, resume = null, chooseModel = false, gla
   /** Under a scene theme: no band, border or sticking, so the sidebar reads as one card. */
   glass: boolean;
   page: SpacePage | null;
-  /** The strands that need the user; null with no Bot. */
-  strands?: number | null;
   onPage(page: SpacePage): void;
   menu: SpaceMenu;
 }) {
   // Each row drags as its page (src/tab-kinds.ts), for the workbench: a drop opens that page as a tab.
   const row = (id: SpacePage, label: string, glyph: ReactNode, extra?: ReactNode) => (
-    <button key={id} type="button" data-testid={`space-page-${id}`} aria-current={page === id || (id === "strands" && page === "automations") ? "page" : undefined} onClick={() => onPage(id)} className={PAGE_ROW}
-      {...dragSourceProps(bot ? refDragItem({ kind: (id === "conversations" ? "archive" : id === "strands" ? "todos" : id) satisfies TabKindId, id: bot.id }, label) : null)}>
+    <button key={id} type="button" data-testid={`space-page-${id}`} aria-current={page === id ? "page" : undefined} onClick={() => onPage(id)} className={PAGE_ROW}
+      {...dragSourceProps(bot ? refDragItem({ kind: (id === "conversations" ? "archive" : id) satisfies TabKindId, id: bot.id }, label) : null)}>
       <span aria-hidden className="flex w-4 shrink-0 justify-center text-muted-foreground">{glyph}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {extra}
@@ -130,7 +126,6 @@ export function SpaceHeader({ bot, line, resume = null, chooseModel = false, gla
         {row("memory", "Memory", <span className="text-sm leading-none">◈</span>)}
         {row("skills", "Skills", <Icon name="Toolbox" className="size-4" />)}
         {row("library", "Library", <Icon name="studio/library" className="size-4" />)}
-        {row("strands", "Strands", <Icon name="ListView" className="size-4" />, strands ? <span data-testid="space-strands-count" className="shrink-0 text-xs tabular-nums text-warning">{strands}</span> : null)}
         {row("conversations", "Conversations", <Icon name="studio/conversations" className="size-4" />)}
       </nav>
     </header>

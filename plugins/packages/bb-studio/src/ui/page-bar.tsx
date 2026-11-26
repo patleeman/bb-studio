@@ -71,7 +71,6 @@ export function botPageTitle(subPath: string): { title: string; windowTitle: str
     : parts[0] === "conversations" ? "Conversations"
       : parts[0] === "new-conversation" ? "New conversation"
         : parts[0] === "bot" && parts.length === 2 && parts[1] === "new" ? "New Bot"
-          : parts[0] === "bot" && parts.length === 3 && (parts[2] === "loops" || parts[2] === "strands") ? "Strands"
             : parts[0] === "bot" && parts.length === 3 && parts[2] === "controls" ? "Bot settings"
             : parts.length === 2 && isEntryKind(parts[0]!) ? ENTRY_TITLE[parts[0]]
               : null;

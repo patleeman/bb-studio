@@ -152,7 +152,7 @@ export const rpcContract = defineRpcContract({
     }),
   },
   "strands.overview": {
-    experimental_description: "Every conversation of a Bot with open strands, needs you first: the Strands page.",
+    experimental_description: "Every conversation of a Bot with open strands, needs you first: the phone's Strands screen.",
     input: z.object({ botId: z.string().min(1).max(200) }).strict(),
     output: z.object({ conversations: z.array(overviewConversation), needs: z.number(), running: z.number() }),
   },

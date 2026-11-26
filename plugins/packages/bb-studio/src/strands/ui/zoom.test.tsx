@@ -558,12 +558,8 @@ describe("the header where BB zooms", () => {
     expect(levels[1]!.getAttribute("aria-pressed")).toBe("true");
     click(container.querySelector("[data-zoom-strands-tab]"));
     expect(state.openTab).toHaveBeenCalledTimes(1);
-    const needs = container.querySelector("[data-zoom-needs]");
-    expect(needs?.getAttribute("aria-label")).toBe("1 need you");
-    expect(needs?.textContent).toBe("1");
-    click(needs);
-    expect(zoomOf("thr_main")).toBe(0);
-    expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=85", { replace: true });
+    // No "N need you" button in the header: the strands box and the Strands tab show what waits.
+    expect(container.querySelector("[data-zoom-needs]")).toBeNull();
   });
 
   it("shows the strand filter: its name, clear, count, previous and next, and Esc clears it", () => {
@@ -581,17 +577,6 @@ describe("the header where BB zooms", () => {
     act(() => select("thr_main", { strandId: "cx", seq: 50 }));
     act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
     expect(selectionOf("thr_main")).toBeNull();
-  });
-
-  it("opens the Strands tab when only stray workers need the user", () => {
-    zoomingHost();
-    state.list = { ...LIST, strands: [view("cx", "Context cuts")], strayWorkers: [{ threadId: "thr_w", title: "router worker", status: "needs-you", endedAt: null }] };
-    render(<ZoomSwitch threadId="thr_main" />);
-    const needs = container.querySelector("[data-zoom-needs]");
-    expect(needs?.getAttribute("aria-label")).toBe("1 need you");
-    click(needs);
-    expect(state.openTab).toHaveBeenCalledTimes(1);
-    expect(state.toAppPath).not.toHaveBeenCalled();
   });
 
   it("zooms by command and by pinch over the conversation, leaving alone what isn't its to zoom", () => {
