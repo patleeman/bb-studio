@@ -334,16 +334,6 @@ a getbb.app machine credential that `bb machine remove` revokes; if that
 revocation fails, the machine is still removed and the response carries a
 warning (printed to stderr) to revoke the machine in the getbb.app dashboard.
 
-Remote access through getbb.app comes from the bundled bb account and Connect
-plugins: `bb account login|status|logout` signs this server in (bb-account
-skill), and `bb connect status|on|off|expose|unexpose|unexpose-all|shares`
-serves it at `<handle>.getbb.app` and shares HTTP ports from any enrolled host
-(share-server-links skill). `bb connect servers` lists every bb on the account.
-`bb connect machine-code` mints a one-time, 10-minute code that pairs the bb
-mobile app (also shown under Settings → Mobile → Add mobile device); `--json`
-prints `{code, serverUrl, apex, expiresAt}`. Without an installed bb, pair a
-dashboard code with `npx -p bb-app@latest bb connect --code <code>`.
-
 ## Move the server
 
 Moving the server is experimental and off by default. Turn on the `serverMove`

@@ -11,7 +11,6 @@ export const UNLISTED_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
   "environment-git-worktree",
   "environment-personal-workspace",
   "environment-project-checkout",
-  "plugin-api-tester",
   "provider-acp",
   "provider-claude-code",
   "provider-codex",
@@ -20,25 +19,12 @@ export const UNLISTED_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
 
 export const INSTALL_ON_REQUEST_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
   "browser-automation",
-  "docs",
-  "environment-modal-sandbox",
-  "github",
-  "memory",
   "tailscale",
-  "tasks",
-  "theme-preview",
 ]);
 
 export const OFF_BY_DEFAULT_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
-  "agent-annotations",
   "ask-user-question",
-  "mcp",
-  "monaco-editor",
-  "plugin-api-docs",
-  "prompt-library",
   "server-switcher",
-  "storage-retention",
-  "workflows",
 ]);
 
 export type BundledPluginSetup =
