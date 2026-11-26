@@ -14,7 +14,7 @@
 // split) is retired: nothing reads or writes it. Its table stays as it was.
 import { ALWAYS_ON_CAP } from "../core-skill";
 import { INSTRUCTIONS_LIMIT } from "./shared";
-import { SKILLS_SLOT, skillsText } from "../bot-model";
+import { findSkillsSlot, skillsCountLine, skillsText } from "../bot-model";
 
 /** The Bot the memory belongs to, as Studio stores it. */
 export interface MemoryBot { id: string; name: string; kind?: "studio" | "external"; primary?: boolean }
@@ -78,7 +78,7 @@ export function fitText(markdown: string, room: number): { text: string; over: b
 export function memoryInstructions(input: { botName: string; role: ThreadRole["role"]; skills: readonly AlwaysOnSkill[]; room?: number }): string {
   const lines = ["## Memory"];
   if (input.role === "worker") lines.push(`You work for ${JSON.stringify(input.botName)}. Its always-on skills (the user's standing rules and what's true right now) follow; they apply to you too.`);
-  else lines.push(`Always on ("## Check-in": your check-ins); patch only a changed rule, quoting it.`);
+  else lines.push(`Always on; "## Check-in" is your check-in list. Quote rules you patch.`);
   if (!input.skills.length) return lines.join("\n");
   const total = input.skills.reduce((sum, skill) => sum + skill.body.trim().length, 0);
   const tags = input.skills.reduce((sum, skill) => sum + `<always-on skill="${skill.name}">\n\n</always-on>\n`.length, 0);
@@ -122,6 +122,8 @@ export class MemoryService {
     if (side) return { botId: side, role: "conversation" };
     const own = this.deps.ownBot(thread.id, pluginMetadata);
     if (own) return { botId: own, role: "conversation" };
+    // A conversation from + New says whose it is in its metadata before Studio records it (bot_conversation_start).
+    if (typeof pluginMetadata.botConversation === "string" && this.studioBot(pluginMetadata.botConversation)) return { botId: pluginMetadata.botConversation, role: "conversation" };
     const runner = this.deps.runnerBot(thread.id, pluginMetadata);
     if (runner) return { botId: runner, role: "worker" };
     const parent = thread.parentThreadId ? this.deps.chainBot(thread.parentThreadId) ?? this.deps.ownedBot(thread.parentThreadId) : null;
@@ -136,6 +138,12 @@ export class MemoryService {
   /** The Bot's on-demand skill list, at the detail `room` allows (src/bot-model.ts skillsText). */
   skillsFor(botId: string, room: number): string {
     return skillsText(this.deps.onDemand?.(botId) ?? [], room);
+  }
+
+  /** Room the shortest list takes ("You have N; …" and its line break); 0 without on-demand skills. */
+  skillsReserve(botId: string): number {
+    const count = this.deps.onDemand?.(botId).length ?? 0;
+    return count ? skillsCountLine(count).length + 1 : 0;
   }
 
   instructionsFor(who: ThreadRole, room?: number): string | null {
@@ -195,27 +203,35 @@ export function withMemory<Context extends ConfigureContext, Result extends { to
     const { rescope: _rescope, ...plain } = inner(context) as Result & { rescope?: unknown };
     const result = plain as unknown as Result;
     const instructions = result.instructions ?? "";
-    if (!instructions.includes(MEMORY_SLOT) && !instructions.includes(SKILLS_SLOT) && skip(context)) return result;
+    const slot = findSkillsSlot(instructions);
+    if (!instructions.includes(MEMORY_SLOT) && !slot && skip(context)) return result;
     let service: MemoryService | null = null;
     let who: ThreadRole | null = null;
-    if (!skip(context)) {
-      try { service = memory(); who = service.threadRole(context); } catch { /* Memory unavailable: the session starts without it. */ }
-    }
-    const hasSkills = instructions.includes(SKILLS_SLOT);
-    const skillsReserve = hasSkills && who ? SKILLS_RESERVE : 0;
-    // The fixed text: both slots out, each block's separator counted.
-    const fixed = dropSlot(dropSlot(instructions, SKILLS_SLOT), MEMORY_SLOT).length;
+    try { service = memory(); if (!skip(context)) who = service.threadRole(context); } catch { /* Memory unavailable: the session starts without it. */ }
+    // The list's Bot: the session's, else the one the instructions' slot names.
+    const listBot = who?.botId ?? slot?.botId ?? null;
+    const reserve = slot && listBot && service ? service.skillsReserve(listBot) : 0;
+    // The fixed text: both slots out.
+    const fixed = dropSlot(slot ? dropSlot(instructions, slot.slot) : instructions, MEMORY_SLOT).length;
+    const build = (block: string | null, listRoom: boolean) => {
+      let text = fillSlot(instructions, block);
+      if (slot) {
+        const room = listRoom ? INSTRUCTIONS_LIMIT - dropSlot(text, slot.slot).length - 1 : -1;
+        const list = service && listBot && room > 0 ? service.skillsFor(listBot, room) : "";
+        text = fillSlot(text, list || null, slot.slot);
+      }
+      return text;
+    };
     let block: string | null = null;
-    try { block = service && who ? service.instructionsFor(who, INSTRUCTIONS_LIMIT - fixed - 2 - skillsReserve - (hasSkills ? 2 : 0)) : null; } catch { block = null; }
-    let filled = fillSlot(instructions, block);
-    if (hasSkills) {
-      const room = INSTRUCTIONS_LIMIT - dropSlot(filled, SKILLS_SLOT).length - 2;
-      const list = service && who ? service.skillsFor(who.botId, room) : "";
-      filled = fillSlot(filled, list || null, SKILLS_SLOT);
-    }
+    try { block = service && who && !skip(context) ? service.instructionsFor(who, INSTRUCTIONS_LIMIT - fixed - 2 - reserve) : null; } catch { block = null; }
+    let filled = build(block, true);
+    // Never over the host's limit: the list goes first, then the always-on text (a pointer to it stays when it fits).
+    if (filled.length > INSTRUCTIONS_LIMIT) filled = build(block, false);
+    if (filled.length > INSTRUCTIONS_LIMIT && block) filled = build(SKILLS_DIDNT_FIT, false);
+    if (filled.length > INSTRUCTIONS_LIMIT) filled = build(null, false);
     return filled === instructions ? result : { ...result, instructions: filled };
   };
 }
 
-/** The shortest skill-list line ("Skills: you have N; …"), kept free for it whatever the always-on skills take. */
-const SKILLS_RESERVE = 53;
+/** The memory block when not even a cut always-on skill fits beside the fixed text. */
+const SKILLS_DIDNT_FIT = "## Memory\n(Your always-on skills didn't fit here; read them with bot_skill (op: view).)";

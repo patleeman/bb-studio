@@ -553,7 +553,7 @@ it("keeps a drawn avatar and a role it's told, with the emoji as a fallback", as
   expect(view.bot).toMatchObject({ avatar: "🤖", shape: "blob", color: "#5b8def", role: null });
   const set = await x.bots.set({ shape: "hexagon", color: "#e5484d", role: "  You are my chief of staff.  " });
   expect(set.bot).toMatchObject({ shape: "hexagon", color: "#e5484d", role: "You are my chief of staff." });
-  expect(x.bots.instructions(set.bot!)).toContain("Your role, in the user's words: You are my chief of staff.");
+  expect(x.bots.instructions(set.bot!)).toContain("Your role, in their words: You are my chief of staff.");
   expect((await x.bots.set({ role: "" })).bot?.role).toBeNull();
 });
 

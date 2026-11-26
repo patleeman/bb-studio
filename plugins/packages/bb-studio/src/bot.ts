@@ -1155,7 +1155,7 @@ export class Bots {
   instructions(bot: NonNullable<BotView["bot"]>, options: { skillsSlot?: boolean } = {}): string {
     if (bot.kind === "external") return externalBotInstructions(bot);
     if (bot.state !== "active") return botInstructions(bot);
-    return botInstructions({ ...bot, skills: this.onDemandSkills(bot.id), ...(options.skillsSlot ? { skillsSlot: true } : {}) });
+    return botInstructions({ ...bot, skills: this.onDemandSkills(bot.id), ...(options.skillsSlot ? { skillsSlot: bot.id } : {}) });
   }
 
   /** The skills a Bot loads when a task matches: not archived, not always on. */

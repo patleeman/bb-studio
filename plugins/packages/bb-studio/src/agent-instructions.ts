@@ -18,10 +18,10 @@ export const PAGE_POINTER = 'Pages: read with pages_read, edit with small pages_
 export const MINI_POINTER = 'An app is a saved output or an interactive tool with its own data: apps (op: create), type "artifact" or "mini". What the user will use or come back to is a "mini"; show it with ::mini{id="mini_…"} on its own line; details are in the studio skill.';
 export const APP_POINTER = 'An app is a saved output or an interactive tool with its own data: apps (op: create), type "artifact" or "mini". What the user will use or come back to is a "mini"; show any app with ::app{id="…"} on its own line; details are in the studio skill.';
 
-export const CONTINUE_POINTER = 'New topic? Offer a new conversation for it; call conversation_continue_new only when they agree or ask.';
+export const CONTINUE_POINTER = 'New topic? Offer a new conversation; call conversation_continue_new only when they agree or ask.';
 
 /** Strands: what each conversation's lines of work are, and the one tool for them. No task tools or work cards. */
-export const STRAND_POINTER = 'Strands track each line of work in a conversation by themselves; say in the chat what you are doing. When a line of work waits on someone or something, or is finished, call strand_note.';
+export const STRAND_POINTER = 'Strands track each line of work by themselves; say in the chat what you are doing. When one waits on someone or something, or is finished, call strand_note.';
 
 /**
  * The end-of-reply line: the Next row (with which attributes are on and the

@@ -1356,6 +1356,6 @@ export class BotThreads {
  */
 export function conversationInstructions(rec: Pick<BotThreadRecord, "isMain" | "forkedFrom">, title: string, forkedFromTitle: string | null): string {
   if (rec.isMain) return "This is Main: reports and alerts arrive here; see bot_info (view: conversations) for the others.";
-  const fork = rec.forkedFrom ? `, forked from ${JSON.stringify(forkedFromTitle ?? "another conversation")}` : "";
-  return `This is your conversation ${JSON.stringify(title)}${fork}, not Main; reports go to Main. Others: bot_info (view: conversations); bot_needs_you flags this one. Asked to finish it: summary, then bot_finish_done.`;
+  const fork = rec.forkedFrom ? ` (from ${JSON.stringify(forkedFromTitle ?? "another conversation")})` : "";
+  return `Your conversation ${JSON.stringify(title)}${fork}, not Main (reports go there). Others: bot_info (view: conversations); bot_needs_you flags this one; to finish it: summary, then bot_finish_done.`;
 }
