@@ -8,7 +8,7 @@ import UIKit
 final class WorkbenchStore {
     static let shared = WorkbenchStore()
 
-    private(set) var states: [String: WorkspaceState] = [:]
+    private(set) var states: [String: WorkbenchState] = [:]
     /// Studio without the Workbench answers "unknown method": no tabs, and New tab says so.
     private(set) var unsupported = false
     /// The tab each conversation shows, picked on this phone.
@@ -23,15 +23,15 @@ final class WorkbenchStore {
     /// `phone:<device>`: Studio tells this phone's own changes from others'.
     static var origin: String { "phone:" + (UIDevice.current.identifierForVendor?.uuidString ?? "unknown") }
 
-    func tabs(_ threadId: String) -> [WorkspaceTab] { states[threadId]?.tabs ?? [] }
+    func tabs(_ threadId: String) -> [WorkbenchTab] { states[threadId]?.tabs ?? [] }
     func count(_ threadId: String) -> Int { tabs(threadId).count }
 
     /// The tab shown: picked here, else Studio's active one, else the first.
-    func selected(_ threadId: String) -> WorkspaceTab? {
+    func selected(_ threadId: String) -> WorkbenchTab? {
         Self.selected(tabs(threadId), picked: picked[threadId], active: states[threadId]?.activeTabId)
     }
 
-    nonisolated static func selected(_ tabs: [WorkspaceTab], picked: String?, active: String?) -> WorkspaceTab? {
+    nonisolated static func selected(_ tabs: [WorkbenchTab], picked: String?, active: String?) -> WorkbenchTab? {
         tabs.first { $0.id == picked } ?? tabs.first { $0.id == active } ?? tabs.first
     }
 
@@ -64,7 +64,7 @@ final class WorkbenchStore {
         }
         #endif
         do {
-            guard let next = try await client.workspace(threadId: threadId) else { return }
+            guard let next = try await client.workbench(threadId: threadId) else { return }
             if states[threadId] != next { states[threadId] = next }
             prune(threadId)
             keepShown(threadId)
@@ -77,14 +77,14 @@ final class WorkbenchStore {
     /// (from the server, not picked here) stays loaded when another is picked.
     func keepShown(_ threadId: String) {
         guard let shown = selected(threadId), shown.heavy, !mounted.contains(shown.id) else { return }
-        mounted = WorkspaceMounted.touch(mounted, shown.id, heavy: true)
+        mounted = WorkbenchMounted.touch(mounted, shown.id, heavy: true)
     }
 
     /// Shows a tab; a heavy one joins the loaded views, pushing out the oldest.
     func select(_ id: String, in threadId: String) {
         guard let tab = tabs(threadId).first(where: { $0.id == id }) else { return }
         picked[threadId] = id
-        mounted = WorkspaceMounted.touch(mounted, id, heavy: tab.heavy)
+        mounted = WorkbenchMounted.touch(mounted, id, heavy: tab.heavy)
         Task { await mutate(threadId, op: "focus", tabId: id) }
     }
 
@@ -106,7 +106,7 @@ final class WorkbenchStore {
     }
 
     /// Opens a Studio item as a tab, and shows it.
-    func open(_ ref: WorkspaceTab.Ref, title: String, in threadId: String) {
+    func open(_ ref: WorkbenchTab.Ref, title: String, in threadId: String) {
         Task {
             if let (_, tabId) = await mutate(threadId, op: "open", ref: ref, title: title, focus: true), let tabId {
                 select(tabId, in: threadId)
@@ -115,8 +115,8 @@ final class WorkbenchStore {
     }
 
     @discardableResult
-    private func mutate(_ threadId: String, op: String, tabId: String? = nil, ref: WorkspaceTab.Ref? = nil, title: String? = nil,
-                        focus: Bool? = nil) async -> (WorkspaceResult, String?)? {
+    private func mutate(_ threadId: String, op: String, tabId: String? = nil, ref: WorkbenchTab.Ref? = nil, title: String? = nil,
+                        focus: Bool? = nil) async -> (WorkbenchResult, String?)? {
         guard !unsupported else { return nil }
         #if DEBUG
         if WorkbenchDemo.state(threadId) != nil { return WorkbenchDemo.mutate(self, threadId, op: op, tabId: tabId, ref: ref, title: title) }
@@ -124,7 +124,7 @@ final class WorkbenchStore {
         for attempt in 0..<2 {
             let base = states[threadId]?.version ?? 0
             do {
-                let (next, result, message) = try await client.mutateWorkspace(
+                let (next, result, message) = try await client.mutateWorkbench(
                     threadId: threadId, baseVersion: base, op: op, tabId: tabId, ref: ref, title: title, focus: focus, origin: Self.origin)
                 states[threadId] = next
                 prune(threadId)
@@ -146,11 +146,11 @@ final class WorkbenchStore {
         let ids = Set(tabs(threadId).map(\.id))
         if let shown = picked[threadId], !ids.contains(shown) { picked[threadId] = nil }
         let all = Set(states.values.flatMap { $0.tabs.map(\.id) })
-        mounted = WorkspaceMounted.prune(mounted, keeping: all)
+        mounted = WorkbenchMounted.prune(mounted, keeping: all)
     }
 
     #if DEBUG
-    fileprivate func setDemo(_ state: WorkspaceState) { states[state.threadId] = state }
+    fileprivate func setDemo(_ state: WorkbenchState) { states[state.threadId] = state }
     #endif
 }
 
@@ -184,7 +184,7 @@ final class WorkbenchShown {
                 guard let self else { return }
                 let ids = Array(self.shown.keys)
                 if !ids.isEmpty, UIApplication.shared.applicationState == .active, !WorkbenchStore.shared.unsupported {
-                    try? await AppModel.shared.client.workspaceShown(threadIds: ids, origin: WorkbenchStore.origin)
+                    try? await AppModel.shared.client.workbenchShown(threadIds: ids, origin: WorkbenchStore.origin)
                 }
                 // Not backed off by the idle gate: Studio forgets after 12 s. EnergyGate still holds it while in the background.
                 await EnergyGate.shared.pollWait(.seconds(6), backsOff: false)
@@ -200,34 +200,34 @@ final class WorkbenchShown {
 @MainActor
 enum WorkbenchDemo {
     static var on: Bool { ProcessInfo.processInfo.arguments.contains("-qaWorkbenchDemo") }
-    private static var states: [String: WorkspaceState] = [:]
+    private static var states: [String: WorkbenchState] = [:]
 
-    static func state(_ threadId: String) -> WorkspaceState? {
+    static func state(_ threadId: String) -> WorkbenchState? {
         guard on else { return nil }
         if let state = states[threadId] { return state }
-        let state = WorkspaceState(threadId: threadId, tabs: [
-            WorkspaceTab(id: "tab-budget", ref: .init(kind: "page", id: "qa-demo"), title: "Lisbon budget", position: 0,
+        let state = WorkbenchState(threadId: threadId, tabs: [
+            WorkbenchTab(id: "tab-budget", ref: .init(kind: "page", id: "qa-demo"), title: "Lisbon budget", position: 0,
                          openedByAgent: true, support: .native),
-            WorkspaceTab(id: "tab-stills", ref: .init(kind: "design", id: "dsn_demo_stills"), title: "Theme stills", position: 1,
+            WorkbenchTab(id: "tab-stills", ref: .init(kind: "design", id: "dsn_demo_stills"), title: "Theme stills", position: 1,
                          openedByAgent: true, support: .native),
-            WorkspaceTab(id: "tab-site", ref: .init(kind: "browser", url: "https://example.com"), title: "example.com", position: 2,
+            WorkbenchTab(id: "tab-site", ref: .init(kind: "browser", url: "https://example.com"), title: "example.com", position: 2,
                          support: .web),
-            WorkspaceTab(id: "tab-code", ref: .init(kind: "vscode", path: "ios/README.md"), title: "README.md", position: 3,
+            WorkbenchTab(id: "tab-code", ref: .init(kind: "vscode", path: "ios/README.md"), title: "README.md", position: 3,
                          support: .desktopOnly),
         ], activeTabId: nil, version: 1)
         states[threadId] = state
         return state
     }
 
-    static func mutate(_ store: WorkbenchStore, _ threadId: String, op: String, tabId: String?, ref: WorkspaceTab.Ref?,
-                       title: String?) -> (WorkspaceResult, String?) {
+    static func mutate(_ store: WorkbenchStore, _ threadId: String, op: String, tabId: String?, ref: WorkbenchTab.Ref?,
+                       title: String?) -> (WorkbenchResult, String?) {
         guard var state = states[threadId] else { return (.ok, tabId) }
         switch op {
         case "close": state.tabs.removeAll { $0.id == tabId }
         case "open":
             guard let ref else { break }
             let id = "tab-\(state.version + 1)"
-            state.tabs.append(WorkspaceTab(id: id, ref: ref, title: title ?? ref.kind, position: state.tabs.count))
+            state.tabs.append(WorkbenchTab(id: id, ref: ref, title: title ?? ref.kind, position: state.tabs.count))
             state.activeTabId = id
             state.version += 1
             states[threadId] = state

@@ -2,7 +2,7 @@ import Foundation
 
 /// One tab in a conversation's Workspace (the desktop's side panel), as
 /// Studio keeps it per conversation (`threadWorkbenchGet`).
-public struct WorkspaceTab: Identifiable, Hashable, Sendable {
+public struct WorkbenchTab: Identifiable, Hashable, Sendable {
     public enum Support: String, Sendable { case native, web, desktopOnly }
 
     public struct Ref: Hashable, Sendable {
@@ -59,13 +59,13 @@ public struct WorkspaceTab: Identifiable, Hashable, Sendable {
 }
 
 /// A conversation's Workspace: its tabs in order, the active one, and the version mutations build on.
-public struct WorkspaceState: Equatable, Sendable {
+public struct WorkbenchState: Equatable, Sendable {
     public var threadId: String
-    public var tabs: [WorkspaceTab]
+    public var tabs: [WorkbenchTab]
     public var activeTabId: String?
     public var version: Int
 
-    public init(threadId: String, tabs: [WorkspaceTab] = [], activeTabId: String? = nil, version: Int = 0) {
+    public init(threadId: String, tabs: [WorkbenchTab] = [], activeTabId: String? = nil, version: Int = 0) {
         self.threadId = threadId
         self.tabs = tabs
         self.activeTabId = activeTabId
@@ -74,7 +74,7 @@ public struct WorkspaceState: Equatable, Sendable {
 }
 
 /// Which heavy tab views stay loaded: the newest first, at most `limit`.
-public enum WorkspaceMounted {
+public enum WorkbenchMounted {
     public static func touch(_ mounted: [String], _ id: String, heavy: Bool, limit: Int = 2) -> [String] {
         guard heavy else { return mounted }
         return Array(([id] + mounted.filter { $0 != id }).prefix(limit))
@@ -88,12 +88,12 @@ public enum WorkspaceMounted {
     /// The tab views to keep in the hierarchy, in tab order: the loaded heavy
     /// ones and the shown one. One list, so a tab keeps its view (its web view)
     /// whether it shows or hides.
-    public static func kept(_ tabs: [WorkspaceTab], mounted: [String], shown: String?) -> [WorkspaceTab] {
+    public static func kept(_ tabs: [WorkbenchTab], mounted: [String], shown: String?) -> [WorkbenchTab] {
         tabs.filter { $0.id == shown || ($0.heavy && mounted.contains($0.id)) }
     }
 }
 
-extension WorkspaceTab {
+extension WorkbenchTab {
     init?(tabId: String?, kind: String?, id: String?, path: String?, environmentId: String?, url: String?, terminalId: String?,
           pluginId: String?, refTabId: String?, title: String?, position: Int?, agent: Bool, support: String?) {
         guard let tabId, !tabId.isEmpty, let kind else { return nil }
@@ -110,10 +110,10 @@ private func kindName<K: Encodable>(_ kind: K?) -> String? {
     return string
 }
 
-extension WorkspaceState {
+extension WorkbenchState {
     init(_ output: Studio.ThreadWorkbenchGetOutput, threadId: String) {
         self.init(threadId: output.threadId ?? threadId, tabs: (output.tabs ?? []).compactMap { item in
-            WorkspaceTab(tabId: item.tabId, kind: kindName(item.ref?.kind), id: item.ref?.id, path: item.ref?.path,
+            WorkbenchTab(tabId: item.tabId, kind: kindName(item.ref?.kind), id: item.ref?.id, path: item.ref?.path,
                          environmentId: item.ref?.environmentId, url: item.ref?.url, terminalId: item.ref?.terminalId,
                          pluginId: item.ref?.pluginId, refTabId: item.ref?.tabId, title: item.title, position: item.position,
                          agent: kindName(item.openedBy) == "agent", support: kindName(item.mobileSupport))
@@ -122,7 +122,7 @@ extension WorkspaceState {
 
     init(_ output: Studio.ThreadWorkbenchMutateOutput, threadId: String) {
         self.init(threadId: output.threadId ?? threadId, tabs: (output.tabs ?? []).compactMap { item in
-            WorkspaceTab(tabId: item.tabId, kind: kindName(item.ref?.kind), id: item.ref?.id, path: item.ref?.path,
+            WorkbenchTab(tabId: item.tabId, kind: kindName(item.ref?.kind), id: item.ref?.id, path: item.ref?.path,
                          environmentId: item.ref?.environmentId, url: item.ref?.url, terminalId: item.ref?.terminalId,
                          pluginId: item.ref?.pluginId, refTabId: item.ref?.tabId, title: item.title, position: item.position,
                          agent: kindName(item.openedBy) == "agent", support: kindName(item.mobileSupport))
@@ -131,19 +131,19 @@ extension WorkspaceState {
 }
 
 /// What a mutation came back with.
-public enum WorkspaceResult: String, Sendable { case ok, unchanged, conflict, notFound, refused, other }
+public enum WorkbenchResult: String, Sendable { case ok, unchanged, conflict, notFound, refused, other }
 
 extension BBClient {
-    public func workspace(threadId: String) async throws -> WorkspaceState? {
+    public func workbench(threadId: String) async throws -> WorkbenchState? {
         let output: Studio.ThreadWorkbenchGetOutput? = try await rpcIfPresent(
             "studio", Studio.Method.threadWorkbenchGet, .object(["threadId": .string(threadId)]))
-        return output.map { WorkspaceState($0, threadId: threadId) }
+        return output.map { WorkbenchState($0, threadId: threadId) }
     }
 
     /// One mutation (`open`, `close`, `focus`, `reorder`, `update`) against `baseVersion`.
-    public func mutateWorkspace(threadId: String, baseVersion: Int, op: String, tabId: String? = nil, ref: WorkspaceTab.Ref? = nil,
+    public func mutateWorkbench(threadId: String, baseVersion: Int, op: String, tabId: String? = nil, ref: WorkbenchTab.Ref? = nil,
                                 title: String? = nil, position: Int? = nil, focus: Bool? = nil, origin: String)
-        async throws -> (WorkspaceState, WorkspaceResult, String?)
+        async throws -> (WorkbenchState, WorkbenchResult, String?)
     {
         var input: [String: JSONValue] = ["threadId": .string(threadId), "baseVersion": .number(Double(baseVersion)), "op": .string(op),
                                           "origin": .string(origin)]
@@ -160,12 +160,12 @@ extension BBClient {
             input["tab"] = .object(tab)
         }
         let output: Studio.ThreadWorkbenchMutateOutput = try await rpc("studio", Studio.Method.threadWorkbenchMutate, .object(input))
-        let result = kindName(output.result).flatMap(WorkspaceResult.init(rawValue:)) ?? .other
-        return (WorkspaceState(output, threadId: threadId), result, output.message)
+        let result = kindName(output.result).flatMap(WorkbenchResult.init(rawValue:)) ?? .other
+        return (WorkbenchState(output, threadId: threadId), result, output.message)
     }
 
     /// Tells Studio which conversations this phone shows, so agents' `workbench_open` reaches it (forgotten after 12 s).
-    public func workspaceShown(threadIds: [String], origin: String) async throws {
+    public func workbenchShown(threadIds: [String], origin: String) async throws {
         let _: JSONValue = try await rpc("studio", Studio.Method.threadWorkbenchShown,
                                          .object(["threadIds": .array(threadIds.prefix(50).map(JSONValue.string)), "origin": .string(origin)]))
     }

@@ -20,7 +20,7 @@ extension EnvironmentValues {
 /// (its bar, tab menu, rail and posture) puts this under its bar and knows
 /// nothing of tab kinds. The content by kind is `WorkbenchTabBody`.
 struct WorkbenchTabContent: View {
-    let tab: WorkspaceTab
+    let tab: WorkbenchTab
     @Environment(\.workbenchContext) private var context
 
     var body: some View {

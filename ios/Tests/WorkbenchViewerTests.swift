@@ -5,8 +5,8 @@ import XCTest
 @MainActor
 final class WorkbenchViewerTests: XCTestCase {
     private func tab(_ kind: String, id: String? = nil, path: String? = nil, environmentId: String? = nil, url: String? = nil,
-                     support: WorkspaceTab.Support = .native) -> WorkspaceTab {
-        WorkspaceTab(id: "t", ref: .init(kind: kind, id: id, path: path, environmentId: environmentId, url: url), title: "T", support: support)
+                     support: WorkbenchTab.Support = .native) -> WorkbenchTab {
+        WorkbenchTab(id: "t", ref: .init(kind: kind, id: id, path: path, environmentId: environmentId, url: url), title: "T", support: support)
     }
 
     func testEveryKindHasItsView() {

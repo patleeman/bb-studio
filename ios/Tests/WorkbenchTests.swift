@@ -6,31 +6,31 @@ import XCTest
 final class WorkbenchTests: XCTestCase {
     func testAtMostTwoHeavyViewsStayLoaded() {
         var mounted: [String] = []
-        mounted = WorkspaceMounted.touch(mounted, "a", heavy: true)
-        mounted = WorkspaceMounted.touch(mounted, "b", heavy: true)
-        mounted = WorkspaceMounted.touch(mounted, "c", heavy: true)
+        mounted = WorkbenchMounted.touch(mounted, "a", heavy: true)
+        mounted = WorkbenchMounted.touch(mounted, "b", heavy: true)
+        mounted = WorkbenchMounted.touch(mounted, "c", heavy: true)
         XCTAssertEqual(mounted, ["c", "b"], "the oldest goes")
-        mounted = WorkspaceMounted.touch(mounted, "b", heavy: true)
+        mounted = WorkbenchMounted.touch(mounted, "b", heavy: true)
         XCTAssertEqual(mounted, ["b", "c"], "a revisit moves it to the front")
-        XCTAssertEqual(WorkspaceMounted.touch(mounted, "light", heavy: false), ["b", "c"], "light views don't count")
-        XCTAssertEqual(WorkspaceMounted.prune(mounted, keeping: ["c"]), ["c"])
+        XCTAssertEqual(WorkbenchMounted.touch(mounted, "light", heavy: false), ["b", "c"], "light views don't count")
+        XCTAssertEqual(WorkbenchMounted.prune(mounted, keeping: ["c"]), ["c"])
     }
 
     /// Review B3: the shown tab and the loaded heavy ones are one list, so
     /// switching between two loaded tabs keeps both views (nothing rebuilt).
     func testSwitchingKeepsBothLoadedTabsInOneList() {
-        let tabs = ["a", "b", "c"].map { WorkspaceTab(id: $0, ref: .init(kind: $0 == "c" ? "file" : "page", id: $0), title: $0) }
+        let tabs = ["a", "b", "c"].map { WorkbenchTab(id: $0, ref: .init(kind: $0 == "c" ? "file" : "page", id: $0), title: $0) }
         let mounted = ["b", "a"]
-        let onA = WorkspaceMounted.kept(tabs, mounted: mounted, shown: "a").map(\.id)
-        let onB = WorkspaceMounted.kept(tabs, mounted: mounted, shown: "b").map(\.id)
+        let onA = WorkbenchMounted.kept(tabs, mounted: mounted, shown: "a").map(\.id)
+        let onB = WorkbenchMounted.kept(tabs, mounted: mounted, shown: "b").map(\.id)
         XCTAssertEqual(onA, ["a", "b"])
         XCTAssertEqual(onA, onB, "the same views, only which one is hidden changes")
-        XCTAssertEqual(WorkspaceMounted.kept(tabs, mounted: mounted, shown: "c").map(\.id), ["a", "b", "c"], "a light tab joins while shown")
-        XCTAssertEqual(WorkspaceMounted.kept(tabs, mounted: [], shown: nil).map(\.id), [], "nothing shown, nothing loaded")
+        XCTAssertEqual(WorkbenchMounted.kept(tabs, mounted: mounted, shown: "c").map(\.id), ["a", "b", "c"], "a light tab joins while shown")
+        XCTAssertEqual(WorkbenchMounted.kept(tabs, mounted: [], shown: nil).map(\.id), [], "nothing shown, nothing loaded")
     }
 
     func testOnlyHttpLinksOpen() {
-        func tab(_ url: String) -> WorkspaceTab { WorkspaceTab(id: "t", ref: .init(kind: "browser", url: url), title: "x", support: .web) }
+        func tab(_ url: String) -> WorkbenchTab { WorkbenchTab(id: "t", ref: .init(kind: "browser", url: url), title: "x", support: .web) }
         XCTAssertNotNil(tab("https://example.com/a").safeURL)
         XCTAssertNotNil(tab("http://example.test/a").safeURL)
         XCTAssertNil(tab("javascript:alert(1)").safeURL)
@@ -45,7 +45,7 @@ final class WorkbenchTests: XCTestCase {
           {"tabId":"a","ref":{"kind":"vscode","path":"ios/README.md"},"title":"","position":0,"openedBy":"user","openedAt":1,"mobileSupport":"desktopOnly"}]}
         """
         let output = try JSONDecoder().decode(Studio.ThreadWorkbenchGetOutput.self, from: Data(json.utf8))
-        let state = WorkspaceState(output, threadId: "t")
+        let state = WorkbenchState(output, threadId: "t")
         XCTAssertEqual(state.version, 7)
         XCTAssertEqual(state.tabs.map(\.id), ["a", "b"], "in position order")
         XCTAssertEqual(state.tabs[0].title, "README.md", "a nameless tab takes its path's name")
@@ -56,7 +56,7 @@ final class WorkbenchTests: XCTestCase {
     }
 
     func testTheShownTabIsThePickedOneElseStudiosActiveElseTheFirst() {
-        let tabs = ["a", "b", "c"].map { WorkspaceTab(id: $0, ref: .init(kind: "page", id: $0), title: $0) }
+        let tabs = ["a", "b", "c"].map { WorkbenchTab(id: $0, ref: .init(kind: "page", id: $0), title: $0) }
         XCTAssertEqual(WorkbenchStore.selected(tabs, picked: "c", active: "b")?.id, "c")
         XCTAssertEqual(WorkbenchStore.selected(tabs, picked: "gone", active: "b")?.id, "b", "a closed pick falls back")
         XCTAssertEqual(WorkbenchStore.selected(tabs, picked: nil, active: nil)?.id, "a")

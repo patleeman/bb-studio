@@ -22,7 +22,7 @@ struct WorkbenchView: View {
             // Heavy views stay loaded (hidden) while among the two newest; the
             // rest load when shown. One ForEach keyed by tab: showing or hiding
             // a tab never moves it to another branch, which would rebuild it.
-            ForEach(WorkspaceMounted.kept(tabs, mounted: store.mounted, shown: shown?.id)) { tab in
+            ForEach(WorkbenchMounted.kept(tabs, mounted: store.mounted, shown: shown?.id)) { tab in
                 WorkbenchTabContent(tab: tab).modifier(WorkbenchHiddenTab(hidden: tab.id != shown?.id))
             }
             if shown == nil {
@@ -177,7 +177,7 @@ struct WorkbenchNewTab: View {
     }
 
     /// A Studio search result as a tab's ref: its kind from the item's route.
-    static func ref(_ item: Studio.SearchAllOutputItem) -> WorkspaceTab.Ref? {
+    static func ref(_ item: Studio.SearchAllOutputItem) -> WorkbenchTab.Ref? {
         guard let href = item.href, let route = Route(href: href) else { return nil }
         switch route {
         case .page(let id): return .init(kind: "page", id: id)

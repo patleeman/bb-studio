@@ -35,7 +35,7 @@ struct ConversationScreen: View {
     }
 
     private var showsWorkbench: Bool { !pane && session.showsWorkbench }
-    private var tab: WorkspaceTab? { workbench.selected(threadId) }
+    private var tab: WorkbenchTab? { workbench.selected(threadId) }
 
     var body: some View {
         VStack(spacing: 0) {

@@ -13,7 +13,7 @@ extension EnvironmentValues {
 /// desktop opens. The Workbench container (tabs, bar, rail) is the shell's:
 /// it puts this under its bar.
 struct WorkbenchTabBody: View {
-    let tab: WorkspaceTab
+    let tab: WorkbenchTab
     let threadId: String
     /// The conversation in BB web: where kinds the phone has no view for open.
     var webURL: URL?
@@ -69,7 +69,7 @@ enum WorkbenchTabKind: Equatable {
     case desktopOnly
     case incomplete
 
-    init(_ tab: WorkspaceTab) {
+    init(_ tab: WorkbenchTab) {
         let ref = tab.ref
         if tab.support == .desktopOnly {
             self = .desktopOnly
