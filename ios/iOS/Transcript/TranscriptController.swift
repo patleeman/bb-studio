@@ -133,6 +133,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private let composerHost = TranscriptHost()
     private let topHost = TranscriptHost()
     private let pillHost = TranscriptHost()
+    /// Over the rows, from the header to the composer: the Workbench, with the composer kept below it.
+    private let coverHost = TranscriptCoverHost()
     private var composerHeight: NSLayoutConstraint!
     private var topHeight: NSLayoutConstraint!
     private var composerBottom: NSLayoutConstraint!
@@ -245,8 +247,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             NotificationCenter.default.addObserver(self, selector: #selector(accessibilityDidTurnOn), name: name, object: nil)
         }
 
-        // The pill under the composer, the header over all.
-        for host in [pillHost, composerHost, topHost] {
+        // The cover over the rows, the pill under the composer, the header over all.
+        for host in [coverHost, pillHost, composerHost, topHost] as [UIViewController] {
             addChild(host)
             host.view.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(host.view)
@@ -291,6 +293,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             topHost.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
             topHost.view.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             pillHost.view.bottomAnchor.constraint(equalTo: composerHost.view.topAnchor),
+            coverHost.view.topAnchor.constraint(equalTo: topHost.view.bottomAnchor),
+            coverHost.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            coverHost.view.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            coverHost.view.bottomAnchor.constraint(equalTo: composerHost.view.topAnchor),
             backdropTop, backdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             backdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             backdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -427,6 +433,18 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         AnyView(content.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { [weak self] _ in self?.view.setNeedsLayout() })
     }
 
+    /// Over the rows, between the header and the composer (the Workbench);
+    /// nil shows the rows. The rows stay loaded underneath, at their place.
+    func setCover(_ cover: AnyView?) {
+        let covered = cover != nil
+        coverHost.rootView = cover ?? AnyView(EmptyView())
+        guard coverHost.view.isHidden == covered else { return }
+        coverHost.view.isHidden = !covered
+        collectionView.isHidden = covered
+        collectionView.accessibilityElementsHidden = covered || rowsHidden
+        pillHost.view.isHidden = covered
+    }
+
     /// Above the transcript's top (a find bar, a header); rows scroll under it.
     func setTop(_ top: AnyView?) {
         guard top != nil || hasTop else { return }
@@ -545,7 +563,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         // Its ideal height, as a lazy stack proposes: a row with a flexible
         // `frame(maxHeight:)` (a clamped long message) otherwise grows to
         // whatever height the sizing pass offers.
-        cell.contentConfiguration = UIHostingConfiguration { view.fixedSize(horizontal: false, vertical: true).id(id) }
+        // The layout's metrics already keep rows clear of the sides' safe area.
+        cell.contentConfiguration = UIHostingConfiguration {
+            view.fixedSize(horizontal: false, vertical: true).id(id).ignoresSafeArea(.container, edges: .horizontal)
+        }
             .margins(.all, 0)
             .minSize(width: 0, height: 0)
     }
@@ -1161,6 +1182,24 @@ enum AccessibilityTurnOn {
             }
         }
         return ProcessInfo.processInfo.systemUptime
+    }
+}
+
+/// The cover's host: as big as its constraints, not its content.
+final class TranscriptCoverHost: UIHostingController<AnyView> {
+    init() {
+        super.init(rootView: AnyView(EmptyView()))
+        sizingOptions = []
+        safeAreaRegions = []
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+        view.isHidden = true
     }
 }
 
