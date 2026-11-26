@@ -65,7 +65,10 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         showList()
         // Main from Home, as any conversation opens.
         let conversation = app.buttons["homeConversation-thr_botdemo01"]
-        if conversation.waitForExistence(timeout: 15) {
+        if layout == "phone" {
+            // The chat demo's Main is short, and testBotChat covers it.
+            steps.append("phone: Main is the Bot chat, checked in testBotChat")
+        } else if conversation.waitForExistence(timeout: 15) {
             app.press(conversation, id: "homeConversation-thr_botdemo01")
             XCTAssertTrue(composer.waitForExistence(timeout: 15))
             expectAtEnd("thread: open")
@@ -140,17 +143,21 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         _ = answer.waitForExistence(timeout: 10)
         watch("actions: sent, and the answer", atEnd: true)
         menu(on: mine, "Edit", "actions: edit")
-        if !app.staticTexts["Editing your last message"].waitForExistence(timeout: 5) { failures.append("actions: no editing card") }
+        // In a Bot conversation editing is a chip in the composer's top row; in a plain thread, a card.
+        let chip = app.buttons["chip-editing-close"]
+        let card = app.staticTexts["Editing your last message"]
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in chip.exists || card.exists }, object: nil)], timeout: 5)
+        if !chip.exists && !card.exists { failures.append("actions: no editing chip or card") }
         let editing = composerField.value as? String ?? ""
         if !editing.contains("Edit me please") { failures.append("actions: the message isn't in the composer (\(editing))") }
-        app.buttons["Cancel"].firstMatch.tap()
+        if chip.exists { chip.tap() } else if app.buttons["Cancel"].exists { app.buttons["Cancel"].firstMatch.tap() }
         command("dismiss")
         watch("actions: after edit", atEnd: false)
         finish()
     }
 
-    /// A question asked while reading leaves the rows where they are, and the
-    /// pill says so; it takes the reader to the end, where the question is.
+    /// A question asked while reading leaves the rows where they are; the
+    /// pill takes the reader to the end, where the question is.
     func testQuestionPill() {
         open()
         command("draft?0")
@@ -158,9 +165,10 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         expectPill(true, "question: up in the history")
         let before = record("question: reading")
         command("ask")
-        expectation(for: NSPredicate { _, _ in self.pill.exists && self.pill.label.contains("Question") }, evaluatedWith: nil)
-        waitForExpectations(timeout: 15) { _ in }
-        if !pill.label.contains("Question") { failures.append("question: the pill doesn't say Question (\(pill.label))") }
+        // The Bot's Main is a conversation: its questions are ordinary
+        // messages, so the pill stays the plain jump (no "Question").
+        Thread.sleep(forTimeInterval: 3)
+        if pill.exists, pill.label.contains("Question") { failures.append("question: a conversation's pill says Question (\(pill.label))") }
         let after = record("question: asked while reading")
         moved(from: before, to: after, "question: asked while reading")
         shot("question-pill")
@@ -188,8 +196,8 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         XCTAssertTrue(composer.waitForExistence(timeout: 15))
         expectAtEnd("find: open")
 
-        app.buttons["More"].firstMatch.tap()
-        app.buttons["Find in thread"].firstMatch.tap()
+        app.openConversationMenu()
+        app.buttons["Find in conversation"].firstMatch.tap()
         let field = app.textFields["Find in thread"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
@@ -285,9 +293,10 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         expectPill(true, "question: reading")
         let before = record("question: reading")
         command("ask")
-        expectation(for: NSPredicate { _, _ in self.pill.exists && self.pill.label.contains("Question") }, evaluatedWith: nil)
-        waitForExpectations(timeout: 15) { _ in }
-        if !pill.label.contains("Question") { failures.append("question: the pill doesn't say Question (\(pill.label))") }
+        // The Bot's Main is a conversation: its questions are ordinary
+        // messages, so the pill stays the plain jump (no "Question").
+        Thread.sleep(forTimeInterval: 3)
+        if pill.exists, pill.label.contains("Question") { failures.append("question: a conversation's pill says Question (\(pill.label))") }
         moved(from: before, to: record("question: asked"), "question: asked while reading")
         pill.tap()
         let card = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Which venue should I book'")).firstMatch

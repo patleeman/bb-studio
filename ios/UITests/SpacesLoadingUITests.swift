@@ -2,8 +2,8 @@ import XCTest
 
 /// Opening the app before Studio's Bots answer (a first launch, or a new
 /// server; offline, `-qaSpacesLate <ms>` holds `bot_spaces` back): a loading
-/// state, then the conversation. A link or push that came meanwhile opens
-/// once the room shows. Only no answer within the timeout (`-qaSpacesFallback
+/// state, then Home. A link or push that came meanwhile opens once the
+/// Bots answer. Only no answer within the timeout (`-qaSpacesFallback
 /// <ms>`, 10 s in the app) shows "Can't reach Studio" with Try Again. There's
 /// no tab bar to fall back to. `LOADING_OUT` keeps PNGs.
 final class SpacesLoadingUITests: ServerIsolatedUITestCase {
@@ -11,7 +11,7 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
 
     private var loading: XCUIElement { app.descendants(matching: .any)["spacesLoading"].firstMatch }
     private var unreachable: XCUIElement { app.descendants(matching: .any)["studioUnreachable"].firstMatch }
-    private var conversation: XCUIElement { app.textViews["Message"] }
+    private var home: XCUIElement { app.descendants(matching: .any)["home"].firstMatch }
 
     private func launch(late: String, fallback: Int, extra: [String] = []) {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaReduceMotion",
@@ -29,16 +29,16 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
         try? XCUIScreen.main.screenshot().pngRepresentation.write(to: url.appendingPathComponent("\(name).png"))
     }
 
-    func testAnAnswerGoesFromLoadingToTheConversation() {
+    func testAnAnswerGoesFromLoadingToHome() {
         launch(late: "6000", fallback: 30000)
         let deadline = Date().addingTimeInterval(25)
-        while !conversation.exists, Date() < deadline {
+        while !home.exists, Date() < deadline {
             XCTAssertFalse(unreachable.exists, "no failure while it's only slow")
             usleep(200_000)
         }
-        XCTAssertTrue(conversation.exists, "the conversation once Studio answers")
+        XCTAssertTrue(home.exists, "Home once Studio answers")
         XCTAssertFalse(loading.exists)
-        shot("2-conversation")
+        shot("2-home")
     }
 
     func testNoAnswerShowsCantReachStudioWithTryAgain() {

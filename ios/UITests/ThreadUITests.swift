@@ -163,8 +163,8 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         clear(composer)
 
         // Find in thread.
-        app.buttons["More"].tap()
-        app.buttons["Find in thread"].tap()
+        app.openConversationMenu()
+        app.buttons["Find in conversation"].firstMatch.tap()
         let field = app.textFields["Find in thread"]
         XCTAssertTrue(field.waitForExistence(timeout: 3), "find field")
         field.typeText("the")
@@ -360,9 +360,9 @@ final class ThreadUITests: ServerIsolatedUITestCase {
 
     func testPageDemo() {
         app.terminate()
-        app.launchArguments = ["-qaPageDemo"]
+        // Links wait for the Bots to answer: the demo Bot answers offline.
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaPageDemo", "-openURL", "bbstudio://page/qa-demo"]
         app.launchOffline()
-        app.open(URL(string: "bbstudio://page/qa-demo")!)
         XCTAssertTrue(app.staticTexts["Launch plan"].waitForExistence(timeout: 10))
         sleep(1)
         shot("page-demo-top")

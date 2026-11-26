@@ -1,7 +1,7 @@
 import XCTest
 
 /// Round 5, change 1, offline (`-qaBotDemo chat -qaSpacesDemo list
-/// -qaStrandsDemo -qaShelfDemo`): a Bot conversation's lasting states are
+/// -qaShelfDemo`): a Bot conversation's lasting states are
 /// chips in the composer's top row, the model fallback is a quiet line at the
 /// end of the transcript, and nothing stacks above the composer (no shelf
 /// cards, no strands). `TEST_RUNNER_CHIPS_OUT` keeps PNGs.
@@ -11,8 +11,8 @@ final class ComposerChipsUITests: ServerIsolatedUITestCase {
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     func testLastingStatesAreChipsAndTheFallbackIsALine() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaConversationHome",
-                               "-qaRoomConversation", "thr_botdemo01", "-qaStrandsDemo", "-qaShelfDemo"]
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
+                               "-qaRoomConversation", "thr_botdemo01", "-qaShelfDemo"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")
 

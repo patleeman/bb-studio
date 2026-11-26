@@ -33,8 +33,6 @@ final class KeyboardFoldUITests: ServerIsolatedUITestCase {
                 Thread.sleep(forTimeInterval: 1.2)
                 steps.append("c\(cycle) \(size): \(report().count) \(counts())")
             }
-            command("pane?narrow")
-            command("pane?even")
             XCUIDevice.shared.press(.home)
             Thread.sleep(forTimeInterval: 1)
             app.activate()
@@ -50,7 +48,9 @@ final class KeyboardFoldUITests: ServerIsolatedUITestCase {
         // (it was set on every resize, from inside the resize's layout pass).
         let totals = rawCounts()
         XCTAssertEqual(totals["keyboard.reloadDuringResize"] ?? 0, 0, "Keyboard reloaded mid-resize: \(totals)")
-        XCTAssertLessThan(totals["window.traitOverride"] ?? 0, totals["write.window"] ?? 0,
+        // (The round 7 shell sets no size class at all: both counts stay 0.)
+        let overrides = totals["window.traitOverride"] ?? 0
+        XCTAssertTrue(overrides == 0 || overrides < totals["write.window"] ?? 0,
             "The size class was set on every window change: \(totals)")
     }
 
