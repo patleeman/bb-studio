@@ -19,10 +19,12 @@ export const UNLISTED_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
 
 export const INSTALL_ON_REQUEST_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
   "browser-automation",
+  "tailscale",
 ]);
 
 export const OFF_BY_DEFAULT_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
   "ask-user-question",
+  "server-switcher",
 ]);
 
 export type BundledPluginSetup =

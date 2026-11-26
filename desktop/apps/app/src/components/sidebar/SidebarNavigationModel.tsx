@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useStore } from "jotai";
+import { useOpenNewThread } from "@/hooks/useOpenNewThread";
 import { splitLayoutAtom } from "@/lib/split-layout/atoms";
 import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import type {
@@ -22,6 +23,7 @@ import { Icon, type IconName } from "@bb/shared-ui/icon";
 import {
   useAppCommandRunner,
   useAppCommandShortcut,
+  useIsAppCommandAvailable,
   useIsAppCommandModifierHeld,
 } from "@/components/commands/AppCommandProvider";
 import { PluginItemIcon } from "@/components/plugin/PluginIcon";
@@ -198,13 +200,11 @@ export function SidebarNavigationModelProvider({
   const navigate = useNavigate();
   const commandRunner = useAppCommandRunner();
   const splitActions = usePaneContentSplitActions();
+  const openNewThread = useOpenNewThread();
   const setPluginEnabled = useSetPluginEnabled();
   const newThreadShortcut = useAppCommandShortcut("thread.new");
   const threadSearchShortcut = useAppCommandShortcut("thread.search");
-  const searchThreadsDisabled = !commandRunner.isCommandAvailable(
-    "thread.search",
-    null,
-  );
+  const searchThreadsDisabled = !useIsAppCommandAvailable("thread.search");
   const newThreadDisabled = host.onNewChat === undefined;
 
   const rawItems = useMemo(() => {
@@ -268,6 +268,7 @@ export function SidebarNavigationModelProvider({
     isHomeActive,
     items,
     navigate,
+    openNewThread,
     rowsById,
     setPluginEnabled,
     splitActions,
@@ -280,6 +281,7 @@ export function SidebarNavigationModelProvider({
       isHomeActive,
       items,
       navigate,
+      openNewThread,
       rowsById,
       setPluginEnabled,
       splitActions,
@@ -310,7 +312,7 @@ export function SidebarNavigationModelProvider({
     return {
       activate(itemId, options) {
         const found = lookup(itemId);
-        if (!found || found.item.isDisabled || found.item.isLoading) return;
+        if (!found || found.item.isDisabled) return;
         const { current, row, item } = found;
         const content = getSidebarNavigationRowContent(row);
         const legacySplit =
@@ -327,7 +329,8 @@ export function SidebarNavigationModelProvider({
         switch (row.action.kind) {
           case "new-thread":
             if (target === "split") {
-              if (content) openInSplit(current, content, item.label);
+              current.host.onNavigate?.();
+              current.openNewThread({ split: true });
               return;
             }
             if (target === "tab") {

@@ -17,15 +17,16 @@ import { useSettingsNavSections } from "@/components/settings/settings-nav";
 import { pluginListQueryOptions } from "@/hooks/queries/plugin-settings-queries";
 import { useRouteState } from "@/hooks/useRouteState";
 import { useServerChoices } from "@/hooks/useServerChoices";
-import { getFocusedAppPanelController } from "@/lib/app-fixed-tab-navigation";
+import { useAppNavigationHost } from "@/lib/app-navigation-host";
+import { useBindPluginActionContext } from "@/lib/plugin-action-context-provider";
 import type { PaletteAction } from "@/lib/command-palette/palette-action";
 import {
   buildAppCommandActions,
   PALETTE_COMMAND_IDS,
 } from "@/lib/command-palette/palette-app-commands";
 import {
+  buildFocusedSurfacePaletteActions,
   buildPluginComposerCommandActions,
-  buildPluginPaletteActions,
 } from "@/lib/command-palette/palette-plugin-actions";
 import { buildPluginPagePaletteActions } from "@/lib/command-palette/palette-plugin-page-actions";
 import { buildSettingsPaletteActions } from "@/lib/command-palette/palette-settings-actions";
@@ -149,6 +150,8 @@ function useLiveCommandActions(enabled: boolean): readonly PaletteAction[] {
   const shortcuts = useAppCommandShortcuts(PALETTE_COMMAND_IDS);
   const { commandPaletteActions } = usePluginSlots();
   const { threadId, projectId } = useRouteState();
+  const bind = useBindPluginActionContext();
+  const host = useAppNavigationHost();
   const pluginCommandIds = useMemo(
     () =>
       commandPaletteActions.map((command) =>
@@ -166,13 +169,14 @@ function useLiveCommandActions(enabled: boolean): readonly PaletteAction[] {
       shortcuts,
     }),
     ...[
-      ...buildPluginPaletteActions({
+      ...buildFocusedSurfacePaletteActions({
         slots: commandPaletteActions.filter(
           (command) => command.target === "app",
         ),
         threadId: threadId ?? null,
         projectId: projectId ?? null,
-        panel: getFocusedAppPanelController(),
+        bind,
+        host,
       }),
       ...buildPluginComposerCommandActions({
         slots: commandPaletteActions.filter(

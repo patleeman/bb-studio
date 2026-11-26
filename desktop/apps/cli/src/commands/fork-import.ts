@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { action, CliExitError } from "../action.js";
 import { cliFetch } from "../client.js";
-import { outputJson } from "./helpers.js";
+import { reportCommandResult } from "../command-result.js";
 
 interface MirrorOptions {
   json?: boolean;
@@ -81,7 +81,10 @@ export function registerForkImportCommands(
     .action(
       action(async (opts: MirrorOptions) => {
         const status = await call(getUrl, "GET", "");
-        if (!outputJson(opts, status)) printStatus(status);
+        reportCommandResult(opts, status, {
+          text: () => printStatus(status),
+          failure: null,
+        });
       }),
     );
 
@@ -92,14 +95,14 @@ export function registerForkImportCommands(
     .action(
       action(async (opts: MirrorOptions) => {
         const summary = await call(getUrl, "POST", "/sync");
-        if (outputJson(opts, summary)) return;
-        if (typeof summary.skipped === "string") {
-          console.log(`Skipped: ${summary.skipped}`);
-          return;
-        }
-        console.log(
-          `Synced ${String(summary.threads)} threads, ${String(summary.eventsAdded)} new events, ${String(summary.eventReloads)} threads reloaded, ${String(summary.threadsDeleted)} removed.`,
-        );
+        reportCommandResult(opts, summary, {
+          text: [
+            typeof summary.skipped === "string"
+              ? `Skipped: ${summary.skipped}`
+              : `Synced ${String(summary.threads)} threads, ${String(summary.eventsAdded)} new events, ${String(summary.eventReloads)} threads reloaded, ${String(summary.threadsDeleted)} removed.`,
+          ],
+          failure: null,
+        });
       }),
     );
 
@@ -114,7 +117,10 @@ export function registerForkImportCommands(
       .action(
         action(async (opts: MirrorOptions) => {
           const status = await call(getUrl, "POST", `/${name}`);
-          if (!outputJson(opts, status)) printStatus(status);
+          reportCommandResult(opts, status, {
+            text: () => printStatus(status),
+            failure: null,
+          });
         }),
       );
   }
@@ -132,16 +138,16 @@ export function registerForkImportCommands(
           "GET",
           `/threads/${encodeURIComponent(threadId)}`,
         );
-        if (outputJson(opts, thread)) return;
-        if (thread.mirrored !== true) {
-          console.log("Not mirrored: this thread belongs to this server.");
-          return;
-        }
-        console.log(
-          thread.readOnly === true
-            ? `Mirrored, read-only. At the source: ${String(thread.sourceStatus)}, ${String(thread.sourceQueuedMessages)} queued messages.`
-            : `Taken over ${when(thread.takenOverAt)}.`,
-        );
+        reportCommandResult(opts, thread, {
+          text: [
+            thread.mirrored !== true
+              ? "Not mirrored: this thread belongs to this server."
+              : thread.readOnly === true
+                ? `Mirrored, read-only. At the source: ${String(thread.sourceStatus)}, ${String(thread.sourceQueuedMessages)} queued messages.`
+                : `Taken over ${when(thread.takenOverAt)}.`,
+          ],
+          failure: null,
+        });
       }),
     );
 
@@ -158,7 +164,10 @@ export function registerForkImportCommands(
           "POST",
           `/threads/${encodeURIComponent(threadId)}/take-over`,
         );
-        if (!outputJson(opts, result)) console.log(String(result.note));
+        reportCommandResult(opts, result, {
+          text: [String(result.note)],
+          failure: null,
+        });
       }),
     );
 }

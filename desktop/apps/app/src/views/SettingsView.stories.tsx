@@ -20,7 +20,7 @@ import { VoiceInputSettingsSectionContent } from "@/components/settings/VoiceInp
 import { AiServicesSettingsSection } from "@/components/settings/AiServicesSettingsSection";
 import { ArchivedThreadsSettingsSection } from "@/components/settings/ArchivedThreadsSettingsSection";
 import { CommunitySettingsSection } from "@/components/settings/CommunitySettingsSection";
-import { FileOpenersSettingsSection } from "@/components/settings/FileOpenersSettingsSection";
+import { FileOpenerChoicesSection } from "@/components/settings/PluginChoiceSettings";
 import { KeyboardSettingsSection } from "@/components/settings/KeyboardSettingsSection";
 import { MarketplacesSettingsSection } from "@/components/settings/MarketplacesSettingsSection";
 import { MachineEnvironmentSettings } from "@/components/settings/MachineEnvironmentSettings";
@@ -126,6 +126,7 @@ function useSettingsStoryState() {
   const [steerActiveThreadOnEnter, setSteerActiveThreadOnEnter] =
     useState(false);
   const [confirmThreadArchive, setConfirmThreadArchive] = useState(true);
+  const [confirmDesktopQuit, setConfirmDesktopQuit] = useState(true);
   const [keepHistoryAfterContextClear, setKeepHistoryAfterContextClear] =
     useState(false);
   const [summarizeShellCommands, setSummarizeShellCommands] = useState(true);
@@ -151,6 +152,8 @@ function useSettingsStoryState() {
     steerActiveThreadOnEnter,
     confirmThreadArchive,
     setConfirmThreadArchive,
+    confirmDesktopQuit,
+    setConfirmDesktopQuit,
     keepHistoryAfterContextClear,
     setKeepHistoryAfterContextClear,
     summarizeShellCommands,
@@ -204,6 +207,9 @@ function GeneralSettingsStory({
       <GeneralSettingsSection
         resumeThreadsAfterRestart={resumeThreadsAfterRestart}
         onResumeThreadsAfterRestartChange={setResumeThreadsAfterRestart}
+        confirmDesktopQuit={state.confirmDesktopQuit}
+        desktopQuitConfirmationAvailable={desktopBrowserAvailable}
+        onConfirmDesktopQuitChange={state.setConfirmDesktopQuit}
         confirmThreadArchive={state.confirmThreadArchive}
         onConfirmThreadArchiveChange={state.setConfirmThreadArchive}
         keepHistoryAfterContextClear={state.keepHistoryAfterContextClear}
@@ -308,7 +314,7 @@ function FilePreferencesStory() {
         onRequestAccess={async () => true}
         targets={connectedTargets}
       />
-      <FileOpenersSettingsSection />
+      <FileOpenerChoicesSection />
     </>
   );
 }

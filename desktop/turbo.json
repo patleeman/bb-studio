@@ -608,6 +608,14 @@
     "typecheck": {
       "dependsOn": ["topo"]
     },
+    "@bb/db#typecheck": {
+      "dependsOn": ["topo"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/plugins/account-pool/src/**",
+        "$TURBO_ROOT$/plugins/automations/src/**"
+      ]
+    },
     "@bb/app#typecheck": {
       "dependsOn": ["topo"],
       "inputs": [
@@ -720,6 +728,10 @@
         "$TURBO_ROOT$/plugins/provider-codex/package.json",
         "$TURBO_ROOT$/plugins/provider-claude-code/src/**",
         "$TURBO_ROOT$/plugins/provider-claude-code/package.json",
+        "$TURBO_ROOT$/plugins/provider-pi/src/**",
+        "$TURBO_ROOT$/plugins/provider-pi/package.json",
+        "$TURBO_ROOT$/packages/provider-bridge-acp/src/**",
+        "$TURBO_ROOT$/packages/provider-bridge-acp/package.json",
         "$TURBO_ROOT$/packages/plugin-sdk/src/**"
       ]
     },
@@ -749,7 +761,11 @@
       "passThroughEnv": ["UPDATE_PARITY_ROW_COUNTS"]
     },
     "test": {
-      "env": ["BB_QUERY_PLAN_EXECUTED", "BB_QUERY_PLAN_REPORT", "VITEST_MAX_WORKERS"],
+      "env": [
+        "BB_QUERY_PLAN_EXECUTED",
+        "BB_QUERY_PLAN_REPORT",
+        "VITEST_MAX_WORKERS"
+      ],
       "dependsOn": ["//#ensure-native-modules", "topo"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest*.ts"],
       "outputs": [".query-plan/**"],
@@ -788,7 +804,12 @@
     // bundling step — so the SDK dist must exist before the suite runs. The
     // marketplace parity suites read apps/web's published JSON schemas.
     "@bb/server#test": {
-      "env": ["BB_CI_TEST_SHARD", "BB_QUERY_PLAN_EXECUTED", "BB_QUERY_PLAN_REPORT", "VITEST_MAX_WORKERS"],
+      "env": [
+        "BB_CI_TEST_SHARD",
+        "BB_QUERY_PLAN_EXECUTED",
+        "BB_QUERY_PLAN_REPORT",
+        "VITEST_MAX_WORKERS"
+      ],
       "outputs": [".query-plan/**"],
       "dependsOn": [
         "@bb/agent-runtime#generate:test-bridges",
@@ -1178,6 +1199,7 @@
       "dependsOn": [
         "//#ensure-native-modules",
         "@get-bb/plugin-sdk#build",
+        "@get-bb/plugin-sdk#build:types",
         "topo"
       ],
       "inputs": [
@@ -1333,6 +1355,17 @@
         "topo"
       ]
     },
+    "bb-plugin-bb--tailscale#typecheck": {
+      "dependsOn": ["@get-bb/plugin-sdk#build:types", "topo"]
+    },
+    "bb-plugin-bb--tailscale#test": {
+      "env": ["VITEST_MAX_WORKERS"],
+      "dependsOn": [
+        "//#ensure-native-modules",
+        "@get-bb/plugin-sdk#build",
+        "topo"
+      ]
+    },
     "bb-plugin-bb-guide#typecheck": {
       "dependsOn": ["@get-bb/plugin-sdk#build:types", "topo"]
     },
@@ -1341,6 +1374,7 @@
       "dependsOn": [
         "//#ensure-native-modules",
         "@get-bb/plugin-sdk#build",
+        "@get-bb/plugin-sdk#build:types",
         "topo"
       ]
     },
@@ -1353,6 +1387,21 @@
         "//#ensure-native-modules",
         "@get-bb/plugin-sdk#build",
         "topo"
+      ]
+    },
+    "bb-plugin-bb--server-switcher#typecheck": {
+      "dependsOn": ["@get-bb/plugin-sdk#build:types", "topo"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/plugin-registry/flavors/**"
+      ]
+    },
+    "bb-plugin-bb--server-switcher#test": {
+      "env": ["VITEST_MAX_WORKERS"],
+      "dependsOn": ["@get-bb/plugin-sdk#build", "topo"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/plugin-registry/flavors/**"
       ]
     },
     "bb-plugin-keep-awake#typecheck": {

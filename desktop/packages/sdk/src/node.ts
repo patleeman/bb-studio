@@ -93,7 +93,8 @@ export {
   createRequestTimeoutFetch,
   DEFAULT_BB_REQUEST_TIMEOUT_MS,
 };
-export { BbHttpError, BbRequestTimeoutError } from "./response.js";
+export { BbHttpError } from "./http-error.js";
+export { BbRequestTimeoutError } from "./response.js";
 export {
   pluginMutationResponseSchema,
   type PluginMutationResponse,
@@ -102,7 +103,6 @@ export { createBuiltinPlanCommandTextInput } from "./core.js";
 export { createGuideArea } from "./areas/guide.js";
 export { createRetiredEnvironmentMembers } from "./areas/retired-environment-members.js";
 export {
-  DEFAULT_THREAD_WAIT_POLL_INTERVAL_MS,
   DEFAULT_THREAD_WAIT_TIMEOUT_MS,
   ThreadWaitTimeoutError,
   ThreadWaitUnreachableError,
@@ -120,5 +120,5 @@ export type {
   BbRealtimeSocketFactory,
   BbRealtimeSocketMessageEvent,
 } from "./transport.js";
-export type { BbHttpErrorArgs } from "./response.js";
+export type { BbHttpErrorArgs } from "./http-error.js";
 export type * from "./public-types.js";

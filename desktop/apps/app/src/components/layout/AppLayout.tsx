@@ -98,9 +98,8 @@ import { usePluginCachePruneCommand } from "@/hooks/usePluginCachePruneCommand";
 import { useServerDaemonLogsCommand } from "@/hooks/useServerDaemonLogsCommand";
 import {
   getLegacyProjectComposeRoutePath,
-  getSettingsProjectRoutePath,
   getRootComposeRoutePath,
-  getThreadRoutePath,
+  getThreadLocationPath,
   isProjectlessProjectId,
   SETTINGS_ROUTE_PATH,
 } from "@/lib/route-paths";
@@ -126,16 +125,14 @@ import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { useMobileVisualViewportHeight } from "./useMobileVisualViewportHeight";
 import { isIOSWebKit } from "@/lib/ios-webkit";
 import { wsManager } from "@/lib/ws";
-import { splitLayoutAtom } from "@/lib/split-layout/atoms";
-import { findPaneByThread } from "@/lib/split-layout";
-import {
-  applyThreadOpenToLayout,
-  paneContentForPathname,
-} from "@/views/thread-detail/splitThreadNavigation";
+import { openThread } from "@/lib/split-layout/openThread";
+import { paneContentForPathname } from "@/views/thread-detail/splitThreadNavigation";
 import { useAppSettingsRouteMemory } from "@/hooks/useAppSettingsRouteMemory";
-import { useSetRootComposeProjectId } from "@/lib/root-compose-selection";
+import { useOpenNewThread } from "@/hooks/useOpenNewThread";
 import { BackToAppCommandHandler } from "./BackToAppCommandHandler";
 import { HistoryCommandHandlers } from "./HistoryCommandHandlers";
+import { isNonImeKey } from "@bb/shared-ui/lib/ime-keyboard";
+import { getSettingsTargetPath } from "@/components/settings/settings-sections";
 
 const SIDEBAR_WIDTH_KEY = "bb.sidebar.width";
 const SIDEBAR_OPEN_KEY = "bb.sidebar.open";
@@ -226,6 +223,7 @@ function SidebarStateBridge({
       }
       framed={usesDesktopChrome}
       data-testid="app-layout-root"
+      data-app-shell=""
       open={open}
       onOpenChange={handleOpenChange}
     >
@@ -430,7 +428,7 @@ function AppHeader({
     !isProjectlessProjectId(projectId) ? (
     <>
       <Link
-        to={getSettingsProjectRoutePath(projectId)}
+        to={getSettingsTargetPath({ projectId: projectId })}
         className={cn(
           HEADER_ICON_BUTTON_CLASS,
           "inline-flex items-center justify-center transition-colors",
@@ -517,39 +515,27 @@ function AppLayoutContent({ children }: AppLayoutProps) {
       : isGlobalSettingsView
         ? appRoutePath
         : sectionBackRoutePath;
-  const setRootComposeProjectId = useSetRootComposeProjectId();
   useEffect(
     () =>
       wsManager.onThreadOpen((signal) => {
-        const route = getThreadRoutePath({
+        openThread({
+          navigate: (route, options) => {
+            void navigate(route, options);
+          },
           projectId: signal.projectId,
           threadId: signal.threadId,
+          split: { zone: signal.split, store, isCompact: isCompactViewport },
         });
-        const current = store.get(splitLayoutAtom);
-        const alreadyOpen =
-          current !== null &&
-          findPaneByThread(current.root, signal.projectId, signal.threadId) !==
-            null;
-        const next = applyThreadOpenToLayout(
-          current,
-          { projectId: signal.projectId, threadId: signal.threadId },
-          isCompactViewport ? "replace" : signal.split,
-        );
-        if (next !== current) {
-          store.set(splitLayoutAtom, next);
-        }
-        void navigate(route, alreadyOpen ? { replace: true } : undefined);
       }),
     [isCompactViewport, navigate, store],
   );
+  const openNewThread = useOpenNewThread();
   const forkNewConversation = useForkNewConversation();
   useAppCommandHandler("thread.new", () => {
     if (forkNewConversation()) return true;
-    if (projectId !== undefined) {
-      setRootComposeProjectId(projectId);
-    }
-    void navigate(getRootComposeRoutePath(), {
-      state: { focusPrompt: true },
+    openNewThread({
+      ...(projectId !== undefined ? { projectId } : {}),
+      focusPrompt: true,
     });
     return true;
   });
@@ -600,7 +586,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
     threadId !== undefined &&
     resolvedThreadProjectId !== undefined &&
     resolvedThreadProjectId !== projectId
-      ? getThreadRoutePath({
+      ? getThreadLocationPath({
           projectId: resolvedThreadProjectId,
           threadId,
         })
@@ -797,7 +783,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (isNonImeKey(event, "Escape")) {
         finishSidebarResize();
       }
     };

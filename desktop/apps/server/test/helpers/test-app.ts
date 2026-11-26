@@ -32,7 +32,7 @@ import type { PluginProviderDeclaration } from "@get-bb/plugin-sdk";
 import { buildPluginProviderRegistration } from "../../src/services/providers/plugin-provider-registration.js";
 import { SkillTreeRegistry } from "../../src/services/skills/injected-skills.js";
 import { PluginHostArtifactRegistry } from "../../src/services/plugins/plugin-host-artifact-registry.js";
-import { createProviderNativeRootsCache } from "../../src/services/providers/native-roots.js";
+import { createProjectSkillIndexCache } from "../../src/services/skills/skill-listing.js";
 import { createProviderLiveCommandsCache } from "../../src/services/providers/provider-live-commands.js";
 import { createAiServiceRegistry } from "../../src/services/ai/ai-service-registry.js";
 import {
@@ -103,10 +103,9 @@ export type TestAppHarnessConfigOverrides = Partial<ServerRuntimeConfig> & {
   terminalAttachTimeoutMs?: number;
   terminalCloseTimeoutMs?: number;
   terminalOpenTimeoutMs?: number;
-  nativeRootsClock?: () => number;
+  skillIndexClock?: () => number;
   liveCommandsClock?: () => number;
   seedFirstPartyProviders?: boolean;
-  tunnelIngressNow?: () => number;
   extraProviders?: readonly {
     declaration: PluginProviderDeclaration;
     pluginId: string;
@@ -169,10 +168,9 @@ export async function createTestAppHarness(
     terminalAttachTimeoutMs = TEST_TERMINAL_RPC_TIMEOUT_MS,
     terminalCloseTimeoutMs,
     terminalOpenTimeoutMs = TEST_TERMINAL_RPC_TIMEOUT_MS,
-    nativeRootsClock,
+    skillIndexClock,
     liveCommandsClock,
     seedFirstPartyProviders = true,
-    tunnelIngressNow: _tunnelIngressNow,
     ...configOverrides
   } = overrides;
   const logger = createTestLogger();
@@ -196,11 +194,12 @@ export async function createTestAppHarness(
     },
   });
   const pluginHostArtifacts = new PluginHostArtifactRegistry();
-  const providerNativeRoots = createProviderNativeRootsCache(
-    nativeRootsClock === undefined ? {} : { now: nativeRootsClock },
+  const projectSkillIndexes = createProjectSkillIndexCache(
+    skillIndexClock === undefined ? {} : { now: skillIndexClock },
   );
   for (const extra of overrides.extraProviders ?? []) {
     providerRegistry.register({
+      reportBridgeFailure: () => undefined,
       ...buildPluginProviderRegistration({
         available: true,
         pluginId: extra.pluginId,
@@ -246,7 +245,6 @@ export async function createTestAppHarness(
     performanceDiagnosticsAvailable: false,
     hostDaemonPort: 3001,
     marketplaceUrl: "https://marketplace.invalid/marketplace.json",
-    connectGateKeysUrl: "https://gate-keys.invalid/bb-connect-gate-keys.json",
     inheritedSkillsRootPaths: [],
     isDevelopment: true,
     serverPort: 3334,
@@ -369,7 +367,7 @@ export async function createTestAppHarness(
     pendingInteractions,
     providerRegistry,
     pluginHostArtifacts,
-    providerNativeRoots,
+    projectSkillIndexes,
     providerLiveCommands: createProviderLiveCommandsCache(
       liveCommandsClock === undefined ? {} : { now: liveCommandsClock },
     ),
@@ -443,19 +441,8 @@ export async function startTestServer(
 ): Promise<RunningTestServer> {
   const harness = await createTestAppHarness(overrides);
   let addressInfo: AddressInfo | null = null;
-  const {
-    app,
-    closeWebSockets,
-    injectWebSocket,
-    pluginService,
-    serverMove,
-    tunnelIngress,
-  } = createApp(
-    harness.deps,
-    overrides.tunnelIngressNow === undefined
-      ? undefined
-      : { tunnelIngressNow: overrides.tunnelIngressNow },
-  );
+  const { app, closeWebSockets, injectWebSocket, pluginService, serverMove } =
+    createApp(harness.deps);
   const server = serve(
     {
       hostname: TEST_SERVER_HOST,
@@ -490,7 +477,6 @@ export async function startTestServer(
           resolve();
         });
       });
-      await tunnelIngress.closeAll();
       await closeWebSockets();
       await closeServer;
       await pluginService.stop();

@@ -11,7 +11,10 @@ import {
 import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
-import type { PluginCliRegistration } from "@get-bb/plugin-sdk";
+import {
+  experimental_BbHttpError,
+  type PluginCliRegistration,
+} from "@get-bb/plugin-sdk";
 import { describe, expect, it, vi } from "vitest";
 import {
   createFakePluginHost,
@@ -363,6 +366,7 @@ describe("data migrations", () => {
 describe("startup reconciliation", () => {
   function reconcileBb(threads: {
     get: (args: { threadId: string }) => Promise<unknown>;
+    queued?: (threadId: string) => unknown[];
   }) {
     const published: unknown[] = [];
     return {
@@ -375,6 +379,10 @@ describe("startup reconciliation", () => {
             },
             spawn: async () => {
               throw new Error("not expected");
+            },
+            queue: {
+              list: async ({ threadId }: { threadId?: string }) =>
+                threads.queued?.(threadId ?? "") ?? [],
             },
           },
         },
@@ -424,7 +432,11 @@ describe("startup reconciliation", () => {
         throw new Error("no thread should be asked about");
       },
     });
-    await reconcileRunningAutomationRuns(bb, db);
+    await reconcileRunningAutomationRuns(
+      bb,
+      db,
+      new Set([scriptRun.id, agentRun.id]),
+    );
     for (const run of [scriptRun, agentRun]) {
       const settled = listAutomationRuns(db, {
         automationId: run.automationId,
@@ -467,6 +479,11 @@ describe("startup reconciliation", () => {
         status: "running",
       },
       {
+        id: "auto_emptied",
+        thread: thread("thr_emptied", "pending"),
+        status: "skipped",
+      },
+      {
         id: "auto_archived",
         thread: thread("thr_archived", "idle", { archivedAt: 5 }),
         status: "skipped",
@@ -475,6 +492,7 @@ describe("startup reconciliation", () => {
       { id: "auto_unreachable", thread: "boom", status: "running" },
     ] as const;
     const threads = new Map<string, unknown>();
+    const runIds = new Map<string, string>();
     for (const testCase of cases) {
       const automation = createScheduledAutomation(db, 0, testCase.id);
       const run = createManualRun(db, {
@@ -484,19 +502,31 @@ describe("startup reconciliation", () => {
       }).run;
       const threadId = `thr_${testCase.id.slice("auto_".length)}`;
       setAutomationRunThread(db, { runId: run.id, threadId });
+      runIds.set(testCase.id, run.id);
       threads.set(threadId, testCase.thread);
     }
     const { bb } = reconcileBb({
       get: async ({ threadId }) => {
         const value = threads.get(threadId);
         if (value === null) {
-          throw Object.assign(new Error("not found"), { status: 404 });
+          throw new experimental_BbHttpError({
+            status: 404,
+            code: null,
+            message: "not found",
+            body: null,
+          });
         }
         if (value === "boom") throw new Error("connection refused");
         return value;
       },
+      queued: (threadId) => (threadId === "thr_pending" ? [{}] : []),
     });
-    await reconcileRunningAutomationRuns(bb, db);
+    const unchecked = await reconcileRunningAutomationRuns(
+      bb,
+      db,
+      new Set(runIds.values()),
+    );
+    expect([...unchecked]).toEqual([runIds.get("auto_unreachable")]);
     for (const testCase of cases) {
       const run = listAutomationRuns(db, {
         automationId: testCase.id,

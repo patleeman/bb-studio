@@ -1,3 +1,4 @@
+import type { OperationResponse } from "@bb/server-contract";
 import {
   type PromptInput,
   type PendingInteraction,
@@ -14,6 +15,7 @@ import {
 } from "@bb/domain";
 import {
   DEFAULT_TURN_RETRY_REASON,
+  threadImportResponseSchema,
   threadTabsResponseSchema,
 } from "@bb/server-contract";
 import type {
@@ -28,7 +30,9 @@ import type {
   QueuedMessageEditHoldResponse,
   SendQueuedMessageResponse,
   ThreadArchiveAllResponse,
+  ThreadBackgroundTasksResponse,
   ThreadChildSummaryResponse,
+  ThreadImportResponse,
   ThreadConversationOutlineResponse,
   ThreadCountGroupBy,
   ThreadCountQuery,
@@ -89,7 +93,7 @@ import type {
 import { signalRequestArgs, type CreateSdkAreaArgs } from "./common.js";
 
 export const DEFAULT_THREAD_WAIT_TIMEOUT_MS = 20 * 60 * 1000;
-export const DEFAULT_THREAD_WAIT_POLL_INTERVAL_MS = 250;
+const THREAD_WAIT_REQUEST_MS = 30_000;
 
 export interface ThreadListArgs {
   archived?: boolean;
@@ -98,7 +102,12 @@ export interface ThreadListArgs {
   sectionId?: string;
   hasParent?: boolean;
   includeHidden?: boolean;
-  limit?: number;
+  /**
+   * Page size. A caller that needs every row pages with `offset` until a
+   * page comes back shorter than its `limit`.
+   */
+  limit: number;
+  /** Rows to skip, in the list's own order; defaults to 0. */
   offset?: number;
   originKind?: ThreadListQuery["originKind"];
   originPluginId?: string;
@@ -204,15 +213,16 @@ export type ThreadTimelineReadResult = ThreadTimelineReadResponse;
 export type ThreadArchiveResult = ThreadArchiveAllResponse;
 export type ThreadOpenResult = ThreadOpenResponse;
 export type ThreadPaneActionResult = ThreadPaneActionResponse;
-export type ThreadDeleteResult = { ok: true };
+export type ThreadDeleteResult = OperationResponse;
 export type ThreadSendResult = SendMessageResponse;
 export type ThreadRetryResult = RetryTurnResponse;
 export type ThreadEditMessageResult = EditMessageResponse;
-export type ThreadStopResult = { ok: true };
-export type ThreadCompactResult = { ok: true };
-export type ThreadBannerActionResult = { ok: true };
-export type ThreadUnarchiveResult = { ok: true };
+export type ThreadStopResult = OperationResponse & { status: ThreadStatus };
+export type ThreadCompactResult = OperationResponse;
+export type ThreadBannerActionResult = OperationResponse;
+export type ThreadUnarchiveResult = OperationResponse;
 export type ThreadArchiveAllResult = ThreadArchiveAllResponse;
+export type ThreadImportResult = ThreadImportResponse;
 export type ThreadReadStateResult = ThreadResponse;
 export type ThreadRestoreEnvironmentResult = ThreadResponse;
 export type ThreadPinOrderResult = ThreadListResponse;
@@ -220,15 +230,17 @@ export type ThreadPromptHistoryResult = PromptHistoryResponse;
 export type ThreadQueuedMessagesResult = ThreadQueuedMessageListResponse;
 export type ThreadQueuedMessageCreateResult = ThreadQueuedMessage;
 export type ThreadQueuedMessageUpdateResult = ThreadQueuedMessage;
-export type ThreadQueuedMessageDeleteResult = { ok: true };
+export type ThreadQueuedMessageDeleteResult = OperationResponse;
 export type ThreadQueuedMessageEditHoldResult = QueuedMessageEditHoldResponse;
-export type ThreadQueuedMessageEditHoldReleaseResult = { ok: true };
+export type ThreadQueuedMessageEditHoldReleaseResult = OperationResponse;
 export type ThreadQueuedMessageReorderResult = ThreadQueuedMessageListResponse;
 export type ThreadQueuedMessageSendResult = SendQueuedMessageResponse;
 export type ThreadQueuedMessageGroupBoundaryResult =
   ThreadQueuedMessageListResponse;
 export type ThreadQueueListResult = ThreadQueuedMessageListResponse;
 export type ThreadTabsResult = ThreadTabsResponse;
+export type ThreadBackgroundTaskListResult = ThreadBackgroundTasksResponse;
+export type ThreadBackgroundTaskStopResult = OperationResponse;
 export type ThreadTabsUpdateResult = ThreadTabsResponse;
 export type ThreadStorageFilesResult = ThreadStorageFileListResponse;
 export type ThreadStorageLocationResult = ThreadStorageLocationResponse;
@@ -337,6 +349,11 @@ export interface ThreadRetryArgs {
 export interface ThreadActionArgs {
   signal?: AbortSignal;
   threadId: string;
+}
+
+export interface ThreadImportArgs {
+  file: ArrayBuffer | Blob | Uint8Array;
+  signal?: AbortSignal;
 }
 
 export interface ThreadStatusArgs extends ThreadActionArgs {
@@ -467,6 +484,11 @@ export interface ThreadInteractionListArgs {
   threadId: string;
 }
 
+export interface ThreadBackgroundTaskTargetArgs {
+  itemId: string;
+  threadId: string;
+}
+
 export interface ThreadInteractionTargetArgs {
   interactionId: string;
   threadId: string;
@@ -490,7 +512,6 @@ export type ThreadWaitTarget =
 
 export interface ThreadWaitArgs {
   event?: string;
-  pollIntervalMs?: number;
   signal?: AbortSignal;
   status?: ThreadStatus;
   threadId: string;
@@ -595,6 +616,24 @@ export interface ThreadQueuedMessagesArea {
   ): Promise<ThreadQueuedMessageUpdateResult>;
 }
 
+/**
+ * The thread's running background tasks: the commands and agents its provider
+ * started in the background, which can outlive the turn that started them.
+ */
+export interface ThreadBackgroundTasksArea {
+  /** Running background tasks, with the timeline item id of each. */
+  list(args: ThreadStatusArgs): Promise<ThreadBackgroundTaskListResult>;
+  /**
+   * Stop one running background task without stopping the thread or its
+   * other tasks. Only tasks listed with `stoppable: true` can be stopped; the
+   * task settles as stopped once the provider reports it, which may follow
+   * an `in-progress` result.
+   */
+  stop(
+    args: ThreadBackgroundTaskTargetArgs,
+  ): Promise<ThreadBackgroundTaskStopResult>;
+}
+
 export interface ThreadTabsArea {
   get(args: ThreadStatusArgs): Promise<ThreadTabsResult>;
   update(args: ThreadTabsUpdateArgs): Promise<ThreadTabsUpdateResult>;
@@ -616,6 +655,8 @@ export interface ThreadQueueArea {
 export interface ThreadsArea {
   archive(args: ThreadActionArgs): Promise<ThreadArchiveResult>;
   archiveAll(args: ThreadActionArgs): Promise<ThreadArchiveAllResult>;
+  /** Experimental: see docs/api_to_audit.md. */
+  experimental_backgroundTasks: ThreadBackgroundTasksArea;
   childSummary(args: ThreadStatusArgs): Promise<ThreadChildSummaryResult>;
   compact(args: ThreadActionArgs & { reason?: string }): Promise<ThreadCompactResult>;
   cancelPlan(args: ThreadActionArgs): Promise<ThreadBannerActionResult>;
@@ -687,12 +728,27 @@ export interface ThreadsArea {
   experimental_regenerateTitle(
     args: ThreadActionArgs,
   ): Promise<ThreadMutationResult>;
+  /**
+   * Download the thread as a thread file: zstd-compressed JSONL with a header
+   * line, then the thread's rows, every event in sequence order and its
+   * attachments. A deleted thread can still be exported until its purge
+   * starts. Experimental: see docs/api_to_audit.md.
+   */
+  experimental_export(args: ThreadActionArgs): Promise<Uint8Array>;
+  /**
+   * Import a thread file: recreates a deleted thread in its project. A
+   * recreated archived thread counts as archived now. Rejects a thread that
+   * still exists or is still being deleted, and a file whose project is not on
+   * this server.
+   * Experimental: see docs/api_to_audit.md.
+   */
+  experimental_import(args: ThreadImportArgs): Promise<ThreadImportResult>;
   updatePluginMetadata(
     args: ThreadPluginMetadataUpdateArgs,
   ): Promise<ThreadPluginMetadataResult>;
   queue: ThreadQueueArea;
   interactions: ThreadInteractionsArea;
-  list(args?: ThreadListArgs): Promise<ThreadListResult>;
+  list(args: ThreadListArgs): Promise<ThreadListResult>;
   listRunning(args?: { signal?: AbortSignal }): Promise<ThreadRunningResult>;
   markRead(args: ThreadActionArgs): Promise<ThreadReadStateResult>;
   markUnread(args: ThreadActionArgs): Promise<ThreadReadStateResult>;
@@ -947,10 +1003,6 @@ function timelineQuery(args: ThreadTimelineArgs): ThreadTimelineQuery {
   };
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function resolveThreadWaitTarget(args: ThreadWaitArgs): ThreadWaitTarget {
   const hasStatus = args.status !== undefined;
   const hasEvent = args.event !== undefined;
@@ -964,7 +1016,6 @@ function resolveThreadWaitTarget(args: ThreadWaitArgs): ThreadWaitTarget {
 }
 
 function validateThreadWaitArgs(args: ThreadWaitArgs): {
-  pollIntervalMs: number;
   target: ThreadWaitTarget;
   timeoutMs: number;
 } {
@@ -974,15 +1025,7 @@ function validateThreadWaitArgs(args: ThreadWaitArgs): {
       "Timeout must be a non-negative number of milliseconds.",
     );
   }
-  const pollIntervalMs =
-    args.pollIntervalMs ?? DEFAULT_THREAD_WAIT_POLL_INTERVAL_MS;
-  if (!Number.isInteger(pollIntervalMs) || pollIntervalMs < 1) {
-    throw new RangeError(
-      "Poll interval must be a positive integer number of milliseconds.",
-    );
-  }
   return {
-    pollIntervalMs,
     target: resolveThreadWaitTarget(args),
     timeoutMs,
   };
@@ -1043,6 +1086,27 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
         ...signalRequestArgs(input.signal),
       ),
     );
+  const waitForStatusChange = async (input: {
+    signal: AbortSignal | undefined;
+    thread: ThreadGetResult;
+    waitMs: number;
+  }): Promise<ThreadGetResult> => {
+    const response = await transport.resolve(
+      transport.api.v1.threads[":id"].status.wait.$get(
+        {
+          param: { id: input.thread.id },
+          query: {
+            notStatus: input.thread.status,
+            waitMs: String(input.waitMs),
+          },
+        },
+        ...signalRequestArgs(input.signal),
+      ),
+    );
+    const statusCode: number = response.status;
+    if (statusCode === 204) return input.thread;
+    return (await response.json()) ?? input.thread;
+  };
   function timeline(
     input: ThreadTimelineArgs & { afterTag?: undefined },
   ): Promise<ThreadTimelineResult>;
@@ -1166,7 +1230,7 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
       );
     },
     async delete(input) {
-      await transport.readVoid(
+      return transport.readJson(
         transport.api.v1.threads[":id"]["queued-messages"][
           ":queuedMessageId"
         ].$delete({
@@ -1176,7 +1240,6 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
           },
         }),
       );
-      return { ok: true };
     },
     async experimental_holdForEdit(input) {
       return transport.readJson(
@@ -1191,7 +1254,7 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
       );
     },
     async experimental_releaseEditHold(input) {
-      await transport.readVoid(
+      return transport.readJson(
         transport.api.v1.threads[":id"]["queued-messages"][":queuedMessageId"][
           "edit-hold"
         ].$delete({
@@ -1201,7 +1264,6 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
           },
         }),
       );
-      return { ok: true };
     },
     async list(input) {
       return transport.readJson(
@@ -1277,6 +1339,25 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
       );
     },
   };
+  const backgroundTasks: ThreadBackgroundTasksArea = {
+    async list(input) {
+      return transport.readJson(
+        transport.api.v1.threads[":id"]["background-tasks"].$get(
+          { param: { id: input.threadId } },
+          ...signalRequestArgs(input.signal),
+        ),
+      );
+    },
+    async stop(input) {
+      return transport.readJson(
+        transport.api.v1.threads[":id"]["background-tasks"][
+          ":itemId"
+        ].stop.$post({
+          param: { id: input.threadId, itemId: input.itemId },
+        }),
+      );
+    },
+  };
   const tabs: ThreadTabsArea = {
     async get(input) {
       const body = await transport.readJson(
@@ -1347,7 +1428,7 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
       );
     },
     async delete(input) {
-      await transport.readVoid(
+      return transport.readJson(
         transport.api.v1.threads[":id"].$delete({
           param: { id: input.threadId },
           json: {
@@ -1355,7 +1436,6 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
           },
         }),
       );
-      return { ok: true };
     },
     async editMessage(input) {
       const { threadId, ...json } = input;
@@ -1417,6 +1497,40 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
           param: { id: input.threadId },
         }),
       );
+    },
+    async experimental_export(input) {
+      const response = await transport.resolve(
+        transport.api.v1.threads[":id"].export.$get(
+          { param: { id: input.threadId } },
+          ...signalRequestArgs(input.signal),
+        ),
+      );
+      return new Uint8Array(await response.arrayBuffer());
+    },
+    async experimental_import(input) {
+      const form = new FormData();
+      form.set(
+        "file",
+        input.file instanceof Blob
+          ? input.file
+          : new Blob([
+              Uint8Array.from(
+                input.file instanceof Uint8Array
+                  ? input.file
+                  : new Uint8Array(input.file),
+              ),
+            ]),
+        "thread.jsonl.zst",
+      );
+      const baseUrl = transport.baseUrl.replace(/\/$/u, "");
+      const response = await transport.resolve(
+        transport.fetch(`${baseUrl}/api/v1/threads/import`, {
+          body: form,
+          method: "POST",
+          signal: input.signal,
+        }),
+      );
+      return threadImportResponseSchema.parse(await response.json());
     },
     async experimental_listPluginMetadata(input) {
       return transport.readJson(
@@ -1608,47 +1722,43 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
       );
     },
     async stop(input) {
-      await transport.readVoid(
+      return transport.readJson(
         transport.api.v1.threads[":id"].stop.$post({
           param: { id: input.threadId },
         }),
       );
-      return { ok: true };
     },
     async compact(input) {
-      await transport.readVoid(
+      return transport.readJson(
         transport.api.v1.threads[":id"].compact.$post({
           param: { id: input.threadId },
           ...(input.reason === undefined ? {} : { query: { reason: input.reason } }),
         }),
       );
-      return { ok: true };
     },
     async clearContext(input) {
-      await transport.readVoid(
+      return transport.readJson(
         transport.api.v1.threads[":id"].context.clear.$post({
           param: { id: input.threadId },
         }),
       );
-      return { ok: true };
     },
     async cancelPlan(input) {
-      await transport.readVoid(
+      return transport.readJson(
         transport.api.v1.threads[":id"].plan.cancel.$post({
           param: { id: input.threadId },
         }),
       );
-      return { ok: true };
     },
     async clearGoal(input) {
-      await transport.readVoid(
+      return transport.readJson(
         transport.api.v1.threads[":id"].goal.clear.$post({
           param: { id: input.threadId },
         }),
       );
-      return { ok: true };
     },
     tabs,
+    experimental_backgroundTasks: backgroundTasks,
     async context(input) {
       return transport.readJson(
         transport.api.v1.threads[":id"].context.$get(
@@ -1726,12 +1836,11 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
       );
     },
     async unarchive(input) {
-      await transport.readVoid(
+      return transport.readJson(
         transport.api.v1.threads[":id"].unarchive.$post({
           param: { id: input.threadId },
         }),
       );
-      return { ok: true };
     },
     async unpin(input) {
       return transport.readJson(
@@ -1749,23 +1858,14 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
       );
     },
     async wait(input) {
-      const { pollIntervalMs, target, timeoutMs } =
-        validateThreadWaitArgs(input);
+      const { target, timeoutMs } = validateThreadWaitArgs(input);
       const deadline = Date.now() + timeoutMs;
-      while (true) {
-        if (target.kind === "status") {
-          const thread = await getThread({
-            signal: input.signal,
-            threadId: input.threadId,
-          });
-          if (thread.status === target.status) {
-            return {
-              matched: true,
-              target,
-              thread,
-              threadId: input.threadId,
-            };
-          }
+      if (target.kind === "status") {
+        let thread = await getThread({
+          signal: input.signal,
+          threadId: input.threadId,
+        });
+        while (thread.status !== target.status) {
           const unreachable = isThreadWaitTargetUnreachable(
             thread.status,
             target,
@@ -1785,19 +1885,32 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
               threadId: input.threadId,
             });
           }
-          if (Date.now() >= deadline) {
+          const remainingMs = deadline - Date.now();
+          if (remainingMs <= 0) {
             throw new ThreadWaitTimeoutError({
               pendingRetry,
               target,
               threadId: input.threadId,
             });
           }
-          await sleep(pollIntervalMs);
-          continue;
+          thread = await waitForStatusChange({
+            signal: input.signal,
+            thread,
+            waitMs: Math.ceil(Math.min(remainingMs, THREAD_WAIT_REQUEST_MS)),
+          });
         }
-
+        return {
+          matched: true,
+          target,
+          thread,
+          threadId: input.threadId,
+        };
+      }
+      while (true) {
         const remainingMs = Math.max(0, deadline - Date.now());
-        const waitMs = Math.floor(Math.min(remainingMs, 30_000));
+        const waitMs = Math.floor(
+          Math.min(remainingMs, THREAD_WAIT_REQUEST_MS),
+        );
         const event = await events.wait({
           signal: input.signal,
           threadId: input.threadId,
@@ -1819,7 +1932,6 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
             threadId: input.threadId,
           });
         }
-        await sleep(pollIntervalMs);
       }
     },
   };

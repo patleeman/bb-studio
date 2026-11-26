@@ -63,6 +63,8 @@ const poem =
 
 const seed = {
   environmentId: null,
+  parent: null,
+  sectionId: null,
   projectId: "proj_personal",
   sourceThreadId: "thr_source",
   sourceThreadTitle: "Sea poem",

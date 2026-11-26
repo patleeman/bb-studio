@@ -160,6 +160,11 @@ export const BUILTIN_PLUGINS = [
     pluginId: "bb--composer",
     defaultEnabled: true,
   },
+  {
+    name: "server-switcher",
+    pluginId: "bb--server-switcher",
+    defaultEnabled: false,
+  },
 ].map((plugin): BundledPluginDefinition => ({
   ...plugin,
   autoInstall: true,
@@ -170,6 +175,11 @@ export const OFFICIAL_PLUGINS = [
     name: "browser-automation",
     pluginId: "browser-automation",
     defaultEnabled: false,
+  },
+  {
+    name: "tailscale",
+    pluginId: "bb--tailscale",
+    defaultEnabled: true,
   },
 ].map((plugin): BundledPluginDefinition => ({
   ...plugin,

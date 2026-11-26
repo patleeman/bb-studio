@@ -1,7 +1,7 @@
 import { reportEnvironmentHookProgress } from "../services/environments/environment-hooks.js";
 import { emitPluginHostConnected } from "../services/plugins/fork-plugin-events.js";
 import { syncDesktopBrowserTabs } from "../services/desktop-browsers.js";
-import { getExperiments, heartbeatSession } from "@bb/db";
+import { heartbeatSession, recordSessionRoute } from "@bb/db";
 import {
   HOST_DAEMON_WS_RESUME_REJECTED_CLOSE_CODE,
   HOST_DAEMON_WS_SHUTDOWN_CLOSE_REASON,
@@ -154,7 +154,10 @@ export function createDaemonSocketEvents(
     Pick<AppDeps, "hub" | "logger" | "sharedPorts" | "terminalSessions"> &
     LoggedPendingInteractionWorkSessionDeps,
   target: DaemonSocketTarget,
-  plugins?: Pick<PluginService, "handleHostSignal" | "handleHostWorkerExit">,
+  plugins?: Pick<
+    PluginService,
+    "handleHostSignal" | "handleHostWorkerExit" | "handleHostWorkerOutput"
+  >,
   serverMove?: Pick<ServerMoveCoordinator, "handleProgress">,
 ): DaemonSocketEvents {
   let channel: DaemonChannel | null = null;
@@ -212,8 +215,7 @@ export function createDaemonSocketEvents(
       if (
         detached === "detached" &&
         reason !== HOST_DAEMON_WS_SHUTDOWN_CLOSE_REASON &&
-        deps.hub.getDaemonSessionSocket(target.sessionId) === channel &&
-        getExperiments(deps.db).resumeDaemonSessions
+        deps.hub.getDaemonSessionSocket(target.sessionId) === channel
       ) {
         onDaemonSocketDetached(deps, target);
         return;
@@ -224,6 +226,9 @@ export function createDaemonSocketEvents(
   };
 }
 
+const HEARTBEAT_ACK_PAYLOAD = JSON.stringify({ type: "heartbeat-ack" });
+const LEASE_RENEWAL_INTERVAL_MS = LEASE_TIMEOUT_MS - 2 * HEARTBEAT_INTERVAL_MS;
+
 export const SERVER_MOVE_FENCED_DAEMON_MESSAGE_TYPES: ReadonlySet<
   HostDaemonDaemonWsMessage["type"]
 > = new Set([
@@ -231,6 +236,7 @@ export const SERVER_MOVE_FENCED_DAEMON_MESSAGE_TYPES: ReadonlySet<
   "desktop-browser.changed",
   "plugin-host.signal",
   "plugin-host.worker-exited",
+  "session.route",
   "terminal.opened",
   "terminal.exited",
 ]);
@@ -248,7 +254,6 @@ export function onDaemonSocketOpen(
   emitPluginHostConnected(args.hostId);
   handleDaemonSocketOpened(deps, { hostId: args.hostId });
   deps.sharedPorts.pushCurrentSharedPortsForHost(args.hostId);
-  deps.sharedPorts.pushCurrentNextTunnelForHost(args.hostId);
   if (!isServerMoveSnapshotFenced(deps.db)) {
     deps.terminalSessions.reconcileDisconnectedHostTerminals({
       daemonSessionId: args.sessionId,
@@ -283,7 +288,10 @@ export function onDaemonSocketOpen(
 export function onDaemonSocketMessage(
   deps: WorkSessionDeps & Pick<AppDeps, "sharedPorts" | "terminalSessions">,
   args: DaemonSocketMessageArgs,
-  plugins?: Pick<PluginService, "handleHostSignal" | "handleHostWorkerExit">,
+  plugins?: Pick<
+    PluginService,
+    "handleHostSignal" | "handleHostWorkerExit" | "handleHostWorkerOutput"
+  >,
   serverMove?: Pick<ServerMoveCoordinator, "handleProgress">,
 ): void {
   deps.hub.recordDaemonActivity(args.sessionId);
@@ -295,6 +303,20 @@ export function onDaemonSocketMessage(
   if (message === null) {
     return;
   }
+  const acknowledged =
+    message.type === "heartbeat" &&
+    deps.hub.getDaemonSessionSocket(args.sessionId) === args.socket;
+  if (acknowledged) {
+    args.socket.send(HEARTBEAT_ACK_PAYLOAD);
+  }
+  const leaseRenewalDue = deps.hub.takeDaemonLeaseRenewal(
+    args.sessionId,
+    Date.now(),
+    LEASE_RENEWAL_INTERVAL_MS,
+  );
+  if (acknowledged && !leaseRenewalDue) {
+    return;
+  }
 
   try {
     runEventLoopWorkSync(`ws:daemon ${message.type}`, () => {
@@ -302,17 +324,14 @@ export function onDaemonSocketMessage(
         hostId: args.hostId,
         sessionId: args.sessionId,
       });
-      const now = Date.now();
-      if (
-        message.type === "heartbeat" ||
-        now < session.updatedAt ||
-        now - session.updatedAt >= session.heartbeatIntervalMs ||
-        session.leaseExpiresAt <= now + session.heartbeatIntervalMs
-      ) {
+      if (leaseRenewalDue) {
         heartbeatSession(
           deps.db,
           session.id,
-          Math.max(now + session.leaseTimeoutMs, session.leaseExpiresAt + 1),
+          Math.max(
+            Date.now() + session.leaseTimeoutMs,
+            session.leaseExpiresAt + 1,
+          ),
         );
       }
       if (
@@ -389,12 +408,12 @@ export function onDaemonSocketMessage(
         deps.sharedPorts.recordTunnelIdentity(args.hostId, message.identity);
         return;
       }
-      if (message.type === "connect-next.status") {
-        deps.sharedPorts.recordNextTunnelStatus({
-          hostId: args.hostId,
+      if (message.type === "session.route") {
+        recordSessionRoute(deps.db, {
           sessionId: args.sessionId,
-          status: message.status,
+          route: message.route,
         });
+        deps.hub.notifyHost(args.hostId, ["host-connected"]);
         return;
       }
       if (message.type === "desktop-browser.changed") {
@@ -424,6 +443,17 @@ export function onDaemonSocketMessage(
           authenticatedHostId: args.hostId,
           pluginId: message.pluginId,
           generation: message.generation,
+          reason: message.reason,
+        });
+        return;
+      }
+      if (message.type === "plugin-host.worker-output") {
+        plugins?.handleHostWorkerOutput({
+          authenticatedHostId: args.hostId,
+          pluginId: message.pluginId,
+          generation: message.generation,
+          stream: message.stream,
+          line: message.line,
         });
         return;
       }
@@ -446,7 +476,9 @@ export function onDaemonSocketMessage(
         return;
       }
       if (message.type === "heartbeat") {
-        args.socket.send(JSON.stringify({ type: "heartbeat-ack" }));
+        if (!acknowledged) {
+          args.socket.send(HEARTBEAT_ACK_PAYLOAD);
+        }
         return;
       }
       if (message.type === "machine.shutdown-ack") {

@@ -3,22 +3,14 @@ import {
   advanceEnvironmentProvisioning,
   providerEnvironmentHasPendingWork,
   refreshProviderRetirement,
+  sweepProviderEnvironment,
 } from "../environments/environment-engine.js";
 import { revokeThreadDesktopBrowserControl } from "../desktop-browsers.js";
 import {
-  and,
-  eq,
-  inArray,
-  isNotNull,
-  isNull,
-  notExists,
-  sql,
-} from "drizzle-orm";
-import {
-  environments,
   getActiveStoredTurnId,
   getEnvironment,
   getHost,
+  updateThread,
   getLatestSessionForHost,
   getLatestThreadSequence,
   getThread,
@@ -27,15 +19,17 @@ import {
   hasStoredTurnCompleted,
   hasThreadStartTurnRequest,
   isThreadAwaitingTurnStartPastDeadline,
+  listActiveThreadIdsOnHost,
+  listDeletedThreadsAwaitingPurgeOnHost,
+  listNonDeletedThreadStatusesOnHost,
   listThreadIdsAwaitingTurnRequestAnswers,
   listThreadIdsWithLatestHostDaemonRestartInterruption,
   listThreadIdsWithOwedStopForHost,
   listThreadIdsWithTurnRequestsForHost,
   listTurnStartDeadlineCandidates,
+  markThreadProvisioningStartupContextDispatched,
   markThreadStorageDeleted,
   requestThreadPurge,
-  threadPurges,
-  threads,
   type TurnStartDeadlineCandidate,
 } from "@bb/db";
 import {
@@ -52,7 +46,10 @@ import type {
   LoggedPendingInteractionWorkSessionDeps,
   LoggedWorkSessionDeps,
 } from "../../types.js";
-import { cancelEnvironmentProvisioningForThreadStopInTransaction } from "../environments/environment-provisioning-cancellation.js";
+import {
+  cancelEnvironmentProvisioningForThreadStopInTransaction,
+  discardPendingCreateForThreadStopInTransaction,
+} from "../environments/environment-provisioning-cancellation.js";
 import {
   emptyCommandResultSideEffects,
   type CommandResultPostCommitAction,
@@ -92,6 +89,7 @@ import {
   clearThreadProvisionSchedule,
   getThreadProvisionContext,
   readDispatchedThreadStartFork,
+  saveThreadProvisionContext,
 } from "./thread-startup-store.js";
 import { cancelAbandonedProviderCreations } from "./thread-environment-providers.js";
 import { scheduleThreadProvisioningAdvance } from "./thread-provisioning.js";
@@ -644,17 +642,10 @@ function dispatchThreadStartInTransaction(
       if (activeProvisionContext === null) {
         return { completedProvisionSequence: null, outcome };
       }
-      tx.update(threads)
-        .set({
-          startupContext: sql`json_set(${threads.startupContext}, '$.kind', 'dispatched')`,
-        })
-        .where(
-          and(
-            eq(threads.id, args.threadId),
-            sql`json_extract(${threads.startupContext}, '$.state.provisioningId') = ${activeProvisionContext.state.provisioningId}`,
-          ),
-        )
-        .run();
+      markThreadProvisioningStartupContextDispatched(tx, {
+        provisioningId: activeProvisionContext.state.provisioningId,
+        threadId: args.threadId,
+      });
       const completedProvisionSequence =
         activeProvisionContext.state.provisionEventSequence === null
           ? null
@@ -783,6 +774,7 @@ function buildProvisioningStoppedEntry(): ProvisioningTranscriptEntry {
 interface PreStartStopResult {
   abandonedProvider: boolean;
   cancelHostId: string | null;
+  discardedEnvironmentId?: string;
   environmentId: string | null;
   finalized: boolean;
   outcomes: ThreadLifecycleOutcome[];
@@ -834,8 +826,35 @@ function requestThreadStopInTransaction(
     thread.environmentId === null
       ? null
       : getEnvironment(deps.db, thread.environmentId);
+  const selection = environment?.environmentProviderSelection ?? null;
+  const discarded =
+    environment !== null &&
+    environment.environmentProviderId !== null &&
+    selection !== null &&
+    context !== null &&
+    discardPendingCreateForThreadStopInTransaction(deps, {
+      environmentId: environment.id,
+      threadId: thread.id,
+    });
+  if (discarded && environment.environmentProviderId !== null && selection !== null) {
+    updateThread(deps.db, deps.hub, thread.id, { environmentId: null });
+    context.request.environmentIntent = {
+      type: "provider",
+      environmentProviderId: environment.environmentProviderId,
+      machine: selection.machine,
+      inputs: selection.inputs,
+      selectionResolved: true,
+    };
+    context.state.environmentId = null;
+    saveThreadProvisionContext({
+      replace: false,
+      db: deps.db,
+      threadId: thread.id,
+      context,
+    });
+  }
   const cancellation =
-    environment === null
+    environment === null || discarded
       ? "ready_to_finalize"
       : cancelEnvironmentProvisioningForThreadStopInTransaction(deps, {
           environmentId: environment.id,
@@ -853,7 +872,10 @@ function requestThreadStopInTransaction(
   return {
     abandonedProvider,
     cancelHostId: null,
-    environmentId: thread.environmentId,
+    ...(discarded && environment !== null
+      ? { discardedEnvironmentId: environment.id }
+      : {}),
+    environmentId: discarded ? null : thread.environmentId,
     finalized: true,
     outcomes: [
       requested,
@@ -896,6 +918,15 @@ async function requestThreadStop(
   }
   if (result.abandonedProvider) {
     cancelAbandonedProviderCreations(deps, threadId);
+  }
+  if (result.discardedEnvironmentId !== undefined) {
+    void sweepProviderEnvironment(deps, result.discardedEnvironmentId).catch(
+      (error) =>
+        deps.logger.warn(
+          { environmentId: result.discardedEnvironmentId, error },
+          "Discarding an environment whose create never returned failed",
+        ),
+    );
   }
   if (!result.finalized && result.environmentId && result.cancelHostId) {
     void advanceEnvironmentProvisioning(deps, {
@@ -1110,22 +1141,10 @@ export function interruptActiveThreadsForHost(
   deps: LoggedPendingInteractionWorkSessionDeps,
   args: InterruptActiveThreadsForHostArgs,
 ): { threads: InterruptedActiveThreadResult[] } {
-  const activeThreadIds = deps.db
-    .select({ threadId: threads.id })
-    .from(threads)
-    .innerJoin(environments, eq(threads.environmentId, environments.id))
-    .where(
-      and(
-        eq(environments.hostId, args.hostId),
-        inArray(
-          threads.status,
-          args.includeStopping ? ["active", "stopping"] : ["active"],
-        ),
-        isNull(threads.deletedAt),
-      ),
-    )
-    .all()
-    .map((row) => row.threadId);
+  const activeThreadIds = listActiveThreadIdsOnHost(deps.db, {
+    hostId: args.hostId,
+    includeStopping: args.includeStopping,
+  });
   const threadIds = new Set([
     ...activeThreadIds,
     ...listThreadIdsWithTurnRequestsForHost(deps.db, { hostId: args.hostId }),
@@ -1223,27 +1242,9 @@ export async function reconcileDaemonReportedThreads(
   deps: LoggedPendingInteractionWorkSessionDeps,
   args: ReconcileDaemonReportedThreadsArgs,
 ): Promise<void> {
-  const deletedThreads = deps.db
-    .select({
-      environmentId: environments.id,
-      id: threads.id,
-      storageDeletedAt: threads.storageDeletedAt,
-    })
-    .from(threads)
-    .innerJoin(environments, eq(threads.environmentId, environments.id))
-    .where(
-      and(
-        eq(environments.hostId, args.hostId),
-        isNotNull(threads.deletedAt),
-        notExists(
-          deps.db
-            .select({ threadId: threadPurges.threadId })
-            .from(threadPurges)
-            .where(eq(threadPurges.threadId, threads.id)),
-        ),
-      ),
-    )
-    .all();
+  const deletedThreads = listDeletedThreadsAwaitingPurgeOnHost(deps.db, {
+    hostId: args.hostId,
+  });
   for (const thread of deletedThreads) {
     if (thread.storageDeletedAt !== null) {
       finalizeStoppedThread(deps, { fence: false, threadId: thread.id });
@@ -1258,25 +1259,10 @@ export async function reconcileDaemonReportedThreads(
   const running = new Set(args.activeThreadIds);
   const eventsPending = new Set(args.undeliveredEventThreadIds);
   const commandsPending = new Set(args.turnCommandThreadIds);
-  const candidates = deps.db
-    .select({ id: threads.id, status: threads.status })
-    .from(threads)
-    .innerJoin(environments, eq(threads.environmentId, environments.id))
-    .where(
-      and(
-        eq(environments.hostId, args.hostId),
-        isNull(threads.deletedAt),
-        inArray(threads.status, [
-          "active",
-          "starting",
-          "stopping",
-          "idle",
-          "error",
-        ]),
-      ),
-    )
-    .all()
-    .filter(
+  const candidates = listNonDeletedThreadStatusesOnHost(deps.db, {
+    hostId: args.hostId,
+    statuses: ["active", "starting", "stopping", "idle", "error"],
+  }).filter(
       (thread) =>
         running.has(thread.id) ||
         thread.status === "active" ||

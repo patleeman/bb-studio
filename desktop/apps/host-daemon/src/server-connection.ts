@@ -1,4 +1,3 @@
-import { Buffer } from "node:buffer";
 import {
   HOST_DAEMON_PROTOCOL_VERSION,
   HOST_DAEMON_WS_RESUME_FROM_QUERY_PARAM,
@@ -7,12 +6,15 @@ import {
   HostDaemonWsSequencer,
   buildHostDaemonWebSocketAuthorizationHeader,
   buildHostDaemonWebSocketProtocols,
+  encodeHostDaemonDaemonWsMessage,
   hostDaemonDaemonWsMessageSchema,
   hostDaemonRpcCommandTypeSchema,
   hostDaemonServerWsMessageSchema,
   type HostDaemonSessionCloseReason,
   type HostDaemonSessionOpenResponse,
   type HostDaemonDaemonWsMessage,
+  type HostDaemonSessionRoute,
+  type HostDaemonWsFrame,
 } from "@bb/host-daemon-contract";
 import { z } from "zod";
 import {
@@ -32,6 +34,12 @@ import { isLikelySystemSuspensionDelay } from "@bb/process-utils";
 import { sliceUtf16Head } from "@bb/text-utils";
 import { normalizeCaughtError, runtimeErrorLogFields } from "./error-utils.js";
 import { ServerResponseError } from "./server-client.js";
+import {
+  SessionSendQueue,
+  sessionSendStreamKey,
+} from "./session-send-queue.js";
+import { StreamSendWindow } from "./stream-send-window.js";
+import { sameServerRoute } from "./server-routes.js";
 
 export type { CreateReconnectingWebSocket } from "./server-connection-support.js";
 
@@ -61,7 +69,8 @@ export type ServerSessionInvalidationSource =
   | "fetchPluginHostArtifact"
   | "interruptInteractiveRequests"
   | "postEvents"
-  | "registerInteractiveRequest";
+  | "registerInteractiveRequest"
+  | "withdrawInteractiveRequest";
 
 export interface HandleServerSessionInvalidatedArgs {
   code: "inactive_session";
@@ -74,9 +83,9 @@ type SessionCloseHandler = (
 ) => void | Promise<void>;
 
 const SERVER_MESSAGE_PAYLOAD_PREVIEW_CHARS = 512;
-const TERMINAL_SOCKET_HIGH_WATER_BYTES = 1024 * 1024;
-const TERMINAL_SOCKET_MAX_QUEUE_BYTES = 32 * 1024 * 1024;
-const TERMINAL_SOCKET_DRAIN_POLL_MS = 10;
+const STREAM_SOCKET_HIGH_WATER_BYTES = 64 * 1024;
+const STREAM_SMALL_MESSAGE_BYTES = 4 * 1024;
+const SEND_QUEUE_MAX_BYTES = 32 * 1024 * 1024;
 
 interface RecoverableMessage {
   key: string;
@@ -84,8 +93,9 @@ interface RecoverableMessage {
 }
 
 interface PendingSocketPayload {
+  attachment: Uint8Array | null;
   bytes: number;
-  payload: string;
+  json: string;
   recoverable: RecoverableMessage | null;
 }
 
@@ -100,8 +110,6 @@ function recoverableMessageKey(
   switch (message.type) {
     case "connect-tunnel.identity":
       return "connect-tunnel.identity";
-    case "connect-next.status":
-      return "connect-next.status";
     case "environment-change":
       return `environment-change\u0000${message.environmentId}\u0000${message.change}`;
     case "environment-metadata-change":
@@ -110,26 +118,6 @@ function recoverableMessageKey(
       return `terminal.exited\u0000${message.terminalId}`;
     default:
       return null;
-  }
-}
-
-function isTerminalDaemonOutputMessage(
-  message: HostDaemonDaemonWsMessage,
-): boolean {
-  return message.type === "terminal.output";
-}
-
-function isTerminalDaemonLifecycleMessage(
-  message: HostDaemonDaemonWsMessage,
-): boolean {
-  switch (message.type) {
-    case "terminal.error":
-    case "terminal.exited":
-    case "terminal.opened":
-    case "terminal.replay":
-      return true;
-    default:
-      return false;
   }
 }
 
@@ -164,9 +152,9 @@ export class ServerConnection {
   private fatalConnectError: ServerResponseError | null = null;
   private protocolMismatchObserved = false;
   private sessionInvalidationInProgress = false;
-  private pendingSocketBytes = 0;
-  private readonly pendingSocketPayloads: PendingSocketPayload[] = [];
-  private socketDrainTimeout: ReturnType<typeof setTimeout> | null = null;
+  private readonly sendQueue = new SessionSendQueue<PendingSocketPayload>();
+  private readonly streamWindow = new StreamSendWindow();
+  private socketDrainScheduled = false;
   private readonly pendingRecoverableMessages = new Map<
     string,
     HostDaemonDaemonWsMessage
@@ -175,6 +163,8 @@ export class ServerConnection {
     string,
     SentRecoverableMessage
   >();
+
+  private reportedRoute: HostDaemonSessionRoute | null = null;
 
   constructor(private readonly options: ServerConnectionOptions) {
     this.createWebSocket =
@@ -209,7 +199,10 @@ export class ServerConnection {
   }
 
   sendMessage(message: HostDaemonDaemonWsMessage): boolean {
-    const parsed = hostDaemonDaemonWsMessageSchema.parse(message);
+    const parsed =
+      message.type === "terminal.output" || message.type === "terminal.replay"
+        ? message
+        : hostDaemonDaemonWsMessageSchema.parse(message);
     const recoverableKey = recoverableMessageKey(parsed);
     const recoverable =
       recoverableKey === null ? null : { key: recoverableKey, message: parsed };
@@ -220,25 +213,59 @@ export class ServerConnection {
       return false;
     }
 
-    const payload = JSON.stringify(parsed);
+    const encoded = encodeHostDaemonDaemonWsMessage(parsed);
+    const payload: PendingSocketPayload = {
+      attachment: encoded.attachment,
+      bytes: encoded.json.length + (encoded.attachment?.byteLength ?? 0),
+      json: encoded.json,
+      recoverable,
+    };
+    const stream = sessionSendStreamKey(parsed);
     const websocket = this.connectedWebSocket();
-    if (
-      websocket === null ||
-      (isTerminalDaemonOutputMessage(parsed) &&
-        (this.pendingSocketPayloads.length > 0 ||
-          (websocket.bufferedAmount ?? 0) > TERMINAL_SOCKET_HIGH_WATER_BYTES))
-    ) {
-      return this.enqueueSocketPayload(payload, recoverable);
+    if (websocket === null) {
+      return this.enqueueSocketPayload(stream, payload);
+    }
+    if (stream === null) {
+      if (this.sendQueue.hasControl) {
+        const queued = this.enqueueSocketPayload(stream, payload);
+        this.flushSocketPayloads();
+        return queued;
+      }
+      return this.writeSocketPayload(websocket, payload);
     }
     if (
-      isTerminalDaemonLifecycleMessage(parsed) &&
-      this.pendingSocketPayloads.length > 0
+      !this.sendQueue.hasStream(stream) &&
+      (payload.bytes <= STREAM_SMALL_MESSAGE_BYTES ||
+        (!this.sendQueue.hasStreams && this.streamWriteAllowed(websocket)))
     ) {
-      const queued = this.enqueueSocketPayload(payload, recoverable);
-      this.flushSocketPayloads(true);
-      return queued;
+      return this.writeStreamPayload(websocket, payload);
     }
-    return this.writeSocketPayload(websocket, payload, recoverable);
+    return this.enqueueSocketPayload(stream, payload);
+  }
+
+  private streamWriteAllowed(websocket: ReconnectingWebSocketLike): boolean {
+    return (
+      (websocket.bufferedAmount ?? 0) <= STREAM_SOCKET_HIGH_WATER_BYTES &&
+      this.streamWindow.open
+    );
+  }
+
+  private writeStreamPayload(
+    websocket: ReconnectingWebSocketLike,
+    payload: PendingSocketPayload,
+  ): boolean {
+    if (!this.writeSocketPayload(websocket, payload)) {
+      return false;
+    }
+    const sequencer = this.sequencer;
+    if (sequencer !== null) {
+      this.streamWindow.recordWrite(
+        sequencer.sentSeq,
+        payload.bytes,
+        performance.now(),
+      );
+    }
+    return true;
   }
 
   private connectedWebSocket(): ReconnectingWebSocketLike | null {
@@ -255,17 +282,16 @@ export class ServerConnection {
 
   private writeSocketPayload(
     websocket: ReconnectingWebSocketLike,
-    payload: string,
-    recoverable: RecoverableMessage | null,
+    payload: PendingSocketPayload,
   ): boolean {
     const sequencer = this.sequencer;
     if (sequencer === null) {
       return false;
     }
-    const frame = sequencer.encode(payload);
-    if (recoverable !== null) {
-      this.sentRecoverableMessages.set(recoverable.key, {
-        message: recoverable.message,
+    const frame = sequencer.encode(payload.json, payload.attachment);
+    if (payload.recoverable !== null) {
+      this.sentRecoverableMessages.set(payload.recoverable.key, {
+        message: payload.recoverable.message,
         seq: sequencer.sentSeq,
       });
     }
@@ -275,7 +301,7 @@ export class ServerConnection {
 
   private sendFrame(
     websocket: ReconnectingWebSocketLike,
-    frame: string,
+    frame: HostDaemonWsFrame,
   ): boolean {
     try {
       websocket.send(frame);
@@ -292,68 +318,59 @@ export class ServerConnection {
   }
 
   private enqueueSocketPayload(
-    payload: string,
-    recoverable: RecoverableMessage | null,
+    stream: string | null,
+    payload: PendingSocketPayload,
   ): boolean {
-    const bytes = Buffer.byteLength(payload, "utf8");
-    if (this.pendingSocketBytes + bytes > TERMINAL_SOCKET_MAX_QUEUE_BYTES) {
+    if (this.sendQueue.bytes + payload.bytes > SEND_QUEUE_MAX_BYTES) {
       this.options.logger.warn(
         {
-          maxQueueBytes: TERMINAL_SOCKET_MAX_QUEUE_BYTES,
-          pendingBytes: this.pendingSocketBytes,
+          maxQueueBytes: SEND_QUEUE_MAX_BYTES,
+          pendingBytes: this.sendQueue.bytes,
         },
-        "Terminal websocket output queue exceeded its limit",
+        "Daemon websocket send queue exceeded its limit",
       );
       this.abandonSession();
-      this.websocket?.reconnect(1013, "terminal-backpressure");
+      this.websocket?.reconnect(1013, "send-queue-overflow");
       return false;
     }
-    this.pendingSocketPayloads.push({ bytes, payload, recoverable });
-    this.pendingSocketBytes += bytes;
-    if (this.connectedWebSocket() !== null) {
+    this.sendQueue.push(stream, payload);
+    if (stream !== null && this.connectedWebSocket() !== null) {
       this.scheduleSocketDrain();
     }
     return true;
   }
 
   private scheduleSocketDrain(): void {
-    if (this.socketDrainTimeout !== null) {
+    if (this.socketDrainScheduled || !this.sendQueue.hasStreams) {
       return;
     }
-    this.socketDrainTimeout = setTimeout(() => {
-      this.socketDrainTimeout = null;
-      this.flushSocketPayloads(false);
-    }, TERMINAL_SOCKET_DRAIN_POLL_MS);
+    this.socketDrainScheduled = true;
+    setImmediate(() => {
+      this.socketDrainScheduled = false;
+      this.flushSocketPayloads();
+    });
   }
 
-  private flushSocketPayloads(ignoreHighWater: boolean): void {
+  private flushSocketPayloads(): void {
     let websocket = this.connectedWebSocket();
-    while (
-      websocket !== null &&
-      this.pendingSocketPayloads.length > 0 &&
-      (ignoreHighWater ||
-        (websocket.bufferedAmount ?? 0) <= TERMINAL_SOCKET_HIGH_WATER_BYTES)
-    ) {
-      const pending = this.pendingSocketPayloads.shift();
-      if (!pending) {
-        break;
+    while (websocket !== null && this.sendQueue.hasControl) {
+      const payload = this.sendQueue.takeControl();
+      if (payload) {
+        this.writeSocketPayload(websocket, payload);
       }
-      this.pendingSocketBytes -= pending.bytes;
-      this.writeSocketPayload(websocket, pending.payload, pending.recoverable);
       websocket = this.connectedWebSocket();
     }
-    if (websocket !== null && this.pendingSocketPayloads.length > 0) {
-      this.scheduleSocketDrain();
+    while (
+      websocket !== null &&
+      this.sendQueue.hasStreams &&
+      this.streamWriteAllowed(websocket)
+    ) {
+      const payload = this.sendQueue.takeNextStreamPayload();
+      if (payload) {
+        this.writeStreamPayload(websocket, payload);
+      }
+      websocket = this.connectedWebSocket();
     }
-  }
-
-  private clearSocketPayloads(): void {
-    if (this.socketDrainTimeout !== null) {
-      clearTimeout(this.socketDrainTimeout);
-      this.socketDrainTimeout = null;
-    }
-    this.pendingSocketPayloads.length = 0;
-    this.pendingSocketBytes = 0;
   }
 
   setSessionCloseHandler(handler: SessionCloseHandler | undefined): void {
@@ -385,6 +402,7 @@ export class ServerConnection {
 
   private async openSession(): Promise<HostDaemonSessionOpenResponse> {
     this.fatalConnectError = null;
+    const route = this.options.routes.active().route;
     try {
       const session = await this.options.serverClient.openSession({
         hostId: this.options.hostId,
@@ -399,6 +417,8 @@ export class ServerConnection {
           this.options.getUndeliveredEventThreadIds?.() ?? [],
         loadedEnvironments: this.options.getLoadedEnvironments?.() ?? [],
       });
+      this.reportedRoute = route;
+      this.options.routes.learn(session.serverRoutes);
       this.session = session;
       this.sequencer = new HostDaemonWsSequencer();
       this.sessionSocketOpened = false;
@@ -407,7 +427,6 @@ export class ServerConnection {
       this.options.onIdleProviderSessionTimeout?.(
         session.idleProviderSessionTimeoutMinutes,
       );
-      this.options.onAgentCpuPriority?.(session.agentCpuPriority);
       return session;
     } catch (error) {
       if (
@@ -470,7 +489,7 @@ export class ServerConnection {
   private logFatalConnectError(error: ServerResponseError): void {
     const base = {
       hostId: this.options.hostId,
-      serverUrl: this.options.serverUrl,
+      serverUrl: this.options.routes.active().url,
       status: error.status,
       code: error.code,
       detail: error.bodyMessage,
@@ -491,6 +510,7 @@ export class ServerConnection {
   private async connectWebSocket(): Promise<HostDaemonSessionOpenResponse> {
     const websocket = this.createWebSocket(
       async () => {
+        await this.options.routes.select();
         const resumable = this.resumableSession();
         if (resumable !== null) {
           this.dialingResume = true;
@@ -509,13 +529,14 @@ export class ServerConnection {
         maxReconnectionDelay: DEFAULT_MAX_RECONNECTION_DELAY,
         reconnectionDelayGrowFactor: DEFAULT_RECONNECTION_DELAY_GROW_FACTOR,
         connectionTimeout: DEFAULT_CONNECTION_TIMEOUT_MS,
-        headers: {
+        headers: () => ({
           authorization: buildHostDaemonWebSocketAuthorizationHeader(
             this.options.hostKey,
           ),
-          ...this.options.serverHeaders,
-        },
+          ...this.options.routes.active().headers,
+        }),
         maxRetries: Number.POSITIVE_INFINITY,
+        onFrameWritten: () => this.scheduleSocketDrain(),
         protocols: buildHostDaemonWebSocketProtocols(),
       },
     );
@@ -575,7 +596,8 @@ export class ServerConnection {
             { sessionId: session.sessionId },
             "Connected to server",
           );
-          this.flushSocketPayloads(true);
+          this.flushSocketPayloads();
+          this.reportRouteIfChanged();
           await this.options.onSessionOpened?.(session);
           this.flushPendingRecoverableMessages();
           if (!settled) {
@@ -656,7 +678,7 @@ export class ServerConnection {
           return;
         }
         this.options.logger.info(
-          { serverUrl: this.options.serverUrl },
+          { serverUrl: this.options.routes.active().url },
           "Waiting for server...",
         );
       };
@@ -699,7 +721,18 @@ export class ServerConnection {
       { sessionId: session.sessionId },
       "Reconnected; resuming the server session",
     );
-    this.flushSocketPayloads(true);
+    this.flushSocketPayloads();
+    this.reportRouteIfChanged();
+  }
+
+  private reportRouteIfChanged(): void {
+    const route = this.options.routes.active().route;
+    if (sameServerRoute(route, this.reportedRoute)) {
+      return;
+    }
+    if (this.sendMessage({ type: "session.route", route })) {
+      this.reportedRoute = route;
+    }
   }
 
   private startResumeDeadline(session: HostDaemonSessionOpenResponse): void {
@@ -728,7 +761,8 @@ export class ServerConnection {
 
   private abandonSession(): void {
     this.clearResumeDeadline();
-    this.clearSocketPayloads();
+    this.sendQueue.clear();
+    this.streamWindow.reset();
     this.sentRecoverableMessages.clear();
     this.sequencer = null;
     this.sessionSocketOpened = false;
@@ -768,6 +802,8 @@ export class ServerConnection {
     }
     const received = sequencer.receive(decodeWebSocketMessageData(data));
     this.pruneAcknowledgedRecoverableMessages(sequencer.acknowledgedSeq);
+    this.streamWindow.acknowledge(sequencer.acknowledgedSeq, performance.now());
+    this.scheduleSocketDrain();
     if (received.kind === "invalid") {
       this.handleInvalidServerMessage({
         data,
@@ -869,7 +905,11 @@ export class ServerConnection {
       this.options.onIdleProviderSessionTimeout?.(
         message.data.idleProviderSessionTimeoutMinutes,
       );
-      this.options.onAgentCpuPriority?.(message.data.agentCpuPriority);
+      return;
+    }
+
+    if (message.data.type === "server-routes.replace") {
+      this.options.routes.learn(message.data.serverRoutes);
       return;
     }
 
@@ -938,22 +978,6 @@ export class ServerConnection {
           "Connect shares handler failed",
         );
       });
-      return;
-    }
-
-    if (message.data.type === "connect-next.replace") {
-      const nextMessage = message.data;
-      try {
-        this.options.onConnectNextReplace?.(nextMessage);
-      } catch (error) {
-        this.options.logger.warn(
-          {
-            generation: nextMessage.generation,
-            ...runtimeErrorLogFields(error),
-          },
-          "Connect next handler failed",
-        );
-      }
       return;
     }
 
@@ -1122,7 +1146,7 @@ export class ServerConnection {
     sessionId: string,
     resumeFrom: number | null,
   ): string {
-    const serverUrl = new URL(this.options.serverUrl);
+    const serverUrl = new URL(this.options.routes.active().url);
     serverUrl.protocol = serverUrl.protocol === "https:" ? "wss:" : "ws:";
     serverUrl.pathname = "/internal/ws";
     serverUrl.searchParams.set("sessionId", sessionId);

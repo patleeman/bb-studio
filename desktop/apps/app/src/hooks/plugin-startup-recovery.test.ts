@@ -43,6 +43,9 @@ it.each(["initial connect", "reconnect", "reload notification"])(
             sdkVersion: "0.1.0",
             compatible: true,
             runtimeSlots: [],
+            staticChunkUrls: [],
+            lazyChunkUrls: [],
+            lazyRuntimeSlots: [],
           },
         },
       }),
@@ -71,10 +74,13 @@ it.each(["initial connect", "reconnect", "reload notification"])(
       resetCrashedSlots: () => {},
       setRegistrations: register,
       removeRegistrations: () => {},
+      setLoadingPlugins: () => {},
+      settlePluginLoad: () => {},
       beginSlotBatch: () => () => {},
       flushSlotBatch: () => {},
       warn: () => {},
       priorityPluginIds: () => [],
+      restoredLazyParts: () => [],
       whenScreenPainted: () => Promise.resolve(),
     };
     const effects = createRealtimeCacheEffects({ queryClient });

@@ -11,6 +11,7 @@ export default async function personalWorkspacePlugin(
 
   type Provider = Parameters<typeof bb.experimental_environments.register>[0];
   const provider: Provider = {
+    apiVersion: 2,
     id: PERSONAL_WORKSPACE_ENVIRONMENT_PROVIDER_ID,
     displayName: "Personal workspace",
     description: "Create a personal directory without a project.",
@@ -39,7 +40,7 @@ export default async function personalWorkspacePlugin(
       }
     },
     async restore(context) {
-      return provider.create!({ ...context, suggestedBranchName: "" });
+      return provider.create!(context);
     },
     async remove({ hostId, path, pathKey, signal }) {
       if (hostId === null) {

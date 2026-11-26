@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import { useAtomValue } from "jotai";
+import { CORE_PLUGIN_ID } from "@bb/domain";
 import { Icon } from "@bb/shared-ui/icon";
 import { EmptyStatePanel } from "@bb/shared-ui/empty-state";
 import { SecondaryPanelContentSkeleton } from "./SecondaryPanelContentSkeleton";
@@ -227,7 +228,7 @@ function panelTabPluginId(
     case "plugin-page-fixed":
       return tab.pluginId;
     case "plugin-fixed":
-      return tab.pluginId === "core" ? null : tab.pluginId;
+      return tab.pluginId === CORE_PLUGIN_ID ? null : tab.pluginId;
     default:
       return null;
   }
@@ -851,7 +852,7 @@ function ThreadSecondaryPanelContent({
   };
 
   const shouldEnableSidebarSplits =
-    !renderAsDrawer && splitPanelStateId !== undefined && areFixedTabsReady;
+    !renderAsDrawer && splitPanelStateId !== undefined;
   const splitTabs = shouldEnableSidebarSplits
     ? ([
         ...fixedTabs.map((fixedTab) => ({
@@ -886,6 +887,7 @@ function ThreadSecondaryPanelContent({
       canNavigateTabs={canNavigateTabs && isLayoutOpen}
       fixedTabIds={fixedTabs.map((tab) => tab.tab.id)}
       hasNewTabButton={showNewTabButton}
+      isTabListReady={areFixedTabsReady}
       onTabNavigated={(paneId, isNewTabButton) => {
         window.requestAnimationFrame(() => {
           const control = isNewTabButton

@@ -1,11 +1,10 @@
 import { forkProviderOptionsContext } from "../providers/provider-options-context.fork.js";
 import {
-  environments,
+  getEnvironment,
+  getThread,
+  hasLiveChildThread,
   hasStoredSpawnAgentToolCall,
-  liveThread,
-  threads,
 } from "@bb/db";
-import { and, eq } from "drizzle-orm";
 import { startsTurnForTurnContext, withTurnContext } from "./turn-context.fork.js";
 import {
   PromptInput,
@@ -342,6 +341,7 @@ export async function buildThreadStartCommand(
       threadId: args.thread.id,
     }),
     instructions: runtimeContext.instructions,
+    additionalWorkspaceFolders: runtimeContext.additionalWorkspaceFolders,
     dynamicTools: runtimeContext.dynamicTools,
     contributedEnv: runtimeContext.contributedEnv,
     injectedSkillSources: runtimeContext.injectedSkillSources,
@@ -384,6 +384,8 @@ function buildPreparedTurnSubmitCommandPayload(
       bridgeLaunch,
       providerThreadId: args.providerThreadId,
       instructions: args.runtimeContext.instructions,
+      additionalWorkspaceFolders:
+        args.runtimeContext.additionalWorkspaceFolders,
       dynamicTools: args.runtimeContext.dynamicTools,
       contributedEnv: args.runtimeContext.contributedEnv,
       injectedSkillSources: args.runtimeContext.injectedSkillSources,
@@ -449,24 +451,6 @@ function requireProviderThreadId(
   return providerThreadId;
 }
 
-function threadHasLiveChildren(
-  deps: Pick<AppDeps, "db">,
-  threadId: string,
-): boolean {
-  const row = deps.db
-    .select({ id: threads.id })
-    .from(threads)
-    .where(
-      and(
-        eq(threads.parentThreadId, threadId),
-        liveThread,
-      ),
-    )
-    .limit(1)
-    .get();
-  return row !== undefined;
-}
-
 export function dispatchThreadRenameCommand(
   deps: CommandResultSideEffectsDeps,
   args: DispatchThreadRenameCommandArgs,
@@ -500,11 +484,7 @@ export function syncThreadTitleToProvider(
   if (!thread.title || !thread.environmentId) {
     return;
   }
-  const environment = deps.db
-    .select()
-    .from(environments)
-    .where(eq(environments.id, thread.environmentId))
-    .get();
+  const environment = getEnvironment(deps.db, thread.environmentId);
   if (environment?.status !== "ready" || !environment.path) {
     return;
   }
@@ -520,11 +500,7 @@ export function dispatchArchivedThreadProviderArchiveCommand(
   deps: CommandResultSideEffectsDeps,
   args: DispatchArchivedThreadProviderArchiveCommandArgs,
 ): boolean {
-  const thread = deps.db
-    .select()
-    .from(threads)
-    .where(eq(threads.id, args.threadId))
-    .get();
+  const thread = getThread(deps.db, args.threadId);
   if (!thread || thread.archivedAt === null || thread.deletedAt !== null) {
     return false;
   }
@@ -534,11 +510,7 @@ export function dispatchArchivedThreadProviderArchiveCommand(
     return false;
   }
 
-  const environment = deps.db
-    .select()
-    .from(environments)
-    .where(eq(environments.id, thread.environmentId))
-    .get();
+  const environment = getEnvironment(deps.db, thread.environmentId);
   if (!environment) {
     return false;
   }
@@ -556,7 +528,7 @@ export function dispatchArchivedThreadProviderArchiveCommand(
   }
 
   if (
-    threadHasLiveChildren(deps, thread.id) ||
+    hasLiveChildThread(deps.db, thread.id) ||
     hasStoredSpawnAgentToolCall(deps.db, thread.id)
   ) {
     return false;

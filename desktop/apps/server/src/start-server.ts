@@ -28,6 +28,7 @@ import {
   setSkippedAppUpdate,
   listRunningThreads,
   setAppSettings,
+  startWalCheckpointer,
 } from "@bb/db";
 import { initDb } from "./db.js";
 import { createApp } from "./server.js";
@@ -36,7 +37,7 @@ import { createMachineAuthService } from "./services/machine-auth.js";
 import { resolveBuiltinSkillsRootPath } from "./services/skills/builtin-skills-copy.js";
 import { SkillTreeRegistry } from "./services/skills/injected-skills.js";
 import { PluginHostArtifactRegistry } from "./services/plugins/plugin-host-artifact-registry.js";
-import { createProviderNativeRootsCache } from "./services/providers/native-roots.js";
+import { createProjectSkillIndexCache } from "./services/skills/skill-listing.js";
 import { createProviderLiveCommandsCache } from "./services/providers/provider-live-commands.js";
 import { createAiServiceRegistry } from "./services/ai/ai-service-registry.js";
 import { createAppUpdateService } from "./services/system/app-update.js";
@@ -49,7 +50,6 @@ import { createLauncherChannel } from "./services/system/launcher-channel.js";
 import { createBbAppManagedConfigReloader } from "./services/system/bb-app-managed-config.js";
 import { startGatedPerformanceDiagnostics } from "./services/system/performance-diagnostics.js";
 import { createGatedQueryPlanObserver } from "./services/system/query-plan-audit.js";
-import { startGatedWalCheckpointer } from "./services/system/wal-checkpoint-experiment.js";
 import { startEventLoopStallMonitor } from "./services/system/event-loop-stall-monitor.js";
 import {
   runPeriodicSweeps,
@@ -57,6 +57,7 @@ import {
 } from "./services/system/periodic-sweeps.js";
 import { installProviderModelCatalogPrewarm } from "./services/providers/provider-model-catalog-prewarm.js";
 import { installProviderCliStatusPrewarm } from "./services/system/provider-cli-status-prewarm.js";
+import { installHostDerivedStateBaseline } from "./services/hosts/host-derived-state.js";
 import {
   createProviderRegistryService,
   type ProviderRegistryService,
@@ -79,6 +80,15 @@ import {
   refuseInterruptedServerImport,
   repairLastServerMoveHostName,
 } from "./services/server-move/pending-boot.js";
+import { Server as HttpServer } from "node:http";
+import {
+  LocalNetworkAccess,
+  setLocalNetworkAccess,
+} from "./services/server-routes/local-network.js";
+import {
+  isLocalNetworkOn,
+  refreshServerAccessOrigins,
+} from "./services/machines/server-access.js";
 import { createConnectHold } from "./services/server-move/connect-hold.js";
 import { isServerMoveFrozen } from "./services/server-move/freeze-state.js";
 import { reconcileServerMoveRunAtBoot } from "./services/server-move/reconcile.js";
@@ -90,6 +100,8 @@ import {
   PluginToolCallRegistry,
   setPluginToolCallRegistry,
 } from "./services/plugins/plugin-tool-calls.js";
+
+const ADVERTISED_ROUTES_REFRESH_INTERVAL_MS = 60_000;
 
 interface StartHttpListenerArgs {
   fetch: Parameters<typeof serve>[0]["fetch"];
@@ -181,7 +193,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
         })
       : null;
   const hub = new NotificationHub();
-  const walCheckpointer = startGatedWalCheckpointer({ db, hub, logger });
+  const walCheckpointer = startWalCheckpointer({ logger });
   walCheckpointer.attach(db.$client);
   const watchInterests = new WatchInterestCoordinator({ db, hub });
   const sharedPorts = new HostSharedPortCoordinator({ db, hub });
@@ -198,7 +210,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     appVersion: serverConfig.BB_APP_VERSION,
     builtinSkillsRootPath: resolveBuiltinSkillsRootPath(),
     marketplaceUrl: serverConfig.BB_MARKETPLACE_URL,
-    connectGateKeysUrl: serverConfig.BB_CONNECT_GATE_KEYS_URL,
     customModels: [],
     dataDir: serverConfig.BB_DATA_DIR,
     featureFlags: serverConfig.featureFlags,
@@ -263,7 +274,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
   await machineAuth.ensureReady();
   const skillTreeRegistry = new SkillTreeRegistry();
   const pluginHostArtifacts = new PluginHostArtifactRegistry();
-  const providerNativeRoots = createProviderNativeRootsCache();
+  const projectSkillIndexes = createProjectSkillIndexCache();
   const providerLiveCommands = createProviderLiveCommandsCache();
   const aiServices = createAiServiceRegistry({
     onStatusChange: () => hub.notifySystem(["config-changed"]),
@@ -283,7 +294,8 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     terminalSessions,
   });
   pendingInteractions.start();
-  setPluginToolCallRegistry(new PluginToolCallRegistry({ logger }));
+  const pluginToolCalls = new PluginToolCallRegistry({ logger });
+  setPluginToolCallRegistry(pluginToolCalls);
 
   const appVersion = createAppVersionService({
     installKind: serverConfig.BB_APP_INSTALL_KIND ?? null,
@@ -377,7 +389,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     pluginCatalogService,
     pluginService,
     serverMove,
-    tunnelIngress,
   } = createApp(
     {
       appUpdate,
@@ -393,7 +404,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       pendingInteractions,
       providerRegistry,
       pluginHostArtifacts,
-      providerNativeRoots,
+      projectSkillIndexes,
       providerLiveCommands,
       aiServices,
       skillTreeRegistry,
@@ -490,6 +501,10 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     pendingServerMove === null
       ? installProviderCliStatusPrewarm(sweepDeps)
       : null;
+  const hostDerivedStateBaseline =
+    pendingServerMove === null
+      ? installHostDerivedStateBaseline(sweepDeps)
+      : null;
   if (pendingServerMove === null) {
     releaseSendsHeldAcrossRestart(sweepDeps);
     await runStartupRecoverySweep(sweepDeps).catch((error) => {
@@ -508,7 +523,34 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     fetch: app.fetch,
     serverConfig,
   });
+  if (!(server instanceof HttpServer)) {
+    throw new Error("The bb server listener must be an HTTP/1.1 server");
+  }
   injectWebSocket(server);
+  const localNetwork = new LocalNetworkAccess({
+    bindHost: serverConfig.BB_SERVER_BIND_HOST,
+    port: serverConfig.BB_SERVER_PORT,
+    logger,
+    isEnabled: () => isLocalNetworkOn({ db }),
+  });
+  setLocalNetworkAccess(localNetwork);
+  if (pendingServerMove === null) localNetwork.attach(server);
+  const refreshAdvertisedRoutes = () =>
+    refreshServerAccessOrigins({ db, hub, logger });
+  const stopRouteRefresh = hub.onChangedMessage((message) => {
+    if (
+      message.entity === "system" &&
+      message.changes.includes("config-changed")
+    ) {
+      localNetwork.reconcile();
+      refreshAdvertisedRoutes();
+    }
+  });
+  const routeRefreshInterval = setInterval(
+    refreshAdvertisedRoutes,
+    ADVERTISED_ROUTES_REFRESH_INTERVAL_MS,
+  );
+  routeRefreshInterval.unref();
 
   logger.info(
     {
@@ -537,6 +579,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
         pluginService,
         providerRegistry,
       }).finally(() => {
+        refreshAdvertisedRoutes();
         void serverMove.handlePluginsStarted();
       });
     }
@@ -565,18 +608,25 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       appUpdate.dispose();
       providerModelCatalogPrewarm?.stop();
       providerCliStatusPrewarm?.stop();
+      hostDerivedStateBaseline?.stop();
       eventLoopStallMonitor.stop();
       await performanceDiagnostics.stop();
       stopDaemonLivenessChecks();
+      stopRouteRefresh();
+      clearInterval(routeRefreshInterval);
+      localNetwork.stop();
+      setLocalNetworkAccess(null);
       if (sweepInterval !== null) {
         clearInterval(sweepInterval);
       }
       pluginCatalogService.stopPeriodicRefresh();
       await pluginService.stopPeriodicUpdateChecks();
       if (pendingServerMove === null) {
+        pluginToolCalls.deferDeliveriesToRestart();
         await pluginService.stop().catch((error: unknown) => {
           logger.warn({ err: error }, "Plugin shutdown failed");
         });
+        await pluginToolCalls.settleDeliveries();
       }
       const closeServer = new Promise<void>((resolve, reject) => {
         server.close((error) => {
@@ -587,7 +637,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
           resolve();
         });
       });
-      await tunnelIngress.closeAll();
       await closeWebSockets();
       await closeServer;
       await walCheckpointer.stop();

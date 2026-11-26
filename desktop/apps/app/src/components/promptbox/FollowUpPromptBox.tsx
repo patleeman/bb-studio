@@ -771,7 +771,7 @@ function FollowUpPromptBoxWithComposer({
                       : isUnavailable
                         ? "Unavailable"
                         : "Submit (Enter)",
-          isRunning: canStopRuntime,
+          isRunning: canStopRuntime || isStopping,
         }}
         typeahead={typeahead}
         attachments={attachments}

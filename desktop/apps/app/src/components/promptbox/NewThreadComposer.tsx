@@ -4,15 +4,15 @@ import {
   readPendingAttachmentUploads,
   usePendingAttachmentUploads,
 } from "./usePendingAttachmentUploads";
-import { useInitialPromptDraft } from "./mentions/initial-prompt-draft";
+import {
+  useInitialPromptDraft,
+  type InitialPromptSeed,
+} from "./mentions/initial-prompt-draft";
 import { ProviderRequirementBanner } from "./banner/ProviderRequirementBanner";
 import { Button } from "@bb/shared-ui/button";
 import { recordTelemetryEvent } from "@/components/onboarding/onboarding-telemetry";
 import { operationFailureReason } from "@/components/onboarding/onboarding-model";
-import {
-  getPluginConfigurationRoutePath,
-  getSettingsRoutePath,
-} from "@/lib/route-paths";
+import { getSettingsTargetPath } from "@/components/settings/settings-sections";
 import {
   useCallback,
   useEffect,
@@ -40,7 +40,6 @@ import type {
   PluginEnvironmentProviderInputsChange,
 } from "@get-bb/plugin-sdk";
 import type {
-  CreateThreadRequest,
   CreateExecutionInputSources,
   SidebarBootstrapResponse,
   SystemEnvironmentProvider,
@@ -108,6 +107,7 @@ import { useSidebarNavigation } from "@/hooks/queries/sidebar-navigation-query";
 import { useSystemConfig } from "@/hooks/queries/system-queries";
 import type { CommandSuggestionSource } from "@/hooks/useCommandSuggestions";
 import {
+  sendPromptDraft,
   usePromptDraftController,
   usePromptDraftInputEmpty,
   type PromptDraftController,
@@ -133,7 +133,6 @@ import {
 } from "@bb/client-core";
 import {
   getProjectComposeRoutePath,
-  getThreadRoutePath,
   isProjectlessProjectId,
 } from "@/lib/route-paths";
 import { sdk } from "@/lib/sdk";
@@ -142,7 +141,7 @@ import {
   resolveHostEnvironmentProvider,
   resolveNewThreadHostEnvironmentProvider,
   resolveRootComposeEffectiveEnvironmentValue,
-  type SeededReuseEnvironment,
+  type SelectedReuseEnvironment,
 } from "@/views/root-compose-environment-selection";
 import { useEnvironment } from "@/hooks/queries/environment-queries";
 import { resolveRootComposeThreadEnvironment } from "@/views/root-compose-thread-environment";
@@ -150,6 +149,7 @@ import {
   MACHINE_SERVER_ACCESS_TITLE,
   machineServerAccessBlockedReason,
 } from "@/components/machines/machine-server-access";
+import { openThread } from "@/lib/split-layout/openThread";
 
 type NewThreadComposerSelectionScope = "new-thread" | "component-local";
 
@@ -160,7 +160,7 @@ export interface NewThreadComposerSeed {
   serviceTier?: ServiceTier;
   permissionMode?: PermissionMode;
   environment?: NewThreadRequest["environment"];
-  initialPrompt?: string;
+  initialPrompt?: InitialPromptSeed;
 }
 
 interface NewThreadComposerLocks {
@@ -272,11 +272,6 @@ export function resolveSubmittedExecutionSources(
     : sources;
 }
 
-export interface NewThreadComposerSubmission extends NewThreadRequest {
-  pluginSubmission?: CreateThreadRequest["pluginSubmission"];
-  sendAt?: number;
-}
-
 export interface NewThreadComposerProps {
   projectId: string | null;
   onProjectChange: (projectId: string) => void | Promise<void>;
@@ -285,7 +280,7 @@ export interface NewThreadComposerProps {
   seed?: NewThreadComposerSeed;
   resetKey?: string | number | null;
   preferReadyProviderWhenUnset?: boolean;
-  onSubmit: (request: NewThreadComposerSubmission) => void | Promise<void>;
+  onSubmit: (request: NewThreadRequest) => void | Promise<void>;
   focusRequest?: number;
   children: (state: NewThreadComposerState) => ReactNode;
 }
@@ -739,10 +734,10 @@ async function submitNewThreadRequest({
   setIsSubmitting,
   setAttachmentError,
 }: {
-  request: NewThreadComposerSubmission;
+  request: NewThreadRequest;
   submittedDraft: PromptDraftState;
   promptDraft: PromptDraftController;
-  onSubmit: (request: NewThreadComposerSubmission) => void | Promise<void>;
+  onSubmit: (request: NewThreadRequest) => void | Promise<void>;
   clearReuseEnvironment: () => void;
   isSubmittingRef: RefObject<boolean>;
   setIsSubmitting: (isSubmitting: boolean) => void;
@@ -751,14 +746,14 @@ async function submitNewThreadRequest({
   isSubmittingRef.current = true;
   setIsSubmitting(true);
   setAttachmentError(null);
-  const clearedSubmittedDraft =
-    promptDraft.clearIfCurrentMatches(submittedDraft);
   recordTelemetryEvent({
     name: "new_thread_submit",
     properties: { outcome: "started" },
   });
   try {
-    await onSubmit(request);
+    await sendPromptDraft(promptDraft, submittedDraft, async () => {
+      await onSubmit(request);
+    });
     recordTelemetryEvent({
       name: "new_thread_submit",
       properties: { outcome: "accepted" },
@@ -772,9 +767,6 @@ async function submitNewThreadRequest({
         failure_reason: operationFailureReason(submitError),
       },
     });
-    if (clearedSubmittedDraft) {
-      promptDraft.restoreIfEmpty(submittedDraft);
-    }
     throw submitError;
   } finally {
     isSubmittingRef.current = false;
@@ -952,63 +944,65 @@ export function NewThreadComposer({
         : newThreadEnvironmentArgsToSeed(seedEnvironment),
     [seedEnvironment],
   );
-  const seededReuseEnvironmentId = useMemo(() => {
-    if (environmentSeed === null) return null;
-    const parsed = parseEnvironmentValue(environmentSeed.selectionValue);
-    return parsed?.type === "reuse" ? parsed.environmentId : null;
-  }, [environmentSeed]);
-  const seededReuseIsThreadDerived =
-    seededReuseEnvironmentId !== null &&
+  const [selectedReuseEnvironmentId, setSelectedReuseEnvironmentId] = useState<
+    string | null
+  >(null);
+  const selectedReuseIsThreadDerived =
+    selectedReuseEnvironmentId !== null &&
     threadDerivedReuseOptions.some(
-      (option) => option.environmentId === seededReuseEnvironmentId,
+      (option) => option.environmentId === selectedReuseEnvironmentId,
     );
-  const seededReuseLookupId =
-    seededReuseEnvironmentId !== null && !seededReuseIsThreadDerived
-      ? seededReuseEnvironmentId
+  const selectedReuseLookupId =
+    selectedReuseEnvironmentId !== null && !selectedReuseIsThreadDerived
+      ? selectedReuseEnvironmentId
       : null;
-  const seededReuseEnvironmentQuery = useEnvironment(seededReuseLookupId);
-  const seededReuseEnvironmentRow =
-    seededReuseLookupId !== null &&
-    seededReuseEnvironmentQuery.data?.id === seededReuseLookupId &&
-    seededReuseEnvironmentQuery.data.status !== "destroyed"
-      ? seededReuseEnvironmentQuery.data
+  const selectedReuseEnvironmentQuery = useEnvironment(selectedReuseLookupId);
+  const selectedReuseEnvironmentRow =
+    selectedReuseLookupId !== null &&
+    selectedReuseEnvironmentQuery.data?.id === selectedReuseLookupId &&
+    selectedReuseEnvironmentQuery.data.status !== "destroyed"
+      ? selectedReuseEnvironmentQuery.data
       : null;
-  const seededReuseEnvironment = useMemo<SeededReuseEnvironment | null>(() => {
-    if (seededReuseEnvironmentId === null) return null;
-    if (seededReuseIsThreadDerived) {
-      return { environmentId: seededReuseEnvironmentId, status: "available" };
-    }
-    if (seededReuseEnvironmentQuery.isPending) {
-      return { environmentId: seededReuseEnvironmentId, status: "pending" };
-    }
-    return {
-      environmentId: seededReuseEnvironmentId,
-      status: seededReuseEnvironmentRow === null ? "missing" : "available",
-    };
-  }, [
-    seededReuseEnvironmentId,
-    seededReuseEnvironmentQuery.isPending,
-    seededReuseEnvironmentRow,
-    seededReuseIsThreadDerived,
-  ]);
+  const selectedReuseEnvironment =
+    useMemo<SelectedReuseEnvironment | null>(() => {
+      if (selectedReuseEnvironmentId === null) return null;
+      if (selectedReuseIsThreadDerived) {
+        return {
+          environmentId: selectedReuseEnvironmentId,
+          status: "available",
+        };
+      }
+      if (selectedReuseEnvironmentQuery.isPending) {
+        return { environmentId: selectedReuseEnvironmentId, status: "pending" };
+      }
+      return {
+        environmentId: selectedReuseEnvironmentId,
+        status: selectedReuseEnvironmentRow === null ? "missing" : "available",
+      };
+    }, [
+      selectedReuseEnvironmentId,
+      selectedReuseEnvironmentQuery.isPending,
+      selectedReuseEnvironmentRow,
+      selectedReuseIsThreadDerived,
+    ]);
   const reuseThreadOptions = useMemo(() => {
-    if (seededReuseEnvironmentRow === null) return threadDerivedReuseOptions;
+    if (selectedReuseEnvironmentRow === null) return threadDerivedReuseOptions;
     return [
       ...threadDerivedReuseOptions,
       {
-        environmentId: seededReuseEnvironmentRow.id,
-        branchName: seededReuseEnvironmentRow.branchName,
-        name: seededReuseEnvironmentRow.name,
-        path: seededReuseEnvironmentRow.path,
+        environmentId: selectedReuseEnvironmentRow.id,
+        branchName: selectedReuseEnvironmentRow.branchName,
+        name: selectedReuseEnvironmentRow.name,
+        path: selectedReuseEnvironmentRow.path,
         environmentProviderId:
-          seededReuseEnvironmentRow.environmentProviderId ?? null,
+          selectedReuseEnvironmentRow.environmentProviderId ?? null,
         hostName:
-          worktreeHostNameById?.get(seededReuseEnvironmentRow.hostId) ?? null,
+          worktreeHostNameById?.get(selectedReuseEnvironmentRow.hostId) ?? null,
         threads: [],
       },
     ];
   }, [
-    seededReuseEnvironmentRow,
+    selectedReuseEnvironmentRow,
     threadDerivedReuseOptions,
     worktreeHostNameById,
   ]);
@@ -1103,7 +1097,7 @@ export function NewThreadComposer({
         projectSources,
         reuseThreadOptions,
         reuseThreadOptionsLoading,
-        seededReuseEnvironment,
+        selectedReuseEnvironment,
       });
       const providerSelection = resolveProviderSelection(effectiveValue);
       if (providerSelection !== null) {
@@ -1125,7 +1119,7 @@ export function NewThreadComposer({
       resolveProviderSelection,
       reuseThreadOptions,
       reuseThreadOptionsLoading,
-      seededReuseEnvironment,
+      selectedReuseEnvironment,
     ],
   );
   const projectDefaultsQuery = useProjectDefaultExecutionOptions(
@@ -1210,6 +1204,16 @@ export function NewThreadComposer({
     sessionOptionSelections,
     setSessionOption,
   } = creationOptions;
+  const parsedEnvironmentSelection = parseEnvironmentValue(
+    environmentSelectionValue,
+  );
+  const currentReuseEnvironmentId =
+    parsedEnvironmentSelection?.type === "reuse"
+      ? parsedEnvironmentSelection.environmentId
+      : null;
+  if (currentReuseEnvironmentId !== selectedReuseEnvironmentId) {
+    setSelectedReuseEnvironmentId(currentReuseEnvironmentId);
+  }
   const selectedThreadModel = activeModel?.model ?? selectedModel;
   const placedSessionOptions = useMemo(
     () =>
@@ -1316,7 +1320,7 @@ export function NewThreadComposer({
         projectSources,
         reuseThreadOptions,
         reuseThreadOptionsLoading,
-        seededReuseEnvironment,
+        selectedReuseEnvironment,
       }),
     [
       environmentSelectionValue,
@@ -1327,7 +1331,7 @@ export function NewThreadComposer({
       projectSources,
       reuseThreadOptions,
       reuseThreadOptionsLoading,
-      seededReuseEnvironment,
+      selectedReuseEnvironment,
     ],
   );
   const parsedEnvironment = useMemo(
@@ -1673,7 +1677,7 @@ export function NewThreadComposer({
   );
 
   const initialPromptDraft = useInitialPromptDraft(seed?.initialPrompt ?? null);
-  const seedInitialPrompt = promptDraft.restoreIfEmpty;
+  const seedInitialPrompt = promptDraft.seedIfEmpty;
   const focusPromptBox = useCallback(() => {
     setLocalPromptBoxFocusRequest((current) => (current ?? 0) + 1);
   }, []);
@@ -1785,12 +1789,11 @@ export function NewThreadComposer({
       if (resource.kind === "thread") {
         const targetProjectId = resource.projectId ?? projectId;
         return () =>
-          void navigate(
-            getThreadRoutePath({
-              projectId: targetProjectId,
-              threadId: resource.threadId,
-            }),
-          );
+          openThread({
+            navigate,
+            projectId: targetProjectId,
+            threadId: resource.threadId,
+          });
       }
       if (resource.kind === "project") {
         return () =>
@@ -1917,7 +1920,7 @@ export function NewThreadComposer({
         ...executionInputSources,
         ...seededExecutionInputSources,
       };
-      const request: NewThreadComposerSubmission = {
+      const request: NewThreadRequest = {
         projectId,
         providerId: selectedProviderId,
         model: selectedThreadModel,
@@ -2016,7 +2019,10 @@ export function NewThreadComposer({
   const selectionState =
     useCommittedComposerState<NewThreadComposerSelectionState>((version) => ({
       version,
-      isSettled: modelCatalogIsSettled && !environmentInputsPending,
+      isSettled:
+        modelCatalogIsSettled &&
+        !environmentInputsPending &&
+        selectedReuseEnvironment?.status !== "pending",
       requestedProjectId: requestedCandidate,
       projectId,
       selectedProviderId,
@@ -2219,7 +2225,9 @@ export function NewThreadComposer({
                       size="sm"
                       className="h-8 shrink-0 px-3"
                       onClick={() =>
-                        void navigate(getSettingsRoutePath("machines"))
+                        void navigate(
+                          getSettingsTargetPath({ section: "machines" }),
+                        )
                       }
                     >
                       Set up machine access
@@ -2237,7 +2245,7 @@ export function NewThreadComposer({
                       className="h-8 shrink-0 px-3"
                       onClick={() =>
                         void navigate(
-                          getPluginConfigurationRoutePath({
+                          getSettingsTargetPath({
                             pluginId: setupRequiredProvider.pluginId,
                           }),
                         )

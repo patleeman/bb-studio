@@ -3,6 +3,7 @@
 
 import { cleanup, render, renderHook, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ExperimentalHostPromptStackEntry } from "@get-bb/plugin-sdk/app";
 import {
@@ -15,6 +16,7 @@ import {
   setPluginSlotRegistrations,
 } from "@/lib/plugin-slots";
 import { makePluginRegistrationSet } from "@/test/fixtures/plugins";
+import { seedRelatedThread } from "@/test/fixtures/related-threads";
 import {
   ForkThreadContextElsewhere,
   useForkChildThreads,
@@ -80,19 +82,23 @@ describe("the running children a plugin hides, thread by thread", () => {
 });
 
 describe("the thread context row a plugin moves away from the composer", () => {
-  const parentThread = { parentThreadTitle: "Main", href: "/threads/thr_main", relationship: "parent" as const };
-  const row = (threadId: string, over: { archived?: boolean } = {}) => (
-    <MemoryRouter>
-      <ThreadPromptContextBanner
-        input={{ threadId, projectId: "proj_1", environment: null }}
-        core={{ parentThread }}
-        archivedSection={over.archived ? { archivedAt: 1 } : null}
-        environmentGoneSection={null}
-        expandedSegment={null}
-        onToggleSegment={() => {}}
-      />
-    </MemoryRouter>
-  );
+  const row = (threadId: string, over: { archived?: boolean } = {}) => {
+    const queryClient = new QueryClient();
+    seedRelatedThread(queryClient, { threadId, projectId: "proj_1", related: { id: "thr_main", title: "Main", relationship: "parent" } });
+    return (
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <ThreadPromptContextBanner
+            input={{ threadId, projectId: "proj_1", environment: null }}
+            archivedSection={over.archived ? { archivedAt: 1 } : null}
+            environmentGoneSection={null}
+            expandedSegment={null}
+            onToggleSegment={() => {}}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+  };
   const contextRow = () => screen.queryByRole("region", { name: "Thread context before sending" });
 
   it("keeps it above a plain thread's composer, hides it above a strands thread's, and keeps the archived row", () => {

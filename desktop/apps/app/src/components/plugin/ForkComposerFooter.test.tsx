@@ -53,7 +53,7 @@ describe("plugin composer footer", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     register();
     render(
-      <PluginComposerFooter scope={{ kind: "thread", threadId: "thr_1" }} />,
+      <PluginComposerFooter scope={{ kind: "thread", threadId: "thr_1", projectId: "proj_1", environmentId: null }} />,
     );
     expect(screen.getByText("Cache warm")).toBeTruthy();
     expect(screen.queryByText("Draft only")).toBeNull();

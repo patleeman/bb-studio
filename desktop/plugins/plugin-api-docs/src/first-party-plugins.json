@@ -50,6 +50,11 @@
     "icon": "Coffee"
   },
   {
+    "id": "bb--server-switcher",
+    "name": "Server switcher",
+    "icon": "ComputerCloud"
+  },
+  {
     "id": "navigation",
     "name": "Navigation",
     "icon": "PanelLeft"

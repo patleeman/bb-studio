@@ -236,6 +236,8 @@ type ExpectedRealtimeKey = "subscribe";
 
 type ExpectedEnvironmentsKey =
   | "experimental_cleanup"
+  | "experimental_create"
+  | "experimental_repos"
   | "archiveThreads"
   | "commit"
   | "delete"
@@ -316,7 +318,12 @@ type ExpectedPluginCatalogKey =
   | "startInstall"
   | "status";
 
-type ExpectedPluginMarketplacesKey = "add" | "list" | "refresh" | "remove";
+type ExpectedPluginMarketplacesKey =
+  | "add"
+  | "list"
+  | "refresh"
+  | "remove"
+  | "setEnabled";
 
 type ExpectedPluginInstallJobsKey = "cancel" | "get" | "list";
 
@@ -344,7 +351,12 @@ type ExpectedProjectsKey =
   | "sources"
   | "update";
 
-type ExpectedProjectSourcesKey = "add" | "delete" | "update";
+type ExpectedProjectSourcesKey =
+  | "add"
+  | "delete"
+  | "experimental_folders"
+  | "update";
+type ExpectedProjectSourceFoldersKey = "add" | "list" | "remove" | "update";
 type ExpectedProjectAttachmentsKey = "copy" | "read" | "upload";
 
 type ExpectedProvidersKey = "catalog" | "list" | "models" | "setEnabled";
@@ -352,6 +364,7 @@ type ExpectedProvidersKey = "catalog" | "list" | "models" | "setEnabled";
 type ExpectedStatusKey = "get";
 
 type ExpectedSystemKey =
+  | "quitStatus"
   | "acknowledgeAppUpdate"
   | "mobileAppDownloads"
   | "mobileAppReleases"
@@ -398,7 +411,10 @@ type ExpectedThreadsKey =
   | "experimental_listCascade"
   | "experimental_listPluginMetadata"
   | "experimental_headState"
+  | "experimental_backgroundTasks"
   | "experimental_regenerateTitle"
+  | "experimental_export"
+  | "experimental_import"
   | "getPluginMetadata"
   | "updatePluginMetadata"
   | "context"
@@ -588,6 +604,9 @@ describe("SDK public type entrypoints", () => {
     expectTypeOf<
       keyof RootBbSdk["projects"]["sources"]
     >().toEqualTypeOf<ExpectedProjectSourcesKey>();
+    expectTypeOf<
+      keyof RootBbSdk["projects"]["sources"]["experimental_folders"]
+    >().toEqualTypeOf<ExpectedProjectSourceFoldersKey>();
     expectTypeOf<
       keyof RootBbSdk["experimental_promptHistory"]
     >().toEqualTypeOf<ExpectedExperimentalPromptHistoryKey>();

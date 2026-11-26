@@ -129,17 +129,15 @@ describe("reading a file inside a root (BB Studio)", () => {
                       1024,
                     )
                   ).fileContents
-                : Buffer.from(
-                    (
-                      await readFileChunkForTransport({
-                        ...rooted(root, file),
-                        offset: 0,
-                        length: 64,
-                        revision: null,
-                      })
-                    ).content,
-                    "base64",
-                  );
+                : (
+                    await readFileChunkForTransport({
+                      ...rooted(root, file),
+                      offset: 0,
+                      length: 64,
+                      revision: null,
+                      knownRevisions: [],
+                    })
+                  ).content;
             if (bytes.equals(PNG)) counts.inside += 1;
             else counts.outside += 1;
           } catch {
@@ -182,8 +180,9 @@ describe("reading a file inside a root (BB Studio)", () => {
       offset: 0,
       length: 4,
       revision: null,
+      knownRevisions: [],
     });
-    expect(chunk.content).toBe(PNG.subarray(0, 4).toString("base64"));
+    expect(chunk.content.equals(PNG.subarray(0, 4))).toBe(true);
   });
 
   it("does not read a file over the size limit", async () => {

@@ -10,6 +10,7 @@ import type {
   ThreadTimelineResponse,
   ThreadWithIncludesResponse,
 } from "@bb/server-contract";
+import { BbHttpError } from "../http-error.js";
 import { signalRequestArgs, type CreateSdkAreaArgs } from "./common.js";
 
 export interface StatusGetArgs {
@@ -45,13 +46,14 @@ export interface StatusArea {
   get(args?: StatusGetArgs): Promise<StatusResult>;
 }
 
-async function fetchSilent<TValue>(
+async function fetchUnlessMissing<TValue>(
   fn: () => Promise<TValue>,
 ): Promise<TValue | null> {
   try {
     return await fn();
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof BbHttpError && error.status === 404) return null;
+    throw error;
   }
 }
 
@@ -77,7 +79,7 @@ export function createStatusArea(args: CreateSdkAreaArgs): StatusArea {
       const threadId = input.threadId;
       const [project, thread] = await Promise.all([
         projectId
-          ? fetchSilent(() =>
+          ? fetchUnlessMissing(() =>
               transport.readJson(
                 transport.api.v1.projects[":id"].$get(
                   {
@@ -89,7 +91,7 @@ export function createStatusArea(args: CreateSdkAreaArgs): StatusArea {
             )
           : Promise.resolve(null),
         threadId
-          ? fetchSilent(() =>
+          ? fetchUnlessMissing(() =>
               transport.readJson(
                 transport.api.v1.threads[":id"].$get(
                   {
@@ -101,31 +103,30 @@ export function createStatusArea(args: CreateSdkAreaArgs): StatusArea {
             )
           : Promise.resolve(null),
       ]);
-      const pendingTodos =
+      const [pendingTodos, childThreads] =
         thread === null
-          ? null
-          : await fetchSilent(async () => {
-              const headState = await transport.readJson(
-                transport.api.v1.threads[":id"]["head-state"].$get(
-                  { param: { id: thread.id } },
-                  ...signalRequestArgs(signal),
-                ),
-              );
-              return headState.pendingTodos;
-            });
-      const childThreads =
-        thread === null
-          ? null
-          : await fetchSilent(() =>
-              transport.readJson(
-                transport.api.v1.threads.$get(
-                  {
-                    query: { parentThreadId: thread.id },
-                  },
-                  ...signalRequestArgs(signal),
+          ? [null, null]
+          : await Promise.all([
+              fetchUnlessMissing(async () => {
+                const headState = await transport.readJson(
+                  transport.api.v1.threads[":id"]["head-state"].$get(
+                    { param: { id: thread.id } },
+                    ...signalRequestArgs(signal),
+                  ),
+                );
+                return headState.pendingTodos;
+              }),
+              fetchUnlessMissing(() =>
+                transport.readJson(
+                  transport.api.v1.threads.$get(
+                    {
+                      query: { parentThreadId: thread.id },
+                    },
+                    ...signalRequestArgs(signal),
+                  ),
                 ),
               ),
-            );
+            ]);
 
       return {
         childThreads,
