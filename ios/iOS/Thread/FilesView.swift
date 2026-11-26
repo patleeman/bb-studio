@@ -279,35 +279,39 @@ struct WorkspaceFileView: View {
 
     var body: some View {
         if inWorkbench {
-            // A Workbench tab: its actions on the tab's own line, no title of its own.
-            VStack(spacing: 0) {
-                WorkbenchTabHeader {
-                    Label(path, systemImage: FileIcon.name(path))
-                } actions: {
-                    actions
-                }
-                loaded
-            }
+            // A Workbench tab: no title of its own; the shell's bar shows its actions.
+            loaded.workbenchTabActions(tabActions)
         } else {
             loaded
                 .navigationTitle(URL(fileURLWithPath: path).lastPathComponent)
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar { actions }
+                .toolbar { toolbarActions }
         }
     }
 
-    @ViewBuilder private var actions: some View {
-        if isMarkdown, file?.text != nil {
+    private var canToggleSource: Bool { isMarkdown && file?.text != nil }
+
+    @ViewBuilder private var toolbarActions: some View {
+        if canToggleSource {
             Button { raw.toggle() } label: {
-                Label(raw ? "Show rendered" : "Show source",
-                      systemImage: raw ? "doc.richtext" : "chevron.left.forwardslash.chevron.right")
+                Image(systemName: raw ? "doc.richtext" : "chevron.left.forwardslash.chevron.right")
             }
-            .labelStyle(.iconOnly)
+            .accessibilityLabel(raw ? "Show rendered" : "Show source")
+        }
+        if let text = file?.text { ShareLink(item: text) }
+    }
+
+    private var tabActions: [WorkbenchTabAction] {
+        var actions: [WorkbenchTabAction] = []
+        if canToggleSource {
+            actions.append(WorkbenchTabAction(id: "source", title: raw ? "Show Rendered" : "Show Source",
+                                              systemImage: raw ? "doc.richtext" : "chevron.left.forwardslash.chevron.right",
+                                              run: { raw.toggle() }))
         }
         if let text = file?.text {
-            ShareLink(item: text) { Label("Share", systemImage: "square.and.arrow.up") }
-                .labelStyle(.iconOnly)
+            actions.append(WorkbenchTabAction(id: "copy", title: "Copy", systemImage: "doc.on.doc", run: { UIPasteboard.general.string = text }))
         }
+        return actions
     }
 
     private var loaded: some View {

@@ -35,31 +35,28 @@ struct WorkbenchDiffTab: View {
     @State private var showingFile = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            WorkbenchTabHeader {
-                Label(title, systemImage: "plusminus")
-            } actions: {
-                if path != nil, diff?.environmentId != nil {
-                    Button { showingFile.toggle() } label: {
-                        Label(showingFile ? "Show diff" : "View file", systemImage: showingFile ? "plusminus" : "doc.text")
-                    }
-                    .accessibilityIdentifier("diffTabViewFile")
-                }
-            }
+        Group {
             if showingFile, let path, let environmentId = diff?.environmentId {
                 WorkspaceFileView(environmentId: environmentId, path: path, threadId: threadId)
-                    .environment(\.inWorkbench, false)
             } else {
                 list
             }
         }
+        .workbenchTabActions(actions)
         .task(id: threadId) { await load() }
     }
 
-    private var title: String {
-        if let path { return URL(fileURLWithPath: path).lastPathComponent }
-        guard let diff else { return "Changes" }
-        return "\(diff.files.count) changed · +\(diff.added) −\(diff.removed)"
+    private var actions: [WorkbenchTabAction] {
+        guard path != nil, diff?.environmentId != nil else { return [] }
+        return [WorkbenchTabAction(id: "viewFile", title: showingFile ? "Show Diff" : "View File",
+                                   systemImage: showingFile ? "plusminus" : "doc.text", run: { showingFile.toggle() })]
+    }
+
+    /// The summary line over the hunks: the file's counts, or the whole change's.
+    private func summary(_ files: [WorkbenchDiff.File]) -> String {
+        let added = files.reduce(0) { $0 + $1.added }, removed = files.reduce(0) { $0 + $1.removed }
+        if let path { return "\(path) · +\(added) −\(removed)" }
+        return "\(files.count) changed · +\(added) −\(removed)"
     }
 
     private var list: some View {
@@ -72,6 +69,10 @@ struct WorkbenchDiffTab: View {
                     if files.isEmpty {
                         ContentUnavailableView("No uncommitted changes", systemImage: "checkmark.seal",
                                                description: Text(path.map { "\(URL(fileURLWithPath: $0).lastPathComponent) matches the last commit." } ?? ""))
+                    }
+                    if !files.isEmpty {
+                        Text(summary(files)).font(.footnote.monospacedDigit()).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.head)
                     }
                     ForEach(files) { file in
                         DiffFileSection(file: file, titled: path == nil)
