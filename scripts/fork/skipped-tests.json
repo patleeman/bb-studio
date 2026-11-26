@@ -871,6 +871,62 @@
     {
       "file": "apps/cli/src/__tests__/commander-errors.test.ts",
       "title": "tells a caller with a terminal ID missing how to list this thread's terminals"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/openThread.test.ts",
+      "title": "preserves search deep-link state when creating a split"
+    },
+    {
+      "file": "apps/app/src/lib/plugin-navigation-hooks.test.tsx",
+      "title": "opens the New thread screen beside the calling panel with the compose options"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "focuses the pane keyboard focus moves into, but not one hidden by maximize"
+    },
+    {
+      "file": "apps/app/src/components/thread/ThreadActionsMenu.test.tsx",
+      "title": "lists every registration in menu order, independent of any thread"
+    },
+    {
+      "file": "apps/app/src/components/settings/CliCommandSettingsSection.test.tsx",
+      "title": "offers to replace the bb a bb machine install added"
+    },
+    {
+      "file": "apps/app/src/components/settings/PluginChoiceSettings.test.tsx",
+      "title": "offers a row for a code block or directive only one plugin draws, so the user can switch it back to bb's own"
+    },
+    {
+      "file": "apps/app/src/components/sidebar/SidebarUpdatesBadge.test.tsx",
+      "title": "leaves provider CLI updates out of the button when the preference hides them"
+    },
+    {
+      "file": "apps/cli/src/__tests__/cli-entry-errors.e2e.test.ts",
+      "title": "suggests the core command for a top-level name no plugin owns"
+    },
+    {
+      "file": "apps/server/test/public/public-host-management.test.ts",
+      "title": "completes a removal whose bb connect credential cannot be revoked, with a warning"
+    },
+    {
+      "file": "apps/server/test/system/cli-command.test.ts",
+      "title": "replaces the command a bb machine install added with the launcher"
+    },
+    {
+      "file": "apps/server/test/sql-in-data-modules.test.ts",
+      "title": "runs SQL only through query functions in packages/db/src/data"
+    },
+    {
+      "file": "plugins/git/host/index-copy.test.ts",
+      "title": "writes no shared index into the repository when core.splitIndex is on"
+    },
+    {
+      "file": "packages/scripts/test/ci-performance.test.mjs",
+      "title": "rejects a missing lockfile snapshot before starting CI jobs"
+    },
+    {
+      "file": "packages/scripts/test/ci-performance.test.mjs",
+      "title": "isolates failed cache restores while preserving healthy caches through a real frozen install"
     }
   ],
   "removeLines": [

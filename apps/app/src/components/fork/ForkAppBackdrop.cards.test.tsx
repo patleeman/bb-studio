@@ -29,12 +29,20 @@ vi.mock("@/components/commands/AppCommandProvider", () => ({
   useAppCommandShortcut: () => null,
   useAppCommandShortcuts: () => [],
   useIndexedAppCommandHandlers: () => {},
+  useIsAppCommandAvailable: () => true,
   useIsAppCommandModifierHeld: () => false,
 }));
 
-vi.mock("@/components/sidebar/PluginThreadList", () => ({
-  PluginThreadList: () => <div data-testid="thread-list" />,
-}));
+vi.mock("@/components/sidebar/PluginThreadList", async () => {
+  const { SidebarContent } = await import("@/components/ui/sidebar.js");
+  return {
+    SidebarThreadListContent: () => (
+      <SidebarContent>
+        <div data-testid="thread-list" />
+      </SidebarContent>
+    ),
+  };
+});
 
 vi.mock("@/components/sidebar/SidebarPluginAttentionGlyph", () => ({
   SidebarPluginAttentionGlyph: () => null,

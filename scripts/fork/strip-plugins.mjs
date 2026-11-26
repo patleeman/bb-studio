@@ -114,7 +114,8 @@ const turboAfter = removeTaskBlocks(turboBefore)
         line.includes(`$TURBO_ROOT$/plugins/${dir}/`),
       ),
   )
-  .join("\n");
+  .join("\n")
+  .replace(/,(\n\s*[\]}])/g, "$1");
 if (turboAfter !== turboBefore) {
   writeFileSync(turboPath, turboAfter);
   console.log("edited turbo.json");
