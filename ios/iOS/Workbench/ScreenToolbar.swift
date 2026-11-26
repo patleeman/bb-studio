@@ -8,11 +8,12 @@ import SwiftUI
 struct ScreenToolbar: ViewModifier {
     let title: String
     let actions: [ScreenAction]
+    var displayMode: NavigationBarItem.TitleDisplayMode = .inline
 
     func body(content: Content) -> some View {
         content
             .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(displayMode)
             .toolbar { ToolbarItemGroup(placement: .topBarTrailing) { ScreenToolbarButtons(actions: actions) } }
             .screenTitle(title)
             .screenActions(actions)
@@ -20,8 +21,8 @@ struct ScreenToolbar: ViewModifier {
 }
 
 extension View {
-    func screenToolbar(_ title: String, actions: [ScreenAction]) -> some View {
-        modifier(ScreenToolbar(title: title, actions: actions))
+    func screenToolbar(_ title: String, actions: [ScreenAction], displayMode: NavigationBarItem.TitleDisplayMode = .inline) -> some View {
+        modifier(ScreenToolbar(title: title, actions: actions, displayMode: displayMode))
     }
 }
 
