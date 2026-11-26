@@ -8,12 +8,13 @@ import { Bots } from "../../bot";
 import { CORE_TEMPLATE } from "../../core-skill";
 
 const SUMMARY = "**Decisions**\n- Ship on Friday.\n\n**Left open**\n- Who writes the post?\n\n**Made**\n- The launch page.";
-const store = vi.hoisted(() => ({ bots: null as null | import("../../bot").Bots, learning: { enabled: true }, calls: [] as [string, Record<string, unknown>][], searched: [] as string[], coreReads: 0, beforeWrite: null as null | (() => void) }));
+const store = vi.hoisted(() => ({ bots: null as null | import("../../bot").Bots, learning: { enabled: true }, calls: [] as [string, Record<string, unknown>][], searched: [] as string[], coreReads: 0, beforeWrite: null as null | (() => void), frozenCore: null as unknown, fresh: false }));
 vi.mock("../../ui/live", () => {
   const read = (method: string, input: Record<string, unknown>) => {
     const bots = store.bots!;
     const botId = input.botId as string;
     if (method === "bot_spaces") return { bots: [{ id: "bot_main", name: "Dot" }], currentBotId: "bot_main" };
+    if (method === "bot_core" && store.frozenCore && !store.fresh) return store.frozenCore;
     if (method === "bot_core") { store.coreReads++; return { skills: bots.alwaysOnSkills(botId).map((skill) => ({ ...skill, warnings: bots.skillLint({ ...skill, alwaysOn: true }, botId) })), ...bots.skillBudget(botId) }; }
     if (method === "bot_skills") return { skills: bots.skills(botId) };
     if (method === "bot_skill_history") return { versions: bots.skillHistory(botId, input.before as number | undefined, input.name as string | undefined) };
@@ -27,7 +28,7 @@ vi.mock("../../ui/live", () => {
     store.calls.push([method, input]);
     const bots = store.bots!;
     if (method === "bot_skill_write") { const before = store.beforeWrite; store.beforeWrite = null; before?.(); return bots.writeSkill(input as never, input.botId as string); }
-    if (method === "bot_core") return read(method, input);
+    if (method === "bot_core") { store.fresh = true; try { return read(method, input); } finally { store.fresh = false; } }
     if (method === "bot_learning_set") { store.learning = { enabled: input.enabled as boolean }; return {}; }
     if (method === "bot_learning_review") return { started: true };
     throw new Error(`unexpected ${method}`);
@@ -60,6 +61,7 @@ beforeEach(() => {
   store.calls = [];
   store.searched = [];
   store.learning = { enabled: true };
+  store.frozenCore = null;
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -103,7 +105,7 @@ it("edits a Core section in place and saves it into the always-on skill", async 
   await click(section.querySelector("[data-testid=memory-section-edit]"));
   type($("[data-testid=memory-section-input]") as HTMLTextAreaElement, "- Give one clear recommendation.");
   await click($("[data-testid=memory-section-save]"));
-  expect(store.calls.at(-1)).toEqual(["bot_skill_write", expect.objectContaining({ botId: "bot_main", name: "core-profile" })]);
+  expect(store.calls.filter(([method]) => method === "bot_skill_write")).toEqual([["bot_skill_write", expect.objectContaining({ botId: "bot_main", name: "core-profile" })]]);
   const body = store.bots!.skill("core-profile", "bot_main")!.body;
   expect(body).toContain("## Preferences\n\n- Give one clear recommendation.\n\n## Right now");
   expect(store.bots!.skill("core-profile", "bot_main")!.alwaysOn).toBe(true);
@@ -153,6 +155,31 @@ it("writes with ifBody, so an edit between the read and the write becomes a conf
   expect(store.calls.find(([method]) => method === "bot_skill_write")?.[1]).toMatchObject({ ifBody: expect.any(String) });
   expect($("[data-testid=memory-section-conflict]")?.textContent).toContain("- Theirs.");
   expect(store.bots!.skill("core-profile", "bot_main")!.body).not.toContain("- Mine.");
+});
+
+it("reopens a section after a save with the saved text, before the poll catches up", async () => {
+  render(<MemoryView botId="bot_main" />);
+  const prefs = () => qa("[data-testid=memory-core-section]").find((each) => each.dataset.section === "Preferences")!;
+  // The page's data stays as it was (no poll yet); the page's own reads see the store.
+  store.bots!.alwaysOnSkills("bot_main");
+  store.frozenCore = { skills: store.bots!.alwaysOnSkills("bot_main").map((skill) => ({ ...skill, warnings: [] })), chars: 0, cap: 2000, over: false };
+  render(<MemoryView botId="bot_main" />);
+  await click(prefs().querySelector("[data-testid=memory-section-edit]"));
+  type($("[data-testid=memory-section-input]") as HTMLTextAreaElement, "- Saved line.");
+  await click($("[data-testid=memory-section-save]"));
+  await click(prefs().querySelector("[data-testid=memory-section-edit]"));
+  expect(($("[data-testid=memory-section-input]") as HTMLTextAreaElement).value).toBe("- Saved line.");
+});
+
+it("shows every always-on skill when the core skill is gone, instead of 'No always-on skill'", () => {
+  const bots = store.bots!;
+  bots.ensureCore("bot_main");
+  bots.writeSkill({ name: "travel-rules", description: "Always on", body: "## Preferences\n\n- Aisle seats.\n", alwaysOn: true }, "bot_main");
+  bots.writeSkill({ name: "home-rules", description: "Always on", body: "- Quiet after 9.\n", alwaysOn: true }, "bot_main");
+  bots.deleteSkill("core-profile", "bot_main");
+  render(<MemoryView botId="bot_main" />);
+  expect($("[data-testid=memory-core-empty]")).toBeNull();
+  expect(qa("[data-testid=memory-core-section]").map((each) => each.dataset.section)).toEqual(["home-rules", "travel-rules"]);
 });
 
 it("adds a skill, toggles Auto-learn and runs it now", async () => {

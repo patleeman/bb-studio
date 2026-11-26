@@ -1187,7 +1187,23 @@ export class Bots {
     const row = this.row(botId);
     if (!row || botKind(row.provider_id) === "external") return [];
     this.ensureCore(row.id);
-    return this.skillStore.alwaysOn(row.id);
+    const skills = this.skillStore.alwaysOn(row.id);
+    return skills.some((skill) => skill.core) || !skills.length ? skills : this.repairCoreMarker(row.id, skills);
+  }
+
+  /**
+   * The marker names a skill that's gone (renamed: written anew, the old one
+   * deleted): point it at the always-on skill holding the core skill's last
+   * text. Nothing is guessed: with no such skill, the marker stays.
+   */
+  private repairCoreMarker(botId: string, skills: ReturnType<BotSkillStore["alwaysOn"]>): ReturnType<BotSkillStore["alwaysOn"]> {
+    const mark = this.deps.db.prepare("SELECT skill_name FROM bot_core_skills WHERE bot_id = ?").get(botId) as { skill_name: string } | undefined;
+    if (!mark) return skills;
+    const last = this.deps.db.prepare("SELECT body FROM bot_skill_versions WHERE bot_id = ? AND name = ? AND body IS NOT NULL ORDER BY id DESC LIMIT 1").get(botId, mark.skill_name) as { body: string } | undefined;
+    const match = last ? skills.find((skill) => skill.body.trim() === last.body.trim()) : undefined;
+    if (!match) return skills;
+    this.deps.db.prepare("UPDATE bot_core_skills SET skill_name = ? WHERE bot_id = ?").run(match.name, botId);
+    return this.skillStore.alwaysOn(botId);
   }
 
   /** Characters the always-on skills use together, against ALWAYS_ON_CAP. */

@@ -1733,3 +1733,21 @@ it("finds the core skill by its marker, never by name or order: check-ins and Me
   expect(x.bots.addCheckin(id, "Another line.")).toBe(false);
   expect(x.bots.skill("aaa-notes", id)!.body).not.toContain("Another line.");
 });
+
+it("repairs the core marker when the core skill was renamed, never by guessing among several", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  x.bots.ensureCore();
+  const core = x.bots.skill("core-profile")!;
+  // Renamed: written anew under another name, the old one deleted.
+  x.bots.writeSkill({ name: "my-rules", description: core.description, body: core.body, alwaysOn: true });
+  x.bots.writeSkill({ name: "travel-rules", description: "Also always on", body: "- Aisle seats.\n", alwaysOn: true });
+  x.bots.deleteSkill("core-profile");
+  expect(x.bots.coreSkill()).toMatchObject({ name: "my-rules" });
+  expect(x.bots.addCheckin(x.bots.list()[0]!.id, "Fridays: the review.")).toBe(true);
+  expect(x.bots.skill("my-rules")!.body).toContain("Fridays: the review.");
+  // Deleted with no copy left, and more than one other: nothing is guessed.
+  x.bots.deleteSkill("my-rules");
+  x.bots.writeSkill({ name: "home-rules", description: "Always on", body: "- Quiet.\n", alwaysOn: true });
+  expect(x.bots.coreSkill()).toBeNull();
+});

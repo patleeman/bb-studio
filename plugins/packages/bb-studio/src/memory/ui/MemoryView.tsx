@@ -81,7 +81,10 @@ function CoreLayer({ botId }: { botId: string }) {
   const core = useLive("bot_core", { botId }, { pollMs: 30_000 });
   const [editing, setEditing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const data = core.data;
+  // What a save just wrote, shown until the poll brings it back: reopening a section right away starts from it.
+  const [saved, setSaved] = useState<typeof core.data>(null);
+  useEffect(() => { setSaved(null); }, [core.data]);
+  const data = saved ?? core.data;
   const skill = data?.skills.find((each) => each.core) ?? null;
   const others = data?.skills.filter((each) => each !== skill) ?? [];
   /**
@@ -100,6 +103,7 @@ function CoreLayer({ botId }: { botId: string }) {
       const body = section === null ? text : withSection(latest.body, section, text);
       // A compare-and-swap (ifBody, as the phone writes): if the Bot changed the skill after this read, nothing is written.
       await call("bot_skill_write", { botId, name, description: latest.description, body, ifBody: latest.body });
+      setSaved(await call("bot_core", { botId }).catch(() => null));
       setEditing(null);
       core.refresh();
       return null;
@@ -122,18 +126,19 @@ function CoreLayer({ botId }: { botId: string }) {
   return (
     <BotPageGroup title="Core" testId="memory-core" aside={budget}>
       {error || core.error ? <p role="alert" className="px-2 text-sm text-destructive">{error ?? core.error}</p> : null}
-      {!data ? <p className="px-2 text-sm text-muted-foreground">Loading…</p> : !skill ? (
+      {!data ? <p className="px-2 text-sm text-muted-foreground">Loading…</p> : !data.skills.length ? (
         <BotPageEmpty testId="memory-core-empty" title="No always-on skill" />
       ) : (
         <div className="flex flex-col">
-          {coreSections(skill.body).map((section) => {
+          {/* The core skill by sections; every other always-on skill (all of them, when the core skill is gone) whole. */}
+          {skill ? coreSections(skill.body).map((section) => {
             const id = `${skill.name}:${section.heading}`;
             return (
               <CoreSection key={id} heading={section.heading} text={section.text} cap={sectionCap(section.heading)} editing={editing === id}
                 onEdit={() => setEditing(id)} onCancel={() => setEditing(null)}
                 onSave={(base, text) => save(skill.name, section.heading, base, text)} />
             );
-          })}
+          }) : null}
           {others.map((other) => (
             <CoreSection key={other.name} heading={other.name} text={other.body} cap={null} editing={editing === other.name}
               onEdit={() => setEditing(other.name)} onCancel={() => setEditing(null)} onSave={(base, body) => save(other.name, null, base, body)} />
