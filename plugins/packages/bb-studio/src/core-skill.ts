@@ -39,6 +39,8 @@ export const CORE_TEMPLATE = `## Preferences
 ${DEFAULT_CHECKIN.join("\n")}
 `;
 
+/** A section starts at a "## " heading and runs to the next one: a "# " title or "### " subheading inside it is its text. */
+const SECTION_START = /^##\s/;
 const heading = (line: string) => /^##\s+(.+?)\s*#*\s*$/.exec(line)?.[1]?.trim() ?? null;
 /** Headings match case-insensitively, ignoring hyphens, spaces and a plural "s" ("Check-ins" is "Check-in"). */
 const norm = (text: string) => text.toLowerCase().replace(/[\s-]+/g, "").replace(/s$/, "");
@@ -50,8 +52,19 @@ export function sectionText(body: string, name: string): string | null {
   const start = lines.findIndex((line) => { const h = heading(line); return !!h && same(h, name); });
   if (start < 0) return null;
   let end = start + 1;
-  while (end < lines.length && !/^#{1,2}\s/.test(lines[end]!)) end++;
+  while (end < lines.length && !SECTION_START.test(lines[end]!)) end++;
   return lines.slice(start + 1, end).join("\n").trim();
+}
+
+/** The core section a heading names ("Check-ins" is "Check-in", "preferences" is "Preferences"), or null for another heading. */
+export function canonicalSection(name: string): CoreSection | null {
+  return CORE_SECTIONS.find((each) => same(each, name)) ?? null;
+}
+
+/** A section's line cap, by its canonical name; null when it has none. */
+export function sectionCap(name: string): number | null {
+  const canonical = canonicalSection(name);
+  return canonical ? SECTION_CAPS[canonical] ?? null : null;
 }
 
 /** Bullets in a section (lines starting with -, * or 1.). */
@@ -66,7 +79,7 @@ export function withSection(body: string, name: string, text: string): string {
   const block = text.trim() ? ["", text.trim(), ""] : [""];
   if (start < 0) return `${[...lines, "", `## ${name}`, ...block].join("\n").replace(/^\n+/, "").trimEnd()}\n`;
   let end = start + 1;
-  while (end < lines.length && !/^#{1,2}\s/.test(lines[end]!)) end++;
+  while (end < lines.length && !SECTION_START.test(lines[end]!)) end++;
   return `${[...lines.slice(0, start + 1), ...block, ...lines.slice(end)].join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n`;
 }
 

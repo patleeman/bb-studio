@@ -345,7 +345,7 @@ export function registerStudioRpc({
     bot_skills: ({ botId }) => ({ skills: bots.skills(botId) }),
     bot_core: ({ botId }) => {
       bots.requireStudio(botId, "skills");
-      const skills = bots.alwaysOnSkills(botId).map((skill) => ({ ...skill, warnings: bots.skillLint({ name: skill.name, body: skill.body, alwaysOn: true }, botId) }));
+      const skills = bots.alwaysOnSkills(botId).map((skill) => ({ name: skill.name, description: skill.description, body: skill.body, updatedAt: skill.updatedAt, core: skill.core, warnings: bots.skillLint({ name: skill.name, body: skill.body, alwaysOn: true }, botId) }));
       return { skills, ...bots.skillBudget(botId) };
     },
     // The user's own write (Studio's UI): an edit to the core skill marks its text as theirs (Maintenance may tidy it from then on).

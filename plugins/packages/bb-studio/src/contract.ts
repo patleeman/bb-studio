@@ -620,7 +620,9 @@ export const rpcContract = defineRpcContract({
   bot_skills: { input: forBot, output: z.object({ skills: z.array(botSkill) }) },
   /** The Bot's always-on skills (src/core-skill.ts) in full, the core skill first, with their advisory notes and the shared character budget: Memory's Core layer. */
   bot_core: { input: forBot, output: z.object({
-    skills: z.array(z.object({ name: z.string(), description: z.string(), body: z.string(), updatedAt: z.number(), warnings: z.array(z.string()) })),
+    skills: z.array(z.object({ name: z.string(), description: z.string(), body: z.string(), updatedAt: z.number(), warnings: z.array(z.string()),
+      /** The Bot's core skill (its marker in bot_core_skills): its sections are Core's. */
+      core: z.boolean().optional() })),
     chars: z.number(), cap: z.number(), over: z.boolean(),
   }) },
   /** Adds or replaces one of the Bot's skills (as its bot_skill_edit tool does with op "write"). */

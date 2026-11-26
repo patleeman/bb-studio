@@ -12,7 +12,7 @@
 // 3. History: Summaries (default), the archived conversations' summaries as
 //    cards, or Past conversations, every conversation with full-text search.
 //    A card or row opens the conversation beside the page.
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Icon } from "../../kit/app/index";
 import { Button } from "../../kit/ui/button";
 import { Input } from "../../kit/ui/input";
@@ -21,7 +21,7 @@ import { Textarea } from "../../kit/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "../../kit/ui/toggle-group";
 import { cn } from "../../kit/ui/index";
 import { errorMessage, relativeTime } from "../../kit/format";
-import { CORE_SECTIONS, SECTION_CAPS, bulletCount, withSection } from "../../core-skill";
+import { CORE_SECTIONS, bulletCount, canonicalSection, sectionCap, sectionText, withSection } from "../../core-skill";
 import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, noMatch, useRowOpen } from "../../ui/bot-page";
 import { useCall, useLive } from "../../ui/live";
 import { lastBot } from "../../ui/bot/selection";
@@ -50,11 +50,10 @@ export function splitSections(body: string): { preamble: string; sections: { hea
 /** The sections the Core layer shows: the three defaults first (empty when the skill lacks one), then any others in the skill's order. */
 export function coreSections(body: string): { heading: string; text: string; missing: boolean }[] {
   const { sections } = splitSections(body);
-  const key = (heading: string) => heading.toLowerCase().replace(/[\s-]+/g, "").replace(/s$/, "");
-  const found = (name: string) => sections.find((section) => key(section.heading) === key(name));
+  const found = (name: string) => sections.find((section) => canonicalSection(section.heading) === name);
   return [
     ...CORE_SECTIONS.map((name) => { const section = found(name); return section ? { ...section, missing: false } : { heading: name, text: "", missing: true }; }),
-    ...sections.filter((section) => !CORE_SECTIONS.some((name) => key(name) === key(section.heading))).map((section) => ({ ...section, missing: false })),
+    ...sections.filter((section) => !canonicalSection(section.heading)).map((section) => ({ ...section, missing: false })),
   ];
 }
 
@@ -81,15 +80,29 @@ function CoreLayer({ botId }: { botId: string }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const data = core.data;
-  const skill = data?.skills[0] ?? null;
-  const save = async (name: string, description: string, body: string) => {
+  const skill = data?.skills.find((each) => each.core) ?? null;
+  const others = data?.skills.filter((each) => each !== skill) ?? [];
+  /**
+   * Saves one section (or a whole other skill) into the latest text: the
+   * skill is read again first, so the Bot's edit to another section stays.
+   * If this section changed since the edit began, nothing is written and
+   * the newer text comes back as a conflict; saving again replaces it.
+   */
+  const save = async (name: string, section: string | null, base: string, text: string): Promise<{ conflict: string } | null> => {
     setError(null);
     try {
-      await call("bot_skill_write", { botId, name, description, body });
+      const latest = (await call("bot_core", { botId })).skills.find((each) => each.name === name);
+      if (!latest) { setError(`${name} is gone.`); return null; }
+      const current = section === null ? latest.body : sectionText(latest.body, section) ?? "";
+      if (current.trim() !== base.trim()) return { conflict: current };
+      const body = section === null ? text : withSection(latest.body, section, text);
+      await call("bot_skill_write", { botId, name, description: latest.description, body });
       setEditing(null);
       core.refresh();
+      return null;
     } catch (cause) {
       setError(errorMessage(cause) || "It didn't save.");
+      return null;
     }
   };
   const budget = data ? (
@@ -107,14 +120,14 @@ function CoreLayer({ botId }: { botId: string }) {
           {coreSections(skill.body).map((section) => {
             const id = `${skill.name}:${section.heading}`;
             return (
-              <CoreSection key={id} heading={section.heading} text={section.text} cap={SECTION_CAPS[section.heading] ?? null} editing={editing === id}
+              <CoreSection key={id} heading={section.heading} text={section.text} cap={sectionCap(section.heading)} editing={editing === id}
                 onEdit={() => setEditing(id)} onCancel={() => setEditing(null)}
-                onSave={(text) => save(skill.name, skill.description, withSection(skill.body, section.heading, text))} />
+                onSave={(base, text) => save(skill.name, section.heading, base, text)} />
             );
           })}
-          {data.skills.slice(1).map((other) => (
+          {others.map((other) => (
             <CoreSection key={other.name} heading={other.name} text={other.body} cap={null} editing={editing === other.name}
-              onEdit={() => setEditing(other.name)} onCancel={() => setEditing(null)} onSave={(body) => save(other.name, other.description, body)} />
+              onEdit={() => setEditing(other.name)} onCancel={() => setEditing(null)} onSave={(base, body) => save(other.name, null, base, body)} />
           ))}
           {data.skills.flatMap((each) => each.warnings).length ? (
             <ul data-testid="memory-core-warnings" className="flex flex-col gap-1 px-2 pt-2 text-xs">
@@ -127,15 +140,24 @@ function CoreLayer({ botId }: { botId: string }) {
   );
 }
 
-function CoreSection({ heading, text, cap, editing, onEdit, onCancel, onSave }: { heading: string; text: string; cap: number | null; editing: boolean; onEdit(): void; onCancel(): void; onSave(text: string): Promise<void> }) {
+function CoreSection({ heading, text, cap, editing, onEdit, onCancel, onSave }: { heading: string; text: string; cap: number | null; editing: boolean; onEdit(): void; onCancel(): void; onSave(base: string, text: string): Promise<{ conflict: string } | null> }) {
   const [draft, setDraft] = useState(text);
+  // The text the edit started from: a refresh (the 30 s poll) doesn't touch an open draft.
+  const [base, setBase] = useState(text);
+  const [conflict, setConflict] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  useEffect(() => { if (editing) setDraft(text); }, [editing, text]);
+  const textRef = useRef(text);
+  textRef.current = text;
+  useEffect(() => { if (editing) { setDraft(textRef.current); setBase(textRef.current); setConflict(null); } }, [editing]);
   const lines = bulletCount(editing ? draft : text);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setSaving(true);
-    try { await onSave(draft); } finally { setSaving(false); }
+    try {
+      const result = await onSave(base, draft);
+      // Changed while you edited: show the newer text; saving again replaces it.
+      if (result) { setConflict(result.conflict); setBase(result.conflict); }
+    } finally { setSaving(false); }
   };
   return (
     <section data-testid="memory-core-section" data-section={heading} className="group/section flex flex-col gap-1 border-b border-border/60 px-2 py-2.5 last:border-b-0">
@@ -149,8 +171,15 @@ function CoreSection({ heading, text, cap, editing, onEdit, onCancel, onSave }: 
           <Textarea aria-label={heading} data-testid="memory-section-input" autoFocus value={draft} rows={Math.min(14, Math.max(3, draft.split("\n").length + 1))}
             onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") onCancel(); if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit(event); }}
             className="font-mono text-xs leading-relaxed" placeholder="- One line per rule" />
+          {conflict !== null ? (
+            <div role="alert" data-testid="memory-section-conflict" className="flex flex-col gap-1 rounded-md border border-warning/40 px-2.5 py-2 text-xs">
+              <span className="text-foreground">This changed while you edited. Now it reads:</span>
+              <span className="whitespace-pre-wrap text-muted-foreground">{conflict || "(empty)"}</span>
+              <span className="text-foreground">Save again to replace it with yours.</span>
+            </div>
+          ) : null}
           <div className="flex gap-1">
-            <Button type="submit" size="sm" className={SMALL} disabled={saving} data-testid="memory-section-save">Save</Button>
+            <Button type="submit" size="sm" className={SMALL} disabled={saving} data-testid="memory-section-save">{conflict !== null ? "Replace" : "Save"}</Button>
             <Button type="button" variant="ghost" size="sm" className={SMALL} onClick={onCancel}>Cancel</Button>
           </div>
         </form>

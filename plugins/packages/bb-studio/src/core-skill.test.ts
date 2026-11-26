@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addCheckinLine, bulletCount, CORE_TEMPLATE, lintAlwaysOn, sectionText, withSection } from "./core-skill";
+import { addCheckinLine, bulletCount, canonicalSection, CORE_TEMPLATE, lintAlwaysOn, sectionCap, sectionText, withSection } from "./core-skill";
 
 describe("always-on core skill text", () => {
   it("reads a section under its heading, whatever its spelling", () => {
@@ -13,6 +13,18 @@ describe("always-on core skill text", () => {
   it("replaces one section and adds a missing one at the end", () => {
     expect(withSection(CORE_TEMPLATE, "Right now", "- Travelling this week.")).toContain("## Right now\n\n- Travelling this week.\n\n## Check-in");
     expect(withSection("## Preferences\n\n- A.\n", "Check-in", "- B.")).toBe("## Preferences\n\n- A.\n\n## Check-in\n\n- B.\n");
+  });
+
+  it("ends a section only at the next ## heading: a # title or ### subheading inside it is its text", () => {
+    const body = "# Dot's profile\n\n## Preferences\n\n- A.\n\n### Writing\n\n- B.\n\n# Notes\n\n- C.\n\n## Check-in\n\n- D.\n";
+    expect(sectionText(body, "Preferences")).toBe("- A.\n\n### Writing\n\n- B.\n\n# Notes\n\n- C.");
+    expect(bulletCount(sectionText(body, "Preferences"))).toBe(3);
+    const next = withSection(body, "Preferences", "- Z.");
+    expect(next).toBe("# Dot's profile\n\n## Preferences\n\n- Z.\n\n## Check-in\n\n- D.\n");
+    expect(sectionCap("preferences")).toBe(25);
+    expect(sectionCap("Right Now")).toBe(10);
+    expect(sectionCap("Check-ins")).toBeNull();
+    expect(canonicalSection("check-ins")).toBe("Check-in");
   });
 
   it("adds a check-in line once", () => {
