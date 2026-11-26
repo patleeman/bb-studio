@@ -33,8 +33,8 @@ export function PageBar({ icon, title, detail, actions, column = false }: PageBa
   );
 }
 
-/** The name of an automation, a todo or a memory record opened as a page. */
-export const ENTRY_TITLE = { automation: "Automation", todo: "Task", record: "Memory record" } as const;
+/** The name of an automation or a todo opened as a page. */
+export const ENTRY_TITLE = { automation: "Automation", todo: "Task" } as const;
 export type EntryKind = keyof typeof ENTRY_TITLE;
 const isEntryKind = (segment: string): segment is EntryKind => Object.hasOwn(ENTRY_TITLE, segment);
 

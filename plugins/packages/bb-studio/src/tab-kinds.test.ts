@@ -28,7 +28,6 @@ const SAMPLE: Record<TabKindId, TabRef> = {
   archive: { kind: "archive", id: "bot_main" },
   automation: { kind: "automation", id: "bot_main:aut_0123456789abcdef" },
   todo: { kind: "todo", id: "loop_0123abcd" },
-  record: { kind: "record", id: "mem_0123456789abcdef" },
   vscode: { kind: "vscode", id: null },
   file: { kind: "file", id: "src/a.ts" },
   diff: { kind: "diff", id: "src/a.ts" },
@@ -165,7 +164,7 @@ describe("naming", () => {
     expect(kindsNamedBy("whiteboards")).toEqual(["whiteboard"]);
     expect(kindsNamedBy("Task")).toEqual(["todo"]);
     expect(kindsNamedBy("todos")).toEqual(["todo"]);
-    expect(kindsNamedBy("memory records")).toEqual(["memory", "record"]);
+    expect(kindsNamedBy("memory")).toEqual(["memory"]);
     expect(kindsNamedBy("pa")).toEqual([]);
   });
 });

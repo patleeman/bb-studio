@@ -1,6 +1,6 @@
-// The Strands page was a workbench tab of its own (Studio's tab id "loops").
-// The page is gone and nothing draws that tab, so Studio closes any still
-// open, like the fixed Bot tabs (retire-fixed-tabs.tsx). BB lists only the
+// The Strands page was a workbench tab of its own (Studio's tab id "loops"),
+// and a memory record opened as a tab too ("memory-record"). Both are gone
+// and nothing draws those tabs, so Studio closes any still open, like the fixed Bot tabs (retire-fixed-tabs.tsx). BB lists only the
 // workbench on screen, so this checks at start and again a little after the
 // view changes (another conversation, a window coming back). An app overlay
 // that draws nothing.
@@ -12,12 +12,14 @@ import type { PanelTab } from "../../workbench-agent/exec";
 
 /** The old Strands page's tab id. */
 export const RETIRED_STRANDS_TAB = "loops";
+/** Every retired tab id: the Strands page and the memory record tab (memory records are retired). */
+export const RETIRED_TABS: ReadonlySet<string> = new Set([RETIRED_STRANDS_TAB, "memory-record"]);
 const SETTLE_MS = 400;
 const AGAIN_ON = ["focus", "popstate", "pointerup"] as const;
 
-/** The keys of Studio's Strands page tabs among `tabs`. Pure. */
+/** The keys of Studio's retired tabs (Strands, memory records) among `tabs`. Pure. */
 export function strandsTabsToClose(tabs: readonly PanelTab[], pluginId: string = STUDIO_PLUGIN_ID): string[] {
-  return tabs.filter((tab) => tab.detail.kind === "plugin" && "pluginId" in tab.detail && tab.detail.pluginId === pluginId && tab.detail.tab.id === RETIRED_STRANDS_TAB).map((tab) => tab.key);
+  return tabs.filter((tab) => tab.detail.kind === "plugin" && "pluginId" in tab.detail && tab.detail.pluginId === pluginId && RETIRED_TABS.has(tab.detail.tab.id)).map((tab) => tab.key);
 }
 
 /** Closes the Strands page tabs in the workbench on screen; how many it closed. */

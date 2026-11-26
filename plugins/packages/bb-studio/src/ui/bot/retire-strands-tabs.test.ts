@@ -10,6 +10,7 @@ const TABS: PanelTab[] = [
   plugin("c", "other", "loops"),
   { key: "d", title: "a.ts", closable: true, detail: { kind: "file", path: "a.ts" } },
   { ...plugin("e", "studio", "loops"), detail: { kind: "plugin", pluginId: "studio", tab: { id: "loops" }, params: { botId: "bot_main" } } },
+  { ...plugin("f", "studio", "memory-record"), detail: { kind: "plugin", pluginId: "studio", tab: { id: "memory-record" }, params: { id: "mem_1" } } },
 ];
 
 function host(tabs: PanelTab[]) {
@@ -20,14 +21,14 @@ function host(tabs: PanelTab[]) {
 
 afterEach(() => { vi.useRealTimers(); });
 
-it("picks only Studio's old Strands page tabs, whatever their params", () => {
-  expect(strandsTabsToClose(TABS)).toEqual(["a", "e"]);
+it("picks only Studio's retired tabs (the old Strands page, memory records), whatever their params", () => {
+  expect(strandsTabsToClose(TABS)).toEqual(["a", "e", "f"]);
 });
 
 it("closes them in the workbench on screen and leaves every other tab", () => {
   const { open, close, navigate } = host(TABS);
-  expect(closeStrandsTabs(navigate)).toBe(2);
-  expect(close.mock.calls.map(([key]) => key)).toEqual(["a", "e"]);
+  expect(closeStrandsTabs(navigate)).toBe(3);
+  expect(close.mock.calls.map(([key]) => key)).toEqual(["a", "e", "f"]);
   expect(open.map((tab) => tab.key)).toEqual(["b", "c", "d"]);
   expect(closeStrandsTabs(navigate)).toBe(0);
 });

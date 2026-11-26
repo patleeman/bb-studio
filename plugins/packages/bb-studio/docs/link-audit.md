@@ -75,7 +75,6 @@ registry doesn't know (Settings) parses to nothing and stays bb's.
 | Conversations | `bb://archive/bot_main` | `/plugins/studio/studio/conversations/bot_main` |  |
 | Automation | `bb://automation/bot_main%3Aaut_0123456789abcdef` | `/plugins/studio/studio/automation/bot_main%3Aaut_0123456789abcdef` |  |
 | To-do | `bb://todo/loop_0123abcd` | `/plugins/studio/studio/todo/loop_0123abcd` |  |
-| Memory record | `bb://record/mem_0123456789abcdef` | `/plugins/studio/studio/record/mem_0123456789abcdef` |  |
 | VS Code | `bb://vscode` | `/plugins/studio/vscode` |  |
 | File (bb) | `bb://file/%2FUsers%2Fp%2Fsrc%2Fa.ts` |  |  |
 | Diff (bb) | `bb://diff/src%2Fa.ts` |  |  |
@@ -107,7 +106,6 @@ the rule above; **n/a** says why it can't.
 | Conversations | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Automation | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | To-do | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
-| Memory record | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | VS Code | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | File (bb) | routes | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | n/a [3] |
 | Diff (bb) | n/a [6] | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | n/a [3] |

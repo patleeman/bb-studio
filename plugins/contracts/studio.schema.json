@@ -5843,7 +5843,6 @@
                         "archive",
                         "automation",
                         "todo",
-                        "record",
                         "vscode",
                         "file",
                         "diff",
@@ -5964,7 +5963,6 @@
                         "archive",
                         "automation",
                         "todo",
-                        "record",
                         "vscode",
                         "file",
                         "diff",
@@ -16839,6 +16837,75 @@
         "additionalProperties": false
       }
     },
+    "bot_core": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "warnings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "body",
+                "updatedAt",
+                "warnings"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "chars": {
+            "type": "number"
+          },
+          "cap": {
+            "type": "number"
+          },
+          "over": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "skills",
+          "chars",
+          "cap",
+          "over"
+        ],
+        "additionalProperties": false
+      }
+    },
     "bot_skill_write": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -26624,6 +26691,63 @@
           "botId",
           "conversations",
           "workers"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_summaries": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summaries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "archivedAt": {
+                  "type": "number"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "threadId",
+                "title",
+                "archivedAt",
+                "summary"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "botId",
+          "summaries"
         ],
         "additionalProperties": false
       }
@@ -57263,7 +57387,6 @@
                         "archive",
                         "automation",
                         "todo",
-                        "record",
                         "vscode",
                         "file",
                         "diff",
@@ -57533,7 +57656,6 @@
                   "archive",
                   "automation",
                   "todo",
-                  "record",
                   "vscode",
                   "file",
                   "diff",
@@ -57754,7 +57876,6 @@
                         "archive",
                         "automation",
                         "todo",
-                        "record",
                         "vscode",
                         "file",
                         "diff",

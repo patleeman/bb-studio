@@ -3,14 +3,15 @@
 // - A finished conversation opens read-only: where its composer goes, "✓
 //   Archived on <date>. Read-only." and Reopen (ReadOnlyComposer.tsx).
 // - The card in Main, `::finished{thread="thr_…"}`: "✓ Archived: <title>",
-//   its dates, the summary's sections, the open icon, and a link to Memory.
+//   its dates, the summary's sections, and the way back to the archived
+//   conversation (the open icon and Open conversation). The summary lives on
+//   the conversation; nothing is saved to Memory.
 import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useState } from "react";
 import type { BotThreadInfo, FinishedConversation } from "../../bot-threads-contract";
 import { Icon } from "../../kit/app/index";
 import { CHAT_CARD_BODY, CHAT_CARD_SKELETON, ChatCard, ChatCardAction, ChatCardFooter, ChatCardHeader, ChatCardIconButton } from "../../kit/app/chat-card";
 import { cn } from "../../kit/ui/index";
-import { MEMORY_SUBPATH } from "../../memory/shared";
 import { errorMessage } from "../../kit/format";
 import { useCall, useLive } from "../live";
 import { summarySections } from "./model";
@@ -55,8 +56,6 @@ export function FinishedCard({ attributes }: PluginMessageDirectiveProps) {
   const finished: FinishedConversation | null = live.data?.finished ?? null;
   if (!finished) return live.loading ? <div className={CHAT_CARD_SKELETON} /> : <p data-testid="finished-card-missing" className="text-xs text-muted-foreground">Archived conversation</p>;
   const sections = summarySections(finished.summary);
-  const memory = () => navigate.toPluginPanel("studio", { subPath: `${MEMORY_SUBPATH}/${encodeURIComponent(finished.botId)}` });
-  const records = finished.records ? `${finished.records} record${finished.records === 1 ? "" : "s"}` : null;
   const dates = `${shortDate(finished.startedAt)}${shortDate(finished.startedAt) === shortDate(finished.finishedAt) ? "" : ` – ${shortDate(finished.finishedAt)}`}`;
   const open = () => navigate.toThread(finished.threadId);
   return (
@@ -75,7 +74,7 @@ export function FinishedCard({ attributes }: PluginMessageDirectiveProps) {
         ))}
       </div>
       <ChatCardFooter>
-        <ChatCardAction icon="Brain" data-testid="finished-memory" onClick={memory}>{records ? `In Memory · ${records}` : "Memory"}</ChatCardAction>
+        <ChatCardAction icon="MessageSquare" data-testid="finished-conversation" onClick={open}>Open conversation</ChatCardAction>
       </ChatCardFooter>
     </ChatCard>
   );

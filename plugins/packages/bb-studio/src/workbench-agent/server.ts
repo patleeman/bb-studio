@@ -100,8 +100,8 @@ export interface WorkbenchLookups {
   itemTitle(id: string): string | null;
   /** A Bot's name, or null when there is no such Bot. */
   botName(id: string): string | null;
-  /** An automation's, a todo's or a memory record's title, or null when there is none with that id. */
-  entryTitle(kind: "automation" | "todo" | "record", id: string): Promise<string | null>;
+  /** An automation's or a todo's title, or null when there is none with that id. */
+  entryTitle(kind: "automation" | "todo", id: string): Promise<string | null>;
   /** Where a path (full, or relative to the conversation's working folder) is, for BB's file preview; null when BB can't show it. */
   fileTarget(threadId: string, path: string): Promise<FileTarget | null>;
   /** A path as the conversation's workspace names it, for the diff tab. */
@@ -208,7 +208,7 @@ export async function openOp(given: OpenInput, threadId: string, deps: Workbench
     }
     case "entry": {
       if (!input.id) return `Give the ${kind.name.toLowerCase()}'s id.`;
-      const title = kind.id === "automation" || kind.id === "todo" || kind.id === "record" ? await deps.entryTitle(kind.id, input.id) : null;
+      const title = kind.id === "automation" || kind.id === "todo" ? await deps.entryTitle(kind.id, input.id) : null;
       if (title === null) return `No ${kind.name.toLowerCase()} has id ${input.id}.`;
       return tab(input.id, title.trim() || kind.name);
     }
@@ -393,7 +393,7 @@ export function workspacePathIn(place: ThreadPlace, path: string): string {
 }
 
 /** Registers the tools, the Workspace RPCs and the window's RPCs; answers the Workspace for the rest of Studio. */
-export function registerWorkbenchAgent(bb: BbPluginApi, db: Database.Database, deps: { itemTitle(id: string): string | null; botName(id: string): string | null; entryTitle(kind: "automation" | "todo" | "record", id: string): Promise<string | null> }): WorkspaceService {
+export function registerWorkbenchAgent(bb: BbPluginApi, db: Database.Database, deps: { itemTitle(id: string): string | null; botName(id: string): string | null; entryTitle(kind: "automation" | "todo", id: string): Promise<string | null> }): WorkspaceService {
   const router = new WorkbenchRouter((command) => { void bb.realtime.publish(WORKBENCH_CHANNEL, command as never); });
   bb.onDispose(() => router.dispose());
   const place = async (threadId: string): Promise<ThreadPlace> => {

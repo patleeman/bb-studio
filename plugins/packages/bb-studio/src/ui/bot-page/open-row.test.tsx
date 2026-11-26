@@ -70,7 +70,7 @@ it("highlights the row whose item is the workbench's selected tab, and the row c
   state.tabs = { open: false, selectedKey: null, tabs: [] };
   render();
   expect(selected()).toEqual(["file"]);
-  expect(openLinksOf({ open: true, selectedKey: "x", tabs: [plugin("x", "automation", { id: "bot_main:heartbeat" }), plugin("y", "memory-record", { id: "mem_1" })] })).toEqual({ open: ["bb://automation/bot_main%3Aheartbeat", "bb://record/mem_1"], selected: "bb://automation/bot_main%3Aheartbeat" });
+  expect(openLinksOf({ open: true, selectedKey: "x", tabs: [plugin("x", "automation", { id: "bot_main:heartbeat" }), plugin("y", "todo", { id: "loop_1" })] })).toEqual({ open: ["bb://automation/bot_main%3Aheartbeat", "bb://todo/loop_1"], selected: "bb://automation/bot_main%3Aheartbeat" });
   expect(rowLink("/threads/thr_9")).toEqual({ link: "bb://conversation/thr_9", ref: { kind: "conversation", id: "thr_9" } });
 });
 

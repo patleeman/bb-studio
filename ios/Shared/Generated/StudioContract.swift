@@ -119,6 +119,7 @@ public enum Studio {
     public static let bot_welcome_opened = "bot_welcome_opened"
     public static let bot_checkin_preset = "bot_checkin_preset"
     public static let bot_skills = "bot_skills"
+    public static let bot_core = "bot_core"
     public static let bot_skill_write = "bot_skill_write"
     public static let bot_skill_share = "bot_skill_share"
     public static let bot_skill_delete = "bot_skill_delete"
@@ -175,6 +176,7 @@ public enum Studio {
     public static let bot_threads_view = "bot_threads_view"
     public static let bot_threads_older = "bot_threads_older"
     public static let bot_conversations_all = "bot_conversations_all"
+    public static let bot_summaries = "bot_summaries"
     public static let bot_conversations_search = "bot_conversations_search"
     public static let bot_thread_info = "bot_thread_info"
     public static let bot_landing = "bot_landing"
@@ -675,6 +677,8 @@ public enum Studio {
 
   public typealias BotSkills = BotSkillsOutput
 
+  public typealias BotCore = BotCoreOutput
+
   public typealias BotSkillWrite = BotSkillWriteOutput
 
   public typealias BotSkillShare = BotSkillShareOutput
@@ -794,6 +798,8 @@ public enum Studio {
   public typealias BotThreadsOlder = BotThreadsOlderOutput
 
   public typealias BotConversationsAll = BotConversationsAllOutput
+
+  public typealias BotSummaries = BotSummariesOutput
 
   public typealias BotConversationsSearch = BotConversationsSearchOutput
 
@@ -6146,7 +6152,6 @@ public enum Studio {
     case archive
     case automation
     case todo
-    case record
     case vscode
     case file
     case diff
@@ -6175,7 +6180,6 @@ public enum Studio {
       case "archive": self = .archive
       case "automation": self = .automation
       case "todo": self = .todo
-      case "record": self = .record
       case "vscode": self = .vscode
       case "file": self = .file
       case "diff": self = .diff
@@ -6206,7 +6210,6 @@ public enum Studio {
       case .archive: try container.encode("archive")
       case .automation: try container.encode("automation")
       case .todo: try container.encode("todo")
-      case .record: try container.encode("record")
       case .vscode: try container.encode("vscode")
       case .file: try container.encode("file")
       case .diff: try container.encode("diff")
@@ -6284,7 +6287,6 @@ public enum Studio {
     case archive
     case automation
     case todo
-    case record
     case vscode
     case file
     case diff
@@ -6313,7 +6315,6 @@ public enum Studio {
       case "archive": self = .archive
       case "automation": self = .automation
       case "todo": self = .todo
-      case "record": self = .record
       case "vscode": self = .vscode
       case "file": self = .file
       case "diff": self = .diff
@@ -6344,7 +6345,6 @@ public enum Studio {
       case .archive: try container.encode("archive")
       case .automation: try container.encode("automation")
       case .todo: try container.encode("todo")
-      case .record: try container.encode("record")
       case .vscode: try container.encode("vscode")
       case .file: try container.encode("file")
       case .diff: try container.encode("diff")
@@ -14785,6 +14785,44 @@ public enum Studio {
     }
   }
 
+  public struct BotCoreInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct BotCoreOutputSkillsItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var description: String?
+    public var body: String?
+    public var updatedAt: Double?
+    public var warnings: [String]?
+
+    public init(name: String? = nil, description: String? = nil, body: String? = nil, updatedAt: Double? = nil, warnings: [String]? = nil) {
+      self.name = name
+      self.description = description
+      self.body = body
+      self.updatedAt = updatedAt
+      self.warnings = warnings
+    }
+  }
+
+  public struct BotCoreOutput: Sendable, Hashable, Codable {
+    public var skills: [BotCoreOutputSkillsItem]?
+    public var chars: Double?
+    public var cap: Double?
+    public var over: Bool?
+
+    public init(skills: [BotCoreOutputSkillsItem]? = nil, chars: Double? = nil, cap: Double? = nil, over: Bool? = nil) {
+      self.skills = skills
+      self.chars = chars
+      self.cap = cap
+      self.over = over
+    }
+  }
+
   public struct BotSkillWriteInput: Sendable, Hashable, Codable {
     public var botId: String?
     public var name: String?
@@ -20342,6 +20380,38 @@ public enum Studio {
       self.botId = botId
       self.conversations = conversations
       self.workers = workers
+    }
+  }
+
+  public struct BotSummariesInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct BotSummariesOutputSummariesItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var archivedAt: Double?
+    public var summary: String?
+
+    public init(threadId: String? = nil, title: String? = nil, archivedAt: Double? = nil, summary: String? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.archivedAt = archivedAt
+      self.summary = summary
+    }
+  }
+
+  public struct BotSummariesOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var summaries: [BotSummariesOutputSummariesItem]?
+
+    public init(botId: String? = nil, summaries: [BotSummariesOutputSummariesItem]? = nil) {
+      self.botId = botId
+      self.summaries = summaries
     }
   }
 
@@ -42189,7 +42259,6 @@ public enum Studio {
     case archive
     case automation
     case todo
-    case record
     case vscode
     case file
     case diff
@@ -42219,7 +42288,6 @@ public enum Studio {
       case "archive": self = .archive
       case "automation": self = .automation
       case "todo": self = .todo
-      case "record": self = .record
       case "vscode": self = .vscode
       case "file": self = .file
       case "diff": self = .diff
@@ -42251,7 +42319,6 @@ public enum Studio {
       case .archive: try container.encode("archive")
       case .automation: try container.encode("automation")
       case .todo: try container.encode("todo")
-      case .record: try container.encode("record")
       case .vscode: try container.encode("vscode")
       case .file: try container.encode("file")
       case .diff: try container.encode("diff")
@@ -42428,7 +42495,6 @@ public enum Studio {
     case archive
     case automation
     case todo
-    case record
     case vscode
     case file
     case diff
@@ -42458,7 +42524,6 @@ public enum Studio {
       case "archive": self = .archive
       case "automation": self = .automation
       case "todo": self = .todo
-      case "record": self = .record
       case "vscode": self = .vscode
       case "file": self = .file
       case "diff": self = .diff
@@ -42490,7 +42555,6 @@ public enum Studio {
       case .archive: try container.encode("archive")
       case .automation: try container.encode("automation")
       case .todo: try container.encode("todo")
-      case .record: try container.encode("record")
       case .vscode: try container.encode("vscode")
       case .file: try container.encode("file")
       case .diff: try container.encode("diff")
@@ -42571,7 +42635,6 @@ public enum Studio {
     case archive
     case automation
     case todo
-    case record
     case vscode
     case file
     case diff
@@ -42601,7 +42664,6 @@ public enum Studio {
       case "archive": self = .archive
       case "automation": self = .automation
       case "todo": self = .todo
-      case "record": self = .record
       case "vscode": self = .vscode
       case "file": self = .file
       case "diff": self = .diff
@@ -42633,7 +42695,6 @@ public enum Studio {
       case .archive: try container.encode("archive")
       case .automation: try container.encode("automation")
       case .todo: try container.encode("todo")
-      case .record: try container.encode("record")
       case .vscode: try container.encode("vscode")
       case .file: try container.encode("file")
       case .diff: try container.encode("diff")

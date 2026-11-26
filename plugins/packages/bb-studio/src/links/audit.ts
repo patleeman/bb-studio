@@ -19,7 +19,6 @@ export const SAMPLE_REFS: Record<TabKindId, TabRef> = {
   archive: { kind: "archive", id: "bot_main" },
   automation: { kind: "automation", id: "bot_main:aut_0123456789abcdef" },
   todo: { kind: "todo", id: "loop_0123abcd" },
-  record: { kind: "record", id: "mem_0123456789abcdef" },
   vscode: { kind: "vscode", id: null },
   file: { kind: "file", id: "/Users/p/src/a.ts" },
   diff: { kind: "diff", id: "src/a.ts" },
@@ -68,7 +67,7 @@ const DESIGN_FRAMES = "A design's screens are sandboxed frames; a link in one op
 const NO_PALETTE_ROW = "Cmd+K lists no such rows; a typed bb:// link, app route or web address goes through the router.";
 const NO_DIFF_LINK = "Replies don't link a diff; bb's change cards open it.";
 const NO_PAGE_ROW = "No Bot page lists one.";
-const BOT_PAGE_ROWS: readonly TabKindId[] = ["conversation", "worker", "page", "whiteboard", "design", "app", "artifact", "automation", "todo", "record"];
+const BOT_PAGE_ROWS: readonly TabKindId[] = ["conversation", "worker", "page", "whiteboard", "design", "app", "artifact", "automation", "todo"];
 const NO_AGENT_TERMINAL = 'A terminal opens by starting one; workbench (op: tab) action "focus" selects an open one.';
 
 function cell(kind: TabKindId, source: LinkSource): LinkAuditCell {

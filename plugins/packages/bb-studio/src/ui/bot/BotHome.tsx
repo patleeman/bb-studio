@@ -14,7 +14,7 @@ import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, Textarea } from "../../kit/ui/index";
 import { Fragment, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import type { BotActivityView, BotLearningView, BotView, HeartbeatRun } from "../../contract";
-import { pagePath } from "../../pages/constants";
+import { memoryPath } from "../../memory/shared";
 import { useCall, useLive, type Method, type RpcInput } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, botProvider, colorForName, DEFAULT_SHAPE, isBotShape } from "./BotAvatar";
@@ -167,10 +167,8 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
     };
     if (Object.keys(input).length) void run("bot_set", input);
   };
-  const openMemory = async () => {
-    const memory = bot.memoryPageId ? { pageId: bot.memoryPageId } : await run("bot_memory") as { pageId: string | null } | null;
-    if (memory?.pageId) openAppPath(pagePath(memory.pageId));
-  };
+  // Memory is its own page now (Core, Skills, History); the old core profile page isn't the source any more.
+  const openMemory = async () => { openAppPath(memoryPath(bot.id)); };
   const sheets = (
     <>
       {sheet === "checkins" ? (

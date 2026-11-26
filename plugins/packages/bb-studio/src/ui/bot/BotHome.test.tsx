@@ -561,7 +561,7 @@ test("Controls: profile and history collapsed until asked, Memory, Skills, and p
   await act(async () => button("Profile changes").click());
   const { openAppPath } = await import("../../kit/app/index");
   await act(async () => click(container.querySelector('[aria-label="Open memory"]')));
-  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/pages/pg_mem");
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/memory/bot_main");
   // Pause and Stop are in Controls too, once, in its state row; the back link goes to the main page.
   expect([...container.querySelectorAll("button")].filter((each) => each.textContent === "Pause")).toHaveLength(1);
   expect(container.querySelector('[data-testid="bot-state-controls"]')?.contains(button("Pause"))).toBe(true);

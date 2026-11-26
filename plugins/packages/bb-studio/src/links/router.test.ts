@@ -255,8 +255,8 @@ describe("openLink", () => {
     expect(elsewhere.deps.openTab).not.toHaveBeenCalled();
   });
 
-  it("a Bot page row opens beside the page: an automation, a todo, a memory record and a thread as tabs of the page's workbench; Shift a window; a deleted one the Not found tab", async () => {
-    for (const kind of ["automation", "todo", "record", "conversation", "page"] as const) {
+  it("a Bot page row opens beside the page: an automation, a todo and a thread as tabs of the page's workbench; Shift a window; a deleted one the Not found tab", async () => {
+    for (const kind of ["automation", "todo", "conversation", "page"] as const) {
       const page = fakeDeps({ thread: () => null, studioPage: () => true });
       const link = linkFor(SAMPLE[kind]);
       expect(await openLink(entity(SAMPLE[kind], link), { source: "botPage", title: "Row" }, page.deps), kind).toEqual({ via: "workbench", pane: null, opened: true });
@@ -267,7 +267,7 @@ describe("openLink", () => {
       expect(await openLink(entity(SAMPLE[kind], link), { source: "botPage", modifiers: { shift: true } }, page.deps), kind).toEqual({ via: "window", opened: true });
       expect(page.deps.popOut, kind).toHaveBeenCalledWith(pathFor(SAMPLE[kind]), "Resolved");
     }
-    for (const kind of ["automation", "todo", "record"] as const) {
+    for (const kind of ["automation", "todo"] as const) {
       const gone = fakeDeps({ thread: () => null, studioPage: () => true, resolved: { found: false, title: null } });
       const link = linkFor(SAMPLE[kind]);
       expect(await openLink(entity(SAMPLE[kind], link), { source: "botPage" }, gone.deps), kind).toEqual({ via: "notFound", opened: true });
@@ -283,7 +283,6 @@ describe("openLink", () => {
     expect(beside.deps.openTab).toHaveBeenCalledWith(SAMPLE.todo, "Resolved", { threadId: "thr_cur", pane: "new" });
     expect(tabOpenFor(SAMPLE.automation)).toEqual({ pluginId: "studio", tabId: "automation", params: { id: "bot_main:aut_0123456789abcdef" }, title: "Automation" });
     expect(pathFor(SAMPLE.todo)).toBe("/plugins/studio/studio/todo/loop_0123abcd");
-    expect(needsResolution(SAMPLE.record)).toBe(true);
   });
 
   it("the conversation on screen opens in the main view, not beside itself; a declined workbench falls back to the route", async () => {

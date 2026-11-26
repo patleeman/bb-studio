@@ -73,7 +73,7 @@ export interface BotThreadsServerDeps {
   seeds?: ThreadSeeds;
   /** A Bot's default model (src/bot.ts): what its new conversations start on; null when it has none. */
   defaultModel(botId: string): { providerId: string; model: string; reasoning: ReasoningLevel | null } | null;
-  /** The summaries a Bot saved of its conversations (memory records under "Conversations"), newest per conversation, by thread id. */
+  /** Older summaries of a Bot's conversations kept elsewhere, by thread id (none now: memory records are retired; a conversation keeps its own). */
   conversationSummaries?(botId: string): ReadonlyMap<string, string>;
 }
 
@@ -598,6 +598,16 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     bot_threads_view: ({ botId }: { botId?: string }) => view(botId),
     bot_threads_older: ({ botId }: { botId?: string }) => older(botId),
     bot_conversations_all: async ({ botId }: { botId?: string }) => (await conversationsAll(botId)).page,
+    bot_summaries: async ({ botId }: { botId?: string }) => {
+      const { page, summaries } = await conversationsAll(botId);
+      return {
+        botId: page.botId,
+        summaries: page.conversations.flatMap((row) => {
+          const summary = summaries.get(row.threadId);
+          return row.archivedAt !== null && summary ? [{ threadId: row.threadId, title: row.title, archivedAt: row.archivedAt, summary }] : [];
+        }).sort((a, b) => b.archivedAt - a.archivedAt),
+      };
+    },
     bot_conversations_search: (input: { botId?: string; query: string }) => conversationsSearch(input),
     bot_thread_info: async ({ threadId }: { threadId: string }) => ({ info: await info(threadId) }),
     bot_landing: async ({ botId, last }: { botId: string; last: string | null }) => {

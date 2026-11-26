@@ -210,8 +210,8 @@ function StudioRootView({ subPath }: { subPath: string }) {
   // The Bot sidebar's "N older conversations" and "N older workers": `conversations` or `conversations/<botId>`.
   if (path === OLDER_SUBPATH || path.startsWith(`${OLDER_SUBPATH}/`)) return <Suspense fallback={null}><OlderPage botId={olderBotFromPath(path)} /></Suspense>;
   if (path === SKILLS_SUBPATH || path.startsWith(`${SKILLS_SUBPATH}/`)) return <Suspense fallback={null}><SkillsPage botId={skillsBotFromPath(path)} /></Suspense>;
-  const entry = /^(automation|todo|record)\/([^/]+)$/.exec(path);
-  if (entry) return <EntryView kind={entry[1] as "automation" | "todo" | "record"} id={decodeSegment(entry[2]!)} />;
+  const entry = /^(automation|todo)\/([^/]+)$/.exec(path);
+  if (entry) return <EntryView kind={entry[1] as "automation" | "todo"} id={decodeSegment(entry[2]!)} />;
   // A Bot's + New: BB's new-thread composer on its default model (`new-conversation/<botId>[/<projectId>]`).
   const fresh = newConversationRoute(path);
   if (fresh) return <NewConversationPage botId={fresh.botId} projectId={fresh.projectId} />;

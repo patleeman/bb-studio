@@ -343,6 +343,11 @@ export function registerStudioRpc({
     bot_thread_adopt: ({ botId, threadId }) => { const bot = bots.stored(botId); if (!bot) throw new Error("That bot isn't there anymore."); return ownedThreads.adopt(threadId, bot.id); },
     bot_checkin_preset: ({ botId, preset }) => bots.checkinPreset(preset, botId),
     bot_skills: ({ botId }) => ({ skills: bots.skills(botId) }),
+    bot_core: ({ botId }) => {
+      bots.requireStudio(botId, "skills");
+      const skills = bots.alwaysOnSkills(botId).map((skill) => ({ ...skill, warnings: bots.skillLint({ name: skill.name, body: skill.body, alwaysOn: true }, botId) }));
+      return { skills, ...bots.skillBudget(botId) };
+    },
     bot_skill_write: ({ botId, ...input }) => { bots.requireStudio(botId, "skills"); return bots.writeSkill(input, botId); },
     bot_skill_share: ({ botId, name }) => bots.shareSkill(name, botId),
     bot_skill_delete: ({ botId, name }) => ({ deleted: bots.deleteSkill(name, botId) }),

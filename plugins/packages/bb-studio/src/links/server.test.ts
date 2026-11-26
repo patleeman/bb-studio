@@ -32,7 +32,6 @@ describe("links.resolve", () => {
     expect(await resolveLink({ kind: "widget", id: "w", threadId: null }, lookups)).toMatchObject({ found: false });
     expect(await resolveLink({ kind: "todo", id: "loop_1", threadId: null }, lookups)).toEqual({ found: true, title: "Pay the bill", spec: null });
     expect(await resolveLink({ kind: "automation", id: "bot_main:aut_1", threadId: null }, lookups)).toEqual({ found: true, title: "Morning card", spec: null });
-    expect(await resolveLink({ kind: "record", id: "mem_1", threadId: null }, lookups)).toEqual({ found: true, title: "Memory record", spec: null });
     expect(await resolveLink({ kind: "todo", id: "loop_deleted", threadId: null }, lookups)).toEqual({ found: false, title: null, spec: null });
     expect(await resolveLink({ kind: "automation", id: "bot_main:aut_deleted", threadId: null }, lookups)).toEqual({ found: false, title: null, spec: null });
     expect(await resolveLink({ kind: "automation", id: null, threadId: null }, lookups)).toMatchObject({ found: false });

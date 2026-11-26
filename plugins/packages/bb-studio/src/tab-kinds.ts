@@ -37,7 +37,6 @@ export const TAB_IDS = {
   archive: "archive",
   automation: "automation",
   todo: "todo",
-  record: "memory-record",
   /** Visual Chat's own tab (packages/bb-studio-visual-chat): a board, `{ threadId }`. */
   board: "board",
 } as const;
@@ -47,7 +46,7 @@ export type TabKindId =
   | "page" | "whiteboard" | "design" | "app" | "artifact" | "recording"
   | "board"
   | "memory" | "skills" | "library" | "automations" | "archive"
-  | "automation" | "todo" | "record"
+  | "automation" | "todo"
   | "vscode"
   | "file" | "diff" | "browser" | "terminal" | "workflow";
 
@@ -91,7 +90,7 @@ export type Listing =
   | "bots"
   /** This window's record of the tabs of this kind opened last (src/ui/opened-tabs.ts); search matches the kind's name. */
   | "opened"
-  /** The Bot pages' rows (automations, todos, memory records), searched by title on the server. */
+  /** The Bot pages' rows (automations, todos), searched by title on the server. */
   | "entries"
   /** bb's own (its recent files, its file search). */
   | "bb";
@@ -200,7 +199,6 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
   botPage("archive", "Conversations", "studio/conversations", TAB_IDS.archive),
   pageRow("automation", "Automation", "Automations", "Clock", TAB_IDS.automation, "Automations page"),
   pageRow("todo", "To-do", "To-dos", "ListTodo", TAB_IDS.todo, "Scheduled page"),
-  pageRow("record", "Memory record", "Memory records", "Brain", TAB_IDS.record, "Memory page"),
   {
     id: "vscode", name: "VS Code", plural: "VS Code", icon: CODE_ICON, owner: "studio", ref: "none", open: { via: "studio", tabId: CODE_TAB },
     actions: [{ tabId: CODE_TAB, group: "Open" }], dragFrom: null, recents: "opened", agentType: "vscode",
@@ -240,7 +238,7 @@ export const MOBILE_SUPPORT: Readonly<Record<TabKindId, MobileSupport>> = {
   page: "native", whiteboard: "native", design: "native", app: "native", artifact: "native", recording: "web",
   board: "web",
   memory: "web", skills: "web", library: "web", automations: "web", archive: "web",
-  automation: "web", todo: "web", record: "web",
+  automation: "web", todo: "web",
   vscode: "desktopOnly",
   file: "native", diff: "native", browser: "web", terminal: "native", workflow: "web",
 };
@@ -340,7 +338,7 @@ export function pathFor(ref: TabRef): string | null {
     case "automations": return "/plugins/studio/automations";
     case "archive": return `${STUDIO_ROOT}/conversations${id ? `/${enc(id)}` : ""}`;
     case "vscode": return "/plugins/studio/vscode";
-    case "automation": case "todo": case "record": return id ? `${STUDIO_ROOT}/${ref.kind}/${enc(id)}` : null;
+    case "automation": case "todo": return id ? `${STUDIO_ROOT}/${ref.kind}/${enc(id)}` : null;
     case "file": case "diff": case "browser": case "terminal": case "workflow": return null;
     default: {
       const segment = itemSegment(ref.kind);
@@ -372,7 +370,7 @@ export function refOfPath(pathname: string): TabRef | null {
   if (first === "memory") return rest.length || third ? null : { kind: "memory", id };
   if (first === "skills") return rest.length || third ? null : { kind: "skills", id };
   if (first === "conversations") return rest.length || third ? null : { kind: "archive", id };
-  if (first === "automation" || first === "todo" || first === "record") return id && !third && !rest.length ? { kind: first, id } : null;
+  if (first === "automation" || first === "todo") return id && !third && !rest.length ? { kind: first, id } : null;
   if (first === "bot") {
     if (!id || id === "new") return null;
     return third ? null : { kind: "bot", id };

@@ -101,7 +101,7 @@ const pageConversation = z.object({
   updatedAt: z.number(),
   /** When it was archived; null while active. */
   archivedAt: z.number().nullable(),
-  /** Its summary's first line or two (from finishing it, or its memory record); null without one. */
+  /** Its summary's first line or two (from finishing it); null without one. */
   summary: z.string().nullable(),
   /** The latest reply's first line. */
   latest: z.string().nullable(),
@@ -219,6 +219,15 @@ export const botThreadsSchemas = {
   bot_conversations_all: {
     input: z.object({ botId: botId.optional() }),
     output: z.object({ botId: z.string().nullable(), conversations: z.array(pageConversation), workers: z.array(worker) }),
+  },
+  /**
+   * Memory's History → Summaries: the archived conversations that have a
+   * summary, newest first, each with its whole summary (Decisions, Left
+   * open, Made) as finishing wrote it on the conversation.
+   */
+  bot_summaries: {
+    input: z.object({ botId: botId.optional() }),
+    output: z.object({ botId: z.string().nullable(), summaries: z.array(z.object({ threadId: z.string(), title: z.string(), archivedAt: z.number(), summary: z.string() })) }),
   },
   /**
    * Searches a Bot's conversations (titles, summaries and messages) and its

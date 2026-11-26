@@ -301,7 +301,7 @@ export default async function plugin(bb: BbPluginApi) {
   const { settings, store: studioSettings } = await registerSettings(bb, STUDIO_PLUGIN_ID);
   const code = registerCode(bb, db);
   // The agent's hands on its conversation's workbench (src/workbench-agent): the tools run here, the window showing the conversation does the work.
-  let entryTitle: (kind: "automation" | "todo" | "record", id: string) => Promise<string | null> = async () => null;
+  let entryTitle: (kind: "automation" | "todo", id: string) => Promise<string | null> = async () => null;
   const threadWorkspace = registerWorkbenchAgent(bb, db, {
     itemTitle: (id) => itemIndex.get(id)?.title ?? searchIndex.titleOf(id),
     // `bots` is made further down; a tool is only called once the plugin has loaded.
@@ -1547,7 +1547,6 @@ export default async function plugin(bb: BbPluginApi) {
   };
   entryTitle = async (kind, id) => {
     if (kind === "todo") { try { return loops.store.get(id).title; } catch { return taskTitle(db, id); } }
-    if (kind === "record") return null;
     const ref = parseAutomationRefId(id);
     if (!ref || !bots.list().some((bot) => bot.id === ref.botId)) return null;
     return (await automationTableFor(ref.botId)).rows.find((row) => row.id === ref.rowId)?.name ?? null;

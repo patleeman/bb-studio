@@ -65,7 +65,7 @@ it("titles the window by the Bot's page, and leaves the Library's own title alon
   expect(botPageTitle("pages/pg_1")).toBeNull();
   expect(botPageTitle("automation/auto_1")).toEqual({ title: "Automation", windowTitle: "Automation" });
   expect(botPageTitle("todo/loop_1")).toEqual({ title: "Task", windowTitle: "Task" });
-  expect(botPageTitle("record/rec_1")).toEqual({ title: "Memory record", windowTitle: "Memory record" });
+  expect(botPageTitle("record/rec_1")).toBeNull();
   expect(botPageTitle("automation")).toBeNull();
 });
 

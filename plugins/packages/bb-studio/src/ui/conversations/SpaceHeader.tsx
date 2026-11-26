@@ -6,9 +6,11 @@
 // run, or nothing; Resume and Run here are buttons), and a ··· menu (Resume
 // <name> while it is paused or stopped, Edit <name>…, Bot settings…: its
 // Controls page, Default model: what its new conversations start on, New
-// Bot); then the Bot's pages as rows: Memory, Skills,
-// Library and Conversations (every conversation, active and archived, with search). The
-// row of the page on screen is selected.
+// Bot); then the Bot's pages as two rows: Memory (its always-on core,
+// skills and history, past conversations included) and Library (pages,
+// designs, apps). The row of the page on screen is selected; the Skills and
+// Conversations pages, still reachable by link, count as Memory. The active
+// conversations stay in the sidebar below.
 import type { ReactNode } from "react";
 import type { BotSpace } from "../../bot-threads-contract";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/app/index";
@@ -27,9 +29,10 @@ export function spacePageAt(pathname: string): SpacePage | null {
   const path = pathname.replace(/\/+$/, "");
   if (path === STUDIO_ROOT_PATH) return "library";
   if (/^\/plugins\/studio\/studio\/memory(?:\/|$)/.test(path)) return "memory";
-  if (/^\/plugins\/studio\/studio\/skills(?:\/|$)/.test(path)) return "skills";
+  // Skills and Conversations live in Memory now (its Skills and History layers).
+  if (/^\/plugins\/studio\/studio\/skills(?:\/|$)/.test(path)) return "memory";
   if (path === AUTOMATIONS_PATH || path.startsWith(`${AUTOMATIONS_PATH}/`)) return "automations";
-  if (/^\/plugins\/studio\/studio\/conversations(?:\/|$)/.test(path)) return "conversations";
+  if (/^\/plugins\/studio\/studio\/conversations(?:\/|$)/.test(path)) return "memory";
   return null;
 }
 
@@ -124,9 +127,7 @@ export function SpaceHeader({ bot, line, resume = null, chooseModel = false, gla
       </div>
       <nav aria-label="Bot pages" className="mt-2 flex flex-col gap-px">
         {row("memory", "Memory", <span className="text-sm leading-none">◈</span>)}
-        {row("skills", "Skills", <Icon name="Toolbox" className="size-4" />)}
         {row("library", "Library", <Icon name="studio/library" className="size-4" />)}
-        {row("conversations", "Conversations", <Icon name="studio/conversations" className="size-4" />)}
       </nav>
     </header>
   );

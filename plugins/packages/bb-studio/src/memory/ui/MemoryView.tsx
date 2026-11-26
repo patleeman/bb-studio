@@ -1,110 +1,333 @@
-// The Memory view (`/plugins/studio/studio/memory`), on the Bot-page
-// template (src/ui/bot-page): one Bot's memory, shared by every
-// conversation. Its core profile page is a folded block above the records,
-// edited in place, with its length against the cap. Then its memory records,
-// one line each: search ("/" focuses it, Esc clears then leaves it), topic
-// pills by frequency, a sort, and New. A record opens as a tab in the
-// workbench beside the page (RecordTab.tsx). Replaced records are folded below.
-import { lazy, Suspense, useDeferredValue, useEffect, useRef, useState } from "react";
+// The Memory page (`/plugins/studio/studio/memory`), on the Bot-page
+// template (src/ui/bot-page): one Bot's memory in three layers, top to bottom
+// (plan "BB Studio Memory & Skills Architecture"):
+//
+// 1. Core: its always-on skills (src/core-skill.ts), in every prompt. The
+//    core skill's sections (Preferences, Right now, Check-in, and any others
+//    it has) are edited in place, with the shared character budget beside
+//    the heading ("1,420 / 3,000 chars") and each capped section's lines.
+// 2. Skills: the on-demand skills, loaded when a task matches. A row opens
+//    its editor and version history; + New skill adds one. One control row:
+//    Auto-learn (daily and when a conversation is archived), with Run now.
+// 3. History: Summaries (default), the archived conversations' summaries as
+//    cards, or Past conversations, every conversation with full-text search.
+//    A card or row opens the conversation beside the page.
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { Icon } from "../../kit/app/index";
+import { Button } from "../../kit/ui/button";
+import { Input } from "../../kit/ui/input";
+import { Switch } from "../../kit/ui/switch";
+import { Textarea } from "../../kit/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "../../kit/ui/toggle-group";
 import { cn } from "../../kit/ui/index";
-import { isTypingTarget } from "../../ui/typing-target";
+import { errorMessage, relativeTime } from "../../kit/format";
+import { CORE_SECTIONS, SECTION_CAPS, bulletCount, withSection } from "../../core-skill";
+import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, noMatch, useRowOpen } from "../../ui/bot-page";
+import { useCall, useLive } from "../../ui/live";
 import { lastBot } from "../../ui/bot/selection";
-import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, noMatch, useBotPageQuery, useRowOpen } from "../../ui/bot-page";
-import type { MemoryRecordView } from "../contract";
-import { recordDate, recordLine } from "../shared";
-import { useMemory, useMemoryCall, type MemoryResult } from "./hooks";
-import { MenuSelect } from "../../ui/menu-select";
-import { searchPlaceholder, SORTS, topicPills, type Sort } from "./model";
-import { RecordEditor } from "./RecordTab";
+import { SkillDetail } from "../../ui/skills/SkillsPage";
+import { conversationDetail, Highlighted, searchWords, SEARCH_DEBOUNCE_MS, useDebounced } from "../../ui/conversations/OlderPage";
+import { shortDate } from "../../ui/conversations/finish";
+import { summarySections } from "../../ui/conversations/model";
 
-const ProfilePane = lazy(() => import("./ProfilePane"));
+const SMALL = "h-7 px-2.5 text-xs font-normal";
+const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const chars = (value: number) => value.toLocaleString("en-US");
 
-/** The topic pill for every topic. */
-const ALL_TOPICS = "__all__";
-
-/** The view for the Bot the route names, else the Bot last picked in this window, else the primary. */
-export default function MemoryView({ botId: routeBot }: { botId: string | null }) {
-  const [remembered, setRemembered] = useState(() => routeBot ? null : lastBot() ?? null);
-  const botId = routeBot ?? remembered ?? undefined;
-  const overview = useMemory("memory.overview", botId ? { botId } : {});
-  // A remembered Bot that's gone: show the primary instead.
-  useEffect(() => { if (overview.error && !routeBot && remembered) setRemembered(null); }, [overview.error, routeBot, remembered]);
-  const data = overview.data;
-  if (!data) {
-    return <div className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground" data-testid="memory-view">{overview.error ?? "Loading memory…"}</div>;
+/** A skill body split at its `## ` headings: the text before the first, then each section. */
+export function splitSections(body: string): { preamble: string; sections: { heading: string; text: string }[] } {
+  const lines = body.split("\n");
+  const sections: { heading: string; lines: string[] }[] = [];
+  const preamble: string[] = [];
+  for (const line of lines) {
+    const heading = /^##\s+(.+?)\s*#*\s*$/.exec(line)?.[1];
+    if (heading) sections.push({ heading, lines: [] });
+    else (sections.at(-1)?.lines ?? preamble).push(line);
   }
-  return <MemoryPage key={data.bot.id} data={data} />;
+  return { preamble: preamble.join("\n").trim(), sections: sections.map((section) => ({ heading: section.heading, text: section.lines.join("\n").trim() })) };
 }
 
-function MemoryPage({ data }: { data: MemoryResult<"memory.overview"> }) {
-  const rowOpen = useRowOpen();
-  const botId = data.bot.id;
-  const topics = data.topics;
-  const count = data.counts.current + data.counts.replaced;
-  const [query, setQuery] = useBotPageQuery();
-  const [topic, setTopic] = useState<string | null>(null);
-  const [sort, setSort] = useState<Sort>("newest");
-  const [adding, setAdding] = useState(false);
-  const search = useDeferredValue(query.trim());
-  const list = useMemory("memory.list", { botId, ...(search ? { query: search } : {}), ...(topic ? { topic } : {}), sort, limit: 300 });
-  const field = useRef<HTMLInputElement | null>(null);
-  // "/" focuses the search from anywhere in the view that isn't a text field.
-  useEffect(() => {
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey || isTypingTarget(event)) return;
-      const root = field.current?.closest("[data-testid=memory-view]");
-      if (root && event.target instanceof Node && event.target !== document.body && !root.contains(event.target)) return;
-      event.preventDefault();
-      field.current?.focus();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-  const records = list.data?.records ?? [];
-  const current = records.filter((record) => !record.replacedById);
-  const replaced = records.filter((record) => record.replacedById);
-  const row = (record: MemoryRecordView) => (
-    <BotPageRow key={record.id} testId="memory-record" data={{ "data-record-id": record.id }} icon="Brain" title={recordLine(record.text)} titleText={recordLine(record.text)}
-      muted={!!record.replacedById || record.archived} status={record.archived ? { label: "Archived" } : null}
-      meta={`${record.topic} · ${recordDate(record.createdAt)}`} {...rowOpen({ kind: "record", id: record.id }, record.topic)} />
-  );
+/** The sections the Core layer shows: the three defaults first (empty when the skill lacks one), then any others in the skill's order. */
+export function coreSections(body: string): { heading: string; text: string; missing: boolean }[] {
+  const { sections } = splitSections(body);
+  const key = (heading: string) => heading.toLowerCase().replace(/[\s-]+/g, "").replace(/s$/, "");
+  const found = (name: string) => sections.find((section) => key(section.heading) === key(name));
+  return [
+    ...CORE_SECTIONS.map((name) => { const section = found(name); return section ? { ...section, missing: false } : { heading: name, text: "", missing: true }; }),
+    ...sections.filter((section) => !CORE_SECTIONS.some((name) => key(name) === key(section.heading))).map((section) => ({ ...section, missing: false })),
+  ];
+}
+
+/** The view for the Bot the route names, else the Bot last picked in this window, else the one on screen. */
+export default function MemoryView({ botId: routeBot }: { botId: string | null }) {
+  const spaces = useLive("bot_spaces", {}, { pollMs: 120_000 });
+  const botId = routeBot ?? lastBot() ?? spaces.data?.currentBotId ?? null;
+  const bot = spaces.data?.bots?.find((each) => each.id === botId) ?? null;
+  if (!botId) return <div className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground" data-testid="memory-view">{spaces.error ?? "Loading memory…"}</div>;
   return (
-    <BotPageLayout testId="memory-view" title="Memory" bot={data.bot.name} botId={botId}
-      toolbar={<BotPageToolbar search={{ value: query, onChange: setQuery, placeholder: searchPlaceholder(count), label: "Search records", inputRef: field }}
-        filter={{ label: "Topics", value: topic ?? ALL_TOPICS, options: topicPills(topics, topic).map((pill) => ({ id: pill.topic ?? ALL_TOPICS, label: pill.label })), onChange: (value) => setTopic(value === ALL_TOPICS ? null : value) }}
-        menus={<MenuSelect<Sort> testId="memory-sort" value={sort} choices={SORTS} onChange={setSort} className="h-8 text-sm" />}
-        onNew={() => setAdding(true)} />}>
-      {adding ? <AddRecord botId={botId} topic={topic} topics={topics} onDone={() => setAdding(false)} /> : null}
-      <BotPageGroup title="Core profile" testId="memory-profile" collapsible defaultOpen={false}
-        aside={data.profile ? <span data-testid="memory-profile-count" className={cn("tabular-nums", data.profile.over && "text-warning")}>{data.profile.chars.toLocaleString("en-US")} of {data.profile.cap.toLocaleString("en-US")} characters</span> : null}>
-        <article data-testid="memory-profile-page" className="h-[480px] overflow-hidden rounded-md border border-border">
-          {data.profile ? (
-            <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Loading…</p>}>
-              <ProfilePane key={data.profile.pageId} pageId={data.profile.pageId} header={(page) => (
-                <p className="shrink-0 px-6 pt-3 text-xs text-muted-foreground" data-testid="memory-profile-header">Edited {recordDate(page.updatedAt)}</p>
-              )} />
-            </Suspense>
-          ) : <p className="p-6 text-sm text-muted-foreground">No core profile</p>}
-        </article>
-      </BotPageGroup>
-      {list.error && !list.data ? <p role="alert" className="text-sm text-destructive">{list.error}</p> : null}
-      {list.data && !records.length ? <BotPageEmpty testId="memory-empty" {...(search
-        ? { title: noMatch(topic ? `records in ${topic}` : "records", search), action: { label: "Clear search", onClick: () => setQuery("") } }
-        : topic ? { title: `No records in ${topic}`, action: { label: "Show all", onClick: () => setTopic(null) } }
-        : { title: "No records yet", hint: "Tell the Bot something to remember, or add a record.", action: adding ? null : { label: "New record", onClick: () => setAdding(true) } })} /> : null}
-      {current.length ? <BotPageGroup title="Records" count={current.length} testId="memory-records">{current.map(row)}</BotPageGroup> : null}
-      {replaced.length ? <BotPageGroup title="Replaced" count={replaced.length} collapsible defaultOpen={false} testId="memory-replaced">{replaced.map(row)}</BotPageGroup> : null}
-      {list.data && list.data.total > records.length ? <p className="px-2 text-xs text-muted-foreground">Showing {records.length} of {list.data.total}</p> : null}
+    <BotPageLayout testId="memory-view" title="Memory" bot={bot?.name} botId={bot?.id}>
+      <CoreLayer key={`core-${botId}`} botId={botId} />
+      <SkillsLayer key={`skills-${botId}`} botId={botId} />
+      <HistoryLayer key={`history-${botId}`} botId={botId} />
     </BotPageLayout>
   );
 }
 
-function AddRecord({ botId, topic, topics, onDone }: { botId: string; topic: string | null; topics: readonly { topic: string; count: number }[]; onDone(): void }) {
-  const call = useMemoryCall();
+// ---- Layer 1: Core -----------------------------------------------------------
+
+function CoreLayer({ botId }: { botId: string }) {
+  const call = useCall();
+  const core = useLive("bot_core", { botId }, { pollMs: 30_000 });
+  const [editing, setEditing] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const data = core.data;
+  const skill = data?.skills[0] ?? null;
+  const save = async (name: string, description: string, body: string) => {
+    setError(null);
+    try {
+      await call("bot_skill_write", { botId, name, description, body });
+      setEditing(null);
+      core.refresh();
+    } catch (cause) {
+      setError(errorMessage(cause) || "It didn't save.");
+    }
+  };
+  const budget = data ? (
+    <span data-testid="memory-budget" className={cn("tabular-nums", data.over ? "text-warning" : "text-muted-foreground")} title="Always-on skills go into every prompt">
+      {chars(data.chars)} / {chars(data.cap)} chars
+    </span>
+  ) : null;
   return (
-    <div className="rounded-lg border border-border p-3" data-testid="memory-add">
-      <RecordEditor botId={botId} initial={{ topic: topic ?? "", text: "" }} topics={topics} saveLabel="Add record" autoFocusTopic={!topic}
-        onSave={async (values) => { await call("memory.add", { botId, ...values }); }} onClose={onDone} />
+    <BotPageGroup title="Core" testId="memory-core" aside={budget}>
+      {error || core.error ? <p role="alert" className="px-2 text-sm text-destructive">{error ?? core.error}</p> : null}
+      {!data ? <p className="px-2 text-sm text-muted-foreground">Loading…</p> : !skill ? (
+        <BotPageEmpty testId="memory-core-empty" title="No always-on skill" />
+      ) : (
+        <div className="flex flex-col">
+          {coreSections(skill.body).map((section) => {
+            const id = `${skill.name}:${section.heading}`;
+            return (
+              <CoreSection key={id} heading={section.heading} text={section.text} cap={SECTION_CAPS[section.heading] ?? null} editing={editing === id}
+                onEdit={() => setEditing(id)} onCancel={() => setEditing(null)}
+                onSave={(text) => save(skill.name, skill.description, withSection(skill.body, section.heading, text))} />
+            );
+          })}
+          {data.skills.slice(1).map((other) => (
+            <CoreSection key={other.name} heading={other.name} text={other.body} cap={null} editing={editing === other.name}
+              onEdit={() => setEditing(other.name)} onCancel={() => setEditing(null)} onSave={(body) => save(other.name, other.description, body)} />
+          ))}
+          {data.skills.flatMap((each) => each.warnings).length ? (
+            <ul data-testid="memory-core-warnings" className="flex flex-col gap-1 px-2 pt-2 text-xs">
+              {[...new Set(data.skills.flatMap((each) => each.warnings))].map((warning) => <li key={warning} className="flex items-start gap-1.5"><Icon name="AlertTriangle" aria-hidden className="mt-px size-3.5 shrink-0 text-warning" /><span>{warning}</span></li>)}
+            </ul>
+          ) : null}
+        </div>
+      )}
+    </BotPageGroup>
+  );
+}
+
+function CoreSection({ heading, text, cap, editing, onEdit, onCancel, onSave }: { heading: string; text: string; cap: number | null; editing: boolean; onEdit(): void; onCancel(): void; onSave(text: string): Promise<void> }) {
+  const [draft, setDraft] = useState(text);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { if (editing) setDraft(text); }, [editing, text]);
+  const lines = bulletCount(editing ? draft : text);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try { await onSave(draft); } finally { setSaving(false); }
+  };
+  return (
+    <section data-testid="memory-core-section" data-section={heading} className="group/section flex flex-col gap-1 border-b border-border/60 px-2 py-2.5 last:border-b-0">
+      <div className="flex items-center gap-2">
+        <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{heading}</h3>
+        {cap ? <span data-testid="memory-section-lines" className={cn("text-xs tabular-nums", lines > cap ? "text-warning" : "text-muted-foreground")}>{lines} / {cap}</span> : null}
+        {!editing ? <Button type="button" variant="ghost" size="sm" data-testid="memory-section-edit" className={cn(SMALL, "opacity-0 group-hover/section:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100")} aria-label={`Edit ${heading}`} onClick={onEdit}>Edit</Button> : null}
+      </div>
+      {editing ? (
+        <form className="flex flex-col gap-2" onSubmit={(event) => void submit(event)}>
+          <Textarea aria-label={heading} data-testid="memory-section-input" autoFocus value={draft} rows={Math.min(14, Math.max(3, draft.split("\n").length + 1))}
+            onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") onCancel(); if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit(event); }}
+            className="font-mono text-xs leading-relaxed" placeholder="- One line per rule" />
+          <div className="flex gap-1">
+            <Button type="submit" size="sm" className={SMALL} disabled={saving} data-testid="memory-section-save">Save</Button>
+            <Button type="button" variant="ghost" size="sm" className={SMALL} onClick={onCancel}>Cancel</Button>
+          </div>
+        </form>
+      ) : text ? (
+        <button type="button" onClick={onEdit} className="rounded-sm text-left text-[13px] leading-relaxed whitespace-pre-wrap text-foreground/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">{text}</button>
+      ) : (
+        <button type="button" onClick={onEdit} className="rounded-sm text-left text-[13px] text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">Add a line</button>
+      )}
+    </section>
+  );
+}
+
+// ---- Layer 2: Skills ---------------------------------------------------------
+
+function SkillsLayer({ botId }: { botId: string }) {
+  const call = useCall();
+  const skills = useLive("bot_skills", { botId }, { pollMs: 30_000 });
+  const learning = useLive("bot_learning", { botId }, { pollMs: 30_000 });
+  const [selected, setSelected] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const now = Date.now();
+  const shown = (skills.data?.skills ?? []).filter((skill) => !skill.alwaysOn && skill.state !== "archived");
+  const act = async (run: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
+    try { await run(); skills.refresh(); learning.refresh(); } catch (cause) { setError(errorMessage(cause) || "That didn't work."); } finally { setBusy(false); }
+  };
+  const revert = (version: { id: number }) => void act(() => call("bot_skill_revert", { botId, versionId: version.id }));
+  const learn = learning.data;
+  return (
+    <BotPageGroup title="Skills" testId="memory-skills"
+      aside={<Button type="button" variant="ghost" size="sm" data-testid="memory-skill-new" className={SMALL} onClick={() => setAdding(true)}><Icon name="Plus" aria-hidden />New skill</Button>}>
+      {error || skills.error ? <p role="alert" className="px-2 text-sm text-destructive">{error ?? skills.error}</p> : null}
+      {adding ? <NewSkill taken={(skills.data?.skills ?? []).map((skill) => skill.name)} onCancel={() => setAdding(false)}
+        onSave={(input) => act(async () => { await call("bot_skill_write", { botId, ...input }); setAdding(false); setSelected(input.name); })} /> : null}
+      {skills.data && !shown.length && !adding ? <BotPageEmpty testId="memory-skills-empty" title="No skills yet" hint="The Bot saves a way of working as a skill when it will come up again." /> : null}
+      {shown.map((skill) => (
+        <div key={skill.name} className="flex flex-col">
+          <BotPageRow testId="memory-skill" data={{ "data-skill": skill.name }} icon="Toolbox" title={skill.name} titleText={`${skill.name}: ${skill.description}`}
+            detail={skill.description} selected={selected === skill.name}
+            status={skill.state === "stale" ? { label: "Stale", tone: "warning" } : null}
+            meta={skill.usedAt ? `used ${relativeTime(skill.usedAt, now)}` : relativeTime(skill.updatedAt, now)}
+            onOpen={() => setSelected(selected === skill.name ? null : skill.name)} />
+          {selected === skill.name ? <SkillDetail botId={botId} name={skill.name} description={skill.description} busy={busy} revert={revert} editable onSaved={() => skills.refresh()} /> : null}
+        </div>
+      ))}
+      {learn ? (
+        <div data-testid="memory-autolearn" className="mt-1 flex min-w-0 items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+          <Switch size="sm" checked={learn.enabled} disabled={busy} aria-label="Auto-learn" onCheckedChange={(enabled) => void act(() => call("bot_learning_set", { botId, enabled }))} />
+          <span className="text-foreground">Auto-learn</span>
+          <span>Daily + on archive</span>
+          <span className="min-w-0 flex-1 truncate" data-testid="memory-autolearn-status">
+            {learn.reviewing ? "· Reviewing now…" : learn.lastReview ? `· ${learn.lastReview.result}, ${relativeTime(learn.lastReview.at, now)}` : ""}
+          </span>
+          <Button type="button" variant="outline" size="sm" data-testid="memory-autolearn-run" className={SMALL} disabled={busy || !learn.enabled || learn.reviewing}
+            onClick={() => void act(() => call("bot_learning_review", { botId }))}>Run now</Button>
+        </div>
+      ) : null}
+    </BotPageGroup>
+  );
+}
+
+function NewSkill({ taken, onSave, onCancel }: { taken: readonly string[]; onSave(input: { name: string; description: string; body: string }): Promise<void>; onCancel(): void }) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [body, setBody] = useState("");
+  const problem = !name ? null : !SKILL_NAME.test(name) ? "Lowercase words joined by hyphens, like weekly-review." : taken.includes(name) ? `There's a skill named ${name} already.` : null;
+  const ready = !!name && !problem && !!description.trim() && !!body.trim();
+  return (
+    <form data-testid="memory-skill-form" className="flex flex-col gap-2 rounded-md border border-border p-3" onSubmit={(event) => { event.preventDefault(); if (ready) void onSave({ name, description: description.trim(), body }); }}>
+      <Input aria-label="Skill name" placeholder="weekly-review" value={name} autoFocus onChange={(event) => setName(event.target.value.trim())} className="h-8 font-mono text-xs" />
+      {problem ? <p className="text-xs text-warning">{problem}</p> : null}
+      <Input aria-label="When to use it" placeholder="When to use it, in one sentence" value={description} onChange={(event) => setDescription(event.target.value)} className="h-8 text-sm" />
+      <Textarea aria-label="Instructions" placeholder="The steps and the pitfalls" value={body} rows={6} onChange={(event) => setBody(event.target.value)} className="font-mono text-xs" />
+      <div className="flex gap-1">
+        <Button type="submit" size="sm" className={SMALL} disabled={!ready}>Save skill</Button>
+        <Button type="button" variant="ghost" size="sm" className={SMALL} onClick={onCancel}>Cancel</Button>
+      </div>
+    </form>
+  );
+}
+
+// ---- Layer 3: History --------------------------------------------------------
+
+type HistoryView = "summaries" | "conversations";
+
+function HistoryLayer({ botId }: { botId: string }) {
+  const [view, setView] = useState<HistoryView>("summaries");
+  const [query, setQuery] = useState("");
+  const words = searchWords(query);
+  const control = (
+    <ToggleGroup type="single" size="sm" value={view} aria-label="History" data-testid="memory-history-view" onValueChange={(next) => { if (next) setView(next as HistoryView); }}>
+      <ToggleGroupItem value="summaries" className="h-7 px-2.5 text-xs">Summaries</ToggleGroupItem>
+      <ToggleGroupItem value="conversations" className="h-7 px-2.5 text-xs">Past conversations</ToggleGroupItem>
+    </ToggleGroup>
+  );
+  return (
+    <BotPageGroup title="History" testId="memory-history" aside={control}>
+      <div className="px-2 pb-2">
+        <Input type="search" aria-label={view === "summaries" ? "Search summaries" : "Search past conversations"} data-testid="memory-history-search" value={query}
+          placeholder={view === "summaries" ? "Search summaries" : "Search every message"} onChange={(event) => setQuery(event.target.value)} className="h-8 text-sm" />
+      </div>
+      {view === "summaries" ? <Summaries botId={botId} words={words} query={query} clear={() => setQuery("")} /> : <PastConversations botId={botId} words={words} query={query} clear={() => setQuery("")} />}
+    </BotPageGroup>
+  );
+}
+
+function Summaries({ botId, words, query, clear }: { botId: string; words: readonly string[]; query: string; clear(): void }) {
+  const rowOpen = useRowOpen();
+  const live = useLive("bot_summaries", { botId }, { pollMs: 60_000 });
+  const now = Date.now();
+  const all = live.data?.summaries ?? [];
+  const shown = all.filter((each) => !words.length || words.every((word) => `${each.title}\n${each.summary}`.toLowerCase().includes(word)));
+  if (live.error && !live.data) return <p role="alert" className="px-2 text-sm text-destructive">{live.error}</p>;
+  if (!live.data) return <p className="px-2 text-sm text-muted-foreground">Loading…</p>;
+  if (!shown.length) return <BotPageEmpty testId="memory-summaries-empty" {...(words.length ? { title: noMatch("summaries", query), action: { label: "Clear search", onClick: clear } } : { title: "No summaries yet", hint: "Archiving a conversation writes its summary here." })} />;
+  return (
+    <div className="flex flex-col gap-2 px-2">
+      {shown.map((each) => {
+        const open = rowOpen({ kind: "conversation", id: each.threadId }, each.title);
+        return (
+          <article key={each.threadId} data-testid="memory-summary" data-thread-id={each.threadId} className={cn("rounded-md border border-border", open.selected && "border-ring")}>
+            <button type="button" onClick={(event) => open.onOpen(event)} className="flex w-full flex-col gap-1.5 rounded-md px-3 py-2.5 text-left hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+              <span className="flex w-full items-baseline gap-2">
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground"><Highlighted text={each.title} words={words} /></span>
+                <span className="shrink-0 text-xs text-muted-foreground">{shortDate(each.archivedAt, now)}</span>
+              </span>
+              <SummaryBody summary={each.summary} words={words} />
+            </button>
+          </article>
+        );
+      })}
     </div>
+  );
+}
+
+function SummaryBody({ summary, words }: { summary: string; words: readonly string[] }) {
+  const sections = useMemo(() => summarySections(summary), [summary]);
+  return (
+    <span className="flex flex-col gap-1 text-xs leading-relaxed">
+      {sections.map((section, index): ReactNode => (
+        <span key={`${section.heading}-${index}`} className="flex flex-col">
+          {section.heading ? <span className="font-medium text-muted-foreground">{section.heading}</span> : null}
+          {section.items.slice(0, 4).map((item, at) => <span key={at} className="line-clamp-2 text-foreground/90">{section.list || section.items.length > 1 ? "· " : ""}<Highlighted text={item} words={words} /></span>)}
+          {section.items.length > 4 ? <span className="text-muted-foreground">+{section.items.length - 4} more</span> : null}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function PastConversations({ botId, words, query, clear }: { botId: string; words: readonly string[]; query: string; clear(): void }) {
+  const rowOpen = useRowOpen();
+  const live = useLive("bot_conversations_all", { botId }, { pollMs: 60_000 });
+  const settled = useDebounced(query.trim(), SEARCH_DEBOUNCE_MS);
+  const search = useLive("bot_conversations_search", { botId, query: settled }, { enabled: settled.length > 0, pollMs: 15_000 });
+  const hits = useMemo(() => new Map((settled && search.data?.hits ? search.data.hits : []).map((hit) => [hit.threadId, hit])), [settled, search.data]);
+  const now = Date.now();
+  const rows = (live.data?.conversations ?? []).filter((row) => !words.length || hits.has(row.threadId) || words.every((word) => row.title.toLowerCase().includes(word)));
+  if (live.error && !live.data) return <p role="alert" className="px-2 text-sm text-destructive">{live.error}</p>;
+  if (!live.data) return <p className="px-2 text-sm text-muted-foreground">Loading…</p>;
+  return (
+    <>
+      {words.length && search.data?.indexing ? <p data-testid="memory-history-indexing" className="px-2 text-xs text-muted-foreground">Still reading older messages</p> : null}
+      {!rows.length ? <BotPageEmpty testId="memory-conversations-empty" {...(words.length ? { title: noMatch("conversations", query), action: { label: "Clear search", onClick: clear } } : { title: "No conversations yet" })} /> : null}
+      {rows.map((row) => {
+        const detail = conversationDetail(row, hits.get(row.threadId));
+        const archived = row.archivedAt !== null;
+        return (
+          <BotPageRow key={row.threadId} testId="memory-conversation" data={{ "data-thread-id": row.threadId }} icon={archived ? (row.summary ? "CircleCheck" : "Archive") : "MessageSquare"}
+            iconClassName={archived && row.summary ? "text-success" : undefined} title={<Highlighted text={row.title} words={words} />} titleText={row.title}
+            detail={detail.text ? (detail.snippet ? <Highlighted text={detail.text} words={words} /> : detail.text) : null} detailTone={detail.tone}
+            meta={archived ? shortDate(row.updatedAt, now) : relativeTime(row.updatedAt, now)} {...rowOpen({ kind: "conversation", id: row.threadId }, row.title)} />
+        );
+      })}
+    </>
   );
 }

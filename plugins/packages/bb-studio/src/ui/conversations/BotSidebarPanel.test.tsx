@@ -211,15 +211,14 @@ it("keeps the header clickable in the desktop app, and with one Bot shows its ic
   expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "bot/new" });
 });
 
-it("opens every conversation from the Conversations row; the list ends without an older row, and the menu has no Archive", async () => {
+it("reaches past conversations through Memory; the list ends without an older row, and the menu has no Archive", async () => {
   (state.live["bot_threads_view:cos"] as { olderConversations: number }).olderConversations = 41;
   await mount();
   expect($('[data-testid="older-conversations"]')).toBeNull();
   expect($('[data-testid="conversations"]')!.textContent).not.toContain("older");
-  const row = $('[data-testid="space-page-conversations"]')!;
-  expect(row.textContent).toBe("Conversations");
-  await act(async () => { row.click(); });
-  expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "conversations/cos" });
+  expect($('[data-testid="space-page-conversations"]')).toBeNull();
+  await act(async () => { $('[data-testid="space-page-memory"]')!.click(); });
+  expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "memory/cos" });
   expect($$('[data-testid="menu"] [role="menuitem"]').map((item) => item.textContent)).not.toContain("Archive");
 });
 
@@ -362,11 +361,12 @@ it("lists no older-workers row however many there are; the Conversations row is 
   await mount();
   expect($('[data-testid="older-workers"]')).toBeNull();
   expect($('[data-testid="bot-sidebar"]')!.textContent).not.toContain("older");
-  expect($('[data-testid="space-page-conversations"]')?.getAttribute("aria-current")).toBeNull();
+  expect($('[data-testid="space-page-memory"]')?.getAttribute("aria-current")).toBeNull();
+  // The Conversations page, still reachable by link, counts as Memory's.
   window.history.replaceState(null, "", "/plugins/studio/studio/conversations/cos");
   await mount();
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
-  expect($('[data-testid="space-page-conversations"]')?.getAttribute("aria-current")).toBe("page");
+  expect($('[data-testid="space-page-memory"]')?.getAttribute("aria-current")).toBe("page");
   expect($('[data-testid="space-page-library"]')?.getAttribute("aria-current")).toBeNull();
   window.history.replaceState(null, "", "/");
 });
@@ -460,11 +460,11 @@ describe("the Bot's space (round 7)", () => {
     expect($('[data-testid="default-model-dialog"]')).toBeNull();
   });
 
-  it("lists the Bot's pages as rows, opens each, and selects the one on screen", async () => {
+  it("lists the Bot's pages as two rows, Memory and Library, opens each, and selects the one on screen", async () => {
     await mount();
-    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Conversations"]);
-    await act(async () => { $('[data-testid="space-page-skills"]')!.click(); });
-    expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "skills/cos" });
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Library"]);
+    await act(async () => { $('[data-testid="space-page-memory"]')!.click(); });
+    expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "memory/cos" });
     await act(async () => { $('[data-testid="space-page-library"]')!.click(); });
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", {});
     window.history.replaceState(null, "", "/plugins/studio/studio/memory/cos");
@@ -481,7 +481,7 @@ describe("the Bot's space (round 7)", () => {
     expect($('[data-testid="space-strands-count"]')).toBeNull();
     state.live.bot_spaces = { bots: [space("cos", "Chief of Staff", false, "main"), space("home", "Home", false, "home_main")], currentBotId: "home" };
     await mount();
-    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Conversations"]);
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Library"]);
     expect($('[data-testid="space-page-automations"]')).toBeNull();
   });
 

@@ -397,7 +397,7 @@ describe("workbench (op: open)'s types come from the tab kinds registry", () => 
     expect(await spec({ link: "bb://automation/bot_main%3Aheartbeat" })).toEqual({ kind: "tab", tab: { id: "automation" }, params: { id: "bot_main:heartbeat" }, title: "Check-in" });
     expect(await spec({ link: "/plugins/studio/studio/todo/loop_1" })).toEqual({ kind: "tab", tab: { id: "todo" }, params: { id: "loop_1" }, title: "Pay the bill" });
     expect(await spec({ type: "todo", id: "loop_gone" })).toBe("No to-do has id loop_gone.");
-    expect(await spec({ type: "record", id: "mem_gone" })).toBe("No memory record has id mem_gone.");
+    expect(await spec({ type: "record", id: "mem_gone" })).toBe("Unknown type record.");
     expect(await spec({ type: "automation" })).toBe("Give the automation's id.");
   });
 

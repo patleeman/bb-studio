@@ -15,7 +15,6 @@ import { pageTab } from "../kit/app/workbench";
 import { NotFoundTab } from "../links/NotFoundTab";
 import { NOT_FOUND_TAB, NOT_FOUND_TITLE } from "../links/router";
 import { TodoTab } from "../loops/ui/TodoTab";
-import { RecordTab } from "../memory/ui/RecordTab";
 import { AutomationTab } from "./automations/AutomationTab";
 import { ITEM_KINDS, NEW_TAB_ACTIONS, newTabFields, newTabTitle, STUDIO_PLUGIN, tabKindEntry, type TabKindId } from "../tab-kinds";
 import { AUTOMATIONS_PANEL, AutomationsPanel } from "./automations/AutomationsPanel";
@@ -52,10 +51,9 @@ export const BOT_PAGE_TABS: readonly { kind: TabKindId; component: ComponentType
   { kind: "archive", component: ({ params }) => <Frame><OlderPage botId={botOf(params) ?? currentBot()} /></Frame> },
 ];
 
-export const ENTRY_TABS: readonly { kind: "automation" | "todo" | "record"; component: ComponentType<{ params: JsonValue | null }> }[] = [
+export const ENTRY_TABS: readonly { kind: "automation" | "todo"; component: ComponentType<{ params: JsonValue | null }> }[] = [
   { kind: "automation", component: AutomationTab },
   { kind: "todo", component: TodoTab },
-  { kind: "record", component: RecordTab },
 ];
 
 export const PAGE_PANELS: readonly (string | undefined)[] = [undefined, AUTOMATIONS_PANEL];
