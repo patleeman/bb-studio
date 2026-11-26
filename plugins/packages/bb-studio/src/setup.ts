@@ -40,6 +40,7 @@ export interface SetupSdk {
 const OPTIONAL: Record<string, string> = {
   mobile: "Only needed for the BB Studio iOS app.",
   "studio-visual-chat": "A prototype, off unless you install it: Visual Chat, an agent that answers on a board.",
+  "provider-antigravity": "Only needed if you use Google Antigravity CLI (agy).",
 };
 
 export const installCommand = (id: string) => `${studioCliName()} plugin install ${id}@${MARKETPLACE_NAME} --yes`;

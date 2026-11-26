@@ -93,9 +93,10 @@ describe("buildSetup", () => {
     const summary = await buildSetup(sdk, health());
     expect(summary.marketplaceAdded).toBe(false);
     expect(summary.commands[0]).toBe("bbs marketplace add git:github.com/patleeman/bb-studio@main");
-    // Mobile and Visual Chat are optional: not in "Install all".
-    expect(summary.installAll?.split(" && ")).toHaveLength(ADDONS.length - 2);
+    // Mobile, Visual Chat and Google Antigravity are optional: not in "Install all".
+    expect(summary.installAll?.split(" && ")).toHaveLength(ADDONS.length - 3);
     expect(summary.installAll).not.toContain("studio-visual-chat");
+    expect(summary.installAll).not.toContain("provider-antigravity");
   });
 });
 

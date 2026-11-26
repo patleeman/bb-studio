@@ -1,0 +1,44 @@
+{
+  "name": "@bb-studio/provider-antigravity",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "Run conversations with Google Antigravity CLI (agy), with account health, quota usage, and CLI updates.",
+  "engines": {
+    "bb": ">=0.50.1",
+    "bbPluginSdk": ">=0.6.157"
+  },
+  "bb": {
+    "name": "Google Antigravity",
+    "description": "Run conversations with Google Antigravity CLI (agy), with account health, quota usage, and CLI updates.",
+    "branding": {
+      "icon": "./icons/antigravity.svg",
+      "experimental_icons": {
+        "antigravity": "./icons/antigravity.svg"
+      }
+    },
+    "server": "./server.ts",
+    "host": "./src/host.ts",
+    "experimental_providers": [
+      {
+        "kind": "agent",
+        "id": "antigravity",
+        "displayName": "Google Antigravity"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build ."
+  },
+  "dependencies": {
+    "@get-bb/plugin-sdk": "0.6.157",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "4.1.1"
+  }
+}
