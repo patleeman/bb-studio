@@ -46,7 +46,9 @@ struct ScreenTitleKey: PreferenceKey {
 extension View {
     /// A screen's actions, for the shell's More menu. Empty: none.
     func screenActions(_ actions: [ScreenAction]) -> some View {
-        preference(key: ScreenActionsKey.self, value: actions)
+        // The innermost non-empty list wins: set only where the content set none
+        // (a plain preference here would override an editor's own actions).
+        transformPreference(ScreenActionsKey.self) { if $0.isEmpty { $0 = actions } }
     }
 
     /// A screen's title, for the Duo's title line.

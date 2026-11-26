@@ -180,14 +180,7 @@ struct ShellDestination: View {
     @Environment(\.shellPosture) private var posture
     @EnvironmentObject private var app: AppModel
 
-    @Environment(\.shellCovered) private var covered
-
     var body: some View {
-        // Inside the column's navigation stack, SwiftUI's own hiding outside it doesn't reach.
-        destination.accessibilityHidden(covered)
-    }
-
-    @ViewBuilder private var destination: some View {
         switch route {
         case .conversation(let id):
             ConversationScreen(threadId: id, pane: pane)
@@ -266,6 +259,7 @@ private struct ShellPages: View {
     @ObservedObject var store: BotSpacesStore
     let window: CGSize
     @ObservedObject private var router = Router.shared
+    @EnvironmentObject private var app: AppModel
     @Environment(\.shellPosture) private var posture
     /// What's pushed over the left page's conversation offers: in the right page's rail.
     @State private var paneActions: [ScreenAction] = []
@@ -294,6 +288,26 @@ private struct ShellPages: View {
             }
         }
         .animation(.snappy(duration: 0.25), value: homeShown)
+        .onAppear { hold(heldConversation, releasing: nil) }
+        .onChange(of: heldConversation) { old, new in hold(new, releasing: old) }
+        .onDisappear { hold(nil, releasing: heldConversation) }
+    }
+
+    /// Book with Home over the conversation: its Workbench still shows on the
+    /// right page, so the thread stays attached and its Workbench marked shown.
+    private var heldConversation: String? {
+        posture == .book && homeShown && !conversation.isEmpty ? conversation : nil
+    }
+
+    private func hold(_ id: String?, releasing old: String?) {
+        if let id, id != old {
+            ConversationSessions.shared.session(id).hold(app)
+            WorkbenchShown.shared.show(id)
+        }
+        if let old, old != id {
+            ConversationSessions.shared.session(old).stop()
+            WorkbenchShown.shared.hide(old)
+        }
     }
 
     @ViewBuilder private func left(width: CGFloat) -> some View {
@@ -305,19 +319,15 @@ private struct ShellPages: View {
                 }
                 conversationColumn
             }
+        } else if homeShown {
+            // Home takes the page. The conversation's thread stays held
+            // (`heldConversation`), and its Workbench on the right page: a
+            // mounted column under Home stays in VoiceOver's tree (its UIKit
+            // hosts ignore SwiftUI's hiding), so it isn't kept.
+            homeColumn
         } else {
-            // Home over the conversation, which stays mounted (its thread, its
-            // place, its Workbench on the right page), out of sight, touch and
-            // VoiceOver's reach (`shellCovered` reaches the UIKit hosts too).
-            ZStack {
-                conversationColumn
-                    .overlay(alignment: .leading) { HomeEdge() }
-                    .opacity(homeShown ? 0 : 1)
-                    .allowsHitTesting(!homeShown)
-                    .accessibilityHidden(homeShown)
-                    .environment(\.shellCovered, homeShown)
-                if homeShown { homeColumn }
-            }
+            conversationColumn
+                .overlay(alignment: .leading) { HomeEdge() }
         }
     }
 

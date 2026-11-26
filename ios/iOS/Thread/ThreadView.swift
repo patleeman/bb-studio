@@ -71,7 +71,6 @@ struct ThreadView: View {
     @Environment(\.look) private var look
     @Environment(\.shellPosture) private var posture
     @Environment(\.shellInnerScreen) private var innerScreen
-    @Environment(\.shellCovered) private var covered
     @ObservedObject private var router = Router.shared
     /// The Workbench over the rows (between the title and the composer); nil shows the chat.
     private let workbench: (() -> AnyView)?
@@ -393,6 +392,7 @@ struct ThreadView: View {
             if runningPlugins.split(separator: ",").contains("studio") {
                 Task { session.sourcePage = try? await client.chatPage(model.threadId) }
             }
+            session.attach(app)
             await model.load()
         }
         // Attached as it appears, in step with `onDisappear`'s stop: a screen
@@ -1679,7 +1679,6 @@ extension ThreadView {
                     guard let predicted, predicted < -ThreadView.flipDistance else { return }
                     withAnimation(.snappy(duration: 0.25)) { session.showsWorkbench = true }
                 },
-                rowsHidden: covered,
                 cover: workbench,
                 onPillChange: { state in
                     let next = TranscriptPillState(shown: state.shown, unseen: min(state.unseen, 1), note: state.note)

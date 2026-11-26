@@ -53,6 +53,12 @@ final class ConversationSession: ObservableObject {
     /// it in its task); the last to go detaches.
     func hold(_ app: AppModel) {
         attached += 1
+        attach(app)
+    }
+
+    /// Attached, without holding: a `.task` (which SwiftUI starts before the
+    /// view appears) loads with the client set, whichever runs first.
+    func attach(_ app: AppModel) {
         guard !isAttached else { return }
         isAttached = true
         model.attach(app)

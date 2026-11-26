@@ -100,6 +100,14 @@ final class ScreenActionsTests: XCTestCase {
         XCTAssertEqual(reported(ZStack { Tab(id: "hidden").modifier(WorkbenchHiddenTab()); Tab(id: "shown") }), ["shown"])
     }
 
+    /// Re-review S7: a screen's own list (an empty one, or none) doesn't
+    /// override what its content shows (an editor's Save and Cancel).
+    func testTheInnermostActionsWin() {
+        XCTAssertEqual(reported(Tab(id: "save").screenActions([])), ["save"])
+        XCTAssertEqual(reported(Tab(id: "save").screenActions([ScreenAction(id: "edit", title: "Edit", systemImage: "pencil")])), ["save"])
+        XCTAssertEqual(reported(Color.clear.frame(width: 10, height: 10).screenActions([ScreenAction(id: "edit", title: "Edit", systemImage: "pencil")])), ["edit"])
+    }
+
     func testAHiddenTabAloneReportsNone() {
         XCTAssertEqual(reported(ZStack { Tab(id: "hidden").modifier(WorkbenchHiddenTab()) }), [])
     }
