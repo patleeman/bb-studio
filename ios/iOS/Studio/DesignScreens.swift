@@ -26,7 +26,7 @@ struct DesignStill: UIViewRepresentable {
 /// moves the picture and nothing inside it rubber-bands. The minimum zoom is
 /// fit-to-width, the picture is centred while it's smaller than the view, and
 /// the edges bounce lightly. `designStill`'s value is the zoom relative to fit.
-final class DesignStillView: UIView, UIScrollViewDelegate, WKNavigationDelegate, WKUIDelegate {
+final class DesignStillView: UIView, UIScrollViewDelegate {
     var play: () -> Void
     var zoomed: (Bool) -> Void = { _ in }
     private var wasZoomed = false
@@ -40,7 +40,8 @@ final class DesignStillView: UIView, UIScrollViewDelegate, WKNavigationDelegate,
     private let imageView = UIImageView()
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let failure = UILabel()
-    private var renderer: WKWebView?
+    /// The one render (`DesignScreenRenderer`); cancelled when the view goes.
+    private var rendering: Task<Void, Never>?
     private var started = false
     private var fit: CGFloat = 1
     private var laidOutWidth: CGFloat = 0
@@ -96,87 +97,49 @@ final class DesignStillView: UIView, UIScrollViewDelegate, WKNavigationDelegate,
         if imageView.image != nil, bounds.width != laidOutWidth { fitToWidth(keepingZoom: laidOutWidth > 0) }
     }
 
+    deinit { rendering?.cancel() }
+
     override func didMoveToWindow() {
         super.didMoveToWindow()
+        // Off screen: stop drawing (the render holds this view while it runs), and draw again on return.
+        if window == nil, imageView.image == nil, rendering != nil {
+            rendering?.cancel()
+            rendering = nil
+            started = false
+        }
         setNeedsLayout()
     }
 
     // MARK: Drawing the still
 
-    /// The page at its own width, offscreen (it must be in the window to draw), until its fonts and first frames are in.
+    /// The page drawn once at its own width, under the scroll view (it must be in the
+    /// window to draw), then shown as a picture. A failed load, a crashed page or a
+    /// cancelled render ends in the failure note, never a spinner left turning.
     private func render() {
         started = true
-        let configuration = UntrustedWeb.configuration()
-        configuration.suppressesIncrementalRendering = true
-        let page = WKWebView(frame: CGRect(origin: .zero, size: size), configuration: configuration)
-        // Opaque, under the scroll view's opaque background: a snapshot keeps the view's alpha, and a hidden view doesn't draw.
-        page.isUserInteractionEnabled = false
-        page.accessibilityElementsHidden = true
-        page.scrollView.contentInsetAdjustmentBehavior = .never
-        page.navigationDelegate = self
-        page.uiDelegate = self
-        insertSubview(page, at: 0)
-        renderer = page
-        #if DEBUG
-        if let html = DesignDemo.html(for: url) {
-            page.loadHTMLString(html, baseURL: nil)
-            return
-        }
-        #endif
-        page.load(URLRequest(url: url))
-    }
-
-    /// The screen's own page only (`UntrustedWeb`): the still draws nothing else.
-    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
-        await UntrustedWeb.policy(for: action, allowed: url)
-    }
-
-    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
-                 for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { nil }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        let script = """
-            if (document.fonts) { await document.fonts.ready; }
-            await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
-            return Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0);
-            """
-        webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { [weak self] result in
-            guard let self else { return }
-            let height = (try? result.get()) as? Double ?? Double(self.size.height)
-            self.pageHeight = min(8000, max(self.size.height, CGFloat(height)))
-            webView.frame.size.height = self.pageHeight
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { self.snapshot(webView) }
-        }
-    }
-
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { failed() }
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { failed() }
-
-    private func snapshot(_ page: WKWebView) {
-        let configuration = WKSnapshotConfiguration()
-        configuration.rect = CGRect(x: 0, y: 0, width: size.width, height: pageHeight)
         // Sharp to a few times fit, within a texture a phone handles (4096 px wide).
-        let scale = window?.screen.scale ?? 3
-        let width = min(size.width * 3, max(bounds.width * 6, size.width), 4096 / scale, 16384 / scale * size.width / pageHeight)
-        configuration.snapshotWidth = NSNumber(value: Double(width))
-        configuration.afterScreenUpdates = true
-        page.takeSnapshot(with: configuration) { [weak self] image, _ in
-            guard let self else { return }
-            page.removeFromSuperview()
-            self.renderer = nil
-            guard let image else { return self.failed() }
-            self.spinner.stopAnimating()
-            self.spinner.isHidden = true
-            self.imageView.image = image
-            self.imageView.frame = CGRect(x: 0, y: 0, width: self.size.width, height: self.pageHeight)
-            self.scroll.contentSize = self.imageView.frame.size
-            self.fitToWidth(keepingZoom: false)
+        let scale = window?.screen.scale ?? 3, fitWidth = bounds.width, size = size
+        rendering = Task { [weak self, url] in
+            guard let host = self else { return }
+            let still = await DesignScreenRenderer.render(url, size: size, in: host, fullPage: true) { pageHeight in
+                min(size.width * 3, max(fitWidth * 6, size.width), 4096 / scale, 16384 / scale * size.width / pageHeight)
+            }
+            guard let self, !Task.isCancelled else { return }
+            if let still { self.show(still) } else { self.failed() }
         }
+    }
+
+    private func show(_ still: DesignScreenRenderer.Still) {
+        spinner.stopAnimating()
+        spinner.isHidden = true
+        pageHeight = still.pageHeight
+        imageView.image = still.image
+        imageView.frame = CGRect(x: 0, y: 0, width: size.width, height: pageHeight)
+        scroll.contentSize = imageView.frame.size
+        fitToWidth(keepingZoom: false)
     }
 
     private func failed() {
-        renderer?.removeFromSuperview()
-        renderer = nil
         spinner.stopAnimating()
         spinner.isHidden = true
         failure.isHidden = false
@@ -236,32 +199,8 @@ final class DesignStillView: UIView, UIScrollViewDelegate, WKNavigationDelegate,
     @objc private func tapped() { play() }
 }
 
-/// A design screen's page as a thumbnail: drawn at the screen's own size,
-/// scaled by the caller, taking no touches so the row scrolls.
-struct DesignFrame: UIViewRepresentable {
-    let url: URL
-
-    func makeUIView(context: Context) -> WKWebView {
-        let view = WKWebView(frame: .zero, configuration: UntrustedWeb.configuration())
-        view.isUserInteractionEnabled = false
-        view.scrollView.contentInsetAdjustmentBehavior = .never
-        view.isOpaque = false
-        view.navigationDelegate = context.coordinator
-        view.uiDelegate = context.coordinator
-        context.coordinator.load(url, in: view)
-        return view
-    }
-
-    func updateUIView(_ view: WKWebView, context: Context) {
-        guard context.coordinator.loaded != url else { return }
-        context.coordinator.load(url, in: view)
-    }
-
-    func makeCoordinator() -> DesignPageLoader { DesignPageLoader() }
-}
-
-/// Loads a screen's page once per address (the demo's pages offline), and
-/// holds the view to that page (`UntrustedWebGuard`) when it is the view's delegate.
+/// Loads the live player's page once per address (the demo's pages offline),
+/// and knows the address `UntrustedWeb` allows it.
 final class DesignPageLoader: UntrustedWebGuard {
     var loaded: URL?
 

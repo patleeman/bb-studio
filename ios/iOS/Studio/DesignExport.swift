@@ -7,13 +7,13 @@ import WebKit
 @MainActor
 enum DesignExport {
     static func file(_ client: BBClient, designId: String, screen: DesignScreen, print: Bool) async throws -> URL {
-        let name = "\(designId)-\(screen.id ?? "screen")"
+        let name = fileName(designId: designId, screenId: screen.id)
         let folder = FileManager.default.temporaryDirectory.appending(path: "design-export-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let url = client.designScreenFileURL(designId, screen, print: print)
         if print {
             let file = folder.appending(path: "\(name).pdf")
-            try await PrintRenderer(size: CGSize(width: screen.size.width, height: screen.size.height)).pdf(of: url).write(to: file)
+            try await printed(url, size: CGSize(width: screen.size.width, height: screen.size.height)).write(to: file)
             return file
         }
         let (status, data) = try await client.raw(method: "GET", path: url.path() + "?" + (url.query() ?? ""), body: nil)
@@ -22,30 +22,28 @@ enum DesignExport {
         try data.write(to: file)
         return file
     }
-}
 
-/// Loads a page offscreen and prints it to PDF pages of `size`.
-@MainActor
-private final class PrintRenderer: NSObject, WKNavigationDelegate, WKUIDelegate {
-    let size: CGSize
-    private var view: WKWebView?
-    private var finished: CheckedContinuation<Void, Error>?
-    private var allowed: URL?
+    /// A file name from ids an agent chose: only letters, digits, `-` and `_`, never a path.
+    static func fileName(designId: String, screenId: String?) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        let safe = { (part: String) in
+            String(part.unicodeScalars.map { allowed.contains($0) ? Character($0) : "-" }).trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        }
+        let name = [safe(designId), safe(screenId ?? "screen")].filter { !$0.isEmpty }.joined(separator: "-")
+        return name.isEmpty ? "design" : String(name.prefix(120))
+    }
 
-    init(size: CGSize) { self.size = size }
-
-    func pdf(of url: URL) async throws -> Data {
+    /// Studio's print page laid out at the screen's size and paged by WebKit's print formatter.
+    /// The load ends exactly once (`UntrustedPageLoad`): a failure, a crashed page or a cancelled
+    /// export throws instead of waiting for good.
+    static func printed(_ url: URL, size: CGSize) async throws -> Data {
         let view = WKWebView(frame: CGRect(origin: .zero, size: size), configuration: UntrustedWeb.configuration())
-        view.navigationDelegate = self
-        view.uiDelegate = self
-        allowed = url
-        self.view = view
-        try await withCheckedThrowingContinuation { continuation in
-            finished = continuation
-            view.load(URLRequest(url: url))
+        guard await UntrustedPageLoad.run(view, url: url) else {
+            try Task.checkCancellation()
+            throw BBError(status: 0, message: "The screen didn't load for printing.")
         }
         // Fonts and first frames before printing.
-        try? await Task.sleep(for: .milliseconds(400))
+        try await Task.sleep(for: .milliseconds(400))
         let renderer = UIPrintPageRenderer()
         renderer.addPrintFormatter(view.viewPrintFormatter(), startingAtPageAt: 0)
         let page = CGRect(origin: .zero, size: size)
@@ -59,28 +57,6 @@ private final class PrintRenderer: NSObject, WKNavigationDelegate, WKUIDelegate 
             renderer.drawPage(at: index, in: UIGraphicsGetPDFContextBounds())
         }
         UIGraphicsEndPDFContext()
-        self.view = nil
         return data as Data
-    }
-
-    /// The print page only (`UntrustedWeb`).
-    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
-        UntrustedWeb.policy(for: action, allowed: allowed)
-    }
-
-    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
-                 for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { nil }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        finished?.resume()
-        finished = nil
-    }
-
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { fail(error) }
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { fail(error) }
-
-    private func fail(_ error: Error) {
-        finished?.resume(throwing: error)
-        finished = nil
     }
 }
