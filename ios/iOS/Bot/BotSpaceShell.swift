@@ -286,7 +286,7 @@ struct BotSpaceList: View {
                                 Image(systemName: "checkmark").font(.footnote.weight(.semibold)).frame(width: 16)
                                 Text("\(split.done.count) done")
                                 Spacer()
-                                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                             }
                             .foregroundStyle(.secondary)
                         }

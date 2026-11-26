@@ -423,7 +423,7 @@ struct StudioKind: Identifiable, Hashable {
     static let known = [
         StudioKind(id: "page", label: "Page", plural: "Pages", symbol: "doc.richtext", tint: .blue),
         StudioKind(id: "recording", label: "Recording", plural: "Recordings", symbol: "waveform", tint: .red),
-        StudioKind(id: "dictation", label: "Dictation", plural: "Dictations", symbol: "mic", tint: .orange),
+        StudioKind(id: "dictation", label: "Dictation", plural: "Dictations", symbol: "mic", tint: .pink),
         StudioKind(id: "drawing", label: "Whiteboard", plural: "Whiteboards", symbol: "scribble.variable", tint: .purple),
         StudioKind(id: "app", label: "App", plural: "Apps", symbol: "macwindow", tint: .teal),
         StudioKind(id: "design", label: "Design", plural: "Designs", symbol: "rectangle.on.rectangle.angled", tint: .pink),
@@ -446,6 +446,7 @@ struct StudioKind: Identifiable, Hashable {
 }
 
 struct StudioView: View {
+    @Environment(\.look) private var look
     @ObservedObject private var router = Router.shared
     var selectsDetail = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -811,7 +812,7 @@ struct StudioView: View {
         let count = store.hasTalk || dynamicTypeSize.isAccessibilitySize ? 2 : 1
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: count), spacing: 10) {
             if store.hasTalk {
-                tile("Dictate", "mic.fill", .orange) { recordingKind = "dictation" } menu: {
+                tile("Dictate", "mic.fill", .pink) { recordingKind = "dictation" } menu: {
                     if store.hasPages {
                         Button("Dictate a Page", systemImage: "doc.badge.plus") { dictatingPage = true }
                     }

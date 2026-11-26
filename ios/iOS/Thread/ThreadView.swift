@@ -95,6 +95,11 @@ struct ThreadView: View {
     @State private var hiddenApprovals: Set<String> = []
     /// A Bot conversation's queue and todos, from their composer chips.
     @State private var showingQueue = false
+    /// A Bot conversation's Workspace sheet (iPhone, folded Duo), from the title.
+    @State private var showingWorkspace = false
+    @State private var workspaceDetent: PresentationDetent = .medium
+    /// More (the rest of the old ⋯), asked for by the unfolded Duo's Info.
+    @State private var showingMore = false
     @State private var showingTodos = false
     @AppStorage(ServerScope.key("dismissedFallbacks")) private var dismissedFallbacks = ""
     /// Permissions chosen in Model & permissions, waiting for the next message.
@@ -249,6 +254,44 @@ struct ThreadView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingWorkspace) {
+            NavigationStack {
+                workspace()
+                    .navigationTitle((model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Conversation") + " · Workspace")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { Button("Done") { showingWorkspace = false }.accessibilityIdentifier("workspaceDone") }
+            }
+            // Medium for Info and Strands, large for a document (round 5).
+            .presentationDetents([.medium, .large], selection: $workspaceDetent)
+            .onChange(of: WorkspaceStore.shared.selected[model.threadId]) { _, id in
+                let local = id == nil || id == WorkspaceStore.info || id == WorkspaceStore.strands
+                withAnimation(.snappy) { workspaceDetent = local ? .medium : .large }
+            }
+        }
+        .sheet(isPresented: $showingMore) {
+            NavigationStack {
+                List { menuItems }
+                    .navigationTitle("More")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { Button("Done") { showingMore = false } }
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .onChange(of: WorkspaceRequests.shared.pending[model.threadId]) { _, action in
+            guard action != nil, conversation != nil, let action = WorkspaceRequests.shared.take(model.threadId) else { return }
+            infoAction(action)
+        }
+        .onChange(of: approvals.cards, initial: true) { _, cards in
+            ApprovalSlots.shared.setWaiting(cards.filter { $0.approval.state.waiting }, for: model.threadId)
+        }
+        .onAppear { if conversation != nil { WorkspaceShown.shared.show(model.threadId) } }
+        .task(id: conversation != nil ? model.threadId : "") {
+            // The title's tab count, before the Workspace is opened.
+            guard conversation != nil else { return }
+            WorkspaceStore.shared.attach(app.realtime)
+            await WorkspaceStore.shared.load(model.threadId)
+        }
+        .onDisappear { if conversation != nil { WorkspaceShown.shared.hide(model.threadId) } }
         .sheet(isPresented: $showingQueue) {
             NavigationStack {
                 ScrollView {
@@ -440,97 +483,125 @@ struct ThreadView: View {
         transcriptV2Screen
     }
 
+    /// A plain thread's header actions. A Bot conversation's header is its
+    /// title alone (round 5): the title opens these as a menu, Stop sits
+    /// beside Send, and hands-free is in the "+" menu and here.
     @ViewBuilder private var threadActions: some View {
-        if model.thread?.isRunning == true, !isWorker {
-            Button { Task { await model.stop() } } label: { Image(systemName: "stop.circle") }
-                .accessibilityLabel("Stop")
+        if conversation == nil {
+            if model.thread?.isRunning == true, !isWorker {
+                Button { Task { await model.stop() } } label: { Image(systemName: "stop.circle") }
+                    .accessibilityLabel("Stop")
+            }
+            // On iPad there's room for Find beside the menu.
+            if sizeClass == .regular {
+                Button { finding = true } label: { Image(systemName: "magnifyingglass") }
+                    .accessibilityLabel("Find")
+            }
+            // One menu rather than a row of buttons, so the title has room.
+            Menu { menuItems } label: {
+                Image(systemName: "ellipsis").modifier(DuoHeaderMenuLabel())
+            }
+            .accessibilityLabel("More")
+            .accessibilityIdentifier("conversationMore")
         }
-        // On iPad there's room for Find beside the menu.
-        if sizeClass == .regular {
-            Button { finding = true } label: { Image(systemName: "magnifyingglass") }
-                .accessibilityLabel("Find")
-        }
-        // Hands-free voice speaks as this conversation (its identity comes from the thread).
+    }
+
+    /// The folded Duo's rail for a Bot conversation: hands-free and the conversation's menu, as round buttons.
+    @ViewBuilder private var railActions: some View {
+        Button { startHandsFree() } label: { Label("Talk hands-free", systemImage: "waveform") }
+            .accessibilityIdentifier("conversationHandsFree")
+        Button { openWorkspace() } label: { Label("Workspace", systemImage: "square.on.square") }
+            .overlay(alignment: .topTrailing) {
+                let count = WorkspaceStore.shared.count(model.threadId)
+                if count > 0 {
+                    Text("\(count)").font(.caption2.weight(.bold)).monospacedDigit()
+                        .padding(.horizontal, 5).frame(minWidth: 18, minHeight: 18)
+                        .background(look.ink, in: .capsule).foregroundStyle(look.canvas)
+                        .offset(x: 4, y: -4).allowsHitTesting(false)
+                }
+            }
+            .accessibilityLabel("Workspace")
+            .accessibilityValue("\(WorkspaceStore.shared.count(model.threadId)) tabs")
+            .accessibilityIdentifier("conversationMore")
+    }
+
+    /// Hands-free voice speaks as this conversation (its identity comes from the thread).
+    private func startHandsFree() { Router.shared.sheet = .handsFree(threadId: model.threadId) }
+
+    /// The thread's menu: the header's ⋯ in a plain thread, the title's menu in a Bot conversation.
+    @ViewBuilder private var menuItems: some View {
         if conversation != nil {
-            Button { Router.shared.sheet = .handsFree(threadId: model.threadId) } label: { Image(systemName: "waveform") }
-                .accessibilityLabel("Talk hands-free")
-                .accessibilityIdentifier("conversationHandsFree")
+            Button { run { startHandsFree() } } label: { Label("Talk hands-free", systemImage: "waveform") }
+                .accessibilityIdentifier("menuHandsFree")
         }
-        // One menu rather than a row of buttons, so the title has room.
-        Menu {
-            Button { finding = true } label: { Label("Find in thread", systemImage: "magnifyingglass") }
-            if let conversation, conversation.mainThreadId != model.threadId {
-                Button { makeMain(conversation) } label: { Label("Make this the Main", systemImage: "star") }
-                    .accessibilityIdentifier("makeMain")
-            }
-            Button {
-                newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
-                renaming = true
-            } label: { Label("Rename", systemImage: "pencil") }
-            Button { choosingModel = true } label: {
-                Label(conversation != nil ? "Model" : "Model & permissions", systemImage: "cpu")
-            }
-            .accessibilityIdentifier("menuModel")
-            if let terminals = TerminalScope.forThread(model.threadId, environmentId: model.thread?.environmentId) {
-                Button { showingFiles = true } label: { Label("Files & changes", systemImage: "folder") }
-                Button { push(.terminals(scope: terminals, title: "Terminals")) } label: {
-                    Label("Terminals", systemImage: "apple.terminal")
-                }
-            }
-            Button { showingHistory = true } label: { Label("Recent prompts", systemImage: "clock.arrow.circlepath") }
-            if canSaveFiles {
-                Button { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: nil) } label: {
-                    Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
-                }
-            }
-            if let sourcePage {
-                Button { push(.page(id: sourcePage.id)) } label: {
-                    Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")
-                }
-            }
-            if ConversationFinish.canRemove(conversation?.conversation, running: model.thread?.isRunning == true) {
-                Button { finish() } label: {
-                    Label(finishing ? "Archiving…" : "Archive", systemImage: "archivebox")
-                    Text(ConversationFinish.archiveHint)
-                }
-                .disabled(finishing)
-                .accessibilityIdentifier("menuArchive")
-                Button(role: .destructive) { confirmingDelete = true } label: {
-                    Label("Delete conversation…", systemImage: "trash")
-                }
-                .disabled(finishing)
-                .accessibilityIdentifier("menuDelete")
-            }
-            if compactHeader {
-                Menu { contextItems } label: { Label("Context", systemImage: "chart.bar") }
-                Menu { shareItems } label: { Label("Share & notifications", systemImage: "square.and.arrow.up") }
-            } else {
-                Section { contextItems }
-                shareItems
-            }
-        } label: {
-            Image(systemName: "ellipsis").modifier(DuoHeaderMenuLabel())
+        Button { run { finding = true } } label: { Label("Find in thread", systemImage: "magnifyingglass") }
+        if let conversation, conversation.mainThreadId != model.threadId {
+            Button { run { makeMain(conversation) } } label: { Label("Make this the Main", systemImage: "star") }
+                .accessibilityIdentifier("makeMain")
         }
-        .accessibilityLabel("More")
-        .accessibilityIdentifier("conversationMore")
+        Button { run {
+            newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
+            renaming = true
+        } } label: { Label("Rename", systemImage: "pencil") }
+        Button { run { choosingModel = true } } label: {
+            Label(conversation != nil ? "Model" : "Model & permissions", systemImage: "cpu")
+        }
+        .accessibilityIdentifier("menuModel")
+        if let terminals = TerminalScope.forThread(model.threadId, environmentId: model.thread?.environmentId) {
+            Button { run { showingFiles = true } } label: { Label("Files & changes", systemImage: "folder") }
+            Button { run { push(.terminals(scope: terminals, title: "Terminals")) } } label: {
+                Label("Terminals", systemImage: "apple.terminal")
+            }
+        }
+        Button { run { showingHistory = true } } label: { Label("Recent prompts", systemImage: "clock.arrow.circlepath") }
+        if canSaveFiles {
+            Button { run { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: nil) } } label: {
+                Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
+            }
+        }
+        if let sourcePage {
+            Button { run { push(.page(id: sourcePage.id)) } } label: {
+                Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")
+            }
+        }
+        if ConversationFinish.canRemove(conversation?.conversation, running: model.thread?.isRunning == true) {
+            Button { run { finish() } } label: {
+                Label(finishing ? "Archiving…" : "Archive", systemImage: "archivebox")
+                Text(ConversationFinish.archiveHint)
+            }
+            .disabled(finishing)
+            .accessibilityIdentifier("menuArchive")
+            Button(role: .destructive) { run { confirmingDelete = true } } label: {
+                Label("Delete conversation…", systemImage: "trash")
+            }
+            .disabled(finishing)
+            .accessibilityIdentifier("menuDelete")
+        }
+        if compactHeader {
+            Menu { contextItems } label: { Label("Context", systemImage: "chart.bar") }
+            Menu { shareItems } label: { Label("Share & notifications", systemImage: "square.and.arrow.up") }
+        } else {
+            Section { contextItems }
+            shareItems
+        }
     }
 
     @ViewBuilder private var contextItems: some View {
         if conversation == nil {
-            Button {
+            Button { run {
                 Task { if let id = await model.fork() { open(.thread(id: id)) } }
-            } label: { Label("Fork thread", systemImage: "arrow.triangle.branch") }
+            } } label: { Label("Fork thread", systemImage: "arrow.triangle.branch") }
         }
-        Button { showingContext = true } label: {
+        Button { run { showingContext = true } } label: {
             Label("Context usage", systemImage: "chart.bar")
         }
-        Button { confirmingCompact = true } label: { Label("Compact context", systemImage: "rectangle.compress.vertical") }
-        Button { confirmingClearContext = true } label: { Label("Clear context", systemImage: "eraser") }
+        Button { run { confirmingCompact = true } } label: { Label("Compact context", systemImage: "rectangle.compress.vertical") }
+        Button { run { confirmingClearContext = true } } label: { Label("Clear context", systemImage: "eraser") }
     }
 
     @ViewBuilder private var shareItems: some View {
         let isMuted = muted.ids.contains(model.threadId)
-        Button {
+        Button { run {
             Task {
                 do {
                     try await muted.set(model.threadId, muted: !isMuted)
@@ -538,16 +609,24 @@ struct ThreadView: View {
                     model.error = BBClient.describe(error, server: client.baseURL)
                 }
             }
-        } label: {
+        } } label: {
             Label(isMuted ? "Unmute notifications" : "Mute notifications", systemImage: isMuted ? "bell" : "bell.slash")
         }
-        Button { showingWeb = true } label: { Label("Open in BB web", systemImage: "safari") }
+        Button { run { showingWeb = true } } label: { Label("Open in BB web", systemImage: "safari") }
         if let thread = model.thread {
             ShareLink(item: client.webURL(forThread: thread).absoluteURL) {
                 Label("Share link", systemImage: "square.and.arrow.up")
             }
         }
-        Button { UIPasteboard.general.string = model.threadId } label: { Label("Copy Thread ID", systemImage: "number") }
+        Button { run { UIPasteboard.general.string = model.threadId } } label: { Label("Copy Thread ID", systemImage: "number") }
+    }
+
+    /// An action from the Workspace sheet (Info, More): the sheet goes first, so
+    /// what the action presents (a sheet, an alert, a push) can show.
+    private func run(_ action: @escaping () -> Void) {
+        guard showingWorkspace else { return action() }
+        showingWorkspace = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { action() }
     }
 
     @ViewBuilder private var jumpButton: some View {
@@ -1076,8 +1155,9 @@ struct ThreadView: View {
 
     private var conversationTitle: some View {
         ConversationTitle(title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? conversation?.conversation?.title ?? "Conversation",
-                          model: conversationModel?.chip ?? executionLabel, pages: roomChat?.pages,
-                          openList: roomChat?.showList) { choosingModel = true }
+                          model: conversationModel?.chip ?? executionLabel, writing: model.thread?.isRunning == true,
+                          tabs: WorkspaceStore.shared.count(model.threadId),
+                          pages: roomChat?.pages, open: openWorkspace)
     }
 
     /// Replaces the `@word` being typed with the mention.
@@ -1160,6 +1240,79 @@ struct ThreadView: View {
     }
 
     private var stackClear: CGFloat { duoLayout.twoPages ? duoLayout.statusColumn : 0 }
+
+    // MARK: The Workspace (round 5, change 3)
+
+    /// The Workspace: Info and Strands, then the conversation's tabs.
+    @ViewBuilder private func workspace(trailingClear: CGFloat = 0) -> some View {
+        WorkspaceView(threadId: model.threadId, trailingClear: trailingClear,
+                      openThread: { id in run { conversation?.openConversation(id) } },
+                      webURL: model.thread.map { client.webURL(forThread: $0) }) {
+            workspaceInfo
+        } strands: {
+            ScrollView {
+                StrandsBox(threadId: model.threadId, panel: true, openThread: { id in run { openStrandThread(id) } })
+                    .padding(12)
+            }
+        }
+    }
+
+    /// Info, in the Workspace sheet: the actions run here, after the sheet goes.
+    private var workspaceInfo: some View {
+        WorkspaceInfoView(thread: model.thread, modelLabel: conversationModel?.chip ?? executionLabel,
+                              cards: approvals.cards.filter { $0.approval.state.waiting },
+                              muted: muted.ids.contains(model.threadId),
+                              canArchive: ConversationFinish.canRemove(conversation?.conversation, running: model.thread?.isRunning == true),
+                              archiving: finishing, shareURL: model.thread.map { client.webURL(forThread: $0).absoluteURL },
+                              act: infoAction) {
+                NavigationLink {
+                    List { menuItems }
+                        .navigationTitle("More")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar { Button("Done") { showingWorkspace = false }.accessibilityIdentifier("workspaceDone") }
+                } label: {
+                    LabeledContent("More", value: "Main, context, files, web, ID")
+                }
+                .accessibilityIdentifier("workspaceMore")
+            }
+    }
+
+    /// What Info asks for, from the sheet or (on the unfolded Duo) from the right screen.
+    private func infoAction(_ action: WorkspaceInfoAction) {
+        switch action {
+        case .approval(let id):
+            run {
+                hiddenApprovals.remove(id)
+                ApprovalSlots.shared.bringUp(id, in: model.threadId)
+            }
+        case .model: run { choosingModel = true }
+        case .notifications:
+            let isMuted = muted.ids.contains(model.threadId)
+            Task {
+                do { try await muted.set(model.threadId, muted: !isMuted) } catch {
+                    model.error = BBClient.describe(error, server: client.baseURL)
+                }
+            }
+        case .find: run { finding = true }
+        case .rename:
+            run {
+                newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
+                renaming = true
+            }
+        case .handsFree: run { startHandsFree() }
+        case .archive: run { finish() }
+        case .more: showingMore = true
+        }
+    }
+
+    /// The title: on the unfolded Duo it shows Info on the right screen; elsewhere it opens the Workspace sheet.
+    private func openWorkspace() {
+        WorkspaceStore.shared.selected[model.threadId] = WorkspaceStore.info
+        if let show = roomChat?.showWorkspace { show() } else {
+            workspaceDetent = .medium
+            showingWorkspace = true
+        }
+    }
 
     // MARK: A Bot conversation's slot, chips and notices
 
@@ -1330,7 +1483,7 @@ struct ThreadView: View {
                     .accessibilityIdentifier("outboxStorageError")
                 }
                 if let status = handoffStatus {
-                    ShelfCard(icon: status.working ? "arrow.triangle.2.circlepath" : "checkmark.circle", tint: status.working ? .orange : .green) {
+                    ShelfCard(icon: status.working ? "arrow.triangle.2.circlepath" : "checkmark.circle", tint: status.working ? .secondary : .green) {
                         HStack(spacing: 6) {
                             if status.working { ProgressView().controlSize(.mini) }
                             Text(status.text).lineLimit(1)
@@ -1348,7 +1501,7 @@ struct ThreadView: View {
                     }
                 }
                 if let pendingPermission, !editing {
-                    ShelfCard(icon: "lock.shield", tint: pendingPermission == "full" ? .orange : .accentColor) {
+                    ShelfCard(icon: "lock.shield", tint: pendingPermission == "full" ? .red : .accentColor) {
                         Button { choosingModel = true } label: {
                             Text("Next message: \(PermissionMode.label(pendingPermission))").lineLimit(1)
                         }
@@ -1361,7 +1514,7 @@ struct ThreadView: View {
                     .accessibilityIdentifier("pendingPermission")
                 }
                 if let review = model.planReview {
-                    ShelfCard(icon: "doc.text.magnifyingglass", tint: .orange) {
+                    ShelfCard(icon: "doc.text.magnifyingglass", tint: look.needsYou) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Plan ready for review").fontWeight(.medium)
                             if let title = review.title, !title.isEmpty {
@@ -1407,6 +1560,8 @@ struct ThreadView: View {
                     label: ThreadNotes.expandLabel(hasNote: notes.note != nil, draftEmpty: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
                     busy: notes.expanding, disabled: dictation.blocksSend, run: expandToPage) : nil,
                 compact: true, prominentMic: compactInput, micTint: compactInput ? look.micTint : nil,
+                stop: conversation != nil && model.thread?.isRunning == true && !isWorker ? { Task { await model.stop() } } : nil,
+                handsFree: conversation != nil ? { startHandsFree() } : nil,
                 top: conversation != nil && !composerChips.isEmpty
                     ? AnyView(ComposerChipsRow(chips: composerChips, goal: model.shelf.goal?.objective, tap: tapChip, close: closeChip)) : nil
             ) {
@@ -1694,6 +1849,7 @@ extension ScrollGeometry {
 
 /// Grey bubbles where a chat's messages will be, until the first rows arrive.
 struct ChatSkeleton: View {
+    @Environment(\.look) private var look
     var bot = false
     private static let bubbles: [(mine: Bool, width: CGFloat, height: CGFloat)] = [
         (false, 0.7, 64), (true, 0.45, 40), (false, 0.8, 96), (false, 0.55, 40), (true, 0.6, 40), (false, 0.75, 80),
@@ -1769,7 +1925,7 @@ extension ThreadView {
         } else {
             FoldedBackButton()
         }
-        threadActions
+        if conversation != nil { railActions } else { threadActions }
         // The ↓ joins the rail's round buttons, so it never narrows the composer. With the
         // keyboard up the rail has no room under ⋯; sending jumps to the end anyway.
         if jumpState.shown && !composerFocused {
@@ -1782,7 +1938,7 @@ extension ThreadView {
                     Circle().fill(look.accent).frame(width: 9, height: 9).offset(x: -6, y: 6).allowsHitTesting(false)
                 }
             }
-            .tint(jumpState.note != nil ? .orange : nil)
+            .tint(jumpState.note != nil ? look.needsYou : nil)
             .transition(.opacity.combined(with: .scale(scale: 0.8)))
             .accessibilityIdentifier("jumpToLatest")
         }
@@ -2092,7 +2248,7 @@ extension ThreadView {
             .frame(minWidth: 40, minHeight: 40)
             .padding(.horizontal, label != nil ? 10 : 0)
         }
-        .buttonStyle(.glass(state.note != nil ? .regular.tint(.orange) : .regular))
+        .buttonStyle(.glass(state.note != nil ? .regular.tint(look.needsYou) : .regular))
         .background(look.stackFill, in: .capsule)
         .clipShape(.capsule)
         .padding(12)
@@ -2141,7 +2297,7 @@ struct InlineJump: ViewModifier {
                 .font(.body.weight(.semibold))
                 .frame(width: 44, height: 44)
                 .background(look.stackFill, in: .circle)
-                .glassEffect(state.note != nil ? .regular.tint(.orange) : .regular, in: .circle)
+                .glassEffect(state.note != nil ? .regular.tint(look.needsYou) : .regular, in: .circle)
                 .overlay(alignment: .topTrailing) {
                     if state.unseen > 0, state.note == nil {
                         Circle().fill(look.accent).frame(width: 9, height: 9).offset(x: -6, y: 6)

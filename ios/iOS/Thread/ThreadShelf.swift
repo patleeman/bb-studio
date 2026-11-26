@@ -3,6 +3,7 @@ import SwiftUI
 /// The cards BB web stacks above the composer: model fallback, plan mode, goal,
 /// background work, todos and queued messages. Each shows only when it applies.
 struct ThreadShelf: View {
+    @Environment(\.look) private var look
     let model: ThreadModel
     let shelf: ThreadModel.Shelf
     let queued: [QueuedMessage]
@@ -19,7 +20,7 @@ struct ThreadShelf: View {
             if let fallback = shelf.fallback, let seq = fallback.sourceSeq,
                 !dismissedFallbacks.split(separator: ",").contains(Substring(String(Int(seq))))
             {
-                ShelfCard(icon: "arrow.triangle.swap", tint: .orange) {
+                ShelfCard(icon: "arrow.triangle.swap", tint: .secondary) {
                     Text("Switched from \(fallback.originalModel) to \(fallback.fallbackModel)").lineLimit(2)
                 } trailing: {
                     dismiss("Dismiss") { dismissedFallbacks += ",\(Int(seq))" }

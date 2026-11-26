@@ -162,6 +162,8 @@ struct RoomChat {
     var pages: RoomChatPages? = nil
     /// The unfolded Duo's left screen shows its strands: no box above the composer.
     var strandsBeside = false
+    /// The unfolded Duo: the title shows the Workspace on the right screen instead of a sheet.
+    var showWorkspace: (() -> Void)? = nil
 }
 
 struct RoomChatPages: Equatable {

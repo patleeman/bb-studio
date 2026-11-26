@@ -203,7 +203,7 @@ struct RouteDestination: View {
     var body: some View {
         switch route {
         case .page: threadsAndTools.studioStar(route)
-        case .thread, .pages, .automations, .automation, .usage, .archived, .memoryRecord: threadsAndTools
+        case .thread, .pages, .automations, .automation, .usage, .archived, .memoryRecord, .roomPlace: threadsAndTools
         case .visualChats, .visualChat: visualChat
         case .terminals: studioItems
         default: studioItems.studioStar(route)

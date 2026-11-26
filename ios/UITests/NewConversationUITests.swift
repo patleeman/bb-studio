@@ -28,8 +28,9 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
 
     private func openNewConversation() {
         app.buttons["roomList"].tap()
-        let row = app.buttons["roomNewConversationRow"]
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "+ New conversation at the top of the list")
+        // Round 5: Home's composer is the one way in (no "+ New conversation" row).
+        let row = app.buttons["roomNewConversation"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "Home's composer")
         shot("1-list")
         row.tap()
         XCTAssertTrue(any("newConversationWith").waitForExistence(timeout: 10), "the New conversation sheet")
@@ -71,7 +72,8 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
         launch()
         openNewConversation()
         app.buttons["newConversationBot"].tap()
-        let home = app.buttons["Home"]
+        // The Bot named Home, not the header's Home button (round 5).
+        let home = app.buttons.matching(NSPredicate(format: "label == 'Home' AND identifier != 'roomList'")).firstMatch
         XCTAssertTrue(home.waitForExistence(timeout: 5), "every Bot, to pick from")
         XCTAssertTrue(app.buttons["No Bot: a thread in a project"].exists, "or a plain thread")
         shot("4-bots")

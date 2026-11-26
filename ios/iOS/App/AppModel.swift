@@ -22,6 +22,8 @@ enum Route: Hashable {
     case visualChats
     case visualChat(threadId: String?)
     case memoryRecord(id: String)
+    /// A Bot's place (Strands, Memory, Library…) pushed in Home's list; only the list draws it.
+    case roomPlace(String)
 }
 
 extension Route {

@@ -220,7 +220,7 @@ struct StrandsBox: View {
 
     private func section(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+            .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             .padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 2)
             .accessibilityAddTraits(.isHeader)
     }
@@ -279,7 +279,7 @@ struct StrandsBox: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(ask.label.isEmpty ? "A reply needs you" : ask.label).font(.footnote).multilineTextAlignment(.leading)
                     Spacer(minLength: 4)
-                    Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                    Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                 }
                 .frame(minHeight: 32)
                 .contentShape(.rect)
@@ -350,7 +350,7 @@ struct StrandsBox: View {
                 BotWorkerGlyph(status: worker.status).frame(width: 14)
                 Text(worker.title.isEmpty ? "Worker" : worker.title).font(.footnote).lineLimit(1)
                 Spacer(minLength: 4)
-                Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             }
             .frame(minHeight: 32)
             .contentShape(.rect)
@@ -397,7 +397,7 @@ struct StrandsPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("\(title) · strands".uppercased())
-                .font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                 .accessibilityAddTraits(.isHeader)
             StrandsBox(threadId: threadId, panel: true, openThread: openThread)
         }

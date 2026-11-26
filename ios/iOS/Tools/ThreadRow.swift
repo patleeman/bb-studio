@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ConnectionBanner: View {
+    @Environment(\.look) private var look
     let message: String
     let retry: () async -> Void
     @State private var retrying = false
@@ -8,7 +9,7 @@ struct ConnectionBanner: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(message, systemImage: "wifi.exclamationmark")
-                .foregroundStyle(.orange)
+                .foregroundStyle(.secondary)
                 .font(.footnote.weight(.medium))
             if message.contains("Tailscale") {
                 Text("Showing the last saved inbox. Turn on Tailscale, or check that the Mac is awake and BB is running.")
@@ -88,6 +89,7 @@ struct ThreadRow: View {
 }
 
 struct StatusDot: View {
+    @Environment(\.look) private var look
     let thread: ThreadEntry
 
     var body: some View {
@@ -99,7 +101,7 @@ struct StatusDot: View {
 
     private var color: Color {
         if thread.status == "error" { return .red }
-        if thread.hasPendingInteraction == true { return .orange }
+        if thread.hasPendingInteraction == true { return look.needsYou }
         if thread.isRunning { return .green }
         return .blue
     }

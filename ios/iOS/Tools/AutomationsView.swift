@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Every automation on the server, by project, with run-now and pause.
 struct AutomationsView: View {
+    @Environment(\.look) private var look
     @EnvironmentObject private var app: AppModel
     @State private var entries: [(automation: Automation, projectName: String)] = []
     @State private var loaded = false
@@ -102,7 +103,7 @@ struct AutomationsView: View {
             Button { Task { await setEnabled(automation, !enabled) } } label: {
                 Label(enabled ? "Pause" : "Resume", systemImage: enabled ? "pause.fill" : "play.fill")
             }
-            .tint(enabled ? .orange : .blue)
+            .tint(enabled ? look.accent : .blue)
         }
     }
 

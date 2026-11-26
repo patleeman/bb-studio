@@ -29,9 +29,7 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
     }
 
     private func openArchive() {
-        let archive = app.buttons["roomArchive"]
-        for _ in 0..<4 where !archive.isHittable { app.swipeUp() }
-        archive.tap()
+        app.openRoomPlace("archive")
         XCTAssertTrue(app.navigationBars["Archive"].waitForExistence(timeout: 15))
     }
 
@@ -49,9 +47,7 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
     private func shown(_ page: String, _ name: String) -> String { app.isFoldedDuo ? name : page }
 
     private func openMore() {
-        let more = app.buttons["More"].firstMatch
-        XCTAssertTrue(more.waitForExistence(timeout: 15), "the ⋯ menu")
-        more.tap()
+        app.openConversationMenu()
         XCTAssertTrue(app.buttons["menuModel"].waitForExistence(timeout: 5))
     }
 

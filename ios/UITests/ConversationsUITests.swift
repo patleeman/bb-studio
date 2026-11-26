@@ -18,10 +18,11 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
     func testReplyInThreadOpensASheetAndLeavesAReplyRow() {
         launch()
         // The folded Duo's header is its title; the model is in its ⋯.
+        // Elsewhere the model is the title's second line (round 5: no chip).
         if !app.isFoldedDuo {
-            let chip = app.buttons["conversationModelChip"]
-            XCTAssertTrue(chip.waitForExistence(timeout: 10), "the model chip is in the header")
-            XCTAssertTrue(chip.label.contains("Opus 5.5"), chip.label)
+            let title = app.buttons["conversationMore"]
+            XCTAssertTrue(title.waitForExistence(timeout: 10), "the title in the header")
+            XCTAssertTrue(title.label.contains("Opus 5.5"), title.label)
         }
         XCTAssertFalse(app.buttons["conversationWorkers"].exists, "workers are in the strands box, not a line of their own")
         XCTAssertFalse(app.buttons["Model & permissions"].exists, "the model picker left the input bar")
@@ -97,7 +98,7 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
 
     func testMainHasNoFinish() {
         launch("list")
-        app.conversationMore.tap()
+        app.openConversationMenu()
         XCTAssertTrue(app.buttons["menuModel"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["menuArchive"].exists)
         XCTAssertFalse(app.buttons["menuDelete"].exists)

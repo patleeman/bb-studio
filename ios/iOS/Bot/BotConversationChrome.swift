@@ -131,73 +131,73 @@ struct ConversationReplyRow: View {
     }
 }
 
+/// A Bot conversation's title, the header's one control besides Home
+/// (round 5): its name, and under it the model and how many Workspace tabs
+/// are open, or "Writing" while a reply runs. Tapping it opens the
+/// Workspace (Info first): a sheet on the iPhone, the right screen on the
+/// unfolded Duo. The page dots are gone from view; VoiceOver still hears
+/// "Conversation 2 of 4".
 struct ConversationTitle: View {
     let title: String
     let model: String?
+    var writing = false
+    var tabs = 0
     var pages: RoomChatPages? = nil
-    /// Tapping the name opens the conversation list (the conversation is home).
-    var openList: (() -> Void)? = nil
-    let choose: () -> Void
+    let open: () -> Void
 
-    var body: some View {
-        VStack(spacing: 1) {
-            Group {
-                if let openList {
-                    Button(action: openList) {
-                        HStack(spacing: 3) {
-                            Text(title).lineLimit(1)
-                            Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
-                        }
-                        .font(.headline)
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("\(title), conversations")
-                    .accessibilityIdentifier("conversationTitleList")
-                } else {
-                    Text(title).font(.headline).lineLimit(1)
-                }
-            }
-            .id(title)
-            .transition(.push(from: .trailing).combined(with: .opacity))
-            HStack(spacing: 6) {
-                if let pages, pages.count > 1 {
-                    HStack(spacing: 4) {
-                        ForEach(0..<min(pages.count, 9), id: \.self) { at in
-                            Capsule().fill(.primary.opacity(at == pages.index ? 0.8 : 0.25))
-                                .frame(width: at == pages.index ? 10 : 4, height: 4)
-                        }
-                    }
-                    .animation(.snappy, value: pages.index)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Conversation \(pages.index + 1) of \(pages.count)")
-                    .accessibilityIdentifier("conversationPageDots")
-                }
-                chip
-            }
-        }
+    /// Model and tab count; the count goes before the model would truncate (large text).
+    private var subtitle: String {
+        let lead = writing ? "Writing" : (model ?? "")
+        guard tabs > 0 else { return lead }
+        let count = "\(tabs) \(tabs == 1 ? "tab" : "tabs")"
+        return lead.isEmpty ? count : "\(lead) · \(count)"
     }
 
-    private var chip: some View {
-            Button(action: choose) {
+    var body: some View {
+        Button(action: open) {
+            VStack(spacing: 1) {
                 HStack(spacing: 3) {
-                    Text(model ?? "Model").lineLimit(1)
-                    Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+                    Text(title).lineLimit(1)
+                    Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
                 }
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(.fill.tertiary, in: .capsule)
-                .contentShape(.capsule)
+                .font(.headline)
+                .id(title)
+                .transition(.push(from: .trailing).combined(with: .opacity))
+                if !subtitle.isEmpty {
+                    HStack(spacing: 4) {
+                        if writing { ProgressView().controlSize(.mini) }
+                        // Large text: the tab count goes before the model would truncate.
+                        ViewThatFits(in: .horizontal) {
+                            Text(subtitle).lineLimit(1)
+                            Text(writing ? "Writing" : (model ?? subtitle)).lineLimit(1)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Model: \(model ?? "unknown")")
-            .accessibilityIdentifier("conversationModelChip")
+            .foregroundStyle(.primary)
+            .frame(minHeight: 44)
+            .contentShape(.rect)
+        }
+        // No style of its own: in the Duo's header, `DuoHeaderButtonStyle` routes the tap.
+        .tint(.primary)
+        .accessibilityLabel([title, subtitle].filter { !$0.isEmpty }.joined(separator: ", "))
+        .accessibilityHint("Opens the conversation's Workspace")
+        .accessibilityIdentifier("conversationMore")
+        .overlay(alignment: .bottom) {
+            if let pages, pages.count > 1 {
+                Color.clear.frame(width: 1, height: 1)
+                    .accessibilityElement()
+                    .accessibilityLabel("Conversation \(pages.index + 1) of \(pages.count)")
+                    .accessibilityIdentifier("conversationPageDots")
+            }
+        }
     }
 }
 
 struct WorkerTitle: View {
+    @Environment(\.look) private var look
     let info: WorkerInfo
 
     var body: some View {
@@ -209,7 +209,7 @@ struct WorkerTitle: View {
                     Text(info.headerLabel(now: context.date)).lineLimit(1)
                 }
                 .font(.caption)
-                .foregroundStyle(info.status == .needsYou ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                .foregroundStyle(info.status == .needsYou ? AnyShapeStyle(look.needsYou) : AnyShapeStyle(.secondary))
             }
         }
         .accessibilityElement(children: .ignore)

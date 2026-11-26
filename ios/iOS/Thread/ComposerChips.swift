@@ -71,7 +71,7 @@ struct ComposerChipsRow: View {
                     }
                     .padding(.leading, 10)
                     .padding(.trailing, chip.closes ? 0 : 10)
-                    .frame(height: 30)
+                    .frame(minHeight: 30)
                     .background(.fill.tertiary, in: .capsule)
                     .frame(minHeight: 44)
                     .contentShape(.rect)

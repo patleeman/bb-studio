@@ -295,6 +295,7 @@ struct PageRow: View {
 
 /// Says why pages couldn't load, with a retry. The cached tree stays on screen.
 struct PagesErrorRow: View {
+    @Environment(\.look) private var look
     let message: String
     let retry: () async -> Void
     @State private var retrying = false
@@ -302,7 +303,7 @@ struct PagesErrorRow: View {
     var body: some View {
         HStack {
             Label(message, systemImage: "wifi.exclamationmark")
-                .foregroundStyle(.orange)
+                .foregroundStyle(.secondary)
                 .font(.footnote.weight(.medium))
             Spacer()
             Button {

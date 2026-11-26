@@ -198,6 +198,10 @@ struct ComposerBar<Settings: View, Send: View>: View {
     var prominentMic = false
     var micTint: Color?
     var attaches = true
+    /// While a reply runs: Stop, just before the mic and Send (a Bot conversation).
+    var stop: (() -> Void)? = nil
+    /// "Talk hands-free", first in the "+" menu (a Bot conversation).
+    var handsFree: (() -> Void)? = nil
     /// A row pinned at the composer's top: a Bot conversation's lasting states (`ComposerChipsRow`).
     var top: AnyView? = nil
     @ViewBuilder let settings: () -> Settings
@@ -215,7 +219,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
                 // One field in the same place either way: rebuilt in another
                 // branch, its text view lost the keyboard it had just taken.
                 HStack(alignment: .bottom, spacing: 2) {
-                    if oneRow && attaches { AttachmentMenu(items: $attachments, symbol: "plus", tint: micTint) }
+                    if oneRow && attaches { AttachmentMenu(items: $attachments, symbol: "plus", tint: micTint, handsFree: handsFree) }
                     field(top: oneRow ? 0 : 4)
                         .padding(.bottom, oneRow ? ComposerRow.lift : 0)
                         .padding(.top, oneRow ? ComposerRow.headroom : 0)
@@ -229,7 +233,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
             }
             if !oneRow {
                 HStack(spacing: 2) {
-                    if attaches { AttachmentMenu(items: $attachments, symbol: "plus", tint: micTint) }
+                    if attaches { AttachmentMenu(items: $attachments, symbol: "plus", tint: micTint, handsFree: handsFree) }
                     settings()
                     Spacer(minLength: 4)
                     if let toPage {
@@ -281,6 +285,18 @@ struct ComposerBar<Settings: View, Send: View>: View {
     }
 
     @ViewBuilder private var micAndSend: some View {
+        if let stop {
+            Button(action: stop) {
+                Image(systemName: "stop.fill").font(.footnote.weight(.bold))
+                    .frame(width: 34, height: 34)
+                    .background(.fill.secondary, in: .circle)
+                    .frame(width: ComposerRow.button, height: ComposerRow.button)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Stop")
+            .accessibilityIdentifier("composerStop")
+        }
         if let talk {
             HoldToTalkMic(talk: talk, prominent: prominentMic && empty && micTint == nil, themeTint: micTint)
         } else {

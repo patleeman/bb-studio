@@ -22,7 +22,7 @@ struct BotChildCard: View {
         switch status {
         case .running, .finished: .green
         case .failed: .red
-        case .needsYou: .orange
+        case .needsYou: look.needsYou
         case .stopped, .waiting: .secondary
         }
     }
@@ -47,7 +47,7 @@ struct BotChildCard: View {
                 }
                 Spacer(minLength: 0)
                 if event.threadId != nil {
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 10)

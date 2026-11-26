@@ -71,6 +71,11 @@ struct RoomView: View {
     @State private var startingConversation = false
     @State private var composeText = ""
     @State private var settingsOpen = false
+    /// The unfolded Duo (round 5): Home on the left and the live conversation
+    /// on the right, or the conversation on the left and its Workspace on the right.
+    @State private var duoHome = true
+    /// A worker opened live on the right screen, in place of the Workspace.
+    @State private var duoWorker: String?
     /// Asked to show a conversation (a link, a pick, a Bot switch that opens
     /// one): the room's opening (Main, or the last one) doesn't replace it.
     @State private var focused = false
@@ -228,6 +233,22 @@ struct RoomView: View {
                 }
                 .navigationDestination(for: Route.self) { route in destination(route) }
         }
+        // The leading edge is back to Home (round 5): a swipe in from it goes
+        // home; a sideways swipe anywhere else pages conversations, which
+        // already ignores drags that start at the edge. Clear of the composer.
+        .overlay(alignment: .leading) {
+            if router.detailPath.isEmpty {
+                Color.clear
+                    .frame(width: 22)
+                    .padding(.top, 100)
+                    .padding(.bottom, 150)
+                    .contentShape(.rect)
+                    .gesture(DragGesture(minimumDistance: 12).onEnded { drag in
+                        if drag.translation.width > 60, abs(drag.translation.height) < drag.translation.width { showList() }
+                    })
+                    .accessibilityHidden(true)
+            }
+        }
         .sheet(item: placeBinding) { place in
             RoomPlaceSheet(place: place, bot: bot, store: store, mainThreadId: mainThreadId,
                            open: openItem, startedConversation: { id in openItem(.conversation(id)) },
@@ -246,37 +267,17 @@ struct RoomView: View {
     private func duo(_ proxy: GeometryProxy, _ pages: DuoPages) -> some View {
         ZStack {
             RoomCanvas(pages: pages, layout: layout) {
-                ZStack(alignment: .bottom) {
-                RoomContextPane(bot: bot, view: view, shown: pager.shown, mainThreadId: mainThreadId, order: order,
-                                    pick: { id in
-                                        router.detailPath = []
-                                        show(id)
-                                    },
-                                    openThread: { id in router.detailPath = [.thread(id: id)] },
-                                    openPlace: { router.showPlace($0) }, settings: openSettings,
-                                    refresh: { [store] in await store.refresh() },
-                                    switchBot: { switchTo($0, opening: nil) },
-                                    newConversation: {
-                                        composeText = ""
-                                        startingConversation = true
-                                    })
+                if duoHome || pages != .sideBySide {
+                    contextPane(proxy)
+                } else {
+                    leftChat
                 }
-                .padding(.top, proxy.safeAreaInsets.top)
-                .padding(.bottom, 8)
-                .ignoresSafeArea(.container, edges: [.top, .bottom])
-                .environment(\.colorScheme, .dark)
             } second: {
-                NavigationStack(path: $router.detailPath) {
-                    chat()
-                        .containerBackground(.clear, for: .navigation)
-                        .navigationDestination(for: Route.self) { route in destination(route) }
+                if duoHome || pages != .sideBySide {
+                    rightChat(proxy, pages)
+                } else {
+                    rightWorkspace(proxy)
                 }
-                .environment(\.duoLayout, pages == .sideBySide && layout.twoPages ? layout : DuoLayout(size: .zero, innerScreen: layout.innerScreen))
-                .environment(nil as DuoPaneState?)
-                .ignoresSafeArea(.container, edges: pages == .sideBySide && layout.twoPages ? .trailing : [])
-                .padding(.trailing, pages == .sideBySide ? max(0, FoldedChrome.column - proxy.safeAreaInsets.trailing) : 0)
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("roomConversation")
             }
             .background {
                 ZStack {
@@ -303,6 +304,102 @@ struct RoomView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: spreadOpen)
+    }
+
+    /// Home: the Bot's list, strands, workers and places (the unfolded Duo's left screen).
+    private func contextPane(_ proxy: GeometryProxy) -> some View {
+        ZStack(alignment: .bottom) {
+            RoomContextPane(bot: bot, view: view, shown: pager.shown, mainThreadId: mainThreadId, order: order,
+                            pick: { id in
+                                router.detailPath = []
+                                show(id)
+                            },
+                            openThread: { id in router.detailPath = [.thread(id: id)] },
+                            openPlace: { router.showPlace($0) }, settings: openSettings,
+                            refresh: { [store] in await store.refresh() },
+                            switchBot: { switchTo($0, opening: nil) },
+                            newConversation: {
+                                composeText = ""
+                                startingConversation = true
+                            })
+        }
+        .padding(.top, proxy.safeAreaInsets.top)
+        .padding(.bottom, 8)
+        .ignoresSafeArea(.container, edges: [.top, .bottom])
+        .environment(\.colorScheme, .dark)
+    }
+
+    /// The live conversation on the right screen, beside Home.
+    private func rightChat(_ proxy: GeometryProxy, _ pages: DuoPages) -> some View {
+        NavigationStack(path: $router.detailPath) {
+            chat()
+                .containerBackground(.clear, for: .navigation)
+                .navigationDestination(for: Route.self) { route in destination(route) }
+        }
+        .environment(\.duoLayout, pages == .sideBySide && layout.twoPages ? layout : DuoLayout(size: .zero, innerScreen: layout.innerScreen))
+        .environment(nil as DuoPaneState?)
+        .ignoresSafeArea(.container, edges: pages == .sideBySide && layout.twoPages ? .trailing : [])
+        .padding(.trailing, pages == .sideBySide ? max(0, FoldedChrome.column - proxy.safeAreaInsets.trailing) : 0)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("roomConversation")
+    }
+
+    /// The conversation on the left screen, its Workspace on the right: a phone-style header with Home.
+    private var leftChat: some View {
+        NavigationStack(path: $router.detailPath) {
+            chat()
+                .containerBackground(.clear, for: .navigation)
+                .navigationDestination(for: Route.self) { route in destination(route) }
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        RoomHomeButton(bot: bot, view: view, needsYou: BotShell.needsYou(bot, view: view)) {
+                            withAnimation(.snappy) {
+                                duoWorker = nil
+                                duoHome = true
+                            }
+                        }
+                    }
+                }
+        }
+        .environment(\.duoLayout, DuoLayout(size: .zero, innerScreen: layout.innerScreen))
+        // A phone-style header (Home and the title), not the folded rail.
+        .environment(\.duoPage, false)
+        .environment(nil as DuoPaneState?)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("roomConversation")
+    }
+
+    /// The right screen beside the conversation: its Workspace, or a worker live.
+    @ViewBuilder private func rightWorkspace(_ proxy: GeometryProxy) -> some View {
+        Group {
+            if let worker = duoWorker {
+                NavigationStack {
+                    ThreadView(threadId: worker).id(worker)
+                        .environment(\.botConversation, context(worker, kind: .worker))
+                        .toolbar {
+                            ToolbarItem(placement: .topBarLeading) {
+                                Button { withAnimation(.snappy) { duoWorker = nil } } label: { Label("Workspace", systemImage: "chevron.left") }
+                                    .accessibilityIdentifier("duoWorkerBack")
+                            }
+                        }
+                }
+                .environment(\.duoLayout, DuoLayout(size: .zero, innerScreen: layout.innerScreen))
+            } else {
+                DuoWorkspacePane(threadId: pager.shown, model: session.model, conversation: shownConversationForPane,
+                                 openThread: { id in withAnimation(.snappy) { duoWorker = id } })
+                    .padding(.top, proxy.safeAreaInsets.top)
+            }
+        }
+        // Clear of the status column (84 pt from the screen's edge), whatever the safe area says.
+        .padding(.trailing, FoldedChrome.column)
+        .ignoresSafeArea(.container, edges: [.top, .trailing])
+        .environment(\.colorScheme, .dark)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("duoWorkspace")
+    }
+
+    private var shownConversationForPane: BotConversation? {
+        view?.conversations.first { $0.threadId == pager.shown }
     }
 
     private var spreadOpen: Bool { pages != nil && (router.place != nil || settingsOpen) }
@@ -355,7 +452,13 @@ struct RoomView: View {
                                           showList: pages == nil ? showList : nil,
                                           page: order.count > 1 ? chatPage : nil,
                                           pages: RoomChatPages(index: order.firstIndex(of: pager.shown) ?? 0, count: order.count),
-                                          strandsBeside: pages != nil))
+                                          strandsBeside: pages != nil && duoHome,
+                                          showWorkspace: pages == .sideBySide ? {
+                                              withAnimation(.snappy) {
+                                                  duoWorker = nil
+                                                  duoHome = false
+                                              }
+                                          } : nil))
         // The room is dark under its frost and shade, whatever variant the
         // scene's driver chose for the hour: the conversation's chrome (its
         // bottom band, strands pill, composer, header) takes the theme's dark
@@ -509,7 +612,13 @@ struct RoomView: View {
 
     private func context(_ threadId: String, kind: BotConversationContext.Kind) -> BotConversationContext {
         BotShell.context(threadId: threadId, kind: kind, bot: bot, view: view, splitsThreads: false,
-                         push: { [router] route in router.detailPath.append(route) },
+                         push: { [router] route in
+                             if pages == .sideBySide, !duoHome, case .thread(let id) = route, id != pager.shown {
+                                 withAnimation(.snappy) { duoWorker = id }
+                             } else {
+                                 router.detailPath.append(route)
+                             }
+                         },
                          openConversation: { id in openItem(.conversation(id)) },
                          showList: { [router] in
                              router.detailPath = []

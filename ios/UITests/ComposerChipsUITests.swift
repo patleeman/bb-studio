@@ -20,7 +20,10 @@ final class ComposerChipsUITests: ServerIsolatedUITestCase {
         for chip in ["chip-planMode", "chip-goal", "chip-todos", "chip-background"] {
             XCTAssertTrue(any(chip).exists, "\(chip) is a chip")
         }
-        XCTAssertTrue(any("notice-fallback-1").waitForExistence(timeout: 10), "the model fallback is a transcript line")
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/bottom")!)
+        sleep(2)
+        let fallback = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'notice-fallback-' AND NOT (identifier ENDSWITH '-action')")).firstMatch
+        XCTAssertTrue(fallback.waitForExistence(timeout: 10), "the model fallback is a transcript line")
 
         let toggle = app.buttons["strands-toggle"]
         XCTAssertTrue(toggle.exists, "the strands line is the slot")
@@ -34,8 +37,8 @@ final class ComposerChipsUITests: ServerIsolatedUITestCase {
         shot("2-todos")
         app.buttons["Done"].tap()
 
-        app.buttons["notice-fallback-1-action"].tap()
-        XCTAssertTrue(any("notice-fallback-1").waitForNonExistence(timeout: 5), "Dismiss takes the line away")
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'notice-fallback-' AND identifier ENDSWITH '-action'")).firstMatch.tap()
+        XCTAssertTrue(fallback.waitForNonExistence(timeout: 5), "Dismiss takes the line away")
     }
 
     private func shot(_ name: String) {

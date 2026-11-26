@@ -34,8 +34,9 @@ enum RoomHome {
     }
 }
 
-/// The header's Bot mark: its avatar still (no animation), amber while
-/// something needs you. Opens the conversation list.
+/// The header's way home (round 5): a back chevron and the Bot's avatar
+/// still (no animation), with an amber dot while something else needs you.
+/// Opens the conversation list.
 struct RoomHomeButton: View {
     let bot: BotSpace
     let view: BotThreadsView?
@@ -45,6 +46,8 @@ struct RoomHomeButton: View {
 
     var body: some View {
         Button(action: action) {
+            HStack(spacing: 2) {
+            Image(systemName: "chevron.left").font(.body.weight(.semibold)).foregroundStyle(.primary)
             ZStack(alignment: .topTrailing) {
                 PresenceView(bot: bot, state: bot.presenceState(live: view),
                              workers: view?.workers.filter { $0.status == .running }.count ?? bot.activity.workers,
@@ -55,11 +58,14 @@ struct RoomHomeButton: View {
                         .offset(x: 2, y: -2)
                 }
             }
-            .frame(width: 44, height: 44)
+            }
+            .padding(.horizontal, 4)
+            .frame(minHeight: 44)
+            .fixedSize()
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(needsYou ? "Conversations, something needs you" : "Conversations")
+        .accessibilityLabel(needsYou ? "Home, something needs you" : "Home")
         .accessibilityIdentifier("roomList")
     }
 }
@@ -73,6 +79,9 @@ struct RoomListHeader: View {
     var refresh: (() async -> Void)? = nil
     /// With it and more than one Bot, the name is a menu of the Bots: pick one to switch to it.
     var switchBot: ((String) -> Void)? = nil
+    /// With it, the name is the Bot menu (round 5): the Bots, then this Bot's
+    /// places (Strands, Memory, Library, Schedules, Theme, Archive).
+    var openPlace: ((RoomPlace) -> Void)? = nil
     @ObservedObject private var spaces = BotSpacesStore.shared
 
     var body: some View {
@@ -93,29 +102,41 @@ struct RoomListHeader: View {
 
     @ViewBuilder private var name: some View {
         let bots = spaces.spaces?.bots ?? []
-        if let switchBot, bots.count > 1 {
+        let switches = switchBot != nil && bots.count > 1
+        if switches || openPlace != nil {
             Menu {
-                Picker("Bot", selection: Binding(get: { bot.id }, set: { if $0 != bot.id { switchBot($0) } })) {
-                    ForEach(bots) { each in
-                        Label {
-                            Text(each.name)
-                        } icon: {
-                            if each.needsYou { Image(systemName: "exclamationmark.circle") }
+                if let switchBot, switches {
+                    Picker("Bot", selection: Binding(get: { bot.id }, set: { if $0 != bot.id { switchBot($0) } })) {
+                        ForEach(bots) { each in
+                            Label {
+                                Text(each.name)
+                            } icon: {
+                                if each.needsYou { Image(systemName: "exclamationmark.circle") }
+                            }
+                            .tag(each.id)
+                            .accessibilityIdentifier("botSwitch-\(each.id)")
                         }
-                        .tag(each.id)
-                        .accessibilityIdentifier("botSwitch-\(each.id)")
+                    }
+                    .pickerStyle(.inline)
+                }
+                if let openPlace {
+                    Section(bot.name) {
+                        ForEach(RoomPlace.homeList + [.archive]) { place in
+                            Button { openPlace(place) } label: { Label(place.title, systemImage: place.symbol) }
+                                .accessibilityIdentifier(place == .archive ? "roomArchive" : "roomPlace-\(place.rawValue)")
+                        }
                     }
                 }
-                .pickerStyle(.inline)
             } label: {
                 HStack(spacing: 4) {
                     Text(bot.name).font(.title3.weight(.semibold))
                     Image(systemName: "chevron.down").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                 }
                 .foregroundStyle(.primary)
+                .frame(minHeight: 44)
                 .contentShape(.rect)
             }
-            .accessibilityLabel("\(bot.name), switch Bot")
+            .accessibilityLabel(switches ? "\(bot.name), switch Bot and places" : "\(bot.name), places")
             .accessibilityIdentifier("botSwitcher")
         } else {
             Text(bot.name).font(.title3.weight(.semibold))
@@ -268,7 +289,7 @@ struct RoomContextPane: View {
 
     private func section(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+            .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             .padding(.bottom, 4)
             .accessibilityAddTraits(.isHeader)
     }

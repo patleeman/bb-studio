@@ -51,6 +51,8 @@ struct AttachmentMenu: View {
     @Binding var items: [PendingAttachment]
     var symbol = "paperclip"
     var tint: Color?
+    /// "Talk hands-free" at the top, where the header's waveform was (a Bot conversation).
+    var handsFree: (() -> Void)? = nil
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var choosingPhotos = false
     @State private var usingCamera = false
@@ -58,6 +60,12 @@ struct AttachmentMenu: View {
 
     var body: some View {
         Menu {
+            if let handsFree {
+                Section {
+                    Button(action: handsFree) { Label("Talk hands-free", systemImage: "waveform") }
+                        .accessibilityIdentifier("composerHandsFree")
+                }
+            }
             Button { choosingPhotos = true } label: { Label("Photo Library", systemImage: "photo.on.rectangle") }
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button { usingCamera = true } label: { Label("Take Photo", systemImage: "camera") }

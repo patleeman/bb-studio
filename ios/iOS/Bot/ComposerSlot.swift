@@ -81,6 +81,12 @@ final class ApprovalSlots {
 
     /// Card ids (`<worker thread>:<interaction>`) by conversation.
     private(set) var cards: [String: Set<String>] = [:]
+    /// The waiting cards themselves, for the Workspace's Info (Needs you).
+    private(set) var waiting: [String: [ConversationApprovals.Card]] = [:]
+
+    func setWaiting(_ list: [ConversationApprovals.Card], for threadId: String) {
+        if waiting[threadId] != list { waiting[threadId] = list }
+    }
     /// A card a conversation was asked to bring up (an ask tapped in the strands box).
     private(set) var requests: [String: String] = [:]
 
@@ -90,6 +96,7 @@ final class ApprovalSlots {
 
     func clear(_ threadId: String) {
         cards[threadId] = nil
+        waiting[threadId] = nil
         requests[threadId] = nil
     }
 
