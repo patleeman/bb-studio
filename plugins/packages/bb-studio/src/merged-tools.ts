@@ -28,7 +28,6 @@ export interface Merge {
 
 export const MERGES: readonly Merge[] = [
   { name: "schedule", field: "op", summary: "The Bot's schedules: check-ins, reminders, watchers and runners", ops: { list: "automation_list", create: "automation_create", update: "automation_update", pause: "automation_pause", resume: "automation_resume", run_now: "automation_run_now", delete: "automation_delete" } },
-  { name: "memory", field: "op", summary: "Memory records shared by the Bot's conversations and workers", ops: { search: "memory_search", add: "memory_add", update: "memory_update" } },
   { name: "talk", field: "op", summary: "Talk recordings and their transcripts", ops: { list: "talk_list", read: "talk_read", search: "talk_search", make_notes: "talk_make_notes" } },
   { name: "bot_skill", field: "op", summary: "The Bot's skills", ops: { list: "bot_skill_list", view: "bot_skill_view", edit: "bot_skill_edit", lint: "bot_skill_lint" }, rename: { edit: { op: "change" } } },
   { name: "bot_info", field: "view", summary: "Read about the Bot and its threads", ops: { profile: "bot_get", state: "bot_state", activity: "bot_activity", conversations: "bot_conversations", thread: "bot_activity_lookup", history: "bot_history_search" } },

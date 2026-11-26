@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFER_LOADING_KEY, DEFER_NAMESPACE, LEAN_LOADED, LOADED, scopeEntries, scopeTools, searchScoped, TRIO_TOOLS, trioInstructions, type ScopeKind } from "./tool-scope";
 
-// A conversation's full list, as Studio's configure() builds it (memory included).
+// A conversation's full list, as Studio's configure() builds it.
 const CONVERSATION_FULL = [
   "pages_list", "pages_read", "pages_create", "pages_edit", "pages_comments",
   "design_save_style", "design_styles", "design_rename", "design_ask", "design_ready", "design_write_screen", "design_edit_screen", "design_comments", "design_resolve_comments",
@@ -13,7 +13,6 @@ const CONVERSATION_FULL = [
   "bot_skill_list", "bot_skill_view", "bot_skill_edit", "bot_skill_lint", "bot_history_search", "runner_migrate",
   "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete",
   "bot_conversations", "bot_needs_you", "bot_activity_lookup", "bot_finish_done", "conversation_continue_new", "theme", "presence",
-  "memory_search", "memory_add", "memory_update",
 ];
 const scope = (kind: ScopeKind, providerId: string, options: { lean?: boolean; defer?: boolean; full?: string[] } = {}) =>
   scopeTools({ kind, full: options.full ?? CONVERSATION_FULL, providerId, lean: options.lean ?? false, deferSupported: options.defer ?? false });
@@ -24,23 +23,23 @@ describe("tool scope by thread kind", () => {
   it("loads each kind's own tools and offers the rest on demand", () => {
     const conversation = scope("conversation", "acp-opencode");
     expect(conversation.loaded).toEqual(CONVERSATION_FULL.filter((name) => LOADED.conversation.includes(name)));
-    expect(conversation.loaded).toHaveLength(14);
+    expect(conversation.loaded).toHaveLength(11);
     expect(conversation.onDemand).toContain("design_write_screen");
     expect(conversation.onDemand).not.toContain("pages_edit");
   });
 
   it("keeps a worker away from the Bot's, the user's screen and strands tools, even on demand", () => {
     const worker = scope("worker", "acp-opencode");
-    expect(worker.loaded).toEqual(["pages_read", "pages_create", "pages_edit", "memory_search", "memory_add"]);
+    expect(worker.loaded).toEqual(["pages_read", "pages_create", "pages_edit"]);
     for (const name of ["bot_get", "bot_conversations", "automation_create", "area_update", "code_show", "workbench_open", "theme", "strand_note"]) expect(worker.onDemand).not.toContain(name);
-    expect(worker.onDemand).toEqual(expect.arrayContaining(["design_write_screen", "apps_create", "talk_read", "memory_update", "pages_comments"]));
+    expect(worker.onDemand).toEqual(expect.arrayContaining(["design_write_screen", "apps_create", "talk_read", "pages_comments"]));
   });
 
-  it("gives a runner runner_report, two page tools and memory_search, and the rest of its allowed set on demand", () => {
+  it("gives a runner runner_report and two page tools, and the rest of its allowed set on demand", () => {
     const runner = scope("runner", "acp-opencode", { full: [...CONVERSATION_FULL, "runner_report"] });
-    expect([...runner.loaded].sort()).toEqual(["memory_search", "pages_edit", "pages_read", "runner_report"]);
+    expect([...runner.loaded].sort()).toEqual(["pages_edit", "pages_read", "runner_report"]);
     expect(runner.delivery).toBe("trio");
-    expect(runner.onDemand).toEqual(expect.arrayContaining(["pages_create", "design_write_screen", "apps_create", "talk_read", "area_update", "memory_add"]));
+    expect(runner.onDemand).toEqual(expect.arrayContaining(["pages_create", "design_write_screen", "apps_create", "talk_read", "area_update"]));
     for (const name of ["strand_note", "bot_get", "bot_conversations", "automation_create", "code_show", "workbench_open", "theme"]) expect(runner.onDemand).not.toContain(name);
   });
 
@@ -64,7 +63,7 @@ describe("delivery by provider", () => {
   it("Codex marks the on-demand tools `defer` when BB supports it, else uses the trio", () => {
     const deferred = scopeEntries(scope("conversation", "codex", { defer: true }), NONE);
     const marked = deferred.filter((entry) => typeof entry === "object" && entry.parameters[DEFER_LOADING_KEY] === DEFER_NAMESPACE);
-    expect(marked).toHaveLength(CONVERSATION_FULL.length - 14);
+    expect(marked).toHaveLength(CONVERSATION_FULL.length - 11);
     expect(marked[0]).toEqual({ name: expect.any(String), parameters: { type: "object", [DEFER_LOADING_KEY]: "studio" } });
     expect(names(deferred)).not.toEqual(expect.arrayContaining([...TRIO_TOOLS]));
     expect(names(scopeEntries(scope("conversation", "codex"), NONE))).toEqual(expect.arrayContaining([...TRIO_TOOLS]));
@@ -83,10 +82,10 @@ describe("delivery by provider", () => {
       expect(names(scopeEntries(scope("worker", provider, { lean: true }), NONE))).toEqual([...TRIO_TOOLS]);
     }
     expect(LEAN_LOADED.runner).toEqual(["runner_report"]);
-    // A lean runner still reaches the page and memory tools it uses, through the trio.
+    // A lean runner still reaches the page tools it uses, through the trio.
     const runner = scope("runner", "acp-opencode", { lean: true, full: [...CONVERSATION_FULL, "runner_report"] });
     expect(runner).toMatchObject({ loaded: ["runner_report"], delivery: "trio" });
-    expect(runner.onDemand).toEqual(expect.arrayContaining(["memory_search", "pages_edit", "pages_read", "pages_create"]));
+    expect(runner.onDemand).toEqual(expect.arrayContaining(["pages_edit", "pages_read", "pages_create"]));
     expect(runner.onDemand).not.toContain("strand_note");
   });
 

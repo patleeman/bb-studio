@@ -1,6 +1,6 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
-import { archiveQuietly, fallbackSummary, FINISH_TIMEOUT_MS, finishInstruction, finishRecordText, finishSummaryPrompt, mainCard, NO_REPLIES_SUMMARY, registerBotFinish } from "./bot-finish";
+import { archiveQuietly, fallbackSummary, FINISH_TIMEOUT_MS, finishInstruction, finishSummaryPrompt, mainCard, NO_REPLIES_SUMMARY, registerBotFinish } from "./bot-finish";
 import { BotThreads, type Signals, type ThreadFacts } from "./bot-threads";
 import { MIGRATIONS } from "./migrations";
 
@@ -35,18 +35,13 @@ async function setup(options: { isBotThread?: (threadId: string) => boolean; pro
   const signals: Signals = { bots: [{ id: "dot", threadId: "thr_main", chain: ["thr_main"] }], focusedBotId: null, sideThread: () => null, runnerBot: () => null, leadThreads: new Set(), internal: new Set(), managedBot: () => null };
   const store = new BotThreads({ db, sdk: bb.sdk, signals: () => signals, changed: () => {}, now: () => now });
   await store.backfill();
-  const records: { botId: string; topic: string; text: string; threadId: string; title: string; at: number }[] = [];
   const reviewed: [string, string][] = [];
   const finish = registerBotFinish(bb, {
     db, threads: store, mainOf: (botId) => (botId === "dot" ? "thr_main" : null), isBotThread: options.isBotThread,
-    memory: {
-      add: (input) => { records.push({ ...input, at: now }); },
-      count: (botId, threadId, since) => records.filter((each) => each.botId === botId && each.threadId === threadId && each.at >= (since ?? 0)).length,
-    },
     changed: () => {}, log: () => {}, now: () => now, providerReady: options.providerReady, summarize: options.summarize,
     reviewArchived: (botId, threadId) => { reviewed.push([botId, threadId]); },
   });
-  return { bb, harness, db, store, finish, threads, send, archive, unarchive, events, records, reviewed, tick: (ms: number) => { now += ms; } };
+  return { bb, harness, db, store, finish, threads, send, archive, unarchive, events, reviewed, tick: (ms: number) => { now += ms; } };
 }
 
 it("sends the finishing turn into the conversation as agent-only steps, with no user bubble", async () => {
@@ -58,7 +53,9 @@ it("sends the finishing turn into the conversation as agent-only steps, with no 
   expect(input.input).toHaveLength(1);
   expect(input.input.every((part) => part.visibility === "agent-only")).toBe(true);
   expect(input.input[0]).toMatchObject({ visibility: "agent-only", text: finishInstruction({ threadId: "prep", title: "Launch prep" }) });
-  expect(input.input[0]!.text).toContain('memory (op: add): topic "Conversations", source {"kind":"conversation","id":"prep","title":"Launch prep"}, and as text one plain line (no markdown) naming what the conversation was about');
+  // The summary stays on the archived conversation: nothing goes to memory or a skill.
+  expect(input.input[0]!.text).not.toMatch(/memory \(op|memory_add/);
+  expect(input.input[0]!.text).toContain("it stays on the archived conversation");
   expect(input.input[0]!.text).toContain("bot_finish_done");
   // Pressing it again while it finishes sends nothing more.
   expect(await x.finish.rpc.bot_finish({ threadId: "prep" })).toEqual({ state: "finishing" });
@@ -78,9 +75,8 @@ it("bot_finish_done archives the conversation with its summary, posts the card t
   x.send.mockClear();
   // The tool runs mid-turn.
   x.threads.set("prep", { ...x.threads.get("prep")!, status: "active" });
-  x.records.push({ botId: "dot", topic: "Launch prep", text: SUMMARY, threadId: "prep", title: "Launch prep", at: 1_000_000 });
   const reply = String(await x.harness.callAgentTool("bot_finish_done", { summary: SUMMARY }, { threadId: "prep" }));
-  expect(reply).toMatch(/^Finished: the conversation is archived, Main has the summary, and 1 memory record cite/);
+  expect(reply).toBe("Finished: the conversation is archived with its summary, and Main has it. Reply with one short line.");
   expect(x.store.get("prep")).toMatchObject({ finishedSummary: SUMMARY });
   expect(x.store.get("prep")!.archivedAt).not.toBeNull();
   expect(x.store.listed("dot").map((each) => each.threadId)).not.toContain("prep");
@@ -100,13 +96,13 @@ it("bot_finish_done archives the conversation with its summary, posts the card t
   x.threads.set("prep", { ...x.threads.get("prep")!, status: "idle" });
   await x.harness.emitThreadEvent("thread.idle", { thread: x.threads.get("prep") as never, lastAssistantText: "Done, it's in Memory." } as never);
   await vi.waitFor(() => expect(x.archive).toHaveBeenCalledWith({ threadId: "prep" }));
-  expect(await x.finish.rpc.bot_finished({ threadId: "prep" })).toMatchObject({ finished: { threadId: "prep", title: "Launch prep", summary: SUMMARY, records: 1, archived: true, memoryHref: "/plugins/studio/studio/memory/dot" } });
+  expect(await x.finish.rpc.bot_finished({ threadId: "prep" })).toMatchObject({ finished: { threadId: "prep", title: "Launch prep", summary: SUMMARY, records: 0, archived: true, memoryHref: "/plugins/studio/studio/memory/dot" } });
   // Not in Main or a worker.
   expect(String(await x.harness.callAgentTool("bot_finish_done", { summary: "x" }, { threadId: "thr_main" }))).toBe("Main can't be finished.");
   expect(String(await x.harness.callAgentTool("bot_finish_done", { summary: "x" }, { threadId: "review" }))).toMatch(/Only a conversation/);
 });
 
-it("finishes with a summary from the last replies when the turn ends without bot_finish_done, and saves it to memory", async () => {
+it("finishes with a summary from the last replies when the turn ends without bot_finish_done, kept on the conversation", async () => {
   const x = await setup();
   await x.finish.rpc.bot_finish({ threadId: "prep" });
   x.tick(30_000);
@@ -121,21 +117,18 @@ it("finishes with a summary from the last replies when the turn ends without bot
   expect(summary).toBe(fallbackSummary(["Here's the summary: one mock a day.\n::next{do=\"x\"}", "Deep dives at minute 24."], null));
   expect(summary).toContain("> Here's the summary: one mock a day.");
   expect(summary).not.toContain("::next");
-  expect(x.records).toMatchObject([{ botId: "dot", topic: "Conversations", threadId: "prep", title: "Launch prep", text: `Launch prep\n\n${summary}` }]);
   await vi.waitFor(() => expect(x.archive).toHaveBeenCalledWith({ threadId: "prep" }));
   expect((x.send.mock.calls.at(-1)![0] as { threadId: string }).threadId).toBe("thr_main");
 });
 
-it("falls back after the timeout too, without a second memory record when the Bot already saved one", async () => {
+it("falls back after the timeout too", async () => {
   const x = await setup();
   await x.finish.rpc.bot_finish({ threadId: "prep" });
-  x.records.push({ botId: "dot", topic: "Launch prep", text: SUMMARY, threadId: "prep", title: "Launch prep", at: 1_000_000 });
   await x.finish.finish.sweep();
   expect(x.store.get("prep")!.archivedAt).toBeNull();
   x.tick(FINISH_TIMEOUT_MS);
   await x.finish.finish.sweep();
   expect(x.store.get("prep")!.archivedAt).not.toBeNull();
-  expect(x.records).toHaveLength(1);
   expect(x.store.get("prep")!.finishedSummary).toMatch(/^\*\*Last replies\*\*/);
 });
 
@@ -163,7 +156,7 @@ it("archiving a conversation in BB starts the same summary step; Main, a worker 
   const input = x.send.mock.calls[0]![0] as { threadId: string; input: { text: string; visibility?: string }[] };
   expect(input.threadId).toBe("prep");
   expect(input.input).toEqual([expect.objectContaining({ visibility: "agent-only" })]);
-  expect(input.input[0]!.text).toContain("memory (op: add)");
+  expect(input.input[0]!.text).toContain("bot_finish_done");
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("thr_main") as never });
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("review") as never });
@@ -187,7 +180,6 @@ it("BB refuses a turn in an archived thread, so archiving unarchives the convers
   expect((x.send.mock.calls[0]![0] as { input: { text: string; visibility?: string }[] }).input).toEqual([expect.objectContaining({ visibility: "agent-only" })]);
   await x.harness.callAgentTool("bot_finish_done", { summary: SUMMARY }, { threadId: "prep" });
   expect(x.store.get("prep")!.finishedSummary).toBe(SUMMARY);
-  expect(x.records).toEqual([]);
   expect(x.archive).toHaveBeenCalledWith({ threadId: "prep" });
   expect(x.threads.get("prep")!.archivedAt).toBe(9);
 });
@@ -203,12 +195,11 @@ it("a quiet archive, or a Bot's own thread it handed off from, gets no summary s
   expect(y.send).not.toHaveBeenCalled();
 });
 
-it("an archived conversation that can't take the turn gets Studio's summary, saved to memory and posted to Main", async () => {
+it("an archived conversation that can't take the turn gets Studio's summary, kept on it and posted to Main", async () => {
   const x = await setup();
   x.send.mockRejectedValueOnce(new Error("archived"));
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
   await vi.waitFor(() => expect(x.store.get("prep")!.finishedSummary).toMatch(/^\*\*Last replies\*\*/));
-  expect(x.records).toMatchObject([{ threadId: "prep", topic: "Conversations" }]);
   expect((x.send.mock.calls.at(-1)![0] as { threadId: string }).threadId).toBe("thr_main");
 });
 
@@ -220,13 +211,13 @@ it("asks for the summary in the second person", () => {
   expect(prompt).not.toContain("::next");
 });
 
-it("archives a conversation with no replies quietly: no turn, nothing in Main, no memory record", async () => {
+it("archives a conversation with no replies quietly: no turn, nothing in Main, no skill review", async () => {
   const x = await setup();
   x.events.mockResolvedValue([{ data: { item: { type: "userMessage", content: [{ type: "text", text: "Say hello." }] } } }]);
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
   await vi.waitFor(() => expect(x.store.get("prep")!.finishedSummary).toBe(NO_REPLIES_SUMMARY));
   expect(x.send).not.toHaveBeenCalled();
-  expect(x.records).toEqual([]);
+  expect(x.reviewed).toEqual([]);
   expect(x.store.get("thr_main")!.latest?.text ?? "").not.toMatch(/Archived/);
   await vi.waitFor(() => expect(x.archive).toHaveBeenCalledWith({ threadId: "prep" }));
 });
@@ -244,7 +235,6 @@ it("writes the summary on a signed-in model when the conversation's own provider
   expect(summarize.mock.calls[0]![0].prompt).toContain("You: Kindle or Kobo for bed?\n\nAssistant: Kobo for the dark mode.");
   expect(x.send.mock.calls.map((call) => (call[0] as { threadId: string }).threadId)).toEqual(["thr_main"]);
   expect(x.store.get("prep")!.finishedSummary).toBe(SUMMARY);
-  expect(x.records).toMatchObject([{ threadId: "prep", topic: "Conversations", text: `Launch prep\n\n${SUMMARY}` }]);
 
   const y = await setup({ providerReady: async () => false, summarize: async () => null });
   y.threads.set("prep", { ...y.threads.get("prep")!, providerId: "codex" } as never);
@@ -280,10 +270,3 @@ it("reopens a finished conversation: back in the sidebar and unarchived in BB, t
   expect(x.store.get("prep")!.archivedAt).not.toBeNull();
 });
 
-it("a summary's record leads with the conversation's name on one plain line, cut short when the name is a whole sentence", () => {
-  expect(finishRecordText("Launch prep", "**Decisions**\n- Ship Friday")).toBe("Launch prep\n\n**Decisions**\n- Ship Friday");
-  const long = finishRecordText(`Help me plan a 3-day trip to Lisbon in March. ${"Keep it short and practical, please. ".repeat(3)}`, "x");
-  expect(long.split("\n")[0]!.length).toBeLessThanOrEqual(80);
-  expect(long.split("\n")[0]).toMatch(/…$/);
-  expect(finishRecordText("  ", "x")).toBe("x");
-});

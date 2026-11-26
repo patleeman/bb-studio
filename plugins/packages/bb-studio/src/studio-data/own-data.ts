@@ -16,7 +16,6 @@
 // table) answers "has data": the check fails closed.
 import type Database from "better-sqlite3";
 import { MEMORY_TEMPLATE } from "../bot";
-import { PROFILE_TEMPLATE } from "../memory/service";
 import { PERSONAL_PROJECT_ID, BOT_RUN_PREFIX } from "../project-lead";
 import { CORE_TEMPLATE } from "../core-skill";
 
@@ -61,7 +60,21 @@ const has = (reason: string): OwnData => ({ has: true, reason });
 
 /** Markdown with its spacing and list and heading marks evened out, to compare a page with the template it started from. */
 const plain = (markdown: string) => markdown.replace(/^[\s>*+#-]+/gm, "").replace(/\s+/g, " ").trim();
-const STARTING_PAGES = new Set([plain(PROFILE_TEMPLATE), plain(MEMORY_TEMPLATE)]);
+/** The core profile page a Bot was given before always-on skills (src/core-skill.ts), as made. */
+const OLD_PROFILE_TEMPLATE = `## Who the user is
+
+## How they work
+
+## Hard rules
+
+## People and places
+
+## Check-in
+
+- Anything waiting on the user, or threads I started that finished, failed or stalled?
+- Project leads: anything stuck?
+`;
+const STARTING_PAGES = new Set([plain(OLD_PROFILE_TEMPLATE), plain(MEMORY_TEMPLATE)]);
 
 function count(db: Database.Database, sql: string, ...params: unknown[]): number {
   return (db.prepare(sql).get(...params) as { n: number }).n;

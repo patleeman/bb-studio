@@ -1,6 +1,6 @@
 // Studio's configure() and the studio_tool_* trio on the real plugin, in the
 // SDK's fake host: what each provider's session gets, and that a lean session
-// on a local model finds and runs pages_create and memory_add through search.
+// on a local model finds and runs pages_create and area_update through search.
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import plugin from "../server";
@@ -61,7 +61,7 @@ describe("configure() by provider", () => {
     expect(names(claude.tools)).toContain("design_screen");
     expect(names(claude.tools)).not.toContain("design_write_screen");
     expect(names(claude.tools)).not.toContain("studio_tool_search");
-    expect(names(acp.tools)).toEqual(expect.arrayContaining(["studio_tool_search", "studio_tool_describe", "studio_tool_call", "pages_edit", "memory", "schedule", "bot_info"]));
+    expect(names(acp.tools)).toEqual(expect.arrayContaining(["studio_tool_search", "studio_tool_describe", "studio_tool_call", "pages_edit", "area", "schedule", "bot_info"]));
     expect(names(acp.tools).length).toBeLessThan(names(claude.tools).length);
     expect(names(lean.tools)).toEqual(["strand_note", "studio_tool_search", "studio_tool_describe", "studio_tool_call"]);
     expect(lean.skills).toEqual([]);
@@ -84,17 +84,17 @@ describe("a lean session finds and runs tools through search", () => {
   const thread = "thr_lean";
   beforeAll(() => { configure(context(thread, "acp-opencode", "inkling-local/inkling-2-mini", { metadata: { bot: botId } })); });
 
-  it("finds pages_create and memory_add", async () => {
+  it("finds pages_create and area_update", async () => {
     const pages = JSON.parse(await run("studio_tool_search", { query: "create page" }, thread)) as { tools: { id: string }[] };
     expect(pages.tools[0]!.id).toBe("pages_create");
-    const memory = JSON.parse(await run("studio_tool_search", { query: "memory add" }, thread)) as { tools: { id: string }[] };
-    expect(memory.tools[0]!.id).toBe("memory");
-    // An old name finds its merged tool too ("Replaces memory_add" in its description).
+    const area = JSON.parse(await run("studio_tool_search", { query: "area update" }, thread)) as { tools: { id: string }[] };
+    expect(area.tools[0]!.id).toBe("area");
+    // An old name finds its merged tool too ("Replaces automation_create" in its description).
     const byOldName = JSON.parse(await run("studio_tool_search", { query: "automation_create" }, thread)) as { tools: { id: string }[] };
     expect(byOldName.tools[0]!.id).toBe("schedule");
-    const described = JSON.parse(await run("studio_tool_describe", { ids: ["pages_create", "memory", "memory_add", "nope"] }, thread)) as { tools: { id: string; inputSchema: unknown; replacedBy?: string }[]; notFound: string[] };
-    expect(described.tools.map((tool) => tool.id)).toEqual(["pages_create", "memory", "memory_add"]);
-    expect(described.tools[2]!.replacedBy).toBe('memory { op: "add" }');
+    const described = JSON.parse(await run("studio_tool_describe", { ids: ["pages_create", "area", "area_update", "nope"] }, thread)) as { tools: { id: string; inputSchema: unknown; replacedBy?: string }[]; notFound: string[] };
+    expect(described.tools.map((tool) => tool.id)).toEqual(["pages_create", "area", "area_update"]);
+    expect(described.tools[2]!.replacedBy).toBe('area { op: "update" }');
     expect(JSON.stringify(described.tools[1]!.inputSchema)).toContain("Needs: ");
     expect(described.notFound).toEqual(["nope"]);
   });
@@ -102,10 +102,10 @@ describe("a lean session finds and runs tools through search", () => {
   it("runs them with their own checks", async () => {
     const page = await run("studio_tool_call", { id: "pages_create", args: { title: "Lean test", markdown: "Hello" } }, thread);
     expect(page).toMatch(/pg_/);
-    const memory = await run("studio_tool_call", { id: "memory", args: { op: "add", topic: "Preferences", text: "Prefers short replies." } }, thread);
-    expect(memory).not.toMatch(/can't take that|isn't available|error/i);
+    const area = await run("studio_tool_call", { id: "area", args: { op: "list" } }, thread);
+    expect(area).not.toMatch(/can't take that|isn't available|error/i);
     // The old name still works for one release.
-    const old = await run("studio_tool_call", { id: "memory_add", args: { topic: "Preferences", text: "Likes lists." } }, thread);
+    const old = await run("studio_tool_call", { id: "area_list", args: {} }, thread);
     expect(old).not.toMatch(/can't take that|isn't available|error/i);
     const bad = await run("studio_tool_call", { id: "pages_create", args: { title: 5 } }, thread);
     expect(bad).toMatch(/pages_create can't take that/);
@@ -171,11 +171,11 @@ describe("every tool an instruction names is there", () => {
     if (provider === "acp-opencode" && !model.includes("local")) {
       // The thread really is that kind: its loaded tools say so.
       const signature: Record<string, [string[], string[]]> = {
-        main: [["schedule", "design_screen", "strand_note", "memory", "bot_info"], ["automation_create", "design_write_screen"]],
+        main: [["schedule", "design_screen", "strand_note", "area", "bot_info"], ["automation_create", "design_write_screen", "memory"]],
         conversation: [["strand_note", "bot_info"], ["schedule"]],
         lead: [["strand_note", "pages_edit"], ["bot_info"]],
-        worker: [["pages_create", "memory"], ["strand_note", "bot_info"]],
-        runner: [["runner_report", "pages_read", "memory"], ["strand_note", "pages_create"]],
+        worker: [["pages_create"], ["strand_note", "bot_info", "memory"]],
+        runner: [["runner_report", "pages_read"], ["strand_note", "pages_create", "memory"]],
       };
       const [has, lacks] = signature[kind]!;
       for (const name of has) expect(loaded.has(name), `${kind} loads ${name}`).toBe(true);
@@ -237,11 +237,11 @@ describe("merged tools run only the ops the thread may use", () => {
     expect(screen.instructions).toMatch(/design_screen, design_review and design_style/);
   });
 
-  it("gives a paused Bot the merged memory tool, never the old names", () => {
+  it("gives a paused Bot no memory tool: its always-on skills come in its instructions", () => {
     db().prepare("INSERT OR IGNORE INTO bots (id, name, avatar, state, thread_id, created_at, updated_at) VALUES ('bot_paused', 'Paused', 'P', 'paused', 'thr_paused_main', 2, 2)").run();
     const paused = configure(context("thr_paused_main", "acp-opencode", "glm"));
-    expect(names(paused.tools)).toContain("memory");
-    expect(names(paused.tools).filter((name) => name.startsWith("memory_"))).toEqual([]);
+    expect(names(paused.tools).filter((name) => name.startsWith("memory"))).toEqual([]);
+    expect(paused.instructions).toContain('<always-on skill="core-profile">');
   });
 });
 
@@ -267,15 +267,14 @@ describe("a loaded merged tool's shown ops", () => {
     return entry?.parameters?.properties?.op?.enum ?? null;
   };
   it("through the trio, shows the loaded ops only, yet runs the others; Claude Code shows them all", async () => {
+    const acp = configure(context("thr_main_ops", "acp-opencode", "glm", { metadata: { bot: botId } }));
+    const claude = configure(context("thr_main_ops", "claude-code", "claude-opus-5-5", { metadata: { bot: botId } }));
+    expect(opsShown(claude.tools, "area")).toEqual(["list", "get", "update"]);
+    expect(opsShown(acp.tools, "area")).toEqual(["list", "get", "update"]);
     db().prepare("INSERT OR IGNORE INTO bot_threads (thread_id, bot_id, kind, is_main, source, created_at, updated_at) VALUES ('thr_kind_worker2', ?, 'worker', 0, 'created', 1, 1)").run(botId);
-    const acp = configure(context("thr_kind_worker2", "acp-opencode", "glm"));
-    expect(opsShown(acp.tools, "memory")).toEqual(["search", "add"]);
-    expect(JSON.stringify(acp.tools.find((each) => typeof each === "object" && each.name === "pages_read"))).not.toContain("comments");
-    const added = await run("memory", { op: "add", topic: "T", text: "A fact." }, "thr_kind_worker2");
-    const id = /mem_[a-z0-9]+/.exec(added)![0];
-    expect(await run("memory", { op: "update", id, text: "A corrected fact." }, "thr_kind_worker2")).not.toMatch(/isn't available|can't take/);
-    const claude = configure(context("thr_kind_worker2", "claude-code", "claude-opus-5-5"));
-    expect(opsShown(claude.tools, "memory")).toEqual(["search", "add", "update"]);
+    const worker = configure(context("thr_kind_worker2", "acp-opencode", "glm"));
+    expect(JSON.stringify(worker.tools.find((each) => typeof each === "object" && each.name === "pages_read"))).not.toContain("comments");
+    expect(names(worker.tools).filter((name) => name.startsWith("memory"))).toEqual([]);
   });
 });
 

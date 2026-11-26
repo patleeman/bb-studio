@@ -76,20 +76,6 @@ beforeAll(async () => {
 });
 afterAll(() => dispose());
 
-describe("memory search", () => {
-  it("gives every match once, in parts, and says a stale cursor is stale", async () => {
-    const ids: string[] = [];
-    for (let index = 0; index < 40; index++) ids.push(/mem_[a-z0-9]+/.exec(await run("memory", { op: "add", topic: "Launch", text: `Alpha fact ${index}: ${"detail ".repeat(60)}` }))![0]);
-    const replies = await walk(await run("memory", { op: "search", query: "alpha" }));
-    expect(replies.length).toBeGreaterThan(2);
-    for (const reply of replies.slice(0, -1)) expect(reply.split("\n")[1]).toMatch(/^\(Records \d+–\d+ of 40, most relevant first\. Next: memory \{ op: "search"/);
-    const seen = all(replies, /"id":"(mem_[a-z0-9]+)"/g);
-    expect(seen.length).toBe(40);
-    expect(new Set(seen)).toEqual(new Set(ids));
-    expect(await run("memory", { op: "search", query: "alpha", offset: 999 })).toMatch(/offset 999 is past the end\. Start again: memory \{ op: "search", query: "alpha" \}/);
-  });
-});
-
 describe("skills", () => {
   it("lists every skill once, in parts", async () => {
     for (let index = 0; index < 40; index++) await run("bot_skill", { op: "edit", change: "write", name: `skill-${String(index).padStart(2, "0")}`, description: `Use when ${"something specific happens ".repeat(10)}`, body: "Do the thing." });

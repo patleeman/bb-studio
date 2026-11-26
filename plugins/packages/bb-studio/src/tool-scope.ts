@@ -25,7 +25,6 @@ const GATEWAY_TRIO = ["tool_gateway_search", "tool_gateway_describe", "tool_gate
 const TRIO = new Set<string>(TRIO_TOOLS);
 
 const PAGES = ["pages_list", "pages_read", "pages_create", "pages_edit", "pages_comments"];
-const MEMORY = ["memory_search", "memory_add", "memory_update"];
 const CONVERSATION = ["bot_conversations", "bot_needs_you", "bot_activity_lookup", "bot_finish_done", "conversation_continue_new"];
 const BOT = ["bot_get", "bot_profile_update", "bot_state", "bot_activity"];
 const BOT_OWN = ["bot_skill_list", "bot_skill_view", "bot_skill_edit", "bot_skill_lint", "bot_history_search", "runner_migrate", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"];
@@ -38,11 +37,11 @@ const LOOKS = ["theme", "presence"];
 /** Tools each kind loads up front (those the kind has; a kind turned off in Setup stays off). */
 export const LOADED: Record<ScopeKind, readonly string[]> = {
   // Main: design 114 calls and code_show 34 in a week, so they load here.
-  main: [...PAGES, ...MEMORY, "strand_note", ...CONVERSATION, ...BOT, ...BOT_OWN, ...AREA, ...DESIGN, "code_show"],
-  conversation: [...PAGES, ...MEMORY, "strand_note", ...CONVERSATION],
-  lead: [...PAGES, ...MEMORY, "strand_note"],
-  worker: ["pages_read", "pages_create", "pages_edit", "memory_search", "memory_add"],
-  runner: ["runner_report", "pages_read", "pages_edit", "memory_search"],
+  main: [...PAGES, "strand_note", ...CONVERSATION, ...BOT, ...BOT_OWN, ...AREA, ...DESIGN, "code_show"],
+  conversation: [...PAGES, "strand_note", ...CONVERSATION],
+  lead: [...PAGES, "strand_note"],
+  worker: ["pages_read", "pages_create", "pages_edit"],
+  runner: ["runner_report", "pages_read", "pages_edit"],
   classifier: [],
 };
 
@@ -139,7 +138,7 @@ export function scopeEntries(scope: Scope, shown: { slim(name: string): Record<s
 const GROUP_LABELS: [RegExp, string][] = [
   [/^design(_|$)/, "designs"], [/^(apps|minis)(_|$)/, "apps"], [/^talk(_|$)/, "recordings"], [/^whiteboard(_|$)/, "whiteboards"],
   [/^code(_|$)/, "VS Code"], [/^workbench(_|$)/, "the workbench"], [/^(schedule|automation_|runner_migrate)/, "schedules"], [/^(bot_skill|bot_history)/, "skills and history"],
-  [/^area(_|$)/, "areas"], [/^(theme|presence)$/, "themes"], [/^bot_/, "the Bot"], [/^pages_/, "pages"], [/^memory(_|$)/, "memory"], [/^studio_tag/, "tags"],
+  [/^area(_|$)/, "areas"], [/^(theme|presence)$/, "themes"], [/^bot_/, "the Bot"], [/^pages_/, "pages"], [/^studio_tag/, "tags"],
 ];
 
 /** One line telling the agent what it can reach through the trio. */

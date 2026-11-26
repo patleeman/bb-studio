@@ -42,10 +42,10 @@ describe("parts of a list", () => {
 
 describe("the Next line", () => {
   it("names the part and the call, under the merged tool's name", () => {
-    expect(callText("memory_search", { query: "launch", after: "mem_9" })).toBe('memory { op: "search", query: "launch", after: "mem_9" }');
+    expect(callText("talk_search", { query: "launch", after: "rec_9" })).toBe('talk { op: "search", query: "launch", after: "rec_9" }');
     expect(callText("bot_conversations", { after: "thr_1" })).toBe('bot_info { view: "conversations", after: "thr_1" }');
     expect(callText("minis_data", { miniId: "mini_1", op: "find", collection: "c", query: { offset: 25 } })).toBe('minis_data { miniId: "mini_1", op: "find", collection: "c", query: {"offset":25} }');
-    expect(nextLine({ from: 1, to: 10, total: 34, next: "mem_10" }, (after) => callText("memory_search", { query: "x", after }), "records")).toBe('(Showing 1–10 of 34 records. Next: memory { op: "search", query: "x", after: "mem_10" }.)');
+    expect(nextLine({ from: 1, to: 10, total: 34, next: "rec_10" }, (after) => callText("talk_search", { query: "x", after }), "recordings")).toBe('(Showing 1–10 of 34 recordings. Next: talk { op: "search", query: "x", after: "rec_10" }.)');
   });
 });
 

@@ -1,23 +1,23 @@
-// Finishing a conversation (plan page pg_ca4aba3141b2d2af, "Finishing a
-// conversation"; mockup 6d). The conversation writes its own summary as a
-// memory record with a link back, and Main gets the card:
+// Finishing a conversation ("Finishing a conversation"; mockup 6d). The
+// conversation writes its own summary, kept on the archived conversation
+// (bot_threads.finished_summary, searched in Memory → History), and Main gets
+// the card. Nothing goes to memory records (retired) or skills.
 //
 // 1. Archiving a conversation (BB's Archive anywhere, iOS, or `bot_finish`)
 //    sends one last agent-only turn INTO the conversation (no user bubble): write a summary of the
-//    decisions, what was left open and what was made; save it with
-//    memory_add (topic "Conversations", a first line naming the conversation, source: the conversation); call
+//    decisions, what was left open and what was made; call
 //    bot_finish_done with it. Main and workers can't be finished; a
 //    conversation that is working can't either (finish it when it's done).
 // 2. bot_finish_done (also when the user asks for it in the chat) archives
 //    the conversation in Studio (bot_threads.archived_at, finished_summary),
 //    sends Main an agent-only note with the summary that has the Bot answer
 //    with the `::finished{thread="…"}` card, and sets Main's row to
-//    "Archived “<title>”". BB's own
-//    archive follows once the conversation's turn is over.
+//    "Archived “<title>”", and queues the conversation's one skill review
+//    pass (src/skill-learning.ts). BB's own archive follows once the
+//    conversation's turn is over.
 // 3. If the turn ends (or fails) without bot_finish_done, or nothing happens
 //    for FINISH_TIMEOUT_MS, Studio finishes it with a summary built from the
-//    conversation's last replies, and saves that to memory itself unless
-//    the Bot already saved a record from this conversation.
+//    conversation's last replies (or a summary model's).
 // 4. A finished conversation is out of the sidebar; Search and the Library
 //    still find it. It opens read-only with "Archived on <date>" and Reopen
 //    (bot_reopen: back in the sidebar, unarchived in BB). Finished
@@ -65,22 +65,12 @@ export function isFinishing(db: Database.Database, threadId: string): boolean {
   return !!db.prepare("SELECT 1 FROM bot_finishes WHERE thread_id = ? AND state = 'finishing'").get(threadId);
 }
 
-/** The one topic every conversation's summary is saved under. */
-export const FINISH_TOPIC = "Conversations";
-
-export function finishRecordText(title: string, summary: string): string {
-  const name = title.replace(/\s+/g, " ").trim();
-  return name ? `${name.length > 80 ? `${name.slice(0, 79).trimEnd()}…` : name}\n\n${summary.trim()}` : summary.trim();
-}
-
 /** The agent-only part of the finishing turn. */
 export function finishInstruction(input: { threadId: string; title: string }): string {
-  const source = JSON.stringify({ kind: "conversation", id: input.threadId, title: input.title });
   return [
     `Studio: the user archived this conversation (${JSON.stringify(input.title)}, ${input.threadId}). Do this now, in this turn:`,
     `1. Write its summary to the user, as "you" (never "the user"), in short markdown: "**Decisions**" with one bullet per decision, "**Left open**" with what is still undecided, "**Made**" with the pages, designs, apps or code it produced. Leave out an empty section.`,
-    `2. Save it with memory (op: add): topic ${JSON.stringify(FINISH_TOPIC)}, source ${source}, and as text one plain line (no markdown) naming what the conversation was about, a blank line, then the summary.`,
-    "3. Call bot_finish_done with the same summary.",
+    "2. Call bot_finish_done with it. Don't copy it into a skill or anywhere else: it stays on the archived conversation.",
     "Then reply with one short line. Studio archives the conversation and posts the summary to Main.",
   ].join("\n");
 }
@@ -118,7 +108,7 @@ export function finishSummaryPrompt(title: string, lines: readonly FinishLine[])
 export function mainCard(input: { threadId: string; botId: string; title: string; summary: string }): { note: string } {
   return {
     note: [
-      `Studio: the user archived the conversation ${JSON.stringify(input.title)} (${input.threadId}). Its summary, saved in your memory (${memoryPath(input.botId)}):`,
+      `Studio: the user archived the conversation ${JSON.stringify(input.title)} (${input.threadId}). Its summary, kept on the archived conversation (Memory → History, ${memoryPath(input.botId)}):`,
       "",
       input.summary.trim(),
       "",
@@ -134,17 +124,11 @@ export interface FinishedView {
   summary: string;
   startedAt: number;
   finishedAt: number;
-  /** Memory records that cite this conversation. */
+  /** Always 0: memory records are retired (kept for the phone, which reads it). */
   records: number;
   memoryHref: string;
   /** Finished and still archived (false once reopened). */
   archived: boolean;
-}
-
-export interface FinishMemory {
-  add(input: { botId: string; topic: string; text: string; threadId: string; title: string }): void;
-  /** Records citing the conversation, since `since` (ms) when given. */
-  count(botId: string, threadId: string, since?: number): number;
 }
 
 export interface FinishDeps {
@@ -154,7 +138,6 @@ export interface FinishDeps {
   /** Every Bot's Main (its chat thread). */
   mainOf(botId: string): string | null;
   isBotThread?(threadId: string): boolean;
-  memory: FinishMemory;
   changed(changes: readonly BotChange[]): void;
   log(message: string): void;
   now?(): number;
@@ -245,11 +228,6 @@ export class BotFinish {
       return null;
     }))?.trim();
     if (!text) { await this.fallback(threadId); return; }
-    const row = this.row(threadId);
-    const rec = this.deps.threads.get(threadId);
-    if (rec && row && !this.deps.memory.count(rec.botId, threadId, row.requested_at)) {
-      try { this.deps.memory.add({ botId: rec.botId, topic: FINISH_TOPIC, text: finishRecordText(row.title, text), threadId, title: row.title }); } catch (error) { this.deps.log(`Finish: saving the summary to memory failed: ${error instanceof Error ? error.message : String(error)}`); }
-    }
     await this.done(threadId, text, "model");
   }
 
@@ -331,7 +309,7 @@ export class BotFinish {
     this.deps.db.prepare("UPDATE bot_finishes SET bb_archive_pending = 0 WHERE thread_id = ?").run(threadId);
   }
 
-  /** Step 3: Studio's summary from the last replies; memory too, unless the Bot saved one. */
+  /** Step 3: Studio's summary from the last replies. */
   async fallback(threadId: string): Promise<FinishedView | null> {
     const row = this.row(threadId);
     if (row?.state !== "finishing") return null;
@@ -339,11 +317,7 @@ export class BotFinish {
     if (!rec) { this.deps.db.prepare("DELETE FROM bot_finishes WHERE thread_id = ?").run(threadId); return null; }
     const replies = (await this.lines(threadId)).flatMap((line) => (line.role === "assistant" ? [line.text] : []));
     if (!replies.length && !rec.latest?.text) return this.done(threadId, NO_REPLIES_SUMMARY, "fallback", { quiet: true });
-    const summary = fallbackSummary(replies, rec.latest?.text ?? null);
-    if (!this.deps.memory.count(rec.botId, threadId, row.requested_at)) {
-      try { this.deps.memory.add({ botId: rec.botId, topic: FINISH_TOPIC, text: finishRecordText(row.title, summary), threadId, title: row.title }); } catch (error) { this.deps.log(`Finish: saving the summary to memory failed: ${error instanceof Error ? error.message : String(error)}`); }
-    }
-    return this.done(threadId, summary, "fallback");
+    return this.done(threadId, fallbackSummary(replies, rec.latest?.text ?? null), "fallback");
   }
 
   /**
@@ -398,7 +372,7 @@ export class BotFinish {
     if (!rec?.finishedSummary || !row?.finished_at) return null;
     return {
       threadId, botId: rec.botId, title: row.title, summary: rec.finishedSummary, startedAt: rec.createdAt, finishedAt: row.finished_at,
-      records: this.deps.memory.count(rec.botId, threadId), memoryHref: memoryPath(rec.botId), archived: rec.archivedAt !== null,
+      records: 0, memoryHref: memoryPath(rec.botId), archived: rec.archivedAt !== null,
     };
   }
 }
@@ -415,15 +389,15 @@ export function registerBotFinish(bb: Bb, deps: Omit<FinishDeps, "sdk">) {
 
   bb.agents.registerTool({
     name: "bot_finish_done",
-    description: "Archive this conversation with its summary (after memory (op: add)) and post the summary to Main. Not in Main or a worker.",
+    description: "Archive this conversation with its summary and post the summary to Main. The summary stays on the archived conversation. Not in Main or a worker.",
     parameters: z.object({ summary: z.string().trim().min(1).max(6000).describe("Short markdown: **Decisions**, **Left open**, **Made**") }),
     execute: async ({ summary }, ctx) => {
       if (!ctx.threadId) return "This isn't a conversation.";
       const rec = deps.threads.get(ctx.threadId);
       if (!rec || rec.kind !== "conversation") return "Only a conversation can be finished; a worker reports through its result.";
       if (rec.isMain) return "Main can't be finished.";
-      const view = await finish.done(ctx.threadId, summary, "bot");
-      return `Finished: the conversation is archived, Main has the summary, and ${view.records} memory record${view.records === 1 ? "" : "s"} cite it. Reply with one short line.`;
+      await finish.done(ctx.threadId, summary, "bot");
+      return "Finished: the conversation is archived with its summary, and Main has it. Reply with one short line.";
     },
   });
 

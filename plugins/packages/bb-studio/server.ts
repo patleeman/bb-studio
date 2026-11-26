@@ -107,11 +107,9 @@ import { MIGRATIONS } from "./src/migrations";
 import { ItemIndex } from "./src/item-index";
 import { ITEM_TYPES, itemType, type ItemType } from "./src/item-model";
 import { APP_TOOLS, appTools, familyTool, ToolBook, type AgentTool } from "./src/family-tools";
-import { MemoryStore } from "./src/memory/store";
-import { MEMORY_TOOLS, MemoryService, setBotMemoryPage, withMemory } from "./src/memory/service";
+import { MemoryService, withMemory } from "./src/memory/service";
 import { registerMemory } from "./src/memory/register";
 import { ALWAYS_ON_CAP } from "./src/core-skill";
-import { recordLine } from "./src/memory/shared";
 import { BotPageState, registerGroupTool } from "./src/bot-page-state";
 import { BotCacheWarmer } from "./src/bot-cache";
 import { Bots, MAIN_HEAL_MS } from "./src/bot";
@@ -144,7 +142,7 @@ import { registerLiveActivity } from "./src/live-activity";
 import { ThreadSeeds } from "./src/thread-seeds";
 import { MoveHandoffs } from "./src/provider-move/handoff";
 import { moveProviderContract } from "./src/provider-move/contract";
-import { FINISH_TOPIC, registerBotFinish } from "./src/bot-finish";
+import { registerBotFinish } from "./src/bot-finish";
 import { askModel } from "./src/kit/decisions";
 import type { ModelSelection } from "./src/decisions/contract";
 import { studioInstructions } from "./src/agent-instructions";
@@ -520,7 +518,7 @@ export default async function plugin(bb: BbPluginApi) {
     // An external bot's agent has its own memory and tools; Studio's don't reach it.
     if (bot?.kind === "external") return { tools: [], skills: [], instructions: bots.instructions(bot) };
     if (bot && bot.state !== "active") {
-      // A paused or stopped Bot: its own tools only; withMemory adds the memory tools through rescope, under the merged name.
+      // A paused or stopped Bot: its own tools only; withMemory adds its always-on skills to the instructions.
       const names = [...BOT_TOOLS, ...CODE_TOOLS];
       const text = bots.instructions(bot);
       return { tools: fixedTools(context, names), skills: ["studio-code"], instructions: text, rescope: (extra: readonly string[]) => ({ tools: fixedTools(context, [...names, ...extra]), instructions: text }) };
@@ -540,7 +538,7 @@ export default async function plugin(bb: BbPluginApi) {
       pages: !off.has("page"), minis: !off.has("mini"), appCards, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
       strands: kind === "main" || kind === "conversation" || kind === "lead", skills: !lean,
     });
-    // `extra`: the memory tools, when withMemory gives this session a profile (src/memory/service.ts).
+    // `extra`: tools a wrapper adds to this session's scope (none today; src/memory/service.ts adds instructions only).
     const build = (extra: readonly string[]) => {
       const scope = scopeTools({ kind, full: [...full, ...extra], providerId: context.provider.id, lean, deferSupported, extras: kind === "runner" ? [] : ON_DEMAND_EXTRAS, delivery: toolDelivery.modeFor(context.provider.id) });
       scopes.remember(context.thread.id, scope, { providerId: context.provider.id, model: context.provider.model });
@@ -557,7 +555,7 @@ export default async function plugin(bb: BbPluginApi) {
     const off = new Set(kindSettings.current.off);
     const kindTools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
     const apps = ITEM_TYPES.some((each) => each.family === "app" && !off.has(each.kind)) ? APP_TOOLS : [];
-    return [...kindTools, ...apps, ...CODE_TOOLS, ...WORKBENCH_TOOLS, ...BOT_TOOLS, STRAND_NOTE_TOOL, ...AREA_TOOLS, ...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS, ...MEMORY_TOOLS];
+    return [...kindTools, ...apps, ...CODE_TOOLS, ...WORKBENCH_TOOLS, ...BOT_TOOLS, STRAND_NOTE_TOOL, ...AREA_TOOLS, ...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS];
   };
   const leanRows = async () => {
     let catalog: { id: string; displayName?: string; enabled?: boolean; info?: { family?: string | null } | null }[] = [];
@@ -585,7 +583,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
   // Studio reloaded mid-session: the thread's scope again, from its real provider, model, title and origin,
-  // through withMemory so the memory tools come only with a memory role.
+  // through withMemory, as at session start.
   const recomputeScope = async (threadId: string, projectId: string | undefined): Promise<Scope | null> => {
     try {
       const thread = await bb.sdk.threads.get({ threadId }) as { projectId?: string; providerId?: string; model?: string | null; title?: string | null; parentThreadId?: string | null; sourceThreadId?: string | null; originKind?: string | null; originPluginId?: string | null } | null;
@@ -1052,30 +1050,24 @@ export default async function plugin(bb: BbPluginApi) {
     setState: (botId, name, state) => { bots.setSkillState(name, state, botId); },
     log: (message) => bb.log.warn(message),
   });
-  // Memory (src/memory): the core profile, memory records and their tools, and the automatic one-time split of an old Memory page.
+  // Memory (src/memory): each Bot's always-on skills in every conversation and worker, and the memory RPC kept for the phone.
   const memoryService: MemoryService = new MemoryService({
-    store: new MemoryStore(db, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" })),
-    bots: { list: () => bots.list(), pageId: (botId) => bots.stored(botId)?.memoryPageId ?? null, setPage: (botId, pageId) => setBotMemoryPage(db, botId, pageId) },
-    pages: {
-      meta: (pageId) => { const page = pages.store.meta(pageId); return page && !page.archived_at ? { title: page.title, updatedAt: page.updated_at } : null; },
-      markdown: (pageId) => pages.markdown(pageId),
-      create: ({ title, markdown, icon }) => pages.createPage({ projectId: PERSONAL_PROJECT_ID, title, icon, markdown }),
-    },
-    threads: { get: async (threadId) => { const thread = await bb.sdk.threads.get({ threadId }).catch(() => null); return thread ? { title: thread.title || thread.titleFallback || "", archived: !!thread.archivedAt } : null; } },
+    bots: { list: () => bots.list() },
+    alwaysOn: (botId) => bots.alwaysOnSkills(botId),
     // Studio's record of conversations and workers (src/bot-threads.ts) decides a thread's Bot and role first.
     botThread: (threadId) => { const rec = botThreads.store.get(threadId); return rec ? { botId: rec.botId, kind: rec.kind, isMain: rec.isMain, title: rec.title } : null; },
-    acting: (threadId) => acting(threadId),
     sideBot: (threadId) => sideThreads.forThread(threadId)?.botId ?? null,
-    runnerName: (threadId) => runners.forThread(threadId)?.name ?? null,
     ownedBot: (threadId) => bots.list().find((bot) => ownedThreads.owned(bot.id).has(threadId))?.id ?? null,
     chainBot: (threadId) => bots.list().find((bot) => bots.chain(bot.id).includes(threadId))?.id ?? null,
     ownBot: (threadId, metadata) => bots.forThread(threadId, metadata)?.id ?? null,
     runnerBot: (threadId, metadata) => runners.forThread(threadId, metadata)?.bot_id ?? null,
-    changed: tagsChanged,
-    log: (message) => bb.log.warn(message),
   });
-  registerMemory(bb, memoryService);
-  // Every Bot with an old Memory page and no core profile yet is split once, on its own, soon after start.
+  registerMemory(bb, {
+    bot: (botId) => { const bot = botId ? bots.stored(botId) : bots.stored(); if (!bot) throw new Error(botId ? `No Bot "${botId}".` : "Make your Bot first."); bots.requireStudio(bot.id, "Memory"); return { id: bot.id, name: bot.name }; },
+    alwaysOn: (botId) => bots.alwaysOnSkills(botId),
+    budget: (botId) => bots.skillBudget(botId),
+    oldPage: (botId) => bots.memoryPage(botId),
+  });
   // The rail holds only BB's global things; Studio's pages open from the Bot sidebar (src/rail-arrangement.ts). Once per install.
   const railStart = setTimeout(() => {
     if (disposed) return;
@@ -1100,7 +1092,6 @@ export default async function plugin(bb: BbPluginApi) {
     }).catch((error: unknown) => bb.log.warn(`Studio couldn't move BB off the old BB Studio palette: ${error instanceof Error ? error.message : String(error)}`));
   }, 3_000);
   bb.onDispose(() => clearTimeout(footerStart));
-  const memorySplitStart = setTimeout(() => { if (!disposed) memoryService.autoSplitAll(); }, 2_000);
   // Every Studio Bot gets its always-on core skill, from its core profile page when it has one (once; src/core-skill-migrate.ts).
   const coreSkillStart = setTimeout(() => {
     if (disposed) return;
@@ -1112,7 +1103,6 @@ export default async function plugin(bb: BbPluginApi) {
     }
   }, 2_500);
   bb.onDispose(() => clearTimeout(coreSkillStart));
-  bb.onDispose(() => clearTimeout(memorySplitStart));
   const maintenance = new BotMaintenance({
     db, sdk: bb.sdk, scheduler, changed: tagsChanged,
     bots: () => bots.list(), owned: (id) => ownedThreads.owned(id), refreshOwned: () => ownedThreads.sweep(),
@@ -1231,10 +1221,6 @@ export default async function plugin(bb: BbPluginApi) {
     sideThreads,
     seeds: threadSeeds,
     defaultModel: (botId) => bots.defaultModel(botId),
-    // The summaries finishing saved (src/bot-finish.ts), newest last so it wins.
-    conversationSummaries: (botId) => new Map((db.prepare(`SELECT source_id, text FROM memory_records
-      WHERE bot_id = ? AND source_kind = 'conversation' AND topic = ? AND replaced_by_id IS NULL AND archived = 0 AND source_id IS NOT NULL
-      ORDER BY created_at ASC`).all(botId, FINISH_TOPIC) as { source_id: string; text: string }[]).map((row) => [row.source_id, row.text])),
   });
   // Areas' items that need the user, by the conversation their area reports into: a lead's own
   // conversation; a runner's, or the Bot's, the Main. Read at most every 15 seconds.
@@ -1372,10 +1358,6 @@ export default async function plugin(bb: BbPluginApi) {
   const botFinish = registerBotFinish(bb, {
     db, threads: botThreads.store, mainOf: (botId) => bots.stored(botId)?.threadId ?? null,
     isBotThread: (threadId) => bots.list().some((bot) => bots.chain(bot.id).includes(threadId)),
-    memory: {
-      add: ({ botId, topic, text, threadId, title }) => { memoryService.store.add({ botId, topic, text, source: { kind: "conversation", id: threadId, title, section: null } }); },
-      count: (botId, threadId, since) => (db.prepare("SELECT COUNT(*) AS n FROM memory_records WHERE bot_id = ? AND source_id = ? AND created_at >= ?").get(botId, threadId, since ?? 0) as { n: number }).n,
-    },
     changed: botThreadsChanged,
     log: (message) => bb.log.warn(message),
     reviewArchived: (botId, threadId) => { learning.archived(botId, threadId); },
@@ -1565,19 +1547,17 @@ export default async function plugin(bb: BbPluginApi) {
   };
   entryTitle = async (kind, id) => {
     if (kind === "todo") { try { return loops.store.get(id).title; } catch { return taskTitle(db, id); } }
-    if (kind === "record") return memoryService.store.get(id)?.topic ?? null;
+    if (kind === "record") return null;
     const ref = parseAutomationRefId(id);
     if (!ref || !bots.list().some((bot) => bot.id === ref.botId)) return null;
     return (await automationTableFor(ref.botId)).rows.find((row) => row.id === ref.rowId)?.name ?? null;
   };
-  const entryRows = async (query: string, limit: number): Promise<EntryRow[]> => {
+  const entryRows = async (_query: string, _limit: number): Promise<EntryRow[]> => {
     const all = bots.list();
     const todos = loops.store.all().filter((loop) => loop.closedAt === null).map((loop): EntryRow => ({ kind: "todo", id: loop.id, title: loop.title, updatedAt: loop.updatedAt }));
     const tables = await Promise.all(all.map((bot) => automationTableFor(bot.id).catch(() => null)));
     const rows = tables.flatMap((table) => (table?.rows ?? []).map((row): EntryRow => ({ kind: "automation", id: automationRefId(table!.botId, row.id), title: row.name, updatedAt: row.lastRunAt ?? 0 })));
-    const found = await Promise.all(all.map((bot) => memoryService.list({ botId: bot.id, query, limit, includeReplaced: false }).catch(() => ({ records: [] }))));
-    const records = found.flatMap((each) => each.records.map((record): EntryRow => ({ kind: "record", id: record.id, title: `${record.topic}: ${recordLine(record.text).slice(0, 120)}`, updatedAt: record.updatedAt })));
-    return [...todos, ...rows, ...records];
+    return [...todos, ...rows];
   };
   const newTabSources: NewTabSources = {
     items: (limit) => itemRows(searchIndex.recent(limit, { kinds: NEW_TAB_ITEM_KINDS })),

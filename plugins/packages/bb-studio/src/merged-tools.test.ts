@@ -21,18 +21,18 @@ describe("callRuns()", () => {
     expect(callRuns({ tool: "code_comments", arguments: {} }, "code_comment_reply")).toBe(false);
 
     // Standard MERGES
-    expect(callRuns({ tool: "memory", arguments: { op: "add" } }, "memory_add")).toBe(true);
-    expect(callRuns({ tool: "memory", arguments: { op: "search" } }, "memory_add")).toBe(false);
-    expect(callRuns({ tool: "memory_add", arguments: {} }, "memory_add")).toBe(true);
+    expect(callRuns({ tool: "area", arguments: { op: "update" } }, "area_update")).toBe(true);
+    expect(callRuns({ tool: "area", arguments: { op: "get" } }, "area_update")).toBe(false);
+    expect(callRuns({ tool: "area_update", arguments: {} }, "area_update")).toBe(true);
   });
 });
 
 describe("mergedTools().execute()", () => {
   function makeBook() {
     const entries = new Map<string, { name: string; description: string; parameters: z.ZodType; execute: () => unknown }>([
-      ["memory_search", { name: "memory_search", description: "Search", parameters: z.object({ query: z.string() }), execute: () => "searched" }],
-      ["memory_add", { name: "memory_add", description: "Add", parameters: z.object({ topic: z.string(), text: z.string() }), execute: () => "added" }],
-      ["memory_update", { name: "memory_update", description: "Update", parameters: z.object({ id: z.string(), text: z.string() }), execute: () => "updated" }],
+      ["area_get", { name: "area_get", description: "Search", parameters: z.object({ query: z.string() }), execute: () => "searched" }],
+      ["area_update", { name: "area_update", description: "Add", parameters: z.object({ topic: z.string(), text: z.string() }), execute: () => "added" }],
+      ["area_list", { name: "area_list", description: "Update", parameters: z.object({ id: z.string(), text: z.string() }), execute: () => "updated" }],
     ]);
     const ran: Array<{ name: string; input: unknown }> = [];
     const book = {
@@ -49,30 +49,30 @@ describe("mergedTools().execute()", () => {
     const { book, ran } = makeBook();
     const allowed = vi.fn(async (_ctx: unknown, _old: string) => true);
     const tools = mergedTools({ book, allowed });
-    const memory = tools.find((t) => t.name === "memory")!;
+    const memory = tools.find((t) => t.name === "area")!;
     expect(memory).toBeDefined();
 
-    const result = await memory.execute({ op: "search", query: "hello" }, {});
-    expect(result).toBe("ran:memory_search");
-    expect(ran).toEqual([{ name: "memory_search", input: { query: "hello" } }]);
+    const result = await memory.execute({ op: "get", query: "hello" }, {});
+    expect(result).toBe("ran:area_get");
+    expect(ran).toEqual([{ name: "area_get", input: { query: "hello" } }]);
     expect(allowed).toHaveBeenCalledTimes(1);
-    expect(allowed).toHaveBeenCalledWith({}, "memory_search");
+    expect(allowed).toHaveBeenCalledWith({}, "area_get");
   });
 
   it("preserves the exact refusal message listing usable ops and ignores prototype keys (__proto__, constructor, toString)", async () => {
     const { book, ran } = makeBook();
-    const allowed = vi.fn(async (_ctx: unknown, old: string) => old === "memory_search");
+    const allowed = vi.fn(async (_ctx: unknown, old: string) => old === "area_get");
     const tools = mergedTools({ book, allowed });
-    const memory = tools.find((t) => t.name === "memory")!;
+    const memory = tools.find((t) => t.name === "area")!;
 
-    const refused = await memory.execute({ op: "add", topic: "t", text: "x" }, {});
-    expect(refused).toBe("memory: op must be one of: search (needs query).");
-    // Should not re-check memory_add after it already returned false.
-    expect(allowed.mock.calls.filter(([, name]) => name === "memory_add")).toHaveLength(1);
+    const refused = await memory.execute({ op: "update", topic: "t", text: "x" }, {});
+    expect(refused).toBe("area: op must be one of: get (needs query).");
+    // Should not re-check area_update after it already returned false.
+    expect(allowed.mock.calls.filter(([, name]) => name === "area_update")).toHaveLength(1);
 
     for (const badOp of ["toString", "__proto__", "constructor"]) {
       const protoRefused = await memory.execute({ op: badOp }, {});
-      expect(protoRefused).toBe("memory: op must be one of: search (needs query).");
+      expect(protoRefused).toBe("area: op must be one of: get (needs query).");
     }
     expect(ran).toEqual([]);
   });
@@ -82,20 +82,20 @@ describe("mergedTools().execute()", () => {
     const ctxA = { threadId: "thr_a" };
     const ctxB = { threadId: "thr_b" };
     const allowed = vi.fn(async (ctx: unknown, old: string) => {
-      if (ctx === ctxA) return old === "memory_search";
-      if (ctx === ctxB) return old === "memory_add";
+      if (ctx === ctxA) return old === "area_get";
+      if (ctx === ctxB) return old === "area_update";
       return false;
     });
     const tools = mergedTools({ book, allowed });
-    const memory = tools.find((t) => t.name === "memory")!;
+    const memory = tools.find((t) => t.name === "area")!;
 
-    expect(await memory.execute({ op: "search", query: "q" }, ctxA)).toBe("ran:memory_search");
-    expect(await memory.execute({ op: "add", topic: "t", text: "x" }, ctxA)).toBe("memory: op must be one of: search (needs query).");
-    expect(await memory.execute({ op: "add", topic: "t", text: "x" }, ctxB)).toBe("ran:memory_add");
-    expect(await memory.execute({ op: "search", query: "q" }, ctxB)).toBe("memory: op must be one of: add (needs topic, text).");
+    expect(await memory.execute({ op: "get", query: "q" }, ctxA)).toBe("ran:area_get");
+    expect(await memory.execute({ op: "update", topic: "t", text: "x" }, ctxA)).toBe("area: op must be one of: get (needs query).");
+    expect(await memory.execute({ op: "update", topic: "t", text: "x" }, ctxB)).toBe("ran:area_update");
+    expect(await memory.execute({ op: "get", query: "q" }, ctxB)).toBe("area: op must be one of: update (needs topic, text).");
     expect(ran).toEqual([
-      { name: "memory_search", input: { query: "q" } },
-      { name: "memory_add", input: { topic: "t", text: "x" } },
+      { name: "area_get", input: { query: "q" } },
+      { name: "area_update", input: { topic: "t", text: "x" } },
     ]);
   });
 });

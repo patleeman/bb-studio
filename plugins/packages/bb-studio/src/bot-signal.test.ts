@@ -57,7 +57,6 @@ async function setup() {
   });
   const finish = registerBotFinish(bb, {
     db, threads: server.store, mainOf: (botId) => (botId === "dot" ? "thr_main" : botId === "home" ? "thr_home" : null),
-    memory: { add: () => {}, count: () => 0 },
     changed: (changes) => signal.add(changes), log: () => {},
   });
   await server.start();

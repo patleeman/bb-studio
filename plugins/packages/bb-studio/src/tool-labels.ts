@@ -6,7 +6,6 @@ type Labels = readonly [pending: string, completed: string];
 export const TOOL_LABELS: Readonly<Record<string, Labels>> = {
   // Merged tools (src/merged-tools.ts): one label true for each op.
   schedule: ["Working on check-ins and runners", "Worked on check-ins and runners"],
-  memory: ["Working with saved facts", "Worked with saved facts"],
   talk: ["Using recordings", "Used recordings"],
   bot_skill: ["Working on skills", "Worked on skills"],
   bot_info: ["Reading about the Bot", "Read about the Bot"],
@@ -47,9 +46,6 @@ export const TOOL_LABELS: Readonly<Record<string, Labels>> = {
   area_update: ["Updating an area", "Updated an area"],
   area_list: ["Listing areas", "Listed areas"],
   area_get: ["Reading an area", "Read an area"],
-  memory_search: ["Searching memory", "Searched memory"],
-  memory_add: ["Saving to memory", "Saved to memory"],
-  memory_update: ["Updating memory", "Updated memory"],
   bot_conversations: ["Listing conversations", "Listed conversations"],
   bot_needs_you: ["Flagging for you", "Flagged for you"],
   conversation_continue_new: ["Continuing in a new conversation", "Continued in a new conversation"],
