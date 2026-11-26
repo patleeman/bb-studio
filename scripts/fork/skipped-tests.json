@@ -918,15 +918,21 @@
     },
     {
       "file": "plugins/git/host/index-copy.test.ts",
-      "title": "writes no shared index into the repository when core.splitIndex is on"
+      "title": "writes no shared index into the repository when core.splitIndex is on",
+      "localOnly": true,
+      "reason": "Local only: fails the same way on the desktop branch with Apple Git 2.50.1 on the owner's Mac; not a fork break."
     },
     {
       "file": "packages/scripts/test/ci-performance.test.mjs",
-      "title": "rejects a missing lockfile snapshot before starting CI jobs"
+      "title": "rejects a missing lockfile snapshot before starting CI jobs",
+      "localOnly": true,
+      "reason": "Local only: the pnpm 9.15.0 frozen-install fixture exits 2 instead of 1 on the owner's Mac, on the desktop branch too; not a fork break."
     },
     {
       "file": "packages/scripts/test/ci-performance.test.mjs",
-      "title": "isolates failed cache restores while preserving healthy caches through a real frozen install"
+      "title": "isolates failed cache restores while preserving healthy caches through a real frozen install",
+      "localOnly": true,
+      "reason": "Local only: the pnpm 9.15.0 frozen-install fixture exits 2 instead of 1 on the owner's Mac, on the desktop branch too; not a fork break."
     }
   ],
   "removeLines": [
