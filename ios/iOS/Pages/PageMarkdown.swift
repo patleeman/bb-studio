@@ -338,6 +338,7 @@ struct Embed: Decodable {
     var id: String?
     var title: String?
     var description: String?
+    var image: String?
 }
 
 // MARK: Views
@@ -423,6 +424,7 @@ struct EmbedCard: View {
     let embed: Embed
     @EnvironmentObject private var app: AppModel
     @ObservedObject private var studio = StudioStore.shared
+    @State private var preview: LinkPreview?
 
     /// Embeds of other add-ons' items, by the add-on that makes them.
     private static let studioPlugins = ["drawing": "excalidraw", "artifact": "artifacts", "recording": "talk", "mini": "minis"]
@@ -443,19 +445,35 @@ struct EmbedCard: View {
             Image(systemName: symbol(kind)).foregroundStyle(.secondary).frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title(kind, target)).font(.subheadline.weight(.semibold)).lineLimit(2)
-                Text(embed.description.flatMap { $0.isEmpty ? nil : $0 } ?? subtitle(kind, target))
+                Text(nonEmpty(embed.description) ?? nonEmpty(preview?.description) ?? subtitle(kind, target))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
             Spacer(minLength: 0)
+            if let image = (nonEmpty(embed.image) ?? nonEmpty(preview?.image)).flatMap({ URL(string: $0) }) {
+                AsyncImage(url: image) { $0.resizable().scaledToFill() } placeholder: { Color.clear }
+                    .frame(width: 56, height: 56)
+                    .clipShape(.rect(cornerRadius: 8))
+                    .accessibilityHidden(true)
+            }
         }
         .padding(12)
         .background(.fill.tertiary, in: .rect(cornerRadius: 12))
+        // Unfurled like the desktop's link card, when the page didn't keep a title.
+        .task(id: target) {
+            guard kind == "bookmark", nonEmpty(embed.description) == nil || nonEmpty(embed.title) == nil,
+                  let url = URL(string: target), url.scheme?.hasPrefix("http") == true else { return }
+            preview = try? await app.client.linkPreview(url)
+        }
 
         if let url = link(kind, target) {
             Link(destination: url) { content }.buttonStyle(.plain)
         } else {
             content
         }
+    }
+
+    private func nonEmpty(_ text: String?) -> String? {
+        text.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
     }
 
     /// A drawing, artifact, recording or any Studio item: its row from Studio, opening natively.
@@ -534,6 +552,7 @@ struct EmbedCard: View {
 
     private func title(_ kind: String, _ target: String) -> String {
         if let title = embed.title, !title.isEmpty { return title }
+        if let title = preview?.title, !title.isEmpty { return title }
         if kind == "page" { return PagesStore.shared.page(target)?.displayTitle ?? "Page" }
         if kind == "bookmark" { return URL(string: target)?.host() ?? target }
         return target.isEmpty ? "Embed" : target

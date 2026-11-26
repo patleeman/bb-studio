@@ -22,6 +22,7 @@ enum PageInsert {
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = calendar.timeZone
         let start = calendar.startOfDay(for: today)
         func next(_ weekday: Int) -> Date {
             calendar.nextDate(after: start, matching: DateComponents(weekday: weekday), matchingPolicy: .nextTime) ?? start

@@ -316,6 +316,4 @@ struct PageEditor: View {
         if !model.dirty { await onSaved() }
         ServerOperation(client: model.client).complete(on: app) { dismiss() }
     }
-
-    static func plain(_ markdown: String) -> String { PageEditorModel.plain(markdown) }
 }
