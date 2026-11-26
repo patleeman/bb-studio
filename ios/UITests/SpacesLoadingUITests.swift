@@ -52,9 +52,8 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
     }
 
     func testALinkDuringLoadingOpensItsTargetOnceTheRoomShows() {
-        launch(late: "6000", fallback: 30000, extra: ["-qaStrandsDemo", "-openURL", "bbstudio://strands"])
-        let strands = app.descendants(matching: .any)["strands-overview"].firstMatch
-        XCTAssertTrue(strands.waitForExistence(timeout: 30), "the link waits for the room, then opens Strands")
+        launch(late: "6000", fallback: 30000, extra: ["-openURL", "bbstudio://bot"])
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the link waits for the Bots, then opens Main")
         XCTAssertFalse(unreachable.exists)
         shot("4-linked")
     }
@@ -70,9 +69,9 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
 
     func testAThreadLinkForAnExistingUserOpensItInTheRoom() {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaReduceMotion",
-                                "-qaStrandsDemo", "-openURL", "bbstudio://strands"]
+                                "-openURL", "bbstudio://bot"]
         app.launchOffline()
-        XCTAssertTrue(app.descendants(matching: .any)["strands-overview"].firstMatch.waitForExistence(timeout: 30), "the room opens its Strands")
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the link opens the Bot's Main over Home")
         XCTAssertFalse(app.tabBars.firstMatch.exists)
     }
 }

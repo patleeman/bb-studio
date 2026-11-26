@@ -17,14 +17,7 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
 
     func testReplyInThreadOpensASheetAndLeavesAReplyRow() {
         launch()
-        // The folded Duo's header is its title; the model is in its ⋯.
-        // Elsewhere the model is the title's second line (round 5: no chip).
-        if !app.isFoldedDuo {
-            let title = app.buttons["conversationMore"]
-            XCTAssertTrue(title.waitForExistence(timeout: 10), "the title in the header")
-            XCTAssertTrue(title.label.contains("Opus 5.5"), title.label)
-        }
-        XCTAssertFalse(app.buttons["conversationWorkers"].exists, "workers are in the strands box, not a line of their own")
+        XCTAssertFalse(app.buttons["conversationWorkers"].exists, "workers are on Home and in the transcript, not a line of their own")
         XCTAssertFalse(app.buttons["Model & permissions"].exists, "the model picker left the input bar")
         XCTAssertFalse(app.buttons["composerExpandToPage"].exists, "no open-as-page control")
         XCTAssertTrue(app.buttons["Send"].exists == false, "dictation is the action while it's empty")
@@ -47,9 +40,7 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         }
         reply.tap()
         let field = app.textViews["Reply…"]
-        XCTAssertTrue(field.waitForExistence(timeout: 15), "the thread opens as a sheet")
-        XCTAssertTrue(app.buttons["replyThreadDone"].exists || app.buttons["BackButton"].exists || app.buttons["folded-back"].exists,
-                      "it closes with Done, or Back where it's pushed")
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "the thread opens, pushed over its conversation")
         shot("reply-sheet")
         field.tap()
         field.typeText("Hold it until Friday")
@@ -92,8 +83,8 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.staticTexts["Main · fork"].waitForExistence(timeout: 15), "the line reopens the fork")
         app.closeReplyThread()
         app.openRoomPlace("conversations")
-        XCTAssertTrue(app.buttons["roomNewConversation"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.buttons["roomConversation-thr_demo_fork1"].exists, "a fork has no row of its own")
+        XCTAssertTrue(app.buttons["homeNew"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["homeConversation-thr_demo_fork1"].exists, "a fork has no row of its own")
     }
 
     func testMainHasNoFinish() {
@@ -107,7 +98,7 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
     func testNewConversation() {
         launch("list")
         app.openRoomPlace("conversations")
-        let plus = app.buttons["roomNewConversation"]
+        let plus = app.buttons["homeNew"]
         XCTAssertTrue(plus.waitForExistence(timeout: 10))
         plus.tap()
         let field = app.textViews["Message Juniper"]
@@ -117,7 +108,7 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         app.buttons["newConversationStart"].tap()
         XCTAssertTrue(app.staticTexts["Plan the Lisbon dinner"].waitForExistence(timeout: 15), "the new conversation opens")
         app.openRoomPlace("conversations")
-        XCTAssertTrue(app.buttons["roomConversation-thr_demo_new1"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["homeConversation-thr_demo_new1"].waitForExistence(timeout: 15))
     }
 
     private func shot(_ name: String) {

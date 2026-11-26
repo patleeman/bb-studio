@@ -1,15 +1,16 @@
 import XCTest
 
-/// The Duo inner screen (951×669, phone idiom): in the right page, the
-/// composer has the transcript's margins, the jump button is centred on the
-/// page above the composer, and the composer sits as close to the bottom edge
-/// as a phone's does above its home indicator. Run on an owned iPhone Duo
-/// simulator.
+/// The Duo inner screen (951×669, phone idiom), book posture: in the
+/// conversation's page (the left one; the Workbench is on the right), the
+/// composer has the transcript's margins, the jump button sits beside it, and
+/// the composer sits as close to the bottom edge as a phone's does above its
+/// home indicator. Run on an owned iPhone Duo simulator.
 @MainActor
 final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
-    /// The crease's right edge: the window midpoint plus half the gutter.
-    private let pageMinX: CGFloat = 951 / 2 + 16
+    /// The conversation's page: from the window's leading edge to the crease.
+    private let pageMinX: CGFloat = 0
+    private let pageMaxX: CGFloat = 951 / 2 - 16
     /// Below a phone's composer, above the home indicator or keyboard: its
     /// vertical padding.
     private let composerGap: CGFloat = 8
@@ -17,18 +18,19 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
     private let otherId = "thr_demo_interview"
     private let other = "Mock with Sam moved to Friday 10:00. I asked"
 
-    func testComposerJumpButtonAndBottomGapInTheRightPage() throws {
+    func testComposerJumpButtonAndBottomGapInTheConversationPage() throws {
         app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles", "-qaDark",
             "-openURL", "bbstudio://bot"]
         app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
+        // The inner screen, landscape: with no hinge to read, the book posture.
+        command("landscape")
+        XCTAssertTrue(app.buttons["rail-tabs"].waitForExistence(timeout: 10), "the book posture's rail")
 
         try check("bot-chat", last: "Duo message 80")
-        // Another conversation, from the left page.
-        let row = app.buttons["contextConversation-thr_demo_interview"]
-        XCTAssertTrue(row.waitForExistence(timeout: 15))
-        row.tap()
+        // Another conversation, from Home (the rail brings it back).
+        app.pickConversation(otherId)
         try check("conversation", last: other, history: false)
 
         // With the keyboard up the composer still sits above it.
@@ -164,19 +166,15 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(message.waitForExistence(timeout: 15), "\(name): transcript loads")
         let composer = app.otherElements["threadComposer"].firstMatch
         XCTAssertTrue(composer.waitForExistence(timeout: 10))
-        expectation(for: NSPredicate { _, _ in message.frame.minX >= self.pageMinX - 1 && composer.frame.minX >= self.pageMinX - 1 },
+        expectation(for: NSPredicate { _, _ in message.frame.maxX <= self.pageMaxX + 1 && composer.frame.maxX <= self.pageMaxX + 1 },
                     evaluatedWith: nil)
         waitForExpectations(timeout: 5) { _ in }
         Thread.sleep(forTimeInterval: 1)
 
-        // 1. The composer has the transcript's leading margin. It runs under
-        // the status column; the transcript keeps clear of it, so its rows
-        // never pass under the Duo's clock, battery and Now Playing.
+        // 1. The composer has the transcript's margins, on its page.
         var layout = try geometry()
-        // The right page's, wholly on it: the room can keep the last
-        // conversation's probe beside the page until its slide settles.
         func onPage(_ layout: Geometry) -> [String: Rect] {
-            layout.surfaces.filter { $0.key.hasPrefix("transcript-") && $0.value.x >= pageMinX - 1 && $0.value.maxX <= layout.width + 1 }
+            layout.surfaces.filter { $0.key.hasPrefix("transcript-") && $0.value.x >= pageMinX - 1 && $0.value.maxX <= pageMaxX + 1 }
         }
         // Its probe reports on a layout: scrolling to the end makes one.
         for _ in 0..<5 where onPage(layout).isEmpty {
@@ -188,15 +186,13 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         XCTAssertLessThanOrEqual(transcripts.count, 1, "\(name): one transcript on the page")
         if let transcript = transcripts.first?.value {
             print("SPLIT COMPOSER \(name) composer=\(composer.frame) transcript=\(transcript) safeRight=\(layout.safeRight) safeBottom=\(layout.safeBottom)")
-            XCTAssertEqual(composer.frame.maxX, transcript.maxX + layout.safeRight, accuracy: 4,
-                           "\(name): composer runs under the status column; the transcript stops short of it")
+            XCTAssertEqual(composer.frame.maxX, transcript.maxX, accuracy: 4, "\(name): composer ends where the transcript does")
             XCTAssertEqual(composer.frame.minX, transcript.x, accuracy: 4, "\(name): composer starts where the transcript does")
         } else {
-            // A conversation shown after the room's slide may not report its
-            // probe (emulated inner screen on an iPhone): the composer stays on the page.
+            // No probe reported (emulated inner screen on an iPhone): the composer stays on the page.
             print("SPLIT COMPOSER \(name) composer=\(composer.frame): no transcript probe on the page")
             XCTAssertGreaterThanOrEqual(composer.frame.minX, pageMinX + 12 - 1, "\(name): composer on the page, with its margin")
-            XCTAssertLessThanOrEqual(composer.frame.maxX, layout.width - 12 + 1, "\(name): composer inside the window, with its margin")
+            XCTAssertLessThanOrEqual(composer.frame.maxX, pageMaxX - 12 + 1, "\(name): composer on the page, with its margin")
         }
 
         // 3. The composer sits as far above the window's bottom edge as a
@@ -217,12 +213,14 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         layout = try geometry()
         let scroll = try XCTUnwrap(layout.scrolls.first { abs($0.x - pageMinX) < 2 && $0.height > 400 && $0.contentHeight > 0 },
                                    "\(name): the transcript scroll view")
-        let page = (minX: pageMinX, maxX: layout.width)
+        let page = (minX: pageMinX, maxX: pageMaxX)
         let visibleBottom = scroll.y + scroll.height - scroll.adjustedBottom
         print("SPLIT JUMP \(name) jump=\(jump.frame) composer=\(composer.frame) visibleBottom=\(visibleBottom)")
         XCTAssertLessThanOrEqual(jump.frame.maxX, page.maxX + 1, "\(name): jump button stays on the page")
         XCTAssertGreaterThanOrEqual(jump.frame.minX, composer.frame.maxX + 7, "\(name): jump button is beside the composer")
-        XCTAssertEqual(jump.frame.midY, composer.frame.midY, accuracy: 4, "\(name): on the composer's row, not a row of its own")
+        // Level with the composer's bottom row (it can be taller: an attachment).
+        XCTAssertGreaterThanOrEqual(jump.frame.minY, composer.frame.minY, "\(name): on the composer's row, not a row of its own")
+        XCTAssertEqual(jump.frame.maxY, composer.frame.maxY - 4, accuracy: 4, "\(name): level with the composer's last row")
         XCTAssertGreaterThanOrEqual(jump.frame.minY, visibleBottom - 1, "\(name): below the transcript's visible rows")
         let rows = transcriptTexts().filter { $0.maxY <= visibleBottom + 1 }
         let lastRow = try XCTUnwrap(rows.max { $0.maxY < $1.maxY }, "\(name): a visible transcript row")
@@ -237,11 +235,11 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         XCTAssertFalse(jump.exists, "\(name): no jump button at the end")
         let top = composer.frame.minY
         let composerFrame: CGRect = composer.frame
-        let minX: CGFloat = pageMinX - 1
+        let maxX: CGFloat = pageMaxX + 1
         // Typed steps: as one expression Xcode 26 couldn't type-check it.
         let frames: [CGRect] = app.staticTexts.allElementsBoundByIndex.map { $0.frame }
         let endRows: [CGRect] = frames.filter { (frame: CGRect) -> Bool in
-            guard frame.width > 0, frame.height > 0, frame.minX >= minX, frame.minY < 669 else { return false }
+            guard frame.width > 0, frame.height > 0, frame.maxX <= maxX, frame.minY < 669 else { return false }
             return !composerFrame.contains(frame)
         }
         let above: [CGRect] = endRows.filter { $0.minY < top }
@@ -251,13 +249,13 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         command("capture?split-composer-" + name + "-end")
     }
 
-    /// Text of the right page's transcript: not the header, composer or sidebar.
+    /// Text of the conversation page's transcript: not the title line, composer or Workbench.
     private func transcriptTexts() -> [CGRect] {
         let composer = app.otherElements["threadComposer"].firstMatch.frame
-        let minX: CGFloat = pageMinX - 1
+        let maxX: CGFloat = pageMaxX + 1
         let frames: [CGRect] = app.staticTexts.allElementsBoundByIndex.map { $0.frame }
         return frames.filter { (frame: CGRect) -> Bool in
-            guard frame.width > 0, frame.height > 0, frame.minX >= minX, frame.maxY > 0, frame.minY < 669 else { return false }
+            guard frame.width > 0, frame.height > 0, frame.maxX <= maxX, frame.maxY > 0, frame.minY < 669 else { return false }
             return !frame.intersects(composer) && frame.minY >= 58
         }
     }

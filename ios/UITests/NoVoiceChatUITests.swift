@@ -20,7 +20,6 @@ final class NoVoiceChatUITests: ServerIsolatedUITestCase {
         let composer = app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
         XCTAssertTrue(composer.waitForExistence(timeout: 30))
         if duo { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/outer")!) }
-        XCTAssertTrue(app.buttons["roomList"].waitForExistence(timeout: 10), "The list stays")
         XCTAssertTrue(app.conversationMore.exists, "The ⋯ menu stays")
         sleep(2)
         shot("bot-rail")

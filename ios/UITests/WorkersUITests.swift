@@ -34,7 +34,7 @@ final class WorkersUITests: ServerIsolatedUITestCase {
         app.openRoomPlace("conversations")
         // The failed worker sits under the conversation that started it, behind that row's toggle.
         let nest = app.buttons["roomNestToggle-thr_demo_interview"]
-        let failed = app.buttons["roomWorker-thr_demo_w3"]
+        let failed = app.buttons["homeWorker-thr_demo_w3"]
         XCTAssertTrue(nest.waitForExistence(timeout: 15) || failed.exists, "Launch prep's workers are behind its toggle")
         if !failed.exists { nest.tap() }
         XCTAssertTrue(failed.waitForExistence(timeout: 15))
@@ -63,7 +63,7 @@ final class WorkersUITests: ServerIsolatedUITestCase {
     func testOpenFromTheListAndAskGoesBack() {
         launch()
         app.openRoomPlace("conversations")
-        let running = app.buttons["roomWorker-thr_demo_w2"]
+        let running = app.buttons["homeWorker-thr_demo_w2"]
         XCTAssertTrue(running.waitForExistence(timeout: 15))
         running.tap()
         expectWorker("Theme stills renderer", status: "running")
@@ -81,7 +81,7 @@ final class WorkersUITests: ServerIsolatedUITestCase {
     func testWaitingOnAnApprovalShowsItsStatusOnly() {
         launch()
         app.openRoomPlace("conversations")
-        let waiting = app.buttons["roomWorker-thr_demo_w1"]
+        let waiting = app.buttons["homeWorker-thr_demo_w1"]
         XCTAssertTrue(waiting.waitForExistence(timeout: 15))
         waiting.tap()
         expectWorker("Studio-native BB fork", status: "needs-you")

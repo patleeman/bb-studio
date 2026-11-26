@@ -21,11 +21,11 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         try? XCUIScreen.main.screenshot().pngRepresentation.write(to: url.appendingPathComponent("\(name).png"))
     }
 
-    private func row(_ id: String) -> XCUIElement { app.buttons["roomConversation-\(id)"] }
+    private func row(_ id: String) -> XCUIElement { app.buttons["homeConversation-\(id)"] }
 
     private func openConversations() {
         app.openRoomPlace("conversations")
-        XCTAssertTrue(app.buttons["roomNewConversation"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["homeNew"].waitForExistence(timeout: 15))
     }
 
     private func openArchive() {
@@ -36,7 +36,7 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
     private func backInTheRoom(_ what: String) {
         // The list sheet and the menu are gone and a conversation shows.
         let composer = app.textViews["Message"]
-        _ = app.descendants(matching: .any)["RoomSheet-conversations"].firstMatch.waitForNonExistence(timeout: 10)
+        _ = app.waitForRoom(timeout: 10)
         let shown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true"), object: composer)
         XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 15), .completed, what)
     }

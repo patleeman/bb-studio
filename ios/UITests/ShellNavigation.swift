@@ -4,18 +4,35 @@ import XCTest
 /// reach Home, its places and a conversation, on the iPhone's bar or the
 /// Duo's rail.
 extension XCUIApplication {
-    /// A conversation shows (its composer).
+    /// A conversation shows (its composer). The app opens on Home: a test that
+    /// starts in a conversation opens its Main from there (`-qaRoomConversation`
+    /// opens another one directly).
     func waitForRoom(timeout: TimeInterval = 30) -> Bool {
-        textViews["Message"].waitForExistence(timeout: timeout)
+        let composer = textViews["Message"]
+        let main = buttons["homeConversation-thr_botdemo01"]
+        let either = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in composer.exists || main.exists }, object: nil)
+        guard XCTWaiter.wait(for: [either], timeout: timeout) == .completed else { return false }
+        if !composer.exists, main.exists, main.isHittable { main.tap() }
+        return composer.waitForExistence(timeout: timeout)
     }
 
     private var home: XCUIElement { descendants(matching: .any)["home"].firstMatch }
 
+    /// A tap, or where the inner screen's stretched window runs past the
+    /// simulator's (outer) screen, the control's action as VoiceOver runs it.
+    func press(_ element: XCUIElement, id: String) {
+        // The inner screen (951 wide) is wider than any simulator's: XCUITest
+        // can call a control hittable there and still miss it.
+        if element.isHittable, windows.firstMatch.frame.width < 900 { return element.tap() }
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/activate?" + id)!)
+        sleep(1)
+    }
+
     /// Home, from wherever: Back on the iPhone, Home in the Duo's rail.
     func goHome(file: StaticString = #filePath, line: UInt = #line) {
         for _ in 0..<4 where !(home.exists && home.isHittable) {
-            let rail = buttons.matching(NSPredicate(format: "identifier IN %@", ["rail-home", "rail-back"])).firstMatch
-            if rail.exists, rail.isHittable { rail.tap() } else if navigationBars.buttons.firstMatch.exists {
+            let back = buttons["rail-back"], railHome = buttons["rail-home"]
+            if back.exists { press(back, id: "rail-back") } else if railHome.exists { press(railHome, id: "rail-home") } else if navigationBars.buttons.firstMatch.exists {
                 navigationBars.buttons.element(boundBy: 0).tap()
             }
             _ = home.waitForExistence(timeout: 3)
@@ -56,8 +73,14 @@ extension XCUIApplication {
     func pickConversation(_ id: String, file: StaticString = #filePath, line: UInt = #line) {
         goHome(file: file, line: line)
         let row = buttons["homeConversation-\(id)"]
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "\(id) on Home", file: file, line: line)
-        row.tap()
+        // Home's list is lazy: on a short window the row is further down.
+        _ = row.waitForExistence(timeout: 5)
+        for _ in 0..<4 where !row.exists {
+            home.exists ? home.swipeUp() : swipeUp()
+            _ = row.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(row.exists, "\(id) on Home", file: file, line: line)
+        press(row, id: "homeConversation-\(id)")
         XCTAssertTrue(waitForRoom(timeout: 15), "the conversation opens", file: file, line: line)
     }
 

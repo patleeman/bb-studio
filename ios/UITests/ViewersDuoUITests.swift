@@ -24,7 +24,7 @@ final class ViewersDuoUITests: ServerIsolatedUITestCase {
     private func launchUnfolded() throws {
         try XCTSkipUnless(UIDevice.current.name.lowercased().contains("duo"), "an iPhone Duo simulator")
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaRoomConversation",
-                               "thr_botdemo01", "-qaWorkspaceDemo", "-qaPageDemo", "-qaDesignDemo"]
+                               "thr_botdemo01", "-qaWorkbenchDemo", "-qaPageDemo", "-qaDesignDemo"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
         XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/landscape")!)

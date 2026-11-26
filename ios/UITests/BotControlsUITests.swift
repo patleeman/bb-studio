@@ -20,7 +20,7 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
 
     func testPauseFromTheListAndResumeFromTheConversation() {
         launch()
-        app.buttons["roomList"].tap()
+        app.goHome()
         let controls = app.buttons["botControls"]
         XCTAssertTrue(controls.waitForExistence(timeout: 10), "the Bot's controls in the list's header")
         controls.tap()
@@ -30,11 +30,11 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
         shot("1-controls")
         app.buttons["botPause"].tap()
         let paused = NSPredicate(format: "label CONTAINS 'Paused'")
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: paused, object: any("roomListHeader"))], timeout: 15), .completed,
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: paused, object: any("homeBotStatus"))], timeout: 15), .completed,
                        "the header says Paused")
         shot("2-paused-list")
         app.goHome()
-        XCTAssertTrue(any("RoomSheet-conversations").waitForNonExistence(timeout: 10), "the list closes")
+        XCTAssertTrue(app.waitForRoom(timeout: 10), "the conversation opens")
         // Round 5: a lasting state is a chip in the composer's top row, not a banner.
         let chip = app.buttons["chip-paused"]
         XCTAssertTrue(chip.waitForExistence(timeout: 15), "the composer says the Bot is paused")
@@ -47,8 +47,8 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
 
     func testMakeThisTheMainFromAConversation() {
         launch()
-        app.buttons["roomList"].tap()
-        let launchPrep = app.buttons["roomConversation-thr_demo_interview"]
+        app.goHome()
+        let launchPrep = app.buttons["homeConversation-thr_demo_interview"]
         XCTAssertTrue(launchPrep.waitForExistence(timeout: 10))
         launchPrep.tap()
         // The conversation's menu is its title (round 5).

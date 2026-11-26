@@ -486,7 +486,7 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         app.open(URL(string: "bbstudio://thread/thr_botdemo01")!)
         XCTAssertTrue(app.staticTexts["Plan mode"].waitForExistence(timeout: 10))
         shot("shelf-demo")
-        app.buttons.matching(NSPredicate(format: "label CONTAINS 'complete'")).firstMatch.tap()
+        app.buttons["chip-todos"].tap()
         sleep(1)
         shot("shelf-demo-todos")
     }

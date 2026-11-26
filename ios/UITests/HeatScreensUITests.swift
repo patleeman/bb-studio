@@ -70,16 +70,6 @@ final class HeatScreensUITests: ServerIsolatedUITestCase {
         hold("conversation")
     }
 
-    func test3StrandsBox() {
-        guard server == nil else { return }
-        launch(["-qaRoomConversation", "thr_botdemo01", "-qaStrandsDemo"])
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 40))
-        let toggle = app.buttons["strands-toggle"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 20), "the strands box's toggle")
-        toggle.tap()
-        hold("strands")
-    }
-
     func test4DesignPlayer() {
         guard server == nil else { return }
         launch(["-qaRoomConversation", "thr_botdemo01", "-qaDesignDemo"])

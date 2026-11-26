@@ -20,7 +20,7 @@ final class ApprovalsUITests: ServerIsolatedUITestCase {
 
     private func openWorker() {
         app.openRoomPlace("conversations")
-        let row = app.buttons["roomWorker-thr_demo_w1"]
+        let row = app.buttons["homeWorker-thr_demo_w1"]
         XCTAssertTrue(row.waitForExistence(timeout: 15))
         row.tap()
         XCTAssertTrue(any("workerTitle").waitForExistence(timeout: 15), "the worker opens")

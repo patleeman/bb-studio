@@ -25,18 +25,15 @@ final class RouterGatewayUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(handOff.exists)
         XCTAssertTrue(handOff.label.contains("GPT-5.2"), handOff.label)
         shot("1-notice")
+        let before = app.conversationTitle.label
         handOff.tap()
-        let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "NOT (label BEGINSWITH 'Conversation 1 of')"), object: any("conversationPageDots"))
+        let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", before), object: app.conversationTitle)
         XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 10), .completed, "it opens the thread that continues")
     }
 
     func testTheToolGatewayIsViewOnly() {
         launch()
-        app.buttons["roomList"].tap()
-        app.swipeUp()
-        let settings = app.buttons["roomSettings"]
-        XCTAssertTrue(settings.waitForExistence(timeout: 10))
-        settings.tap()
+        app.openRoomPlace("settings")
         let gateway = app.buttons["settingsToolGateway"]
         XCTAssertTrue(gateway.waitForExistence(timeout: 15))
         gateway.tap()
