@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "../migrations";
-import { registerLoops } from "../loops/register";
 import { registerWorkCards } from "../work/register";
 import { checkTasks } from "./check";
 import type { Task } from "./contract";
@@ -12,7 +11,7 @@ import { applyLinks, linkAtStart, planLinks, SPAWN_GRACE_MS, ThreadDirectory, ty
 import { retireAgentTasks } from "./retire";
 import { registerTasks } from "./register";
 import { withTaskTools, withWorkTools } from "./test/tools";
-import { boardRows, dayStart } from "./rows";
+import { boardRows, dayStart, flightRows } from "./rows";
 import { SpawnLinks } from "./spawn";
 import { TaskStore } from "./store";
 import { registerUserTasks } from "./user";
@@ -73,7 +72,6 @@ function setup(threads: ThreadFact[] = THREADS) {
   };
   const posts: string[] = [];
   const post = async (text: string) => { posts.push(text); };
-  const loops = registerLoops(bb as never, db, post, () => "UTC");
   const work = withWorkTools(tools, db, registerWorkCards(bb as never, db, { read: async () => ({ rows: [] }), thread: async () => ({ status: "active" }) }));
   const later: (() => void)[] = [];
   const store = new TaskStore(db);
@@ -81,8 +79,7 @@ function setup(threads: ThreadFact[] = THREADS) {
   let user: ReturnType<typeof registerUserTasks> | null = null;
   const agent = withTaskTools(tools, db, registerTasks(bb as never, db, post, async () => {}, () => {}, { links, check: async () => (await user!.check()).problems }));
   user = registerUserTasks(bb as never, db, {
-    post, send: async () => {}, thread: async (id) => (facts.get(id) ?? null) as never,
-    loopAct: (x) => loops.actDirect(x), reopenLoop: () => null, snoozeLoopUntil: () => null, held: () => [],
+    thread: async (id) => (facts.get(id) ?? null) as never, held: () => [],
     zone: () => "UTC", facts: async () => [...facts.values()],
   });
   const tool = async (name: string, input: unknown, threadId = "thr_lead") => {
@@ -158,12 +155,12 @@ it("a worker's own task_create binds it when it has no task", async () => {
 });
 
 it("drops the made-up task when the lead names the worker's real task, so the worker is on one task", async () => {
-  const { tool, links, store, user } = setup();
+  const { tool, links, store, user, ctx } = setup();
   const made = links.ensure(fact("thr_w3", { parentThreadId: "thr_lead", status: "active", title: "Fix the keyboard" }))!;
   expect(made.state).toBe("in_progress");
   const real = (await tool("task_create", { title: "Keyboard covers Send", owner: "thread:thr_w3", workers: ["thr_w3"], conversation: "thr_main" })).task;
   expect(store.get(made.id)).toMatchObject({ state: "dropped", workers: [] });
-  expect((await user.board()).rows.map((r) => r.id)).toEqual([real.id]);
+  expect((boardRows(store.all(), ctx())).rows.map((r) => r.id)).toEqual([real.id]);
   expect((await user.check()).problems.map((p) => [p.kind, p.threadId])).toEqual([["worker-without-task", "thr_w1"]]);
 });
 
@@ -197,13 +194,13 @@ it("a worker card for a worker that has a task draws that task instead of making
 });
 
 it("nests a worker's own task under the lead's task that lists the same worker (rule 2), live", async () => {
-  const { tool, tools, store, user } = setup();
+  const { tool, tools, store, ctx } = setup();
   const card = JSON.parse(await tools.work_card_create!.execute({ title: "iOS build", kind: "worker", workerThreadId: "thr_w1" }, { threadId: "thr_main" }));
   const workerCard = store.get(card.id);
   expect(workerCard.owner).toBe("thread:thr_w1");
   const lead = (await tool("task_create", { title: "TestFlight", owner: "me", card: true, conversation: "thr_main", workers: ["thr_w1", "thr_w2"] })).task;
   expect(store.get(card.id).parentId).toBe(lead.id);
-  const flight = await user.flight("thr_main");
+  const flight = flightRows(store.all(), "thr_main", ctx());
   expect(ids(flight.rows)).toEqual([lead.id, `  ${card.id}`]);
   expect(flight.rows[0]!.workers).toEqual(["thr_w2"]);
   expect(flight.rows[1]!.workers).toEqual(["thr_w1"]);
@@ -371,7 +368,7 @@ it("the check also catches one worker on two rows of the same task", async () =>
 });
 
 it("a reused idle worker with a real task never gets its made-up task back (review P1-1)", async () => {
-  const { tool, links, store, user } = setup();
+  const { tool, links, store, user, ctx } = setup();
   const made = links.ensure(fact("thr_w1", { parentThreadId: "thr_lead", status: "active" }))!;
   links.settled("thr_w1");
   expect(store.get(made.id).state).toBe("done");
@@ -379,7 +376,7 @@ it("a reused idle worker with a real task never gets its made-up task back (revi
   links.resumed("thr_w1");
   expect(store.get(made.id).state).toBe("dropped");
   expect(store.all().filter((t) => t.state !== "dropped" && t.state !== "done" && t.workers.includes("thr_w1")).map((t) => t.id)).toEqual([real.id]);
-  const rows = (await user.board()).rows;
+  const rows = (boardRows(store.all(), ctx())).rows;
   expect(rows.filter((r) => r.workers.includes("thr_w1")).map((r) => r.id)).toEqual([real.id]);
   expect((await user.check()).problems.filter((p) => p.threadId === "thr_w1")).toEqual([]);
 });
@@ -422,14 +419,13 @@ it("never puts an open worker task under a closed lead task at start (review P3-
 });
 
 it("a thread that owns two jobs is a lead: not drawn as a worker on each, not flagged (review P2-3)", async () => {
-  const { tool, user, store } = setup();
+  const { tool, user, store, ctx } = setup();
   await tool("task_create", { title: "Build", owner: "thread:thr_w1", workers: ["thr_w1"] });
   await tool("task_create", { title: "Keys", owner: "thread:thr_w3", workers: ["thr_w3"] });
   const one = (await tool("task_create", { title: "Lead job one", owner: "thread:thr_w2" }, "thr_main")).task;
   const two = (await tool("task_create", { title: "Lead job two", owner: "thread:thr_w2" }, "thr_main")).task;
-  const board = await user.board();
+  const board = boardRows(store.all(), ctx());
   expect(board.rows.filter((r) => r.id === one.id || r.id === two.id).map((r) => r.workers)).toEqual([[], []]);
-  expect((await user.workers()).rows.map((r) => r.id)).not.toContain(one.id);
   expect((await user.check()).problems).toEqual([]);
   const reused = (await tool("task_create", { title: "Earlier", owner: "thread:thr_w1", workers: ["thr_w1"] })).task;
   await tool("task_update", { id: reused.id, state: "done" });
@@ -502,21 +498,21 @@ it("starts the user's day at local midnight on daylight-saving days (review P3-6
 });
 
 it("finds Main where the Bot keeps it: the personal project's lead, not the bots row, fresh or stale (QA)", async () => {
-  const { tool, user } = setup();
+  const { tool, ctx, store } = setup();
   const finding = (await tool("task_create", { title: "Spend went up", owner: "cos" }, "thr_main")).task;
   expect(finding.conversation).toBeNull();
-  expect((await user.flight("thr_main")).rows.map((r) => r.id)).toEqual([finding.id]);
-  expect((await user.board()).rows.find((r) => r.id === finding.id)!.home).toBe("thr_main");
+  expect((flightRows(store.all(), "thr_main", ctx())).rows.map((r) => r.id)).toEqual([finding.id]);
+  expect((boardRows(store.all(), ctx())).rows.find((r) => r.id === finding.id)!.home).toBe("thr_main");
   db.prepare("UPDATE bots SET thread_id = 'thr_old_main'").run();
-  expect((await user.flight("thr_main")).rows.map((r) => r.id)).toEqual([finding.id]);
-  expect((await user.flight("thr_old_main")).rows).toEqual([]);
+  expect((flightRows(store.all(), "thr_main", ctx())).rows.map((r) => r.id)).toEqual([finding.id]);
+  expect((flightRows(store.all(), "thr_old_main", ctx())).rows).toEqual([]);
   expect(new ThreadDirectory(db).main()).toBe("thr_main");
   db.prepare("DELETE FROM project_leads").run();
   expect(new ThreadDirectory(db).main()).toBeNull();
 });
 
 it("work_card_create for an idle worker whose made-up task closed reopens and draws that task, not a new card (QA note 3)", async () => {
-  const { tools, links, store, user } = setup();
+  const { tools, links, store, ctx } = setup();
   const made = links.ensure(fact("thr_w1", { parentThreadId: "thr_lead", status: "active" }))!;
   links.settled("thr_w1");
   expect(store.get(made.id).state).toBe("done");
@@ -527,7 +523,7 @@ it("work_card_create for an idle worker whose made-up task closed reopens and dr
   expect(store.all()).toHaveLength(before);
   expect(store.get(made.id)).toMatchObject({ state: "in_progress", title: "Second round", conversation: "thr_main", closedAt: null, progress: { line: "Starting" }, card: { kind: "worker" } });
   expect(store.history(made.id).map((e) => e.type)).toContain("reopened");
-  const rows = (await user.board()).rows.filter((r) => r.workers.includes("thr_w1"));
+  const rows = (boardRows(store.all(), ctx())).rows.filter((r) => r.workers.includes("thr_w1"));
   expect(rows.map((r) => r.id)).toEqual([made.id]);
   links.settled("thr_w1");
   expect(store.get(made.id).state).toBe("in_progress");
@@ -542,9 +538,9 @@ async function tool2(tools: Record<string, Tool>, name: string, input: unknown) 
 }
 
 it("work_card_create never reopens a made-up task the user closed", async () => {
-  const { tools, links, store, handlers } = setup();
+  const { tools, links, store } = setup();
   const made = links.ensure(fact("thr_w1", { parentThreadId: "thr_lead", status: "active" }))!;
-  await handlers["tasks.act"]!({ id: made.id, action: "done" });
+  store.change(made.id, (t) => { t.state = "done"; }, "patrick");
   expect(store.get(made.id)).toMatchObject({ state: "done", closedBy: "patrick" });
   const out = JSON.parse(await tools.work_card_create!.execute({ title: "Second round", kind: "worker", workerThreadId: "thr_w1" }, { threadId: "thr_main" }));
   expect(out.id).not.toBe(made.id);

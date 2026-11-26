@@ -12,7 +12,7 @@ import { WorkCardStore } from "../work/store";
 import { task as taskSchema, type Task } from "./contract";
 import { adoptAtStart, backupPath, KEEP_BACKUPS, migrateToTasks, summarizeTaskMigration, verifyTaskMigration } from "./migrate";
 import { registerTasks } from "./register";
-import { todoGroups, withTaskTools, withWorkTools } from "./test/tools";
+import { seedTodo, todoGroups, withTaskTools, withWorkTools } from "./test/tools";
 import { markTasksUnavailable, normalizeTask, TaskStore } from "./store";
 import { applyLoop, applyWork, taskFromLoop, taskFromWork, toLoop, toWork } from "./views";
 import { taskFromLoop as captureTaskFromLoop } from "../../../../scripts/capture/task-rows.mjs";
@@ -54,7 +54,7 @@ function setup() {
   const { bb, tools, handlers } = fakeBb();
   const posts: string[] = [];
   const post = async (text: string) => { posts.push(text); };
-  const loops = registerLoops(bb as never, db, post, () => "UTC");
+  const loops = registerLoops(bb as never, db);
   const work = withWorkTools(tools, db, registerWorkCards(bb as never, db, { read: async () => ({ rows: [] }), thread: async () => ({ status: "active" }) }));
   const tasks = withTaskTools(tools, db, registerTasks(bb as never, db, post));
   const call = async (name: string, input: unknown, ctx: { threadId?: string | null } = { threadId: "thr_lead" }) => {
@@ -115,7 +115,7 @@ it("reads a task's title for a sidebar line, and null for an unknown id", async 
 
 it("keeps loop_, wc_ and task_ ids, and each resolves through task_get", async () => {
   const { call, loops, work } = setup();
-  const loop = loops.store.add({ title: "Call Sam" });
+  const loop = seedTodo(db, { title: "Call Sam" });
   const card = work.create({ title: "Build", threadId: "thr_lead" }).card;
   const { task } = await call("task_create", { title: "New", owner: "cos" });
   for (const id of [loop.id, card.id, task.id]) expect((await call("task_get", { id })).task.id).toBe(id);
@@ -213,16 +213,6 @@ it("a work card needs-you is owned by the user, and leaving it returns the card 
   store.update(card.id, { state: "done" });
   expect(tasks.get(card.id)).toMatchObject({ owner: "thread:thr_w", state: "done", closedBy: "thread:thr_w" });
   expect(tasks.history(card.id).map((e) => e.type)).toEqual(["handed_off", "state", "handed_off", "closed"]);
-});
-
-it("keeps fields only tasks have when a todo or card is saved through its old shape", () => {
-  const tasks = new TaskStore(db);
-  const loops = new LoopStore(db);
-  const l = loops.add({ title: "Todo" });
-  tasks.save({ ...tasks.get(l.id), project: "Home", outputs: [{ kind: "page", ref: "pg_1" }], workers: ["thr_a"], state: "failed" });
-  loops.update(l.id, { why: "because" });
-  expect(tasks.get(l.id)).toMatchObject({ why: "because", project: "Home", outputs: [{ kind: "page", ref: "pg_1" }], workers: ["thr_a"], state: "failed" });
-  expect(loops.get(l.id).status).toBe("dropped");
 });
 
 it("round-trips every todo status and kind and every card state through a task", () => {
@@ -333,7 +323,7 @@ it("is idempotent: a second run adopts nothing, takes no backup and keeps tasks 
   migrate(file);
   legacy(file);
   migrateToTasks(file);
-  new LoopStore(file).update("loop_a", { title: "Changed since" });
+  new TaskStore(file).change("loop_a", (t) => { t.title = "Changed since"; }, null);
   const before = file.prepare("SELECT id, record FROM tasks ORDER BY id").all();
   const events = file.prepare("SELECT count(*) AS n FROM task_events").get();
   vi.setSystemTime(NOW + 60000);
@@ -432,7 +422,7 @@ it("checks triggers like todos do: incomplete ones refused, place names lower-ca
 it("shows a clear error in Todos, In flight and the tools when adoption failed, instead of empty lists", async () => {
   const { call, handlers } = setup();
   markTasksUnavailable(db, "disk I/O error");
-  await expect(Promise.resolve().then(() => handlers["loops.list"]!({}))).rejects.toThrow(/^Tasks could not be loaded\. Nothing was lost\. Restart BB Studio to try again\.$/);
+  await expect(Promise.resolve().then(() => handlers["loops.get"]!({ id: "loop_x" }))).rejects.toThrow(/^Tasks could not be loaded\. Nothing was lost\. Restart BB Studio to try again\.$/);
   await expect(Promise.resolve().then(() => handlers["work.list"]!({ threadId: "thr_lead" }))).rejects.toThrow(/Tasks could not be loaded/);
   expect((await call("task_list", {})).error).toMatch(/Tasks could not be loaded/);
 });
@@ -495,9 +485,9 @@ it.each([
   expect(file.prepare("SELECT (SELECT count(*) FROM tasks) + (SELECT count(*) FROM task_legacy) + (SELECT count(*) FROM task_events) AS n").get()).toEqual({ n: 0 });
   expect(readdirSync(dir).filter((name) => name.includes("before-tasks"))).toEqual([]);
   const { bb, handlers } = fakeBb();
-  registerLoops(bb as never, file, async () => {}, () => "UTC");
+  registerLoops(bb as never, file);
   registerWorkCards(bb as never, file, { read: async () => ({ rows: [] }) });
-  await expect(Promise.resolve().then(() => handlers["loops.list"]!({}))).rejects.toThrow(/^Tasks could not be loaded\. Nothing was lost/);
+  await expect(Promise.resolve().then(() => handlers["loops.get"]!({ id: "loop_x" }))).rejects.toThrow(/^Tasks could not be loaded\. Nothing was lost/);
   await expect(Promise.resolve().then(() => handlers["work.list"]!({ threadId: "thr_lead" }))).rejects.toThrow(/Tasks could not be loaded/);
   expect(adoptAtStart(file, log)).toBeNull();
   expect(readdirSync(dir).filter((name) => name.includes("before-tasks"))).toEqual([]);

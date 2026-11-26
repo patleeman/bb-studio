@@ -193,8 +193,8 @@ Strands are each conversation's lines of work: Studio sorts every turn into
 one by itself (`src/strands`). A conversation shows them in its strands box
 above the composer, its **Strands** tab, the tag in each message's footer
 (with **Move to…**) and the folds in its transcript. The desktop has no
-page of every conversation's strands any more; the phone's Strands screen
-still reads them (`strands.overview`).
+page of every conversation's strands any more, and the phone no longer has
+a Strands screen reading them all at once.
 
 A strand needs you when a BB question or approval waits in it, one of its
 workers needs you, a Tool Gateway request waits, an area's open item needs

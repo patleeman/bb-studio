@@ -1,8 +1,8 @@
 // Strands for Studio, in every Bot conversation (Main included, not workers):
 // the detector fed from BB's thread events, the live signals each read is
 // worked out from, the user's edits (move, new strand from here, rename,
-// pin, merge), and the RPCs the strip, the message tags, the Strands tab and
-// the overview read. A conversation is backfilled lazily (opened, or a turn
+// pin, merge), the RPCs the strip, the message tags and the Strands tab read,
+// and the needs-you push's check. A conversation is backfilled lazily (opened, or a turn
 // finished), only when it was active in the last 14 days, one at a time,
 // the most recently active first.
 import type Database from "better-sqlite3";
@@ -24,7 +24,7 @@ export interface StrandServiceDeps extends Omit<DetectorDeps, "store" | "openTas
   db: Database.Database;
   /** A conversation strands run in (a Bot's, Main included; not a worker, not archived): its Bot and last activity. Null for any other thread. */
   conversation(threadId: string): { botId: string; lastActiveAt: number } | null;
-  /** A Bot's conversations, for the overview. */
+  /** A Bot's conversations, for the needs-you push's check. */
   conversationsOf(botId: string): Promise<{ threadId: string; title: string; isMain: boolean; lastActiveAt: number }[]>;
   /** The conversation's workers, with BB's status. */
   workers(threadId: string): Promise<WorkerFact[]>;
@@ -363,18 +363,6 @@ export class StrandService {
       if (this.disposed || this.now() >= deadline) return unknown;
       await new Promise((resolve) => { const timer = setTimeout(resolve, 250); (timer as { unref?: () => void }).unref?.(); });
     }
-  }
-
-  /** Every conversation of a Bot with strands showing (not only Earlier), needs you first, then the most recently active. */
-  async overview(botId: string): Promise<{ conversations: OverviewConversation[]; needs: number; running: number }> {
-    const { conversations } = await this.read(botId, this.now() - BACKFILL_ACTIVE_MS, () => true);
-    const needs = (row: OverviewConversation) => row.strands.filter((strand) => strand.state === "needs-you").length;
-    conversations.sort((a, b) => Number(needs(b) > 0) - Number(needs(a) > 0) || Number(b.isMain) - Number(a.isMain) || b.lastActiveAt - a.lastActiveAt);
-    return {
-      conversations,
-      needs: conversations.reduce((sum, row) => sum + needs(row), 0),
-      running: conversations.reduce((sum, row) => sum + row.strands.filter((strand) => strand.state === "running").length, 0),
-    };
   }
 
   /**

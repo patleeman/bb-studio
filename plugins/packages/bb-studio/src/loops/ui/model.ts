@@ -85,7 +85,7 @@ export function placeLabel(place: string, direction: "arrive" | "leave" = "arriv
   return direction === "arrive" ? (key === "home" ? "When you get home" : `When you get to ${where}`) : `When you leave ${where}`;
 }
 
-/** Why a due todo still waits (loops.list `held`): the day's budget is spent, or it's low priority. */
+/** Why a due todo still waits (tasks.list `held`): the day's budget is spent, or it's low priority. */
 export type Hold = "budget" | "morning";
 
 /** What releases a todo, in words, with its chip icon. A held todo says what it waits for instead. */
@@ -142,7 +142,7 @@ export function snoozeHint(preset: SnoozePreset, now = Date.now(), zone?: string
 
 export const isClosed = (loop: Pick<Loop, "closedAt">) => loop.closedAt !== null;
 
-/** A thread owner as the server resolved it (loops.list `owners`, loops.get `owner`). */
+/** A thread owner as the server resolved it (loops.get `owner`). */
 export type OwnerInfo = { owner: string; name: string; threadId: string | null };
 
 /** The owner's name: "You", the Bot, a lead by its project, the thread's title, or "An agent". */

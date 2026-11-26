@@ -1092,7 +1092,7 @@ const loopGroups = { needsYouNow: [loop("loop_a", "Pay the property tax")], comi
 
 test("the Bot page lists no to-dos, and its old Tasks address opens no Strands page", async () => {
   state.settings = { loopsEnabled: true };
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups, "tasks.list": { tasks: Object.values(loopGroups).flat().map((l) => taskFromLoop(l as never)), threads: [], held: [] } };
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "tasks.list": { tasks: Object.values(loopGroups).flat().map((l) => taskFromLoop(l as never)), threads: [], held: [] } };
   await show(<BotPanel />);
   expect(container.querySelector("[role=tablist][aria-label='Bot page']")).toBeNull();
   expect(container.querySelector('[data-need="loop:loop_a"]')).toBeNull();
@@ -1140,7 +1140,7 @@ test("Bot rows draw BB's thread status glyph: working off its hidden chat, unrea
 
 test("the sidebar has no Todos row or Needs you list under the primary Bot: its badge says a todo needs you", async () => {
   state.settings = { loopsEnabled: true };
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, attention: { reason: "1 todo needs you", count: 1, since: Date.now() } }, "loops.list": loopGroups };
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, attention: { reason: "1 todo needs you", count: 1, since: Date.now() } } };
   await show(<BotThreadList {...listProps} />);
   expect(container.querySelector("[data-testid=bot-all-loops]")).toBeNull();
   expect(container.textContent).not.toContain("All todos");

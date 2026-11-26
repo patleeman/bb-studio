@@ -241,7 +241,7 @@ describe("bb studio strands", () => {
   });
 });
 
-describe("strands.overview and list concurrency", () => {
+describe("strands list concurrency", () => {
   it("calls busy() once per list() and reads multiple conversations concurrently while preserving order", async () => {
     const db = database();
     const busyCalls: string[] = [];
@@ -284,10 +284,10 @@ describe("strands.overview and list concurrency", () => {
     await svc.list("thr_1");
     expect(busyCalls).toEqual(["thr_1"]);
 
-    // overview() must read the 3 conversations concurrently and preserve order.
+    // The needs-you check must read the 3 conversations concurrently and preserve order.
     busyCalls.length = 0;
     maxInFlight = 0;
-    const ov = await svc.overview("bot");
+    const ov = await svc.needsYouCheck("bot", 0);
     expect(maxInFlight).toBeGreaterThanOrEqual(2);
     expect(busyCalls.sort()).toEqual(["thr_1", "thr_2", "thr_3"]);
     expect(ov.conversations.map((c) => c.threadId)).toEqual(["thr_1", "thr_2", "thr_3"]);
