@@ -1,9 +1,10 @@
 {
   "_comment": "Provider-literal ratchet (G1). Per-file occurrence count of provider-ID references in core. May only go DOWN. Regenerate: node scripts/check-provider-literal-ratchet.mjs --write. Every counted file must have an `allowlist` entry (count, reason, owner, diesAt); the entries are authored by hand and survive --write. Delete this file and the guard when empty.",
-  "total": 14,
+  "total": 15,
   "files": {
     "apps/demo-server/src/fixtures/providers.ts": 3,
     "apps/demo-server/src/fixtures/world.ts": 2,
+    "apps/server/src/services/threads/agents-md-dedupe.fork.ts": 1,
     "apps/server/src/services/threads/thread-edit-message.ts": 1,
     "packages/config/src/bb-app-managed-config.ts": 4,
     "packages/scripts/src/commands/archive-codex-tmp-bb-sessions.ts": 1,
@@ -21,6 +22,12 @@
       "reason": "demo fixtures: the demo world's default provider.",
       "owner": "owner-accepted (demo fixture)",
       "diesAt": "never (demo fixture)"
+    },
+    "apps/server/src/services/threads/agents-md-dedupe.fork.ts": {
+      "count": 1,
+      "reason": "BB Studio fork: Pi reads AGENTS.md from the workspace's parent folders, so bb leaves its copy of <dataDir>/AGENTS.md out.",
+      "owner": "BB Studio fork (agents-md-dedupe seam)",
+      "diesAt": "when providers declare which instruction files they read"
     },
     "apps/server/src/services/threads/thread-edit-message.ts": {
       "count": 1,

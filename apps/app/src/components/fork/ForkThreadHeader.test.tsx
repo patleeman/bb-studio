@@ -9,6 +9,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   ExperimentalThreadHeaderRegistration,
@@ -88,12 +89,15 @@ function target(id: string): PluginThreadActionTarget {
 
 function Host({ children }: { children: ReactNode }) {
   const controller = useRenameController();
+  const [queryClient] = useState(() => new QueryClient());
   return (
-    <RenameControllerProvider controller={controller}>
-      <PaneContext.Provider value={PANE_CONTEXT}>
-        {children}
-      </PaneContext.Provider>
-    </RenameControllerProvider>
+    <QueryClientProvider client={queryClient}>
+      <RenameControllerProvider controller={controller}>
+        <PaneContext.Provider value={PANE_CONTEXT}>
+          {children}
+        </PaneContext.Provider>
+      </RenameControllerProvider>
+    </QueryClientProvider>
   );
 }
 

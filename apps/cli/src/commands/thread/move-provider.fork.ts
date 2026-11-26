@@ -6,14 +6,10 @@ import {
 import { action, CliExitError } from "../../action.js";
 import { cliFetch } from "../../client.js";
 import { resolveContextThreadId } from "../../context-env.js";
-import { noteJsonPayloadWritten } from "../../cli-error-output.js";
-
-function outputForkJson(opts: { json?: boolean }, data: unknown): boolean {
-  if (!opts.json) return false;
-  console.log(JSON.stringify(data, null, 2));
-  noteJsonPayloadWritten();
-  return true;
-}
+import {
+  passThroughExitCode,
+  reportCommandResult,
+} from "../../command-result.js";
 
 // `bbs thread move-provider`: move threads to another provider in place
 // (apps/server/src/services/threads/thread-provider-move.fork.ts). Never
@@ -309,20 +305,21 @@ export function registerMoveProviderCommand(
     .action(
       action(async (ids: string[], opts: MoveProviderOptions) => {
         const outcome = await runMoveProvider(getUrl, ids, opts);
-        if (!outputForkJson(opts, outcome)) {
-          for (const entry of outcome.results) {
-            const detail =
-              entry.result === "failed"
-                ? `${entry.reason ?? "failed"}${entry.message ? `: ${entry.message}` : ""}`
-                : `${describeSide(entry.from)} -> ${describeSide(entry.to)}`;
-            console.log(`${entry.threadId}  ${entry.result}  ${detail}`);
-          }
-          const s = outcome.summary;
-          console.log(
+        const s = outcome.summary;
+        reportCommandResult(opts, outcome, {
+          text: [
+            ...outcome.results.map((entry) => {
+              const detail =
+                entry.result === "failed"
+                  ? `${entry.reason ?? "failed"}${entry.message ? `: ${entry.message}` : ""}`
+                  : `${describeSide(entry.from)} -> ${describeSide(entry.to)}`;
+              return `${entry.threadId}  ${entry.result}  ${detail}`;
+            }),
             `${String(s.total)} threads: ${String(s.moved)} moved, ${String(s.alreadyMoved)} already moved, ${String(s.wouldMove)} would move, ${String(s.failed)} failed`,
-          );
-        }
-        if (outcome.exitCode !== 0) process.exitCode = outcome.exitCode;
+          ],
+          failure: null,
+        });
+        if (outcome.exitCode !== 0) passThroughExitCode(outcome.exitCode);
       }),
     );
 
@@ -350,11 +347,15 @@ export function registerMoveProviderCommand(
               "GET",
               `/threads/${encodeURIComponent(id)}/move-provider`,
             );
-            threads.push(
-              http.status === 200
-                ? http.body
-                : { threadId: id, state: "unknown", move: null },
-            );
+            if (http.status !== 200) {
+              throw new CliExitError(
+                typeof http.body.message === "string"
+                  ? http.body.message
+                  : `The server answered ${String(http.status)}`,
+                1,
+              );
+            }
+            threads.push(http.body);
           }
         } else {
           const query = new URLSearchParams();
@@ -381,19 +382,19 @@ export function registerMoveProviderCommand(
           started: threads.filter((t) => t.state === "started").length,
           cleared: threads.filter((t) => t.state === "cleared").length,
         };
-        if (outputForkJson(opts, { threads, summary })) return;
-        for (const thread of threads) {
-          const move = thread.move as {
-            to?: { providerId?: string; model?: string };
-            at?: string;
-          } | null;
-          console.log(
-            `${String(thread.threadId)}  ${String(thread.state)}${move ? `  ${move.to?.providerId ?? "?"}/${move.to?.model ?? "?"}  ${move.at ?? ""}` : ""}`,
-          );
-        }
-        console.log(
-          `${String(summary.total)} moved threads: ${String(summary.pending)} pending, ${String(summary.rebuilt)} rebuilt, ${String(summary.started)} started, ${String(summary.cleared)} cleared`,
-        );
+        reportCommandResult(opts, { threads, summary }, {
+          text: [
+            ...threads.map((thread) => {
+              const move = thread.move as {
+                to?: { providerId?: string; model?: string };
+                at?: string;
+              } | null;
+              return `${String(thread.threadId)}  ${String(thread.state)}${move ? `  ${move.to?.providerId ?? "?"}/${move.to?.model ?? "?"}  ${move.at ?? ""}` : ""}`;
+            }),
+            `${String(summary.total)} moved threads: ${String(summary.pending)} pending, ${String(summary.rebuilt)} rebuilt, ${String(summary.started)} started, ${String(summary.cleared)} cleared`,
+          ],
+          failure: null,
+        });
       }),
     );
 }
