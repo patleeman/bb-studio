@@ -7,9 +7,11 @@ final class PageViewerUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func openPage() {
-        app.launchArguments = ["-qaPageDemo", "-skipPushPrompt", "YES"]
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
+                               "-qaRoomConversation", "thr_botdemo01", "-qaPageDemo"]
         app.launchOffline()
-        app.open(URL(string: "bbstudio://page/qa-demo")!)
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://page/qa-demo")!)
         XCTAssertTrue(app.descendants(matching: .any)["pageScroll"].waitForExistence(timeout: 15), "the page opens")
     }
 
@@ -101,7 +103,9 @@ final class PageViewerUITests: ServerIsolatedUITestCase {
 
     func testActionsAndEditor() {
         openPage()
-        app.buttons["More"].tap()
+        XCTAssertTrue(app.screenAction("edit").waitForExistence(timeout: 10), "Edit is one of the two buttons (bar or rail)")
+        XCTAssertTrue(app.screenAction("comments").exists, "and Comments the other")
+        app.screenMore.tap()
         for title in ["Add a Page Inside", "Copy Reference", "Version History", "Export PDF", "Delete"] {
             XCTAssertTrue(app.buttons[title].waitForExistence(timeout: 5), title)
         }
@@ -109,7 +113,7 @@ final class PageViewerUITests: ServerIsolatedUITestCase {
         app.buttons["Change Icon"].tap()
         XCTAssertTrue(app.buttons["pageIcon-🧠"].waitForExistence(timeout: 5), "the desktop's icons")
         app.buttons["Cancel"].tap()
-        app.buttons["Edit page"].tap()
+        app.screenAction("edit").tap()
         XCTAssertTrue(app.textViews["pageEditor"].waitForExistence(timeout: 5))
         app.buttons["Insert"].tap()
         XCTAssertTrue(app.buttons["Callout"].waitForExistence(timeout: 5), "the slash menu's blocks")
@@ -119,6 +123,26 @@ final class PageViewerUITests: ServerIsolatedUITestCase {
         XCTAssertTrue((app.textViews["pageEditor"].value as? String)?.contains("> [!NOTE]") == true)
         app.buttons["Mention"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Next Monday"].waitForExistence(timeout: 5), "dates to mention")
+    }
+
+    /// The shell's Workbench, offline: its first tab is this page. The tab draws no bar
+    /// and no Work bar; its actions are at the top of the conversation's More.
+    func testAPageTabHasNoBarAndHandsItsActionsToMore() {
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
+                               "-qaRoomConversation", "thr_botdemo01", "-qaWorkbenchDemo", "-qaPageDemo"]
+        app.launchOffline()
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
+        let either = { (ids: [String]) in self.app.buttons.matching(NSPredicate(format: "identifier IN %@", ids)).firstMatch }
+        either(["workbenchButton", "rail-workbench"]).tap()
+        XCTAssertTrue(app.staticTexts["Callouts take their tone's colour."].waitForExistence(timeout: 15), "the page tab")
+        XCTAssertFalse(app.buttons["screenAction-edit"].exists, "no bar of its own")
+        XCTAssertFalse(app.textFields["Work with this page…"].exists || app.textViews["Work with this page…"].exists, "no second composer")
+        shot("page-tab")
+        either(["conversationMore", "rail-more"]).tap()
+        // A system menu: its items keep their labels, not always their identifiers.
+        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 5), "Edit at the top of More")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Comments'")).firstMatch.exists, "and Comments")
+        shot("page-tab-more")
     }
 
     private func shot(_ name: String) {

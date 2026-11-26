@@ -42,13 +42,13 @@ struct WorkbenchDiffTab: View {
                 list
             }
         }
-        .workbenchTabActions(actions)
+        .screenActions(actions)
         .task(id: threadId) { await load() }
     }
 
-    private var actions: [WorkbenchTabAction] {
+    private var actions: [ScreenAction] {
         guard path != nil, diff?.environmentId != nil else { return [] }
-        return [WorkbenchTabAction(id: "viewFile", title: showingFile ? "Show Diff" : "View File",
+        return [ScreenAction(id: "viewFile", title: showingFile ? "Show Diff" : "View File",
                                    systemImage: showingFile ? "plusminus" : "doc.text", run: { showingFile.toggle() })]
     }
 

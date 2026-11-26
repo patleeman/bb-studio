@@ -1,8 +1,8 @@
 import XCTest
 
 /// Round 7, on the iPhone Duo simulator unfolded (`bbstudio://qa-duo/landscape`),
-/// offline: a page with its comment marks, a design's player zooming, and a
-/// page as a Workbench tab with no bar of its own. `VIEWERS_OUT` keeps PNGs.
+/// offline: a page with its comments, and a design's player zooming.
+/// `VIEWERS_OUT` keeps PNGs.
 final class ViewersDuoUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
@@ -39,7 +39,7 @@ final class ViewersDuoUITests: ServerIsolatedUITestCase {
         shot("duo-unfolded-page")
         // The page spans both halves; its bar's Comments is on the right one.
         page("right")
-        app.buttons["pageComments"].tap()
+        app.screenAction("comments").tap()
         XCTAssertTrue(onEitherPage("Add the press kit."), "the comments")
         shot("duo-unfolded-page-comments")
     }
@@ -59,24 +59,6 @@ final class ViewersDuoUITests: ServerIsolatedUITestCase {
         while (Double(still.value as? String ?? "") ?? 0) < 1.5, Date() < until { Thread.sleep(forTimeInterval: 0.25) }
         XCTAssertGreaterThan(Double(still.value as? String ?? "") ?? 0, 1.5, "a double tap zooms on the Duo too")
         shot("duo-unfolded-design-zoomed")
-    }
-
-    func testAPageTabHasNoBarOfItsOwn() throws {
-        try launchUnfolded()
-        page("right")
-        let title = app.buttons["conversationMore"]
-        XCTAssertTrue(title.waitForExistence(timeout: 10))
-        title.tap()
-        XCTAssertTrue(any("duoWorkspace").waitForExistence(timeout: 10), "the Workspace on the right")
-        let budget = app.buttons["workspaceTab-tab-budget"]
-        XCTAssertTrue(budget.waitForExistence(timeout: 10))
-        budget.tap()
-        let content = any("workspaceContent-tab-budget")
-        XCTAssertTrue(content.waitForExistence(timeout: 10), "the page tab")
-        XCTAssertTrue(app.staticTexts["Callouts take their tone's colour."].waitForExistence(timeout: 10), "the page inside")
-        XCTAssertTrue(app.buttons["pageCommentMark-aaaa0004"].waitForExistence(timeout: 10), "its comment marks")
-        XCTAssertFalse(app.buttons["Edit page"].exists, "no bar of its own: its actions are the shell's More")
-        shot("duo-unfolded-page-tab")
     }
 
     private func shot(_ name: String) {

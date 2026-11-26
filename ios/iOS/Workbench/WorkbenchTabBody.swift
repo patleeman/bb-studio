@@ -108,8 +108,8 @@ private struct WorkbenchItemTab: View {
         NavigationStack {
             screen.toolbar(.hidden, for: .navigationBar)
         }
-        .workbenchTabActions([
-            WorkbenchTabAction(id: "fullScreen", title: "Open Full Screen", systemImage: "arrow.up.left.and.arrow.down.right",
+        .screenActions([
+            ScreenAction(id: "fullScreen", title: "Open Full Screen", systemImage: "arrow.up.left.and.arrow.down.right",
                                run: { app.push(route) }),
         ])
     }

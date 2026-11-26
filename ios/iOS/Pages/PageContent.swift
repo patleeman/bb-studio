@@ -82,23 +82,26 @@ private struct PageHeader: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if !parents.isEmpty { breadcrumbs }
-            if meta?.archived == true { archived }
-            Button { sheet = .icon } label: {
-                if let emoji = meta?.emoji {
-                    Text(emoji).font(.system(size: 44))
-                } else {
-                    Label("Add icon", systemImage: "face.smiling").font(.footnote).foregroundStyle(.secondary)
+        // Nothing until the page's details are in: an empty title line would leave a band.
+        if let meta {
+            VStack(alignment: .leading, spacing: 6) {
+                if !parents.isEmpty { breadcrumbs }
+                if meta.archived == true { archived }
+                Button { sheet = .icon } label: {
+                    if let emoji = meta.emoji {
+                        Text(emoji).font(.system(size: 44))
+                    } else {
+                        Label("Add icon", systemImage: "face.smiling").font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(meta.emoji == nil ? "Add icon" : "Change icon")
+                .accessibilityIdentifier("pageIcon")
+                Text(meta.displayTitle)
+                    .font(.largeTitle.bold())
+                    .foregroundStyle(meta.title?.isEmpty == false ? .primary : .secondary)
+                if let updatedAt = meta.updatedAt { edited(meta, updatedAt) }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(meta?.emoji == nil ? "Add icon" : "Change icon")
-            .accessibilityIdentifier("pageIcon")
-            Text(meta?.displayTitle ?? " ")
-                .font(.largeTitle.bold())
-                .foregroundStyle(meta?.title?.isEmpty == false ? .primary : .secondary)
-            if let meta, let updatedAt = meta.updatedAt { edited(meta, updatedAt) }
         }
     }
 

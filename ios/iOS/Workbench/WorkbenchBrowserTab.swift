@@ -21,7 +21,7 @@ struct WorkbenchBrowserTab: View {
                 }
             }
             .accessibilityIdentifier("browserTabPage")
-            .workbenchTabActions(actions)
+            .screenActions(actions)
             .task(id: url) {
                 guard page.url != url else { return }
                 // A failed load shows WebKit's own error page; nothing to add here.
@@ -29,19 +29,19 @@ struct WorkbenchBrowserTab: View {
             }
     }
 
-    private var actions: [WorkbenchTabAction] {
+    private var actions: [ScreenAction] {
         let list = page.backForwardList
         return [
-            WorkbenchTabAction(id: "back", title: "Back", systemImage: "chevron.backward", disabled: list.backList.isEmpty,
+            ScreenAction(id: "back", title: "Back", systemImage: "chevron.backward", disabled: list.backList.isEmpty,
                                run: { go(list.backList.last) }),
-            WorkbenchTabAction(id: "forward", title: "Forward", systemImage: "chevron.forward", disabled: list.forwardList.isEmpty,
+            ScreenAction(id: "forward", title: "Forward", systemImage: "chevron.forward", disabled: list.forwardList.isEmpty,
                                run: { go(list.forwardList.first) }),
             page.isLoading
-                ? WorkbenchTabAction(id: "reload", title: "Stop", systemImage: "xmark", run: { page.stopLoading() })
-                : WorkbenchTabAction(id: "reload", title: "Reload", systemImage: "arrow.clockwise", run: { run(page.reload()) }),
-            WorkbenchTabAction(id: "safari", title: "Open in Safari", systemImage: "safari", run: { openURL(shown) }),
-            WorkbenchTabAction(id: "copy", title: "Copy Link", systemImage: "link", run: { UIPasteboard.general.url = shown }),
-            WorkbenchTabAction(id: "share", title: "Share", systemImage: "square.and.arrow.up", share: shown),
+                ? ScreenAction(id: "reload", title: "Stop", systemImage: "xmark", run: { page.stopLoading() })
+                : ScreenAction(id: "reload", title: "Reload", systemImage: "arrow.clockwise", run: { run(page.reload()) }),
+            ScreenAction(id: "safari", title: "Open in Safari", systemImage: "safari", run: { openURL(shown) }),
+            ScreenAction(id: "copy", title: "Copy Link", systemImage: "link", run: { UIPasteboard.general.url = shown }),
+            ScreenAction(id: "share", title: "Share", systemImage: "square.and.arrow.up", share: shown),
         ]
     }
 

@@ -77,17 +77,15 @@ struct PageView: View {
             }
     }
 
-    /// The content with its actions: the navigation bar's, or the shell's More.
+    /// The content with its one action list (Edit and Comments first): pushed, the bar's
+    /// buttons and ⋯ on the iPhone and the rail on the Duo; in a Workbench tab, the shell's More.
     @ViewBuilder private var chrome: some View {
         let actions = PageActions(page: meta, model: model, chats: chats, gone: gone, star: starItem, studio: studio,
-                                  open: { sheet = $0 }, ask: { dialog = $0 }, act: act)
+                                  open: { sheet = $0 }, ask: { dialog = $0 }, act: act).all
         if inWorkbench {
-            content.workbenchTabActions(actions.all)
+            content.screenActions(actions)
         } else {
-            content
-                .navigationTitle(meta?.displayTitle ?? "Page")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItemGroup(placement: .topBarTrailing) { PageToolbarButtons(actions: actions) } }
+            content.screenToolbar(meta?.displayTitle ?? "Page", actions: actions)
         }
     }
 
@@ -148,34 +146,5 @@ private struct PageNotice: View {
                 }
                 .accessibilityIdentifier("pageNotice")
         }
-    }
-}
-
-/// Edit and Comments in the bar, the rest under ⋯.
-private struct PageToolbarButtons: View {
-    let actions: PageActions
-
-    var body: some View {
-        if let edit = actions.edit {
-            Button(action: edit.run) { Image(systemName: edit.systemImage) }
-                .accessibilityLabel("Edit page")
-        }
-        if let comments = actions.comments {
-            Button(action: comments.run) {
-                HStack(spacing: 3) {
-                    Image(systemName: comments.systemImage)
-                    if actions.model.openComments > 0 { Text("\(actions.model.openComments)").font(.subheadline.monospacedDigit()) }
-                }
-            }
-            .accessibilityLabel("Comments")
-            .accessibilityIdentifier("pageComments")
-            .accessibilityValue(actions.model.openComments > 0 ? "\(actions.model.openComments) open" : "")
-        }
-        Menu {
-            WorkbenchTabActionItems(actions: actions.more)
-        } label: {
-            Image(systemName: "ellipsis")
-        }
-        .accessibilityLabel("More")
     }
 }

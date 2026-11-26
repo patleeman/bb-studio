@@ -280,7 +280,7 @@ struct WorkspaceFileView: View {
     var body: some View {
         if inWorkbench {
             // A Workbench tab: no title of its own; the shell's bar shows its actions.
-            loaded.workbenchTabActions(tabActions)
+            loaded.screenActions(tabActions)
         } else {
             loaded
                 .navigationTitle(URL(fileURLWithPath: path).lastPathComponent)
@@ -301,15 +301,15 @@ struct WorkspaceFileView: View {
         if let text = file?.text { ShareLink(item: text) }
     }
 
-    private var tabActions: [WorkbenchTabAction] {
-        var actions: [WorkbenchTabAction] = []
+    private var tabActions: [ScreenAction] {
+        var actions: [ScreenAction] = []
         if canToggleSource {
-            actions.append(WorkbenchTabAction(id: "source", title: raw ? "Show Rendered" : "Show Source",
+            actions.append(ScreenAction(id: "source", title: raw ? "Show Rendered" : "Show Source",
                                               systemImage: raw ? "doc.richtext" : "chevron.left.forwardslash.chevron.right",
                                               run: { raw.toggle() }))
         }
         if let text = file?.text {
-            actions.append(WorkbenchTabAction(id: "copy", title: "Copy", systemImage: "doc.on.doc", run: { UIPasteboard.general.string = text }))
+            actions.append(ScreenAction(id: "copy", title: "Copy", systemImage: "doc.on.doc", run: { UIPasteboard.general.string = text }))
         }
         return actions
     }

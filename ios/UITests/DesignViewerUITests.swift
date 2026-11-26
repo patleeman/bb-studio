@@ -19,7 +19,9 @@ final class DesignViewerUITests: ServerIsolatedUITestCase {
 
     func testCommentsListOpensAPinnedScreen() {
         launch()
-        app.buttons["designComments"].tap()
+        XCTAssertTrue(app.screenAction("comment").waitForExistence(timeout: 10), "Comment is one of the two buttons (bar or rail)")
+        XCTAssertTrue(app.screenAction("screens").exists, "and Screens the other")
+        app.screenMoreAction("comments")
         let first = app.buttons["designComment-1"]
         XCTAssertTrue(first.waitForExistence(timeout: 10), "the open comment, numbered")
         XCTAssertTrue(app.staticTexts["Bigger title"].exists)
@@ -49,13 +51,13 @@ final class DesignViewerUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(live.buttons["Comment 2"].waitForExistence(timeout: 15), "its pin appears on the element")
         shot("design-new-pin")
         app.buttons["Done"].firstMatch.tap()
-        app.buttons["designComments"].tap()
+        app.screenMoreAction("comments")
         XCTAssertTrue(app.buttons["designComment-2"].waitForExistence(timeout: 10), "and it's in the list")
     }
 
     func testResolveAndReopen() {
         launch()
-        app.buttons["designComments"].tap()
+        app.screenMoreAction("comments")
         let first = app.buttons["designComment-1"]
         XCTAssertTrue(first.waitForExistence(timeout: 10))
         first.swipeLeft()

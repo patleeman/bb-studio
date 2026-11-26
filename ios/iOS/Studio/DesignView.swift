@@ -60,32 +60,13 @@ struct DesignView: View {
             .accessibilityIdentifier("designView")
     }
 
+    /// One action list (Comment and Screens first): pushed, the bar's buttons and ⋯ on the
+    /// iPhone and the rail on the Duo; in a Workbench tab, the shell's More.
     @ViewBuilder private var chrome: some View {
         if inWorkbench {
-            content.workbenchTabActions(actions)
+            content.screenActions(actions)
         } else {
-            content
-                .navigationTitle(model.design?.displayName ?? "Design")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItemGroup(placement: .topBarTrailing) {
-                        Button { sheet = .comments } label: {
-                            HStack(spacing: 3) {
-                                Image(systemName: "text.bubble")
-                                if !model.openComments.isEmpty { Text("\(model.openComments.count)").font(.subheadline.monospacedDigit()) }
-                            }
-                        }
-                        .accessibilityLabel("Comments")
-                        .accessibilityIdentifier("designComments")
-                        Menu {
-                            WorkbenchTabActionItems(actions: actions.filter { $0.id != "comments" })
-                            StudioChatMenuButton(isPresented: $chatting)
-                        } label: {
-                            Image(systemName: "ellipsis")
-                        }
-                        .accessibilityLabel("Design options")
-                    }
-                }
+            content.screenToolbar(model.design?.displayName ?? "Design", actions: actions)
         }
     }
 
@@ -102,32 +83,48 @@ struct DesignView: View {
         }
     }
 
-    /// The desktop's toolbar and header: Present, Comments, star, rename, the conversation, Related, BB web, delete.
-    private var actions: [WorkbenchTabAction] {
+    /// The desktop's toolbar and header: Comment, the screens, Comments, Present, star,
+    /// rename, the conversation, Studio Chat, Related, BB web, delete.
+    private var actions: [ScreenAction] {
         guard let design = model.design else { return [] }
-        var list: [WorkbenchTabAction] = []
+        var list: [ScreenAction] = []
         if let newest = design.screens.first?.id {
-            list.append(WorkbenchTabAction(id: "present", title: "Present", systemImage: "play.rectangle",
-                                           run: { playing = DesignPlayerStart(screenId: newest, mode: .play) }))
+            list.append(ScreenAction(id: "comment", title: "Comment", systemImage: "text.bubble.badge.plus",
+                                     run: { playing = DesignPlayerStart(screenId: newest, mode: .comment) }))
+            list.append(ScreenAction(id: "screens", title: "Screens", systemImage: "rectangle.on.rectangle",
+                                     children: (design.rounds ?? []).flatMap { $0.screens ?? [] }.compactMap { screen in
+                                         screen.id.map { id in
+                                             ScreenAction(id: "screen-\(id)", title: [id, screen.title?.isEmpty == false ? screen.title : screen.caption]
+                                                             .compactMap { $0 }.joined(separator: " · "),
+                                                          systemImage: "rectangle", run: { playing = DesignPlayerStart(screenId: id) })
+                                         }
+                                     }))
+        }
+        if let newest = design.screens.first?.id {
+            list.append(ScreenAction(id: "present", title: "Present", systemImage: "play.rectangle",
+                                     run: { playing = DesignPlayerStart(screenId: newest, mode: .play) }))
         }
         let open = model.openComments.count
-        list.append(WorkbenchTabAction(id: "comments", title: open > 0 ? "Comments (\(open))" : "Comments", systemImage: "text.bubble",
+        list.append(ScreenAction(id: "comments", title: open > 0 ? "Comments (\(open))" : "Comments", systemImage: "text.bubble",
                                        run: { sheet = .comments }))
         if studio.supportsStars, let item = studio.item(for: .design(id: model.id)) {
             let starred = studio.isStarred(item)
-            list.append(WorkbenchTabAction(id: "star", title: starred ? "Unstar" : "Star", systemImage: starred ? "star.slash" : "star",
+            list.append(ScreenAction(id: "star", title: starred ? "Unstar" : "Star", systemImage: starred ? "star.slash" : "star",
                                            run: { act { try await studio.setStarred(item, !starred, client: $0) } }))
         }
-        list.append(WorkbenchTabAction(id: "rename", title: "Rename", systemImage: "pencil", run: {
+        list.append(ScreenAction(id: "rename", title: "Rename", systemImage: "pencil", run: {
             newName = design.name ?? ""
             renaming = true
         }))
         if let threadId = design.threadId, !inWorkbench {
-            list.append(WorkbenchTabAction(id: "thread", title: "Open Conversation", systemImage: Symbols.thread, run: { app.push(.thread(id: threadId)) }))
+            list.append(ScreenAction(id: "thread", title: "Open Conversation", systemImage: Symbols.thread, run: { app.push(.thread(id: threadId)) }))
         }
-        list.append(WorkbenchTabAction(id: "related", title: "Related", systemImage: "link", run: { sheet = .related }))
-        list.append(WorkbenchTabAction(id: "web", title: "Open in BB Web", systemImage: "safari", run: { sheet = .web }))
-        list.append(WorkbenchTabAction(id: "delete", title: "Delete Design", systemImage: "trash", role: .destructive, run: { deleting = true }))
+        if studio.plugins.contains("studio") {
+            list.append(ScreenAction(id: "chat", title: "Chat About This", systemImage: "bubble.left.and.text.bubble.right", run: { chatting = true }))
+        }
+        list.append(ScreenAction(id: "related", title: "Related", systemImage: "link", run: { sheet = .related }))
+        list.append(ScreenAction(id: "web", title: "Open in BB Web", systemImage: "safari", run: { sheet = .web }))
+        list.append(ScreenAction(id: "delete", title: "Delete Design", systemImage: "trash", role: .destructive, run: { deleting = true }))
         return list
     }
 

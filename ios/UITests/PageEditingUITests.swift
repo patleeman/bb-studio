@@ -18,10 +18,12 @@ final class PageEditingUITests: ServerIsolatedUITestCase {
 
     func testPageEditorIsOneContinuousText() {
         let app = XCUIApplication()
-        app.launchArguments = ["-qaPageDemo"]
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
+                               "-qaRoomConversation", "thr_botdemo01", "-qaPageDemo"]
         app.launchOffline()
-        app.open(URL(string: "bbstudio://page/qa-demo")!)
-        let edit = app.buttons["Edit page"]
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://page/qa-demo")!)
+        let edit = app.screenAction("edit")
         XCTAssertTrue(edit.waitForExistence(timeout: 10))
         edit.tap()
         let editor = app.textViews["pageEditor"]
