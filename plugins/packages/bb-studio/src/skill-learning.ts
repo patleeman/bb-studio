@@ -45,6 +45,8 @@ export const REVIEW_TIMEOUT_MS = 20 * 60_000;
 export const SKILL_SOFT_LIMIT = 8000;
 /** Reviews a Bot starts in one local day, daily and archive passes together; Run now isn't counted against it. */
 export const DAILY_REVIEW_CAP = 6;
+/** Tries a queued review gets when it fails before its fork exists (a transient error reading or forking the thread). */
+export const START_ATTEMPTS = 3;
 /** When the daily sweep may run (local hour) and how far apart sweeps are at least. */
 const DAILY_HOUR = 3;
 const DAY_MS = 86_400_000;
@@ -221,7 +223,7 @@ type LearningRow = {
   daily_at: number | null;
 };
 type ReviewRow = { thread_id: string; bot_id: string; kind: "review" | "consolidate"; status: "running" | "done"; saved: number; memory: number; started_at: number; finished_at: number | null; result: string | null; source_thread_id: string | null; source_seq: number | null };
-type QueueRow = { thread_id: string; bot_id: string; reason: ReviewReason; queued_at: number };
+type QueueRow = { thread_id: string; bot_id: string; reason: ReviewReason; queued_at: number; attempts: number };
 
 export interface LearningBot { id: string; name: string; threadId: string | null; state: string; kind?: string }
 export interface LearningSkill { name: string; description: string; body: string; state: SkillState; pinned: boolean; usedAt: number | null; updatedAt: number; alwaysOn?: boolean }
@@ -274,6 +276,8 @@ export class SkillLearning {
   private readonly started = new Set<string>();
   /** Review forks already told once that their tools are connected. */
   private readonly retried = new Set<string>();
+  /** Running reviews this process has looked at since it started (settle), so a reload's orphans are checked once. */
+  private readonly seen = new Set<string>();
   /** A minute tick still running: the next one waits for it rather than overlapping. */
   private ticking = false;
 
@@ -415,12 +419,15 @@ export class SkillLearning {
 
   /** Reviews the Bot started today: daily and archive passes, not Run now's or the curator's. */
   startedToday(botId: string, now = Date.now()): number {
-    return (this.deps.db.prepare("SELECT COUNT(*) AS n FROM bot_skill_reviews WHERE bot_id = ? AND kind = 'review' AND started_at >= ? AND COALESCE(reason, '') != 'manual'").get(botId, dayStart(now)) as { n: number }).n;
+    // A start that failed (no prompt sent) isn't a review.
+    return (this.deps.db.prepare("SELECT COUNT(*) AS n FROM bot_skill_reviews WHERE bot_id = ? AND kind = 'review' AND started_at >= ? AND COALESCE(reason, '') != 'manual' AND COALESCE(result, '') NOT LIKE 'Couldn''t start%'").get(botId, dayStart(now)) as { n: number }).n;
   }
 
   /** Run now: the sweep at once, and the first review starts. True when something was queued or is running. */
   async runNow(botId: string, now = Date.now()): Promise<boolean> {
     if (this.studioBot(botId)?.state !== "active") return false;
+    // Before the first tick's baseline: take it now, so Run now never queues old history.
+    if (this.row(botId).daily_at === null) await this.baseline(botId, now);
     const queued = await this.sweep(botId, now, "manual");
     await this.next(botId, now);
     return queued > 0 || !!this.running(botId);
@@ -439,16 +446,21 @@ export class SkillLearning {
     for (const entry of this.queued(botId)) {
       if (entry.reason !== "manual" && this.startedToday(botId, now) >= DAILY_REVIEW_CAP) continue;
       const thread = await this.deps.sdk.threads.get({ threadId: entry.thread_id }).catch(() => null) as ThreadLike | null;
-      // Gone: nothing to review. Busy: it waits for a later tick.
+      // Gone: nothing to review. Archived since a daily or manual pass was queued: its archive pass covers it
+      // (start() refuses an archived thread for any other pass, which would jam the queue). Busy: a later tick.
       if (!thread) { this.dequeue(entry.thread_id); continue; }
+      if (thread.archivedAt && entry.reason !== "archive") { this.dequeue(entry.thread_id); continue; }
       if (thread.status && thread.status !== "idle" && !thread.archivedAt) continue;
       let started = false;
       try {
         started = await this.start(botId, "review", entry.reason, entry.thread_id);
       } catch (error) {
-        // It failed after forking (the fork is closed): drop it, so a broken thread doesn't retry every minute.
         this.deps.log?.(`Skill review of ${entry.thread_id}: ${error instanceof Error ? error.message : String(error)}`);
-        this.dequeue(entry.thread_id);
+        // After its fork existed (the fork is closed as "Couldn't start"): dropped, so a broken thread doesn't retry
+        // every minute. Before the fork (reading or forking the thread failed): tried again on later ticks, a few times.
+        const attempts = entry.attempts + 1;
+        if ((error as { forked?: boolean }).forked || attempts >= START_ATTEMPTS) this.dequeue(entry.thread_id);
+        else this.deps.db.prepare("UPDATE bot_skill_review_queue SET attempts = ? WHERE thread_id = ?").run(attempts, entry.thread_id);
         return false;
       }
       if (!started) return false;
@@ -514,7 +526,7 @@ export class SkillLearning {
         await this.deps.sdk.threads.send({ threadId: fork.id, mode: "auto", input: [{ type: "text", text: prompt, mentions: [] }] } as never);
       } catch (error) {
         await this.close(this.review(fork.id)!, `Couldn't start: ${error instanceof Error ? error.message : String(error)}`, true);
-        throw error;
+        throw Object.assign(error instanceof Error ? error : new Error(String(error)), { forked: true });
       }
       this.deps.changed();
       return true;
@@ -580,6 +592,30 @@ export class SkillLearning {
     this.deps.changed();
   }
 
+  /**
+   * What a running review's fork really did, for one this process lost
+   * track of (a reload) or one past REVIEW_TIMEOUT_MS: its thread gone, it's
+   * released; idle after its turn, it finishes as if its idle had been seen
+   * (its result recorded, the mark moved); still working past the timeout,
+   * it's stopped. A fork that's idle without having taken its turn waits for
+   * the timeout, then is released.
+   */
+  private async settle(review: ReviewRow, now: number): Promise<void> {
+    this.seen.add(review.thread_id);
+    const fork = await this.deps.sdk.threads.get({ threadId: review.thread_id }).catch(() => null) as ThreadLike | null;
+    const late = now - review.started_at > REVIEW_TIMEOUT_MS;
+    if (!fork) { await this.close(review, "Stopped: its thread is gone"); return; }
+    if (fork.status && fork.status !== "idle") { if (late) await this.close(review, "Stopped: took too long", true); else this.started.add(review.thread_id); return; }
+    const events = await this.deps.sdk.threads.events.list({ threadId: review.thread_id, order: "desc", limit: "50", types: ["item/completed", "turn/completed"] }).catch(() => []) as EventRow[];
+    if (events.some((event) => event.type === "turn/completed")) {
+      const reply = events.map((event) => (event.data as { item?: { type?: string; text?: string } } | null | undefined)?.item).find((item) => item?.type === "agentMessage" && item.text)?.text ?? null;
+      this.retried.add(review.thread_id);
+      await this.finish(review, reply);
+      return;
+    }
+    if (late) await this.close(review, "Stopped: took too long", true);
+  }
+
   /** A thread became active: a new turn in the thread under review stops its review (the next sweep picks it up again). */
   async active(threadId: string): Promise<void> {
     if (this.review(threadId)?.status === "running") { this.started.add(threadId); return; }
@@ -624,8 +660,10 @@ export class SkillLearning {
   private async tickOnce(now: number): Promise<void> {
     for (const review of this.deps.db.prepare("SELECT * FROM bot_skill_reviews WHERE status = 'running'").all() as ReviewRow[]) {
       const bot = this.deps.bot(review.bot_id);
-      if (!bot || bot.state !== "active") await this.close(review, `Stopped: ${bot?.name ?? "the bot"} is ${bot?.state ?? "gone"}`, true);
-      else if (now - review.started_at > REVIEW_TIMEOUT_MS) await this.close(review, "Stopped: took too long", true);
+      if (!bot || bot.state !== "active") { await this.close(review, `Stopped: ${bot?.name ?? "the bot"} is ${bot?.state ?? "gone"}`, true); continue; }
+      // A review this process didn't start (Studio reloaded while it ran), or one past its time: look at the fork itself.
+      const orphan = !this.started.has(review.thread_id) && !this.seen.has(review.thread_id);
+      if (orphan || now - review.started_at > REVIEW_TIMEOUT_MS) await this.settle(review, now);
     }
     for (const bot of this.deps.bots()) {
       if (bot.kind === "external" || bot.state !== "active") continue;

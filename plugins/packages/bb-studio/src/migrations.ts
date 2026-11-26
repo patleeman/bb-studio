@@ -1258,4 +1258,6 @@ export const MIGRATIONS: string[] = [
    ALTER TABLE bot_skill_reviews ADD COLUMN source_seq INTEGER;`,
   // Why a review ran (archive, daily, manual): the daily cap counts daily and archive passes only.
   `ALTER TABLE bot_skill_reviews ADD COLUMN reason TEXT;`,
+  // A queued review's failed starts before its fork existed (retried a few times, then dropped).
+  `ALTER TABLE bot_skill_review_queue ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;`,
 ];

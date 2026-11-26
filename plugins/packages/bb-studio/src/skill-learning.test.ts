@@ -117,6 +117,7 @@ async function setup() {
   const threads = new Map([["bot1", makeThreadResponse({ id: "bot1", projectId: "proj_personal", providerId: "claude-code", status: "idle", updatedAt: 0 })]]);
   let events: { seq: number; type: string; data: Record<string, unknown> }[] = [];
   const tips = new Map<string, number>();
+  const forkEvents = new Map<string, { seq: number; type: string; data: Record<string, unknown> }[]>();
   let forks = 0;
   const fork = vi.fn(async ({ sourceThreadId }: { sourceThreadId: string }) => {
     const thread = makeThreadResponse({ id: `fork${++forks}`, projectId: "proj_personal", providerId: "claude-code", status: "idle", sourceThreadId });
@@ -132,7 +133,7 @@ async function setup() {
     if (Number(limit) > 100) throw Object.assign(new Error("Thread event limit cannot exceed 100"), { status: 400 });
     // A fork's workspace is ready at once.
     // A fork's workspace is ready at once; another conversation's last event is its tip in `tips`.
-    if (threadId.startsWith("fork")) return [{ seq: 1, type: "system/thread-provisioning", data: { status: "completed" } }];
+    if (threadId.startsWith("fork")) return [{ seq: 1, type: "system/thread-provisioning", data: { status: "completed" } }, ...(forkEvents.get(threadId) ?? [])];
     if (threadId !== "bot1") return [{ seq: tips.get(threadId) ?? 1, type: "turn/completed", data: {} }];
     const after = events.filter((event) => event.seq > Number(afterSeq ?? 0));
     return (order === "desc" ? [...after].reverse() : after).slice(0, Number(limit ?? 100));
@@ -164,7 +165,7 @@ async function setup() {
     setState: (_botId, name, state) => { db.prepare("UPDATE bot_skills SET state = ? WHERE name = ?").run(state, name); },
   });
   const work = (n: number, user = false) => { for (let i = 0; i < n; i++) events.push(...turn((events.at(-1)?.seq ?? 0) + 1, ["commandExecution"], { user })); };
-  return { db, bot, threads, learning, conversations, tips, fork, update, send, stop, archive, work, skills, writeSkill, setEvents: (next: typeof events) => { events = next; } };
+  return { db, bot, bb, threads, learning, conversations, tips, forkEvents, fork, update, send, stop, archive, work, skills, writeSkill, setEvents: (next: typeof events) => { events = next; } };
 }
 
 const markOf = (x: { db: import("better-sqlite3").Database }, threadId: string) => (x.db.prepare("SELECT seq FROM bot_skill_review_marks WHERE thread_id = ?").get(threadId) as { seq: number } | undefined)?.seq ?? null;
@@ -282,6 +283,72 @@ it("keeps a queued review when it can't start yet, and caps daily and archive pa
   x.work(3);
   expect(await x.learning.runNow("bot_main", now)).toBe(true);
   expect(x.fork).toHaveBeenLastCalledWith(expect.objectContaining({ sourceThreadId: "bot1" }));
+});
+
+it("drops a daily entry whose thread was archived since, instead of jamming the queue", async () => {
+  const x = await setup();
+  x.threads.set("conv1", makeThreadResponse({ id: "conv1", projectId: "proj_personal", providerId: "claude-code", status: "idle", updatedAt: 0 }));
+  x.conversations.push("conv1");
+  await x.learning.baseline("bot_main");
+  x.tips.set("conv1", 9);
+  x.work(2);
+  expect(await x.learning.sweep("bot_main")).toBe(2);
+  x.threads.set("conv1", { ...x.threads.get("conv1")!, archivedAt: 5 });
+  // The archived conversation sorts first by queue time; it's dropped and Main's review starts.
+  x.db.prepare("UPDATE bot_skill_review_queue SET queued_at = 0 WHERE thread_id = 'conv1'").run();
+  expect(await x.learning.next("bot_main")).toBe(true);
+  expect(x.fork).toHaveBeenLastCalledWith(expect.objectContaining({ sourceThreadId: "bot1" }));
+  expect((await x.learning.view("bot_main")).queued).toBe(0);
+});
+
+it("retries a review that failed before its fork existed, a few times; one that failed after is dropped and isn't counted", async () => {
+  const x = await setup();
+  x.threads.set("conv1", { ...makeThreadResponse({ id: "conv1", projectId: "proj_personal", providerId: "claude-code", status: "idle", updatedAt: 0 }), archivedAt: 5 });
+  x.learning.archived("bot_main", "conv1");
+  x.fork.mockRejectedValueOnce(new Error("network"));
+  expect(await x.learning.next("bot_main")).toBe(false);
+  expect((await x.learning.view("bot_main")).queued).toBe(1);
+  x.fork.mockRejectedValueOnce(new Error("network"));
+  x.fork.mockRejectedValueOnce(new Error("network"));
+  await x.learning.next("bot_main");
+  await x.learning.next("bot_main");
+  expect((await x.learning.view("bot_main")).queued).toBe(0);
+  // After the fork: closed as Couldn't start, dropped, not counted toward the day's cap.
+  x.learning.archived("bot_main", "conv1");
+  x.send.mockRejectedValueOnce(new Error("offline"));
+  expect(await x.learning.next("bot_main")).toBe(false);
+  expect((await x.learning.view("bot_main")).queued).toBe(0);
+  expect(x.learning.startedToday("bot_main")).toBe(0);
+});
+
+it("settles a review left running across a reload from its fork: finished, it's recorded; gone, it's released", async () => {
+  const x = await setup();
+  x.work(2);
+  await x.learning.baseline("bot_main");
+  x.work(1);
+  expect(await x.learning.start("bot_main", "review", "daily", "bot1")).toBe(true);
+  // Studio reloads; meanwhile the fork took its turn and went idle.
+  x.forkEvents.set("fork1", [{ seq: 2, type: "item/completed", data: { item: { type: "agentMessage", text: "[PASS]" } } }, { seq: 3, type: "turn/completed", data: {} }]);
+  const reloaded = new SkillLearning({ ...(x.learning as unknown as { deps: ConstructorParameters<typeof SkillLearning>[0] }).deps });
+  await reloaded.tick();
+  expect(reloaded.review("fork1")).toMatchObject({ status: "done", result: "Nothing to save" });
+  expect(markOf(x, "bot1")).toBe(9);
+  // Another, whose fork is gone after the reload: released, the mark stays.
+  x.work(1);
+  expect(await reloaded.start("bot_main", "review", "daily", "bot1")).toBe(true);
+  x.threads.delete("fork2");
+  const again = new SkillLearning({ ...(x.learning as unknown as { deps: ConstructorParameters<typeof SkillLearning>[0] }).deps });
+  await again.tick();
+  expect(again.review("fork2")).toMatchObject({ status: "done", result: "Stopped: its thread is gone" });
+  expect(markOf(x, "bot1")).toBe(9);
+});
+
+it("takes the baseline first when Run now comes before the first tick", async () => {
+  const x = await setup();
+  x.work(3);
+  expect(await x.learning.runNow("bot_main")).toBe(false);
+  expect(x.fork).not.toHaveBeenCalled();
+  expect(markOf(x, "bot1")).toBe(9);
 });
 
 it("doesn't overlap minute ticks", async () => {
