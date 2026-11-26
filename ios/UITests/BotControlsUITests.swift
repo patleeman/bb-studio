@@ -29,9 +29,10 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["botStop"].exists)
         shot("1-controls")
         app.buttons["botPause"].tap()
-        let paused = NSPredicate(format: "label CONTAINS 'Paused'")
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: paused, object: any("homeBotStatus"))], timeout: 15), .completed,
-                       "the header says Paused")
+        let status = any("homeBotStatus")
+        let until = Date().addingTimeInterval(20)
+        while !(status.exists && status.label.contains("Paused")), Date() < until { sleep(1) }
+        XCTAssertTrue(status.label.contains("Paused"), "the header says Paused: \(status.exists ? status.label : "no status line")")
         shot("2-paused-list")
         app.goHome()
         XCTAssertTrue(app.waitForRoom(timeout: 10), "the conversation opens")
@@ -53,7 +54,7 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
         launchPrep.tap()
         // The conversation's menu is its title (round 5).
         app.openConversationMenu()
-        let make = app.buttons["makeMain"]
+        let make = app.menuItem("Make this the Main")
         XCTAssertTrue(make.waitForExistence(timeout: 5), "Make this the Main in the conversation's menu")
         shot("4-make-main")
         make.tap()

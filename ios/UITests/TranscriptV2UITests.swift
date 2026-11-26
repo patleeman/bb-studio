@@ -12,7 +12,8 @@ import XCTest
 ///   swipe down; the draft and its photo stay.
 ///
 /// `TEST_RUNNER_TRANSCRIPT_LAYOUT`: `phone` (default), `outer` (the Duo's
-/// outer screen) or `split` (the inner screen's right page, two pages).
+/// outer screen) or `split` (the inner screen in the book posture: the
+/// conversation on the left page, its Workbench on the right).
 /// `TEST_RUNNER_TRANSCRIPT_SHOTS=<dir>` saves window renders.
 @MainActor
 final class TranscriptV2UITests: ServerIsolatedUITestCase {
@@ -40,33 +41,17 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     func testBotChat() {
         open()
         checkChat("bot-chat")
-        if layout == "split" {
-            // Full width: the list hidden, the chat across the inner screen
-            // (renders only; the right half is what's on the simulator's screen).
-            command("pane?hidden")
-            command("split-right")
-            Thread.sleep(forTimeInterval: 1.5)
-            watch("full width", atEnd: true)
-            shot("full-width-keyboard-down")
-            composerField.tap()
-            expectKeyboard(true, "full width: keyboard up")
-            watch("full width: keyboard up", atEnd: true)
-            shot("full-width-keyboard-up")
-            command("dismiss")
-            command("pane?even")
-        }
         finish()
     }
 
-    /// A Bot thread from its Running group, and a normal thread from the Threads list.
+    /// A worker and a conversation, each from its row on Home.
     func testThreads() {
         // Warm cache, as `DuoSplitComposerUITests`: the demo serves these threads from it.
         open(cold: false)
-        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "iOS: black on reopen")).firstMatch
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'homeWorker-' AND label CONTAINS %@", "iOS: black on reopen")).firstMatch
         showList()
         if row.waitForExistence(timeout: 15) {
             row.tap()
-            showRightPage()
             XCTAssertTrue(composer.waitForExistence(timeout: 15))
             expectAtEnd("bot thread: open")
             expectGap("bot thread")
@@ -78,11 +63,10 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
             steps.append("no Running Bot thread in this layout")
         }
         showList()
-        command("tab?threads")
-        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
+        // Main from Home, as any conversation opens.
+        let conversation = app.buttons["homeConversation-thr_botdemo01"]
         if conversation.waitForExistence(timeout: 15) {
-            conversation.tap()
-            showRightPage()
+            app.press(conversation, id: "homeConversation-thr_botdemo01")
             XCTAssertTrue(composer.waitForExistence(timeout: 15))
             expectAtEnd("thread: open")
             expectGap("thread")
@@ -194,14 +178,13 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     /// refetched: the demo tells only the Bot chat of changes.
     /// `testQuestionPill` covers the pill.)
     func testFind() throws {
-        guard layout == "split" else { throw XCTSkip("The demo lists its normal thread only on the Duo's inner screen") }
+        guard layout == "split" else { throw XCTSkip("The Duo demo's long conversation, on the inner screen") }
         open(cold: false)
         showList()
-        command("tab?threads")
-        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
+        // Main from Home, as any conversation opens.
+        let conversation = app.buttons["homeConversation-thr_botdemo01"]
         XCTAssertTrue(conversation.waitForExistence(timeout: 15))
-        conversation.tap()
-        showRightPage()
+        app.press(conversation, id: "homeConversation-thr_botdemo01")
         XCTAssertTrue(composer.waitForExistence(timeout: 15))
         expectAtEnd("find: open")
 
@@ -246,7 +229,6 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         }
         XCTAssertTrue(composerField.waitForExistence(timeout: 30))
         if layout == "outer" { command("outer") }
-        showRightPage()
         let footer = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Mini card scrolling check 8'")).firstMatch
         XCTAssertTrue(footer.waitForExistence(timeout: 15))
         watch("minis: open", atEnd: true, seconds: 5)
@@ -268,17 +250,17 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     /// moving the rows; a question asked while reading shows on the pill,
     /// and its card is at the end; Quote, Select Text and Edit work.
     func testThreadParity() throws {
-        guard layout == "split" else { throw XCTSkip("The demo lists its normal thread only on the Duo's inner screen") }
+        guard layout == "split" else { throw XCTSkip("The Duo demo's long conversation, on the inner screen") }
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog", "-qaBotDemo", "duo",
             "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles", "-qaDemoLatency", "300", "-qaDemoColdCache",
             "-qaDemoUnread", "8", "-qaDark", "-openURL", "bbstudio://bot"]
         app.launchOffline()
         XCTAssertTrue(composerField.waitForExistence(timeout: 30))
-        command("tab?threads")
-        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
+        showList()
+        // Main from Home, as any conversation opens.
+        let conversation = app.buttons["homeConversation-thr_botdemo01"]
         XCTAssertTrue(conversation.waitForExistence(timeout: 15))
-        conversation.tap()
-        showRightPage()
+        app.press(conversation, id: "homeConversation-thr_botdemo01")
 
         // Opens at the first unread, under its divider, reading.
         let divider = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'New since you last looked'")).firstMatch
@@ -346,11 +328,10 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         guard layout == "split" else { throw XCTSkip("Folds from the Duo's inner screen") }
         open(cold: false)
         showList()
-        command("tab?threads")
-        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
+        // Main from Home, as any conversation opens.
+        let conversation = app.buttons["homeConversation-thr_botdemo01"]
         XCTAssertTrue(conversation.waitForExistence(timeout: 15))
-        conversation.tap()
-        showRightPage()
+        app.press(conversation, id: "homeConversation-thr_botdemo01")
         command("mid")
         expectPill(true, "fold: up in the history")
         Thread.sleep(forTimeInterval: 1)
@@ -362,7 +343,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         if !(folded.exists && folded.isHittable) { failures.append("fold: \(label) isn't on the outer screen") }
         else { steps.append(String(format: "fold: on the outer screen at %.1f", folded.frame.minY)) }
         expectAtRest("fold: outer screen")
-        command("split-right")
+        command("landscape")
         Thread.sleep(forTimeInterval: 2)
         let back = app.staticTexts[label]
         if back.exists {
@@ -501,7 +482,6 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         if layout == "outer" { standUpTheRoom() }
         XCTAssertTrue(composerField.waitForExistence(timeout: 30))
         if layout == "outer" { command("outer") }
-        showRightPage()
         Thread.sleep(forTimeInterval: 1)
     }
 
@@ -509,20 +489,9 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         if inRoom { XCTAssertTrue(app.waitForRoom(timeout: 30), "the conversation shows on the folded Duo") }
     }
 
-    /// The split's right page on the simulator's screen (it's only as wide as the outer one).
-    private func showRightPage() {
-        guard layout == "split" else { return }
-        command("split-right")
-        // A wait, not a check: the steps after it measure what matters, and
-        // under load the shift can land after a fixed timeout.
-        let until = Date().addingTimeInterval(15)
-        while !(0..<200).contains(composer.frame.minX), Date() < until { Thread.sleep(forTimeInterval: 0.25) }
-    }
-
-    /// The split's left page, the list, back on the screen.
+    /// Home, where conversations and workers open from.
     private func showList() {
-        guard layout == "split" else { return }
-        command("landscape")
+        app.goHome()
         Thread.sleep(forTimeInterval: 1)
     }
 

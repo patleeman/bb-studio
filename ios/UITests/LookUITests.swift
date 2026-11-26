@@ -1,34 +1,25 @@
 import XCTest
 
 /// The phone's look, offline (`-qaSpacesDemo needs`): On Air by default, a
-/// Classic theme, scene themes as a still behind the Bot's list (never behind
-/// the conversation), the presence in the header, and Settings → Look.
-/// `TEST_RUNNER_LOOK_OUT` keeps PNGs.
+/// Classic theme, scene themes as a still behind the shell (Home and the
+/// conversation, round 7), and Settings → Look. `TEST_RUNNER_LOOK_OUT` keeps PNGs.
 final class LookUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launch(theme: String, live: Bool = false) {
-        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "needs", "-qaNoDemoApprovals", "-qaLookTheme", theme, "-qaSplitShell"]
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "needs", "-qaNoDemoApprovals", "-qaLookTheme", theme]
         if live { app.launchArguments.append("-qaLiveScene") }
         app.launchOffline()
-        // The split shell starts on the Bot's list and opens Main once it knows
-        // Main; when it stays on the list, open Main from it. (Main's build
-        // landed through the socket's retries reloading everything offline.)
-        let message = app.textViews["Message"]
-        let main = app.buttons["conversation-thr_botdemo01"]
-        let until = Date().addingTimeInterval(60)
-        while !message.exists, Date() < until {
-            if main.exists, main.isHittable { main.tap() }
-            _ = message.waitForExistence(timeout: 2)
-        }
-        XCTAssertTrue(message.exists, "Main opens")
+        XCTAssertTrue(app.waitForRoom(timeout: 60), "Main opens")
     }
 
-    /// The split shell's Bot list, back from Main (the folded Duo's Back is in its column).
+    /// Home, back from Main.
     private func toList() {
-        app.goBack()
-        XCTAssertTrue(app.otherElements["BotSpaceHeader"].firstMatch.waitForExistence(timeout: 15) || app.staticTexts["Conversations"].waitForExistence(timeout: 5))
+        app.goHome()
     }
+
+    /// The scene behind the shell: its theme's id, or none for a Classic theme.
+    private var scene: XCUIElement { app.descendants(matching: .any)["shellScene"].firstMatch }
 
     private func shot(_ name: String) {
         guard let folder = ProcessInfo.processInfo.environment["LOOK_OUT"] else { return }
@@ -42,20 +33,21 @@ final class LookUITests: ServerIsolatedUITestCase {
         launch(theme: "on-air")
         shot("on-air-main")
         toList()
-        XCTAssertEqual(app.descendants(matching: .any)["BotSpaceList"].firstMatch.value as? String, "On Air", "a classic theme has no scene")
+        // A Classic phone theme has no scene of its own: the shell's default one (RoomTheme.fallback).
+        XCTAssertTrue(scene.waitForExistence(timeout: 20))
+        XCTAssertEqual(scene.value as? String, "aurora-fjord", "a classic theme falls back to the default scene")
         shot("on-air-home")
     }
 
-    func testEverySceneShowsAStillBehindTheListOnly() {
+    func testEverySceneShowsAStillBehindTheShell() {
         for theme in ["event-horizon", "forest", "kyoto-garden", "tonights-sky", "miami-1985", "aurora-fjord", "grid", "data-city", "deep-sea"] {
             app.terminate()
             app.launchArguments = []
             launch(theme: theme)
             shot("\(theme)-main")
             toList()
-            let list = app.descendants(matching: .any)["BotSpaceList"].firstMatch
-            XCTAssertTrue(list.waitForExistence(timeout: 20))
-            XCTAssertTrue((list.value as? String ?? "").hasPrefix("Scene "), "\(theme): the list sits on the scene (\(list.value ?? "-"))")
+            XCTAssertTrue(scene.waitForExistence(timeout: 20), "\(theme): Home sits on the scene")
+            XCTAssertEqual(scene.value as? String, theme)
             shot("\(theme)-home")
         }
     }
@@ -72,8 +64,7 @@ final class LookUITests: ServerIsolatedUITestCase {
 
     func testLookSettingsListsEveryTheme() {
         launch(theme: "on-air")
-        toList()
-        app.buttons["BotSpaceSettings"].tap()
+        app.openRoomPlace("settings")
         let look = app.buttons["SettingsLook"]
         XCTAssertTrue(app.buttons["Server"].waitForExistence(timeout: 15) || app.textFields["settingsServerURL"].waitForExistence(timeout: 5))
         for _ in 0..<6 where !look.isHittable { app.swipeUp() }

@@ -16,17 +16,17 @@ final class LinksUITests: ServerIsolatedUITestCase {
 
     func testABotPageLinkOpensThePage() {
         launch("bbstudio://archive")
-        XCTAssertTrue(app.navigationBars["Archive"].waitForExistence(timeout: 30), "the Archive page")
+        XCTAssertTrue(any("archive-page").waitForExistence(timeout: 30), "the Archive page")
         XCTAssertTrue(app.buttons["archive-finished-thr_demo_lisbon"].waitForExistence(timeout: 15))
         shot("archive-link")
         app.goHome()
-        XCTAssertTrue(app.waitForRoom(timeout: 15), "pulling down shows the room")
     }
 
     func testAWorkerLinkOpensTheWorkerReadOnly() {
         launch("bbstudio://worker/thr_demo_w3")
-        XCTAssertTrue(any("workerTitle").waitForExistence(timeout: 30), "the worker")
-        XCTAssertTrue(any("workerTitle").label.hasPrefix("Mock question bank"), any("workerTitle").label)
+        let title = app.conversationTitle
+        XCTAssertTrue(title.waitForExistence(timeout: 30), "the worker")
+        XCTAssertTrue(title.label.hasPrefix("Mock question bank"), title.label)
         XCTAssertFalse(app.textViews["Message"].exists, "read-only")
         shot("worker-link")
     }

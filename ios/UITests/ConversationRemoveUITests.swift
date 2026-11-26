@@ -1,17 +1,18 @@
 import XCTest
 
+/// Archiving and deleting conversations, offline: a swipe or a long press on
+/// Home's row, the conversation's menu, and the Archive page. Finishing the
+/// shown conversation goes back to Home.
 final class ConversationRemoveUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launch() {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaNoDemoApprovals"]
         app.launchOffline()
-        if !app.waitForRoom() {
-            app.terminate()
-            app.launchOffline()
-        }
-        XCTAssertTrue(app.waitForRoom(timeout: 60), "the app opens on the room")
+        XCTAssertTrue(home.waitForExistence(timeout: 60), "the app opens on Home")
     }
+
+    private var home: XCUIElement { app.descendants(matching: .any)["home"].firstMatch }
 
     private func shot(_ name: String) {
         guard let folder = ProcessInfo.processInfo.environment["REMOVE_OUT"] else { return }
@@ -21,34 +22,35 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         try? XCUIScreen.main.screenshot().pngRepresentation.write(to: url.appendingPathComponent("\(name).png"))
     }
 
-    private func row(_ id: String) -> XCUIElement { app.buttons["homeConversation-\(id)"] }
+    /// Home's row, scrolled to: the list is lazy and the folded Duo short.
+    private func row(_ id: String) -> XCUIElement {
+        let row = app.buttons["homeConversation-\(id)"]
+        if !row.exists, app.descendants(matching: .any)["home"].exists { app.scrollHome(to: row) }
+        return row
+    }
 
     private func openConversations() {
         app.openRoomPlace("conversations")
-        XCTAssertTrue(app.buttons["homeNew"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.homeNew.waitForExistence(timeout: 15))
     }
 
     private func openArchive() {
         app.openRoomPlace("archive")
-        XCTAssertTrue(app.navigationBars["Archive"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.descendants(matching: .any)["archive-page"].waitForExistence(timeout: 15))
     }
 
-    private func backInTheRoom(_ what: String) {
-        // The list sheet and the menu are gone and a conversation shows.
+    /// The menu is gone and Home shows: a finished conversation closes.
+    private func backOnHome(_ what: String) {
         let composer = app.textViews["Message"]
-        _ = app.waitForRoom(timeout: 10)
-        let shown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true"), object: composer)
-        XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 15), .completed, what)
+        let shown = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in self.home.exists && !composer.exists }, object: nil)
+        if XCTWaiter.wait(for: [shown], timeout: 15) != .completed {
+            XCTFail("\(what): home \(home.exists), composer \(composer.exists)\n\(app.debugDescription)")
+        }
     }
-
-    /// The page dots, or the folded Duo's title (it has no dots).
-    private var dots: XCUIElement { app.shownConversation }
-    /// What `dots` says: the page on the phone, the conversation's name on the folded Duo.
-    private func shown(_ page: String, _ name: String) -> String { app.isFoldedDuo ? name : page }
 
     private func openMore() {
         app.openConversationMenu()
-        XCTAssertTrue(app.buttons["menuModel"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.menuItem("Model & permissions").waitForExistence(timeout: 5))
     }
 
     func testSwipeArchivesAConversationAndTheArchiveRestoresIt() {
@@ -57,9 +59,10 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         let interview = row("thr_demo_interview")
         XCTAssertTrue(interview.waitForExistence(timeout: 10))
         interview.swipeLeft()
-        let archive = app.buttons["roomConversationArchive-thr_demo_interview"]
+        if !app.buttons["homeArchive-thr_demo_interview"].waitForExistence(timeout: 2) { print("SWIPE\n\(app.debugDescription)"); interview.swipeLeft() }
+        let archive = app.buttons["homeArchive-thr_demo_interview"]
         XCTAssertTrue(archive.waitForExistence(timeout: 5), "Archive behind a swipe")
-        XCTAssertTrue(app.buttons["roomConversationDelete-thr_demo_interview"].exists, "and Delete")
+        XCTAssertTrue(app.buttons["homeDelete-thr_demo_interview"].exists, "and Delete")
         shot("1-swipe")
         archive.tap()
         XCTAssertTrue(interview.waitForNonExistence(timeout: 10), "the row leaves the list")
@@ -100,8 +103,12 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(title.waitForNonExistence(timeout: 5))
         XCTAssertTrue(speech.exists, "cancel keeps it")
 
-        speech.press(forDuration: 1.2)
-        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        // The first menu's dismissal can still be running: press again if it doesn't open.
+        for _ in 0..<3 where !delete.exists {
+            speech.press(forDuration: 1.2)
+            _ = delete.waitForExistence(timeout: 3)
+        }
+        XCTAssertTrue(delete.exists, "Delete in the context menu again")
         delete.tap()
         XCTAssertTrue(app.buttons["confirmDelete"].firstMatch.waitForExistence(timeout: 5))
         app.buttons["confirmDelete"].firstMatch.tap()
@@ -115,19 +122,21 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(main.waitForExistence(timeout: 10), "Main is listed")
         main.swipeLeft()
         sleep(1)
-        XCTAssertFalse(app.buttons["roomConversationArchive-thr_botdemo01"].exists, "Main: no Archive")
-        XCTAssertFalse(app.buttons["roomConversationDelete-thr_botdemo01"].exists, "Main: no Delete")
-        let working = row("thr_demo_trunc")
-        if !working.exists { openConversations() }
+        XCTAssertFalse(app.buttons["homeArchive-thr_botdemo01"].exists, "Main: no Archive")
+        XCTAssertFalse(app.buttons["homeDelete-thr_botdemo01"].exists, "Main: no Delete")
+        // Main's swipe actions close first; then the working one, further down.
+        if main.exists { main.swipeRight() }
+        var working = row("thr_demo_trunc")
+        if !working.exists { openConversations(); working = row("thr_demo_trunc") }
         XCTAssertTrue(working.waitForExistence(timeout: 10))
         working.swipeLeft()
         sleep(1)
-        XCTAssertFalse(app.buttons["roomConversationArchive-thr_demo_trunc"].exists, "working: no Archive")
-        XCTAssertFalse(app.buttons["roomConversationDelete-thr_demo_trunc"].exists, "working: no Delete")
+        XCTAssertFalse(app.buttons["homeArchive-thr_demo_trunc"].exists, "working: no Archive")
+        XCTAssertFalse(app.buttons["homeDelete-thr_demo_trunc"].exists, "working: no Delete")
         if working.exists { working.tap() }
         openMore()
-        XCTAssertFalse(app.buttons["menuArchive"].exists, "a working conversation can't be archived")
-        XCTAssertFalse(app.buttons["menuDelete"].exists, "or deleted")
+        XCTAssertFalse(app.menuItem("Archive").exists, "a working conversation can't be archived")
+        XCTAssertFalse(app.menuItem("Delete conversation…").exists, "or deleted")
     }
 
     func testTheThreadMenuArchivesAndDeletes() {
@@ -135,48 +144,46 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         openConversations()
         row("thr_demo_interview").tap()
         openMore()
-        XCTAssertTrue(app.buttons["menuArchive"].exists, "Archive in ⋯")
-        let delete = app.buttons["menuDelete"]
+        XCTAssertTrue(app.menuItem("Archive").exists, "Archive in ⋯")
+        let delete = app.menuItem("Delete conversation…")
         XCTAssertTrue(delete.exists, "Delete conversation… in ⋯")
         shot("5-thread-menu")
         delete.tap()
         XCTAssertTrue(app.staticTexts["Delete “Launch prep”?"].waitForExistence(timeout: 5), "it asks first")
         shot("6-thread-confirm")
         app.buttons["confirmDelete"].firstMatch.tap()
-        backInTheRoom("the deleted conversation closes")
+        backOnHome("the deleted conversation closes")
         openConversations()
         XCTAssertFalse(row("thr_demo_interview").waitForExistence(timeout: 3), "and is gone from the list")
 
         row("thr_demo_speech").tap()
         openMore()
-        app.buttons["menuArchive"].tap()
-        backInTheRoom("the archived conversation closes")
+        app.menuItem("Archive").tap()
+        backOnHome("the archived conversation closes")
         openConversations()
         XCTAssertFalse(row("thr_demo_speech").waitForExistence(timeout: 3), "and leaves the list")
         openArchive()
         XCTAssertTrue(app.buttons["archive-finished-thr_demo_speech"].waitForExistence(timeout: 15), "for the archive")
     }
 
-    func testArchivingTheShownConversationMovesTheRoomToItsNeighbour() {
+    func testArchivingTheShownConversationGoesHome() {
         launch()
         openConversations()
         row("thr_demo_interview").tap()
-        XCTAssertTrue(dots.waitForExistence(timeout: 10))
-        XCTAssertEqual(dots.label, shown("Conversation 2 of 4", "Launch prep"), "on Launch prep")
+        XCTAssertTrue(app.conversationTitle.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.conversationTitle.label.contains("Launch prep"), "on Launch prep: \(app.conversationTitle.label)")
         openMore()
-        app.buttons["menuArchive"].tap()
-        backInTheRoom("the archived conversation closes")
-        let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", shown("Conversation 1 of 3", "Juniper")), object: dots)
-        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 15), .completed, "the room moves to the page before it: \(dots.label)")
+        app.menuItem("Archive").tap()
+        backOnHome("the archived conversation closes")
+        XCTAssertFalse(row("thr_demo_interview").waitForExistence(timeout: 3), "and leaves Home")
         shot("7-archived-shown")
 
-        openConversations()
-        row("thr_demo_speech").swipeLeft()
-        app.buttons["roomConversationArchive-thr_demo_speech"].tap()
-        XCTAssertTrue(row("thr_demo_speech").waitForNonExistence(timeout: 10))
+        let speech = row("thr_demo_speech")
+        speech.swipeLeft()
+        app.buttons["homeArchive-thr_demo_speech"].tap()
+        XCTAssertTrue(speech.waitForNonExistence(timeout: 10), "archived from Home's row")
         row("thr_botdemo01").tap()
-        backInTheRoom("Main opens")
-        XCTAssertEqual(dots.label, shown("Conversation 1 of 2", "Juniper"), "archived from the list, the room leaves it too")
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 15), "Main opens")
     }
 
     func testTheArchiveDeletesAndArchivesItsRows() {

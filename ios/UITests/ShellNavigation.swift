@@ -12,8 +12,14 @@ extension XCUIApplication {
         let main = buttons["homeConversation-thr_botdemo01"]
         let either = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in composer.exists || main.exists }, object: nil)
         guard XCTWaiter.wait(for: [either], timeout: timeout) == .completed else { return false }
-        if !composer.exists, main.exists, main.isHittable { main.tap() }
-        return composer.waitForExistence(timeout: timeout)
+        // Home may still be settling: tap Main until its conversation shows.
+        let end = Date().addingTimeInterval(timeout)
+        while !composer.exists, Date() < end {
+            // Not `isHittable`: XCUITest can call the selected row unhittable and still tap it.
+            if main.exists { main.tap() }
+            _ = composer.waitForExistence(timeout: 3)
+        }
+        return composer.exists
     }
 
     private var home: XCUIElement { descendants(matching: .any)["home"].firstMatch }
@@ -28,16 +34,19 @@ extension XCUIApplication {
         sleep(1)
     }
 
+    /// Home is the screen on top: its New conversation shows (the iPhone's
+    /// bar, the Duo's rail). A list never counts as hittable, so not that.
+    var homeOnTop: Bool { home.exists && homeNew.exists }
+
     /// Home, from wherever: Back on the iPhone, Home in the Duo's rail.
     func goHome(file: StaticString = #filePath, line: UInt = #line) {
-        for _ in 0..<4 where !(home.exists && home.isHittable) {
-            let back = buttons["rail-back"], railHome = buttons["rail-home"]
-            if back.exists { press(back, id: "rail-back") } else if railHome.exists { press(railHome, id: "rail-home") } else if navigationBars.buttons.firstMatch.exists {
-                navigationBars.buttons.element(boundBy: 0).tap()
-            }
-            _ = home.waitForExistence(timeout: 3)
+        for _ in 0..<4 where !homeOnTop {
+            let back = buttons["rail-back"], railHome = buttons["rail-home"], barBack = navigationBars.buttons["BackButton"]
+            if back.exists { press(back, id: "rail-back") } else if railHome.exists { press(railHome, id: "rail-home") }
+            else if barBack.exists { barBack.tap() }
+            _ = homeNew.waitForExistence(timeout: 3)
         }
-        XCTAssertTrue(home.waitForExistence(timeout: 10), "Home", file: file, line: line)
+        XCTAssertTrue(homeOnTop, "Home", file: file, line: line)
     }
 
     /// One of Home's places: Memory, Library and Archive are rows; Schedules,
@@ -69,35 +78,47 @@ extension XCUIApplication {
         menu.tap()
     }
 
-    /// A conversation from Home, pushed over it.
-    func pickConversation(_ id: String, file: StaticString = #filePath, line: UInt = #line) {
-        goHome(file: file, line: line)
-        let row = buttons["homeConversation-\(id)"]
-        // Home's list is lazy: on a short window the row is further down.
+    /// Home's list is lazy: on a short window a row further down exists once scrolled to.
+    func scrollHome(to row: XCUIElement) {
         _ = row.waitForExistence(timeout: 5)
         for _ in 0..<4 where !row.exists {
             home.exists ? home.swipeUp() : swipeUp()
             _ = row.waitForExistence(timeout: 2)
         }
+    }
+
+    /// A conversation from Home, pushed over it.
+    func pickConversation(_ id: String, file: StaticString = #filePath, line: UInt = #line) {
+        goHome(file: file, line: line)
+        let row = buttons["homeConversation-\(id)"]
+        scrollHome(to: row)
         XCTAssertTrue(row.exists, "\(id) on Home", file: file, line: line)
         press(row, id: "homeConversation-\(id)")
         XCTAssertTrue(waitForRoom(timeout: 15), "the conversation opens", file: file, line: line)
     }
 
-    /// Back from a pushed screen: the bar's Back, or Home in the Duo's rail.
+    /// Back from a pushed screen: the bar's Back, or Back (else Home) in the Duo's rail.
     func goBack(timeout: TimeInterval = 20, file: StaticString = #filePath, line: UInt = #line) {
-        let bar = navigationBars.firstMatch
-        let rail = buttons.matching(NSPredicate(format: "identifier IN %@", ["rail-back", "rail-home"])).firstMatch
-        let shown = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            bar.buttons.firstMatch.exists || (rail.exists && rail.isHittable)
-        }, object: nil)
+        let barBack = navigationBars.buttons["BackButton"]
+        let back = buttons["rail-back"], railHome = buttons["rail-home"]
+        let shown = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in barBack.exists || back.exists || railHome.exists }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: timeout), .completed, "a way back", file: file, line: line)
-        if bar.buttons.firstMatch.exists { bar.buttons.element(boundBy: 0).tap() } else { rail.tap() }
+        if barBack.exists { barBack.tap() } else if back.exists { press(back, id: "rail-back") } else { press(railHome, id: "rail-home") }
+    }
+
+    /// Home's New conversation: + in the iPhone's bar, New in the Duo's rail.
+    var homeNew: XCUIElement {
+        buttons.matching(NSPredicate(format: "identifier IN %@", ["homeNew", "rail-new"])).firstMatch
     }
 
     /// The conversation's menu: ⋯ in the iPhone's bar, More in the Duo's rail.
     var conversationMore: XCUIElement {
         buttons.matching(NSPredicate(format: "identifier == 'conversationMore' OR identifier == 'rail-more'")).firstMatch
+    }
+
+    /// An item of an open menu, by its title: SwiftUI's menus drop their items' identifiers.
+    func menuItem(_ title: String) -> XCUIElement {
+        buttons.matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", title, title + ",")).firstMatch
     }
 
     /// The conversation's menu, open.

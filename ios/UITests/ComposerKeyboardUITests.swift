@@ -9,14 +9,10 @@ final class ComposerKeyboardUITests: ServerIsolatedUITestCase {
     private func launch(room: Bool) {
         variant = room ? "room" : "chat"
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat"]
-            + (room ? ["-qaSpacesDemo", "list", "-qaLoopsDemo", "-qaRoomTheme", ProcessInfo.processInfo.environment["ROOM_THEME"] ?? "forest"] : [])
-        let ready = field
+            + (room ? ["-qaSpacesDemo", "list", "-qaRoomTheme", ProcessInfo.processInfo.environment["ROOM_THEME"] ?? "forest"] : [])
         app.launchOffline()
-        if !ready.waitForExistence(timeout: 30) {
-            app.terminate()
-            app.launchOffline()
-        }
-        XCTAssertTrue(ready.waitForExistence(timeout: 60), room ? "the app opens on the room" : "the app opens on the Bot chat")
+        // The app opens on Home: Main from there.
+        XCTAssertTrue(app.waitForRoom(timeout: 60) && field.waitForExistence(timeout: 10), "Main opens from Home")
     }
 
     private func shot(_ name: String) {
@@ -77,8 +73,7 @@ final class ComposerKeyboardUITests: ServerIsolatedUITestCase {
 
     private func standUpAgain() {
         if keyboard.exists { return }
-        let input = app.buttons["roomInput"]
-        if input.exists, input.isHittable { input.tap() } else { field.tap() }
+        field.tap()
     }
 
     private func clear() {

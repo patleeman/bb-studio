@@ -11,7 +11,7 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
     private func launch(_ variant: String = "needs") {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", variant, "-qaNoDemoApprovals"]
         app.launchOffline()
-        XCTAssertTrue(app.waitForRoom(), "the app opens on the room")
+        XCTAssertTrue(app.waitForRoom(), "Main opens from Home")
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 
@@ -77,28 +77,30 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         app.closeReplyThread()
         // Review M9: the fork stays reachable from its message.
         let forked = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'forked-'")).firstMatch
+        // Back in the conversation it may show its latest: up to the message.
+        for _ in 0..<6 where !forked.waitForExistence(timeout: 2) { app.collectionViews.firstMatch.swipeDown() }
         XCTAssertTrue(forked.waitForExistence(timeout: 15), "the message shows its Forked here line")
         XCTAssertTrue(forked.label.contains("Forked here · 1 conversation"), forked.label)
         forked.tap()
         XCTAssertTrue(app.staticTexts["Main · fork"].waitForExistence(timeout: 15), "the line reopens the fork")
         app.closeReplyThread()
         app.openRoomPlace("conversations")
-        XCTAssertTrue(app.buttons["homeNew"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.homeNew.waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["homeConversation-thr_demo_fork1"].exists, "a fork has no row of its own")
     }
 
     func testMainHasNoFinish() {
         launch("list")
         app.openConversationMenu()
-        XCTAssertTrue(app.buttons["menuModel"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["menuArchive"].exists)
-        XCTAssertFalse(app.buttons["menuDelete"].exists)
+        XCTAssertTrue(app.menuItem("Model & permissions").waitForExistence(timeout: 5))
+        XCTAssertFalse(app.menuItem("Archive").exists)
+        XCTAssertFalse(app.menuItem("Delete conversation…").exists)
     }
 
     func testNewConversation() {
         launch("list")
         app.openRoomPlace("conversations")
-        let plus = app.buttons["homeNew"]
+        let plus = app.homeNew
         XCTAssertTrue(plus.waitForExistence(timeout: 10))
         plus.tap()
         let field = app.textViews["Message Juniper"]

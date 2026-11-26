@@ -147,11 +147,12 @@ final class ErrorStatesCaptureUITests: ServerIsolatedUITestCase {
         guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad only") }
         launch(["-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoLong", "-openURL", "bbstudio://bot"])
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
-        duo("tab?threads")
-        let thread = app.buttons["inbox-thread-thr_botdemo01"]
+        // Main, as any conversation opens: from Home.
+        app.goHome()
+        let thread = app.buttons["homeConversation-thr_botdemo01"]
         XCTAssertTrue(thread.waitForExistence(timeout: 20))
-        thread.tap()
-        XCTAssertTrue(app.staticTexts["duoThreadTitle"].waitForExistence(timeout: 15))
+        app.press(thread, id: "homeConversation-thr_botdemo01")
+        XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 15))
         sleep(3)
         shot("composer-duo-bottom")
         let jump = app.buttons["Jump to latest"]
