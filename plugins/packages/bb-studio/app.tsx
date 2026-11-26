@@ -46,6 +46,7 @@ import { post } from "./src/code/file-opener";
 import { registerItemDrops } from "./src/ui/item-drop";
 import { withPageTabs } from "./src/ui/page-tab-requests";
 import { RetireFixedBotTabs } from "./src/ui/bot/retire-fixed-tabs";
+import { RetireStrandsTabs } from "./src/ui/bot/retire-strands-tabs";
 import { ITEM_TAB_ICON } from "./src/ui/item-icons";
 import { registerItemWindows } from "./src/ui/item-window";
 import { registerHostWindow } from "./src/kit/app/windows";
@@ -369,9 +370,11 @@ export default definePluginApp((app) => {
   registerItemDrops(app.slots);
   // Main tabs kept each Bot as a fixed workbench tab; those close once.
   app.slots.experimental_appOverlay({ id: "retire-fixed-tabs", component: RetireFixedBotTabs });
-  // `studio/automations`: the Bot's Todos page (src/ui/automations/AutomationsPanel.tsx).
+  // The old Strands page's workbench tabs (tab id "loops") close too.
+  app.slots.experimental_appOverlay({ id: "retire-strands-tabs", component: RetireStrandsTabs });
+  // `studio/automations`: the Bot's Scheduled page (src/ui/automations/AutomationsPanel.tsx).
   // Its title row is the page's own, in BB's title bar (headerContent), as the Library's is: one row, not two.
-  app.slots.navPanel({ id: AUTOMATIONS_PANEL, title: "Tasks", icon: "ListTodo", path: AUTOMATIONS_PANEL, component: withPageTabs(AutomationsPanel, AUTOMATIONS_PANEL), headerContent: StudioBarSlot, ...OFF_RAIL });
+  app.slots.navPanel({ id: AUTOMATIONS_PANEL, title: "Scheduled", icon: "ListTodo", path: AUTOMATIONS_PANEL, component: withPageTabs(AutomationsPanel, AUTOMATIONS_PANEL), headerContent: StudioBarSlot, ...OFF_RAIL });
   // VS Code, its own page in BB's rail (`studio/vscode`): the workspace used
   // last, else the picker (src/code/vscode-panel.tsx).
   app.slots.navPanel({ id: VSCODE_PANEL, title: "VS Code", icon: CODE_ICON, path: VSCODE_PANEL, component: VsCodePanel, headerContent: StudioBarSlot, experimental_usePageTitle: useCodePageTitle, ...OFF_RAIL });
