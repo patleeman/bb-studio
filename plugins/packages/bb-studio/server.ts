@@ -50,6 +50,7 @@ import { registerScopedTools, ScopeMemory } from "./src/tool-scope-tools";
 import { slim, slimmedIfSmaller } from "./src/slim-schema";
 import { createMergedShownCache, INTERNAL_RENAMES, mergedTools, presentScope } from "./src/merged-tools";
 import { LeanStore, leanFor } from "./src/context-lean";
+import { isAcpAgent, noteCatalog, refreshProviderFamilies } from "./src/provider-family";
 import { ToolDeliveryStore } from "./src/tool-delivery";
 import { createMoveProvider } from "./src/move-provider/register";
 import { contextLeanContract } from "./src/context-lean-contract";
@@ -315,6 +316,8 @@ export default async function plugin(bb: BbPluginApi) {
   // The model router (src/router): Auto in the pickers, rules picked by Jev, the usage-limit notice.
   // Auto reports whether its pick runs lean (Settings › Agent context); the lean settings load further down.
   const leanRef: { store: LeanStore | null } = { store: null };
+  // Which providers are ACP agents (src/provider-family.ts): the router, Lean and moves ask synchronously.
+  await refreshProviderFamilies(bb.sdk.providers, true);
   const modelRouter = await registerRouter(bb, { systemOne: decisions.ask.systemOne }, { lean: (providerId, model) => leanFor(leanRef.store?.current ?? {}, providerId, model) });
   let settingValues: Record<string, unknown> = await settings.get();
   appCards = settingValues.appCards === true;
@@ -555,8 +558,8 @@ export default async function plugin(bb: BbPluginApi) {
     return [...kindTools, ...apps, ...CODE_TOOLS, ...WORKBENCH_TOOLS, ...BOT_TOOLS, STRAND_NOTE_TOOL, ...AREA_TOOLS, ...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS, ...MEMORY_TOOLS];
   };
   const leanRows = async () => {
-    let catalog: { id: string; displayName?: string; enabled?: boolean }[] = [];
-    try { catalog = await bb.sdk.providers.catalog() as typeof catalog; } catch { /* Stored rows only. */ }
+    let catalog: { id: string; displayName?: string; enabled?: boolean; info?: { family?: string | null } | null }[] = [];
+    try { catalog = await bb.sdk.providers.catalog() as typeof catalog; noteCatalog(catalog); } catch { /* Stored rows only. */ }
     const names = new Map(catalog.filter((entry) => entry.enabled !== false).map((entry) => [entry.id, entry.displayName || entry.id]));
     for (const id of Object.keys(leanModes.current)) if (!names.has(id)) names.set(id, id);
     const count = (scope: ReturnType<typeof scopeTools>) => scope.loaded.length + (scope.delivery === "trio" ? 3 : scope.delivery === "none" ? 0 : scope.onDemand.length);
@@ -565,7 +568,7 @@ export default async function plugin(bb: BbPluginApi) {
       const leanScope = scopeTools({ kind: "conversation", full, providerId: id, lean: true, deferSupported, extras: ON_DEMAND_EXTRAS });
       const fullScope = scopeTools({ kind: "conversation", full, providerId: id, lean: false, deferSupported, extras: ON_DEMAND_EXTRAS, delivery: toolDelivery.modeFor(id) });
       const fullDelivery = fullScope.delivery === "all" ? "native" as const : fullScope.delivery === "defer" ? "defer" as const : "search" as const;
-      return { id, name, acp: id.startsWith("acp-"), mode: leanModes.current[id] ?? "auto", tools: { lean: count(leanScope), full: count(fullScope) }, fullDelivery };
+      return { id, name, acp: isAcpAgent(id), mode: leanModes.current[id] ?? "auto", tools: { lean: count(leanScope), full: count(fullScope) }, fullDelivery };
     }).sort((a, b) => Number(a.acp) - Number(b.acp) || a.name.localeCompare(b.name));
   };
   bb.rpc.register(contextLeanContract, {

@@ -3,6 +3,8 @@
 // answers mapped to per-item results, and the router-rule rewrite.
 // The service (./service.ts) does the I/O; the CLI (./cli.ts) the words.
 
+import { isAcpAgent } from "../provider-family";
+
 export type PermissionMode = "accept-edits" | "auto" | "full";
 export const PERMISSION_MODES: readonly PermissionMode[] = ["accept-edits", "auto", "full"];
 const RANK: Record<PermissionMode, number> = { "accept-edits": 0, auto: 1, full: 2 };
@@ -13,8 +15,8 @@ export const isPermissionMode = (value: unknown): value is PermissionMode => typ
 export const DEFAULT_HISTORY_TOKENS = 150_000;
 export const MAX_HISTORY_TOKENS = 1_000_000;
 
-/** BB's ACP agents take no `auto`: it lands on accept-edits there. */
-export const isAcpProvider = (providerId: string) => providerId.startsWith("acp-");
+/** BB's ACP agents (acp-* or the ACP family, src/provider-family.ts) take no `auto`: it lands on accept-edits there. */
+export const isAcpProvider = (providerId: string) => isAcpAgent(providerId);
 
 export type PermissionDecision = { ok: true; mode: PermissionMode } | { ok: false; reason: "permission-widening" | "permission-unsupported"; detail: string };
 
@@ -22,8 +24,9 @@ export type PermissionDecision = { ok: true; mode: PermissionMode } | { ok: fals
  * The permission a moved thread (or an automation that targets it) runs with.
  * Never wider than `current`: unknown counts as the narrowest. Without an
  * explicit mode, `full` steps down to `auto` (full only when asked for), and
- * `auto` lands on accept-edits on an ACP target. `supported`, when the target
- * says, narrows it further to a mode it offers.
+ * `auto` lands on accept-edits on an ACP target. `supported`, the target's
+ * declared modes, narrows it further to the widest one it offers at or below
+ * that (auto -> accept-edits on a target without auto, such as antigravity).
  */
 export function targetPermission(current: PermissionMode | null | undefined, requested: PermissionMode | null | undefined, targetProviderId: string, supported?: readonly PermissionMode[] | null): PermissionDecision {
   const now: PermissionMode = current ?? "accept-edits";

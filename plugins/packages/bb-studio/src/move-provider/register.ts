@@ -6,6 +6,7 @@ import type Database from "better-sqlite3";
 import { z } from "zod";
 import { automationsPluginOff } from "../automations-plugin";
 import { mapPool } from "../kit/pool";
+import { noteProviders } from "../provider-family";
 import { isPermissionMode, type PermissionMode, type RouterPolicy } from "./core";
 import { MoveProviderService, type BbAutomation, type BotRef, type MoveDeps, type MoveEventStatus, type TargetCheck, type ThreadInfo } from "./service";
 
@@ -129,8 +130,9 @@ export function createMoveProvider(deps: MoveRegisterDeps): MoveProviderService 
     target: async (providerId): Promise<TargetCheck> => {
       const [catalog, providers] = await Promise.all([
         sdk.providers.catalog().catch(() => []) as Promise<{ id: string; enabled?: boolean }[]>,
-        sdk.providers.list().catch(() => []) as Promise<{ id: string; capabilities?: { permissionModes?: readonly string[] } }[]>,
+        sdk.providers.list().catch(() => []) as Promise<{ id: string; family?: string; capabilities?: { permissionModes?: readonly string[] } }[]>,
       ]);
+      noteProviders(providers);
       const entry = catalog.find((each) => each.id === providerId);
       if (!entry || entry.enabled === false) return { known: false, ready: false, models: [], defaultModel: null, permissionModes: null };
       const modes = providers.find((each) => each.id === providerId)?.capabilities?.permissionModes;

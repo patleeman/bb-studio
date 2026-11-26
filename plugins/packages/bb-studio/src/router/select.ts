@@ -1,6 +1,7 @@
 // The model router's rules, as pure functions: the question Jev answers,
 // reading its answer (or the fallback model's), walking a chain to the first
 // available target, and reading a failed turn's structured error.
+import { isAcpAgent } from "../provider-family";
 import { DEFAULT_RULE, type NoticeKind, type Policy, type Rule, type Target } from "./contract";
 
 /** Jev's answer counts at or above this; below it the default chain is used. */
@@ -123,7 +124,7 @@ export function firstAvailable(chain: readonly Target[], why: Availability, unsu
 
 /** Pi and ACP agents run models from several services; a limit or an outage belongs to the model, not the whole provider. */
 export function multiBackend(providerId: string): boolean {
-  return providerId === "pi" || providerId.startsWith("acp-");
+  return providerId === "pi" || isAcpAgent(providerId);
 }
 
 // ---------------------------------------------------------------------------

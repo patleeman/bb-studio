@@ -242,6 +242,9 @@ describe("ids and who sees the tools", () => {
     expect(json(await h.agent("tool_gateway_call", { id: opaqueToolId("two", "count"), args: {} }, "thr_acp"))).toEqual({ calls: 1 });
     const providers = (await h.rpc("toolGateway.providers", null, CLIENT)).providers;
     expect(providers.find((provider: { id: string }) => provider.id === "acp-hermes")).toMatchObject({ acp: true, access: true, servers: ["two"] });
+    // A provider plugin of the ACP family (no acp- prefix) is an ACP agent too.
+    expect(providers.find((provider: { id: string }) => provider.id === "antigravity")).toMatchObject({ acp: true });
+    expect(providers.find((provider: { id: string }) => provider.id === "codex")).toMatchObject({ acp: false });
   });
 
   it("limits a server to its projects", async () => {

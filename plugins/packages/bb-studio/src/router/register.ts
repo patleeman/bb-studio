@@ -1,4 +1,5 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { noteProviders, type ProviderFamilyInfo } from "../provider-family";
 import { ROUTER_CHANNEL, routerContract, type Policy, type Target } from "./contract";
 import type { AgentErrorText } from "./select";
 import type { RouterDecisions } from "./decide";
@@ -82,13 +83,14 @@ export async function registerRouter(
   const hooks = (bb as { experimental_hooks?: RouterHooks }).experimental_hooks;
   const primaryHostId = async () => (await bb.sdk.system.config()).primaryHostId ?? null;
   const completeText = typeof hooks?.experimental_completeText === "function" ? hooks.experimental_completeText.bind(hooks) : null;
+  const noted = <P extends ProviderFamilyInfo>(list: P[]): P[] => (noteProviders(list), list);
   const router = new ModelRouter({
     kv: bb.storage.kv,
     providerStates: async () => {
       const hostId = await primaryHostId();
       return (await bb.sdk.system.providerStates(hostId ? { hostId } : undefined)).providers;
     },
-    providers: async () => new Map((await bb.sdk.providers.list()).map((provider) => {
+    providers: async () => new Map(noted(await bb.sdk.providers.list()).map((provider) => {
       const modes = (provider as { capabilities?: { permissionModes?: readonly string[] } }).capabilities?.permissionModes ?? [];
       return [provider.id, { name: provider.displayName, permissionModes: [...modes] } satisfies RouterProvider] as const;
     })),

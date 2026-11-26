@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
+import { isAcpAgent } from "../provider-family";
 import { createMoveProvider } from "./register";
 
 const TO = "acp-antigravity-acp";
@@ -63,6 +64,20 @@ describe("createMoveProvider wiring", () => {
     expect(report.threads[0]).toMatchObject({ result: "moved", from: { permission: "auto" }, to: { model: "gemini-3-pro", permission: "accept-edits" } });
     expect(rpc[0]).toMatchObject({ pluginId: "studio", method: "moveProvider.prepare", input: { threadId: "thr_a", from: { providerId: "claude-code", model: "opus" }, to: { providerId: TO, model: "gemini-3-pro" }, historyTokens: 40000 } });
     expect(moves).toEqual([{ threadId: "thr_a", input: { providerId: TO, model: "gemini-3-pro", permissionMode: "accept-edits", historyTokens: 40000 } }]);
+  });
+
+  it("moves an auto thread to antigravity (family acp, no acp- prefix) with accept-edits, from BB's provider list", async () => {
+    const { bb, moves } = fakeBb();
+    bb.sdk.providers = {
+      ...bb.sdk.providers,
+      catalog: async () => [{ id: "claude-code" }, { id: "antigravity" }],
+      list: async () => [{ id: "antigravity", family: "acp", capabilities: { permissionModes: ["accept-edits", "full"] } }],
+      models: async () => ({ models: [{ model: "gemini-4-neon", isDefault: true }] }),
+    } as typeof bb.sdk.providers;
+    const report = await createMoveProvider(deps(bb)).move({ ids: ["thr_a"], includeArchived: false, runners: false }, { to: "antigravity", dryRun: false, automations: false, botDefaults: false, routerRules: false });
+    expect(report.threads[0]).toMatchObject({ result: "moved", from: { permission: "auto" }, to: { providerId: "antigravity", model: "gemini-4-neon", permission: "accept-edits" } });
+    expect(moves).toEqual([{ threadId: "thr_a", input: { providerId: "antigravity", model: "gemini-4-neon", permissionMode: "accept-edits", historyTokens: 150000 } }]);
+    expect(isAcpAgent("antigravity")).toBe(true);
   });
 
   it("fails clearly on a BB without the move hook, and maps the hook's refusals", async () => {

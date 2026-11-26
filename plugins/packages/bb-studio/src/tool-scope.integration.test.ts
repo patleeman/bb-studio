@@ -32,7 +32,7 @@ const run = async (name: string, input: unknown, threadId: string) => {
 
 beforeAll(async () => {
   const thread = (threadId: string) => ({ id: threadId, projectId: "proj_personal", environmentId: "env", providerId: "acp-opencode", title: null, status: "idle", parentThreadId: null, sourceThreadId: null, createdAt: 1, updatedAt: 1, archivedAt: null });
-  const host = createFakePluginHost({ pluginId: "studio", sdk: { threads: { list: async () => [], get: async ({ threadId }: { threadId: string }) => thread(threadId) }, projects: { list: async () => [] }, providers: { catalog: async () => [{ id: "acp-opencode", displayName: "OpenCode" }, { id: "codex", displayName: "Codex" }] } } } as never);
+  const host = createFakePluginHost({ pluginId: "studio", sdk: { threads: { list: async () => [], get: async ({ threadId }: { threadId: string }) => thread(threadId) }, projects: { list: async () => [] }, providers: { catalog: async () => [{ id: "acp-opencode", displayName: "OpenCode" }, { id: "codex", displayName: "Codex" }, { id: "antigravity", displayName: "Google Antigravity", info: { family: "acp" } }] } } } as never);
   await plugin(host.bb);
   configure = host.harness.registrations.agentConfigurationProvider as unknown as Configure;
   const registered = (host.harness.registrations as unknown as { agentTools: Tool[] }).agentTools;
@@ -196,6 +196,9 @@ describe("Settings › Agent context changes", () => {
     await callRpc("contextLean.set", { providerId: "acp-opencode", mode: "auto" }, appWindow);
     const read = await callRpc("contextLean.get", null) as { providers: { id: string; mode: string }[] };
     expect(read.providers.find((row) => row.id === "acp-opencode")?.mode).toBe("auto");
+    const rows = read.providers as unknown as { id: string; acp: boolean; fullDelivery: string }[];
+    expect(rows.find((row) => row.id === "antigravity")).toMatchObject({ acp: true, fullDelivery: "search" });
+    expect(rows.find((row) => row.id === "codex")).toMatchObject({ acp: false });
   });
 });
 

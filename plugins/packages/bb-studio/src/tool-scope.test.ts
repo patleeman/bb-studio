@@ -71,7 +71,7 @@ describe("delivery by provider", () => {
   });
 
   it("Pi and ACP agents get the loaded tools plus the trio", () => {
-    for (const provider of ["pi", "acp-opencode", "acp-antigravity-acp"]) {
+    for (const provider of ["pi", "acp-opencode", "acp-antigravity-acp", "antigravity"]) {
       const entries = names(scopeEntries(scope("conversation", provider), NONE));
       expect(entries).toEqual([...LOADED.conversation.filter((name) => CONVERSATION_FULL.includes(name)).sort((a, b) => CONVERSATION_FULL.indexOf(a) - CONVERSATION_FULL.indexOf(b)), ...TRIO_TOOLS]);
     }

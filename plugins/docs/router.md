@@ -39,7 +39,7 @@ A target whose readiness BB can't tell (provider state `unknown`: an ACP agent w
 
 ### Pi and other ACP agents
 
-Pi (`pi`) and ACP agents (`acp-…`: OpenCode, Antigravity, Gemini, local models through OpenCode or an Ollama or LM Studio agent) are targets like any other. They run models from several services, so the router treats their models one by one:
+Pi (`pi`) and ACP agents (custom `acp-…` agents such as OpenCode, Gemini, or local models through OpenCode or an Ollama or LM Studio agent, and provider plugins that declare the ACP family, such as Google Antigravity, `antigravity`) are targets like any other. They run models from several services, so the router treats their models one by one:
 
 - A usage limit blocks only the model that hit it. GLM 5.3 through OpenCode running out leaves a local model through OpenCode available. A sign-in failure blocks the whole agent.
 - An agent whose model catalog failed twice in a row (for the same machine and project), or failed because the agent couldn't start (`provider_unavailable`, `missing_executable`, a refused connection), is skipped as "unreachable". One slow listing (a cold start timing out) isn't enough. The catalog is read on the primary machine, for the project when Auto knows it, since OpenCode's catalog is per workspace.

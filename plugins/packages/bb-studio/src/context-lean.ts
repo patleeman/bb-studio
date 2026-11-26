@@ -2,7 +2,10 @@
 // only what a turn needs (strand_note, runner_report) and reaches the rest through studio_tool_*, and lists
 // none of Studio's skills. Auto is lean for an ACP agent whose model runs
 // locally, judged by the model id (inkling-local/…, ollama/…, qwen3:8b, mlx-community/…)
-// or the agent's provider slug (acp-ollama).
+// or the agent's provider slug (acp-ollama). An ACP agent is an acp-* agent or
+// a provider plugin of the ACP family (src/provider-family.ts).
+
+import { isAcpAgent } from "./provider-family";
 
 export type LeanMode = "auto" | "lean" | "full";
 export const LEAN_KEY = "context:lean";
@@ -23,7 +26,7 @@ export function isLocalModel(model: string | null | undefined): boolean {
 
 /** True for an ACP agent whose provider slug names a local server (acp-ollama, acp-lmstudio…), whatever its model id says ("acp-default"). */
 export function isLocalAcpProvider(providerId: string): boolean {
-  return providerId.startsWith("acp-") && LOCAL_TOKEN.test(providerId.slice("acp-".length));
+  return isAcpAgent(providerId) && LOCAL_TOKEN.test(providerId.startsWith("acp-") ? providerId.slice("acp-".length) : providerId);
 }
 
 /** Whether a session of this provider and model runs lean. */
@@ -31,7 +34,7 @@ export function leanFor(modes: Readonly<Record<string, LeanMode>>, providerId: s
   const mode = modes[providerId] ?? "auto";
   if (mode === "lean") return true;
   if (mode === "full") return false;
-  return providerId.startsWith("acp-") && (isLocalModel(model) || isLocalAcpProvider(providerId));
+  return isAcpAgent(providerId) && (isLocalModel(model) || isLocalAcpProvider(providerId));
 }
 
 export class LeanStore {

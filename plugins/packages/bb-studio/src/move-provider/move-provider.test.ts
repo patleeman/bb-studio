@@ -7,6 +7,10 @@ import { MoveProviderService, type BbAutomation, type BotRef, type MoveDeps, typ
 
 const TO = "acp-antigravity-acp";
 const MODEL = "gemini-3-pro";
+// provider-antigravity: a plugin provider (family "acp") that declares accept-edits and full, not auto.
+const AG = "antigravity";
+const AG_MODEL = "gemini-4-neon";
+const AG_MODES: PermissionMode[] = ["accept-edits", "full"];
 
 function thread(id: string, extra: Partial<ThreadInfo> = {}): ThreadInfo {
   return { id, title: `Thread ${id}`, providerId: "claude-code", model: "opus", permission: "accept-edits", status: "idle", archived: false, projectId: "proj_a", ...extra };
@@ -34,7 +38,7 @@ function world(threads: ThreadInfo[], options: { busy?: string[]; modelMissingOn
     botThreads: async () => ["main", "w1"],
     runnerThreads: (botId) => runners.filter((each) => !botId || each.botId === botId),
     leadThreads: async () => ["lead"],
-    target: async (providerId) => providerId === TO ? { known: true, ready: true, models: [MODEL, "gemini-flash"], defaultModel: MODEL, permissionModes: null } : providerId === "claude-code" ? { known: true, ready: true, models: ["opus", "sonnet"], defaultModel: "opus", permissionModes: null } : { known: false, ready: false, models: [], defaultModel: null, permissionModes: null },
+    target: async (providerId) => providerId === AG ? { known: true, ready: true, models: [AG_MODEL], defaultModel: AG_MODEL, permissionModes: AG_MODES } : providerId === TO ? { known: true, ready: true, models: [MODEL, "gemini-flash"], defaultModel: MODEL, permissionModes: null } : providerId === "claude-code" ? { known: true, ready: true, models: ["opus", "sonnet"], defaultModel: "opus", permissionModes: null } : { known: false, ready: false, models: [], defaultModel: null, permissionModes: null },
     coreMove: async (threadId, body) => {
       calls.core.push({ threadId, body });
       if (options.coreMissing) return { status: 404, body: null };
@@ -82,6 +86,72 @@ function world(threads: ThreadInfo[], options: { busy?: string[]; modelMissingOn
 
 const base = { dryRun: false, automations: true, botDefaults: false, routerRules: false } as const;
 const parse = (out: { stdout?: string }) => JSON.parse(out.stdout ?? "null");
+
+/**
+ * Core's rule (desktop: resolveMovePermissionMode in
+ * apps/server/src/services/threads/thread-provider-move.fork.ts, the
+ * `provider-move` seam in STUDIO_FORK.md), copied so Studio's choice is
+ * checked against what core accepts. Throws where core answers 422.
+ */
+function coreMovePermission(args: { current: PermissionMode; requested: PermissionMode | undefined; supported: readonly PermissionMode[] | null; ceiling: PermissionMode }): PermissionMode {
+  const rank = (mode: PermissionMode) => ["accept-edits", "auto", "full"].indexOf(mode);
+  const supported = args.supported && args.supported.length > 0 ? args.supported : null;
+  if (args.requested !== undefined) {
+    if (rank(args.requested) > rank(args.current) && args.requested !== "full") throw new Error("permission_widening");
+    if (rank(args.requested) > rank(args.ceiling)) throw new Error("permission_widening");
+    if (supported !== null && !supported.includes(args.requested)) throw new Error("permission_unsupported");
+    return args.requested;
+  }
+  const limit = rank(args.ceiling) < rank(args.current) ? args.ceiling : args.current;
+  const chosen = (supported ?? [limit]).filter((mode) => rank(mode) <= rank(limit)).sort((a, b) => rank(b) - rank(a))[0];
+  if (chosen === undefined) throw new Error("permission_unsupported");
+  return chosen;
+}
+
+describe("moving to antigravity (a provider plugin of the ACP family, no acp- prefix)", () => {
+  it("lands an auto thread on accept-edits from the declared modes alone, never full", () => {
+    expect(targetPermission("auto", null, AG, AG_MODES)).toEqual({ ok: true, mode: "accept-edits" });
+    expect(targetPermission("full", null, AG, AG_MODES)).toEqual({ ok: true, mode: "accept-edits" });
+    expect(targetPermission("accept-edits", null, AG, AG_MODES)).toEqual({ ok: true, mode: "accept-edits" });
+    expect(targetPermission("auto", "auto", AG, AG_MODES)).toMatchObject({ ok: true, mode: "accept-edits" });
+    expect(targetPermission("auto", "full", AG, AG_MODES)).toMatchObject({ ok: false, reason: "permission-widening" });
+    expect(targetPermission("full", "full", AG, AG_MODES)).toEqual({ ok: true, mode: "full" });
+  });
+
+  it("matches core's route: core takes Studio's mode as asked, and lands auto on accept-edits on its own", () => {
+    for (const current of ["accept-edits", "auto", "full"] as const) {
+      const studio = targetPermission(current, null, AG, AG_MODES);
+      expect(studio.ok).toBe(true);
+      if (!studio.ok) continue;
+      expect(studio.mode).not.toBe("full");
+      expect(coreMovePermission({ current, requested: studio.mode, supported: AG_MODES, ceiling: "full" })).toBe(studio.mode);
+    }
+    expect(coreMovePermission({ current: "auto", requested: undefined, supported: AG_MODES, ceiling: "full" })).toBe("accept-edits");
+    expect(() => coreMovePermission({ current: "auto", requested: "auto", supported: AG_MODES, ceiling: "full" })).toThrow("permission_unsupported");
+    expect(() => coreMovePermission({ current: "auto", requested: "full", supported: AG_MODES, ceiling: "accept-edits" })).toThrow("permission_widening");
+  });
+
+  it("moves an auto thread end to end: core gets accept-edits, the thread and its automation never full", async () => {
+    const w = world([thread("a", { permission: "auto" }), thread("b", { permission: "full" })]);
+    w.bbAutomations.push({ id: "aut_1", projectId: "p", name: "Daily", execution: { mode: "agent", targetThreadId: "a", providerId: "claude-code", model: "opus", permissionMode: "auto", prompt: "go" } });
+    const report = await w.service.move({ ids: ["a", "b"], includeArchived: false, runners: false }, { ...base, to: AG });
+    expect(report.threads.map((each) => [each.threadId, each.result, each.to.permission])).toEqual([["a", "moved", "accept-edits"], ["b", "moved", "accept-edits"]]);
+    expect(w.calls.core.map((each) => each.body)).toEqual([
+      { providerId: AG, model: AG_MODEL, permissionMode: "accept-edits", historyTokens: 150000 },
+      { providerId: AG, model: AG_MODEL, permissionMode: "accept-edits", historyTokens: 150000 },
+    ]);
+    expect(w.store.get("a")!.permission).toBe("accept-edits");
+    expect(w.store.get("b")!.permission).toBe("accept-edits");
+    expect(w.bbAutomations[0]!.execution).toMatchObject({ providerId: AG, model: AG_MODEL, permissionMode: "accept-edits" });
+  });
+
+  it("narrows --permission auto to accept-edits, so core never sees an auto it would refuse", async () => {
+    const w = world([thread("a", { permission: "auto" })]);
+    const out = parse(await w.cli(["a", "--to", AG, "--permission", "auto", "--json"]));
+    expect(out.threads[0]).toMatchObject({ result: "moved", to: { permission: "accept-edits" } });
+    expect(w.calls.core[0]!.body.permissionMode).toBe("accept-edits");
+  });
+});
 
 describe("targetPermission: never wider", () => {
   it("lowers auto to accept-edits on an ACP target and steps full down without an explicit mode", () => {
