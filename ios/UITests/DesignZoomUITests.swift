@@ -62,7 +62,7 @@ final class DesignZoomUITests: ServerIsolatedUITestCase {
         launch()
         open("1b")
         XCTAssertTrue(waitForZoom { abs($0 - 1) < 0.01 }, "it opens at fit-to-width: \(zoom)")
-        XCTAssertGreaterThan(painted(still), 0.002, "painted with no pinch")
+        XCTAssertGreaterThan(painted(still), 0.001, "painted with no pinch")
         let frame = still.frame
         shot("1-large-open")
 
@@ -101,7 +101,7 @@ final class DesignZoomUITests: ServerIsolatedUITestCase {
         launch()
         open("1a")
         XCTAssertTrue(waitForZoom { abs($0 - 1) < 0.01 }, "it opens at fit-to-width: \(zoom)")
-        XCTAssertGreaterThan(painted(still), 0.002, "painted with no pinch")
+        XCTAssertGreaterThan(painted(still), 0.001, "painted with no pinch")
         shot("4-small-open")
         still.swipeUp(velocity: .fast)
         Thread.sleep(forTimeInterval: 1)

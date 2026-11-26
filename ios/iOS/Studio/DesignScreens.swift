@@ -8,6 +8,7 @@ struct DesignStill: UIViewRepresentable {
     var play: () -> Void
     /// Told when the still leaves fit-to-width or comes back to it.
     var zoomed: (Bool) -> Void = { _ in }
+    var identifier = "designStill"
 
     func makeUIView(context: Context) -> DesignStillView {
         DesignStillView(url: url, size: size, play: play)
@@ -16,6 +17,7 @@ struct DesignStill: UIViewRepresentable {
     func updateUIView(_ view: DesignStillView, context: Context) {
         view.play = play
         view.zoomed = zoomed
+        view.identifier = identifier
     }
 }
 
@@ -28,6 +30,10 @@ final class DesignStillView: UIView, UIScrollViewDelegate, WKNavigationDelegate 
     var play: () -> Void
     var zoomed: (Bool) -> Void = { _ in }
     private var wasZoomed = false
+    var identifier: String {
+        get { scroll.accessibilityIdentifier ?? "" }
+        set { scroll.accessibilityIdentifier = newValue }
+    }
     private let url: URL
     private let size: CGSize
     private let scroll = UIScrollView()

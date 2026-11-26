@@ -41,11 +41,11 @@ struct DesignPlayer: View {
 
     var body: some View {
         NavigationStack {
-            pager
-                .background(Color(.secondarySystemBackground))
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    DesignPlayerBar(mode: $mode, step: $step, steps: screen?.steps ?? [], screens: round.compactMap(\.id), screenId: $screenId)
-                }
+            // The bar under the screens, not over them: a still fits the room above it.
+            VStack(spacing: 0) {
+                pager.background(Color(.secondarySystemBackground))
+                DesignPlayerBar(mode: $mode, step: $step, steps: screen?.steps ?? [], screens: round.compactMap(\.id), screenId: $screenId)
+            }
                 .overlay(alignment: .top) { DesignNotice(notice: $notice) }
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
@@ -77,28 +77,34 @@ struct DesignPlayer: View {
         }
     }
 
-    /// The round's stills side by side, a page each. Paging waits while a zoomed still pans to its edge.
+    /// The round's stills side by side, a page each. Paging waits while a zoomed
+    /// still pans to its edge. The screen on show is put in place on appear and
+    /// whenever the width changes (a Duo unfolding), as paging alone can't.
     private var stills: some View {
-        ScrollView(.horizontal) {
-            LazyHStack(spacing: 0) {
-                ForEach(round, id: \.id) { screen in
-                    page(screen)
-                        .containerRelativeFrame([.horizontal, .vertical])
-                        .id(screen.id ?? "")
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 0) {
+                    ForEach(round, id: \.id) { screen in
+                        page(screen)
+                            .containerRelativeFrame([.horizontal, .vertical])
+                            .id(screen.id ?? "")
+                    }
                 }
+                .scrollTargetLayout()
             }
-            .scrollTargetLayout()
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: pagerPosition)
+            .scrollIndicators(.hidden)
+            .scrollDisabled(zoomed)
+            .onAppear { proxy.scrollTo(screenId) }
+            .onGeometryChange(for: CGFloat.self, of: \.size.width) { _, _ in proxy.scrollTo(screenId) }
         }
-        .scrollTargetBehavior(.paging)
-        .scrollPosition(id: pagerPosition)
-        .scrollIndicators(.hidden)
-        .scrollDisabled(zoomed)
     }
 
     private func page(_ screen: DesignScreen) -> some View {
         DesignPlayerPage(model: model, screen: screen, mode: screen.id == screenId ? mode : .view,
                          step: screen.id == screenId ? step : "", active: active, event: handle,
-                         play: { mode = .play }, zoomed: { zoomed = $0 })
+                         play: { mode = .play }, zoomed: { zoomed = $0 }, shown: screen.id == screenId)
     }
 
     private var pagerPosition: Binding<String?> {
@@ -179,10 +185,13 @@ private struct DesignPlayerPage: View {
     /// A tap on the still plays the prototype.
     let play: () -> Void
     let zoomed: (Bool) -> Void
+    /// The page on show; the neighbours a lazy stack keeps ready are off screen.
+    let shown: Bool
 
     var body: some View {
         if mode == .view {
-            DesignStill(url: model.screenURL(screen), size: CGSize(width: screen.size.width, height: screen.size.height), play: play, zoomed: zoomed)
+            DesignStill(url: model.screenURL(screen), size: CGSize(width: screen.size.width, height: screen.size.height), play: play, zoomed: zoomed,
+                        identifier: shown ? "designStill" : "designStill-\(screen.id ?? "")")
         } else {
             DesignLiveFrame(url: model.screenURL(screen, step: step), pageWidth: screen.size.width, mode: mode, pins: pins, event: event)
                 .id(step)

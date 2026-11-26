@@ -179,6 +179,7 @@ private struct PageToolbarButtons: View {
                 }
             }
             .accessibilityLabel("Comments")
+            .accessibilityIdentifier("pageComments")
             .accessibilityValue(actions.model.openComments > 0 ? "\(actions.model.openComments) open" : "")
         }
         Menu {

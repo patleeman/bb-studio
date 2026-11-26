@@ -46,8 +46,9 @@ struct PageToggle: View {
         } label: {
             Text(MarkdownText.inline(summary))
                 .font(level == 1 ? .title3.bold() : level == 2 ? .headline : level != nil ? .subheadline.bold() : .body)
-                .foregroundStyle(.primary)
         }
+        // A heading, not a link: the desktop draws it in the text's colour.
+        .tint(.primary)
         .accessibilityIdentifier("pageToggle")
     }
 }
