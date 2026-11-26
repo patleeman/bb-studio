@@ -69,8 +69,8 @@ describe("searchSettings", () => {
     expect(searchTitles("a").slice(0, 4)).toEqual([
       "AI services",
       "Appearance",
-      "Archived threads",
-      "General › App links",
+      "Archived conversations",
+      "General › Archive confirmation",
     ]);
   });
 

@@ -1,5 +1,5 @@
 import { cn } from "@bb/shared-ui/lib/utils";
-import bbLogoUrl from "../../../../../assets/bb-logo.svg";
+const bbLogoUrl = "/icon-192.png";
 
 export function BbLogo({ className = "size-4" }: { className?: string }) {
   return (
@@ -7,7 +7,7 @@ export function BbLogo({ className = "size-4" }: { className?: string }) {
       src={bbLogoUrl}
       alt=""
       aria-hidden="true"
-      className={cn(className, "object-contain dark:invert")}
+      className={cn(className, "rounded-[22%] object-contain")}
     />
   );
 }

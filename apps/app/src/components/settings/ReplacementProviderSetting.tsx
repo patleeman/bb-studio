@@ -64,10 +64,10 @@ export function ReplacementProviderSetting({
           title: "Automatic",
           description:
             automaticProvider === undefined
-              ? `Chooses ${builtIn?.title ?? "bb"}.`
+              ? `Chooses ${builtIn?.title ?? "BB Studio"}.`
               : `Chooses ${automaticProvider.title} (${
                   isBundled(automaticProvider)
-                    ? "from bb"
+                    ? "from BB Studio"
                     : automaticProvider.pluginId
                 }).`,
         };
@@ -89,7 +89,7 @@ export function ReplacementProviderSetting({
     isBundled(slot)
       ? {
           key: replacementProviderKey(slot),
-          title: `${titleOf(slot)} (from bb)`,
+          title: `${titleOf(slot)} (from BB Studio)`,
           description: slot.description ?? `From the ${slot.pluginId} plugin.`,
         }
       : {

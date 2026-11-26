@@ -37,7 +37,7 @@ export function useSettingsSearchConditions(): ReadonlySet<SettingsSearchConditi
   const hasComposers = choiceLabels.has("Composer");
   const hasDiffRenderers = choiceLabels.has("Diffs");
   const hasSourceCodeRenderers = choiceLabels.has("Source code");
-  const hasThreadLists = choiceLabels.has("Sidebar thread list");
+  const hasThreadLists = choiceLabels.has("Sidebar conversation list");
   const hasSidebarNavigations = choiceLabels.has("Navigation");
   const hasThreadHeaderTitles = choiceLabels.has("Thread header title");
   const hasThreadRailOutlines = choiceLabels.has("Thread outline");

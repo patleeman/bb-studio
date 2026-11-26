@@ -146,14 +146,14 @@ export function createPushNotificationsPlugin(
         type: "boolean",
         label: "Web notifications",
         description:
-          "Show system notifications while bb is open in a browser. Each browser needs notification permission.",
+          "Show system notifications while BB Studio is open in a browser. Each browser needs notification permission.",
         default: true,
       },
       desktopEnabled: {
         type: "boolean",
         label: "Desktop notifications",
         description:
-          "Show system notifications while the bb desktop app is running.",
+          "Show system notifications while the BB Studio desktop app is running.",
         default: true,
       },
       activeDeviceFirst: {
@@ -167,7 +167,7 @@ export function createPushNotificationsPlugin(
         type: "select",
         label: "Default notifications",
         description:
-          "For threads you haven't set. Needs input only skips finished turns.",
+          "For conversations you haven't set. Needs input only skips finished turns.",
         options: [...notificationLevelSchema.options],
         experimental_optionLabels: {
           all: NOTIFICATION_LEVEL_LABELS.all,
@@ -179,9 +179,9 @@ export function createPushNotificationsPlugin(
       },
       childLevel: {
         type: "select",
-        label: "Child thread notifications",
+        label: "Worker notifications",
         description:
-          "For child threads you haven't set. A thread's level also limits its child threads.",
+          "For workers you haven't set. A conversation's level also limits its workers.",
         options: [...ownNotificationLevelSchema.options],
         experimental_optionLabels: {
           inherit: NOTIFICATION_LEVEL_LABELS.inherit,

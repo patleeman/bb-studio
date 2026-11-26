@@ -39,9 +39,9 @@ const KIND_OPTIONS: ReadonlyArray<{
   label: string;
   value: ArchivedThreadsKindFilter;
 }> = [
-  { label: "All threads", value: "all" },
-  { label: "Threads", value: "root" },
-  { label: "Child threads", value: "child" },
+  { label: "All conversations", value: "all" },
+  { label: "Conversations", value: "root" },
+  { label: "Workers", value: "child" },
 ];
 
 interface ArchiveFilterMenuProps<T extends string> {
@@ -176,7 +176,7 @@ export function ArchivedThreadsSettingsSection() {
 
   const selectedKindLabel =
     KIND_OPTIONS.find((option) => option.value === kind)?.label ??
-    "All threads";
+    "All conversations";
   const isInitialLoading = searchIsActive
     ? threadSearch.isDebouncing ||
       (threadSearch.isLoading && threadSearch.data === undefined)
@@ -186,10 +186,10 @@ export function ArchivedThreadsSettingsSection() {
     <section className="space-y-5">
       <div>
         <h2 className="text-lg font-semibold text-foreground">
-          Archived threads
+          Archived conversations
         </h2>
         <p className="mt-1 text-xs text-subtle-foreground">
-          Find and restore archived threads from across your projects.
+          Find and restore archived conversations from across your projects.
         </p>
       </div>
 
@@ -200,10 +200,10 @@ export function ArchivedThreadsSettingsSection() {
             className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-subtle-foreground"
           />
           <Input
-            aria-label="Search archived threads"
+            aria-label="Search archived conversations"
             className="h-8 pl-8 text-xs"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search archived threads…"
+            placeholder="Search archived conversations…"
             value={search}
           />
         </div>
@@ -232,8 +232,8 @@ export function ArchivedThreadsSettingsSection() {
       ) : archivedThreads.length === 0 ? (
         <EmptyStatePanel className="py-8">
           {search.trim().length > 0
-            ? "No archived threads match your search."
-            : "No archived threads match these filters."}
+            ? "No archived conversations match your search."
+            : "No archived conversations match these filters."}
         </EmptyStatePanel>
       ) : (
         <div className="space-y-6">
@@ -245,7 +245,7 @@ export function ArchivedThreadsSettingsSection() {
                   {projectNames.get(groupProjectId) ?? "Unknown project"}
                 </h3>
                 <span>
-                  {threads.length} {threads.length === 1 ? "thread" : "threads"}
+                  {threads.length} {threads.length === 1 ? "conversation" : "conversations"}
                 </span>
               </div>
               <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
