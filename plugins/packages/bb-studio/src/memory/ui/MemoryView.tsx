@@ -141,8 +141,8 @@ function CoreSection({ heading, text, cap, editing, onEdit, onCancel, onSave }: 
     <section data-testid="memory-core-section" data-section={heading} className="group/section flex flex-col gap-1 border-b border-border/60 px-2 py-2.5 last:border-b-0">
       <div className="flex items-center gap-2">
         <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{heading}</h3>
-        {cap ? <span data-testid="memory-section-lines" className={cn("text-xs tabular-nums", lines > cap ? "text-warning" : "text-muted-foreground")}>{lines} / {cap}</span> : null}
         {!editing ? <Button type="button" variant="ghost" size="sm" data-testid="memory-section-edit" className={cn(SMALL, "opacity-0 group-hover/section:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100")} aria-label={`Edit ${heading}`} onClick={onEdit}>Edit</Button> : null}
+        {cap ? <span data-testid="memory-section-lines" className={cn("text-xs tabular-nums", lines > cap ? "text-warning" : "text-muted-foreground")}>{lines} / {cap}</span> : null}
       </div>
       {editing ? (
         <form className="flex flex-col gap-2" onSubmit={(event) => void submit(event)}>
