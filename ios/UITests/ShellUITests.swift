@@ -57,6 +57,23 @@ final class ShellUITests: ServerIsolatedUITestCase {
     /// work): still marks, not spinners that would run for hours.
     func testAWorkingBotGoesIdle() { expectIdle(["-qaShelfDemo", "-openURL", "bbstudio://bot"], bot: "working") }
     func testHomeWithARunningWorkerGoesIdle() { expectIdle([], home: true) }
+    /// A conversation closed while it scrolls to its end (just opened): its
+    /// scroll's display link stops too. One left ticking kept the app awake
+    /// and never idle for the rest of the launch.
+    func testClosingAConversationMidScrollLeavesNoDisplayLink() {
+        launch(["-qaConversation", "thr_botdemo01", "-qaDemoLatency", "300", "-qaDemoColdCache"])
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")
+        for _ in 0..<3 {
+            app.goHome()
+            XCTAssertTrue(app.waitForRoom(timeout: 15), "Main again")
+        }
+        app.goHome()
+        sleep(2)
+        command("counts")
+        let counts = (try? JSONDecoder().decode([String: Int].self, from: Data((app.windows.firstMatch.value as? String ?? "").utf8))) ?? [:]
+        XCTAssertEqual(counts["transcript.links"], 0, "display links left running: \(counts)")
+    }
+
     /// Back to Home from a conversation (the rail's Home): Home settles too.
     func testHomeGoesIdleAfterAConversation() {
         launch(["-qaConversation", "thr_botdemo01"])

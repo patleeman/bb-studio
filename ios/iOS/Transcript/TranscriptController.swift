@@ -344,6 +344,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        // Off screen: no scroll to finish (and no display link left ticking).
+        stopAnimation()
         appearedAt = nil
         if let spotKey { TranscriptReadingSpots.disappeared(spotKey) }
     }
@@ -778,7 +780,11 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         animating = true
         animationStart = CACurrentMediaTime()
         animationDistance = distance
-        let link = CADisplayLink(target: TranscriptDisplayLinkTarget { [weak self] in self?.animationFrame() }, selector: #selector(TranscriptDisplayLinkTarget.tick))
+        let link = CADisplayLink(target: TranscriptDisplayLinkTarget { [weak self] in
+            guard let self else { return false }
+            self.animationFrame()
+            return true
+        }, selector: #selector(TranscriptDisplayLinkTarget.tick(_:)))
         link.add(to: .main, forMode: .common)
         animation = link
     }
@@ -1128,10 +1134,26 @@ struct TranscriptRowID: Hashable, @unchecked Sendable {
 }
 
 /// A display link holds its target strongly; this breaks the cycle.
-private final class TranscriptDisplayLinkTarget: NSObject {
-    let frame: () -> Void
-    init(_ frame: @escaping () -> Void) { self.frame = frame }
-    @objc func tick() { frame() }
+/// A display link's target. `frame` answers whether its owner is still
+/// there: once it's gone (a conversation closed mid-scroll), the link stops
+/// itself. Left running, it ticked every frame for the rest of the launch,
+/// keeping the phone awake and the app from ever going idle.
+final class TranscriptDisplayLinkTarget: NSObject {
+    let frame: () -> Bool
+    #if DEBUG
+    /// Targets alive, so links alive (a link holds its target until invalidated): `qa-duo/counts`.
+    nonisolated(unsafe) static var live = 0
+    deinit { Self.live -= 1 }
+    #endif
+    init(_ frame: @escaping () -> Bool) {
+        self.frame = frame
+        #if DEBUG
+        Self.live += 1
+        #endif
+    }
+    @objc func tick(_ link: CADisplayLink) {
+        if !frame() { link.invalidate() }
+    }
 }
 
 /// Lays out, then tells the controller, which keeps the view in range.

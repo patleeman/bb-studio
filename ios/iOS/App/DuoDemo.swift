@@ -225,6 +225,7 @@ enum DuoDemo {
             // `?reset` starts over; otherwise the counts since then, as JSON.
             RenderCount.watchMainThread()
             if url.query() == "reset" { RenderCount.reset() }
+            RenderCount.set("transcript.links", TranscriptDisplayLinkTarget.live)
             if let data = try? JSONSerialization.data(withJSONObject: RenderCount.counts, options: .sortedKeys) {
                 window.accessibilityValue = String(data: data, encoding: .utf8)
             }
