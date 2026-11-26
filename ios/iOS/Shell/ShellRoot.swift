@@ -231,12 +231,10 @@ struct ShellPlace: View {
 /// What a thread's screen knows of the Bot it belongs to.
 @MainActor
 enum ShellContext {
-    /// A worker; a conversation of the Bot's; else a side thread (a reply thread or a fork) of one.
+    /// A worker, a reply thread opened from a message, or else a conversation.
     static func kind(_ threadId: String, bot: BotSpace, store: BotSpacesStore) -> BotConversationContext.Kind {
-        guard let view = store.view(for: bot.id) else { return .conversation }
-        if view.workers.contains(where: { $0.threadId == threadId }) { return .worker }
-        if view.conversations.contains(where: { $0.threadId == threadId }) || view.main?.threadId == threadId { return .conversation }
-        return .reply
+        if store.view(for: bot.id)?.workers.contains(where: { $0.threadId == threadId }) == true { return .worker }
+        return Router.shared.replyThreads.contains(threadId) ? .reply : .conversation
     }
 
     static func make(_ threadId: String, kind: BotConversationContext.Kind, bot: BotSpace, store: BotSpacesStore) -> BotConversationContext {

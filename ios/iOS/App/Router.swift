@@ -41,6 +41,8 @@ final class Router: ObservableObject {
     @Published var sheet: Sheet?
     /// Set by `bbstudio://reply/<id>`; that thread focuses its composer.
     @Published var replyThreadId: String?
+    /// Reply threads opened from their conversation's messages: pushed, they say Reply….
+    var replyThreads: Set<String> = []
     /// New conversation over Home, its message prefilled.
     @Published var compose: String?
     /// Studio's kind filter; nil for everything.

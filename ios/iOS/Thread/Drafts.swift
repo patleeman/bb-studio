@@ -10,11 +10,29 @@ enum Drafts {
 
     private static let defaults = UserDefaults.standard
 
+    #if DEBUG
+    /// An offline demo launch (`-qaBotDemo`) starts with none: UI tests share
+    /// the demo's server, and one test's draft would wait in the next's composer.
+    private static let demoFresh: Void = {
+        guard ProcessInfo.processInfo.arguments.contains("-qaBotDemo") else { return }
+        let prefix = ServerScope.key("draft.")
+        for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix(prefix) {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }()
+    #endif
+
     static func load(_ threadId: String, serverURL: URL = ServerScope.selectedURL) -> Draft? {
-        defaults.data(forKey: ServerScope.key("draft.\(threadId)", serverURL: serverURL)).flatMap { try? JSONDecoder().decode(Draft.self, from: $0) }
+        #if DEBUG
+        _ = demoFresh
+        #endif
+        return defaults.data(forKey: ServerScope.key("draft.\(threadId)", serverURL: serverURL)).flatMap { try? JSONDecoder().decode(Draft.self, from: $0) }
     }
 
     static func save(_ threadId: String, text: String, mentions: [Mention], serverURL: URL) {
+        #if DEBUG
+        _ = demoFresh
+        #endif
         let key = ServerScope.key("draft.\(threadId)", serverURL: serverURL)
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             if defaults.object(forKey: key) != nil { defaults.removeObject(forKey: key) }

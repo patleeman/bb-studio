@@ -919,12 +919,12 @@ struct ThreadView: View {
     }
 
     private func replyInThread(_ row: TimelineRow) {
-        if let id = ConversationReplies.existing(sideThreads, messageId: row.id) { return showThread(id) }
+        if let id = ConversationReplies.existing(sideThreads, messageId: row.id) { return showReply(id) }
         let threadId = model.threadId
         Task {
             do {
                 let opened = try await client.threadReply(threadId: threadId, messageId: row.id, sourceSeqEnd: row.sourceSeqEnd)
-                showThread(opened.threadId)
+                showReply(opened.threadId)
                 await loadSideThreads()
                 if opened.created { shell?.refresh() }
             } catch {
@@ -936,6 +936,12 @@ struct ThreadView: View {
     /// A side thread (a reply thread or a fork) opens over the conversation.
     private func showThread(_ id: String) {
         push(.thread(id: id))
+    }
+
+    /// A reply thread: its composer says Reply….
+    private func showReply(_ id: String) {
+        Router.shared.replyThreads.insert(id)
+        showThread(id)
     }
 
     private func forkConversation(_ row: TimelineRow) {
