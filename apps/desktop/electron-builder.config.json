@@ -1,7 +1,8 @@
 {
-  "appId": "dev.bb.desktop",
-  "productName": "bb",
-  "artifactName": "${productName}-${version}-${arch}.${ext}",
+  "appId": "nyc.plee.bbstudio",
+  "productName": "BB Studio",
+  "artifactName": "BB-Studio-${version}-${arch}.${ext}",
+  "extraMetadata": { "name": "bb-studio-desktop" },
   "toolsets": {
     "appimage": "1.0.3"
   },
@@ -33,14 +34,14 @@
     {
       "channel": "latest",
       "provider": "generic",
-      "url": "https://github.com/get-bb/bb/releases/download/desktop-latest/"
+      "url": "https://updates.invalid/bb-studio/desktop-latest/"
     }
   ],
   "mac": {
     "category": "public.app-category.developer-tools",
     "extendInfo": {
-      "NSAppleEventsUsageDescription": "bb lets agents you run control other apps on this Mac, such as Computer Use.",
-      "NSMicrophoneUsageDescription": "bb uses your microphone for voice input and sites you allow in the in-app browser."
+      "NSAppleEventsUsageDescription": "BB Studio lets agents you run control other apps on this Mac, such as Computer Use.",
+      "NSMicrophoneUsageDescription": "BB Studio uses your microphone for voice input and sites you allow in the in-app browser."
     },
     "minimumSystemVersion": "13.0.0",
     "entitlements": "build/entitlements.mac.plist",
