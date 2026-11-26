@@ -850,6 +850,11 @@
       "seam": "agents-md-once",
       "intent": "The provider-literal ratchet counts and allowlists the one \"pi\" literal in apps/server/src/services/threads/agents-md-dedupe.fork.ts (total raised by one), so the guard stays live for every other file.",
       "budget": 9
+    },
+    "apps/server/src/services/plugins/app-bundle.ts": {
+      "seam": "plugin-chunk-names",
+      "intent": "PLUGIN_APP_CHUNK_FILE_PATTERN accepts dots after the first character of a chunk name (chunks/subset-shared.chunk-<hash>.js, as esbuild names a chunk after a dependency's dotted file name), still one path segment under chunks/. Without it a Studio bundle built with the 0.6.204 CLI is refused at load and reload.",
+      "budget": 2
     }
   }
 }
