@@ -451,7 +451,6 @@ struct StudioView: View {
     var selectsDetail = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var app: AppModel
-    @Environment(\.duoLayout) private var duoLayout
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
     @ObservedObject private var store = StudioStore.shared
@@ -592,16 +591,12 @@ struct StudioView: View {
         .safeAreaInset(edge: .bottom) {
             if selecting { selectionBar }
         }
-        .containerBackground(Color(uiColor: duoLayout.twoPages ? .systemGroupedBackground : .systemBackground), for: .navigation)
+        .containerBackground(Color(uiColor: .systemBackground), for: .navigation)
         .environment(\.editMode, $editMode)
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(selecting ? .inline : .automatic)
-        .modifier(DuoSearch(query: $query, unfolded: duoLayout.twoPages, prompt: "Search Studio"))
-        .toolbar(duoLayout.twoPages ? .hidden : .automatic, for: .navigationBar)
-        .safeAreaInset(edge: .top, spacing: 0) { duoHeader }
+        .shellSearchable(text: $query, prompt: "Search Studio")
         // Keep Select reachable, so search results can be acted on together.
         .searchPresentationToolbarBehavior(.avoidHidingContent)
-        .toolbar { toolbarItems }
+        .screenToolbar(title, actions: actions, displayMode: selecting ? .inline : .automatic)
     }
 
     private var title: String {
@@ -609,59 +604,35 @@ struct StudioView: View {
         return showArchived ? "Archived" : "Studio"
     }
 
-    /// Select All, or Deselect All once everything shown is selected.
-    private var selectAllButton: some View {
-        let all = Set(visible.map(\.id))
-        let everything = all.isSubset(of: selection) && !all.isEmpty
-        return Button(everything ? "Deselect All" : "Select All") {
-            selection = all.isSubset(of: selection) ? [] : all
+    /// The bar's items as one list (the iPhone's bar, the Duo's rail): Done and Select All
+    /// while selecting; else New and Select first, then the project filter.
+    private var actions: [ScreenAction] {
+        if selecting {
+            let all = Set(visible.map(\.id))
+            let everything = all.isSubset(of: selection) && !all.isEmpty
+            return [
+                ScreenAction(id: "done", title: "Done", systemImage: "checkmark", run: { endSelecting() }),
+                ScreenAction(id: "selectAll", title: everything ? "Deselect All" : "Select All",
+                             systemImage: everything ? "circle" : "checkmark.circle", run: { selection = everything ? [] : all }),
+            ]
         }
-    }
-
-    /// Beside two pages: the sidebar's header, its actions and search.
-    @ViewBuilder private var duoHeader: some View {
-        if duoLayout.twoPages && selectsDetail {
-            VStack(spacing: 0) {
-                DuoHeader(sidebar: true) {
-                    Text(title).font(.title2.bold())
-                } actions: {
-                    if selecting {
-                        selectAllButton
-                        Button("Done") { endSelecting() }
-                    } else {
-                        if !store.creatable.isEmpty { newMenu }
-                        projectMenu
-                        if store.viaStudio, !visible.isEmpty {
-                            Button("Select") { withAnimation { editMode = .active } }
-                        }
-                    }
-                }
-                SidebarSearchField(prompt: "Search Studio", text: $query)
-            }.background(Color(uiColor: .systemGroupedBackground))
-            .ignoresSafeArea(.container, edges: .trailing)
+        var list: [ScreenAction] = []
+        if !store.creatable.isEmpty {
+            list.append(ScreenAction(id: "new", title: "New", systemImage: "plus", children: store.creatable.map { kind in
+                ScreenAction(id: "new-\(kind.id)", title: "New \(kind.label)", systemImage: StudioKind.of(kind.id).symbol,
+                             run: { Task { await create(kind) } })
+            }))
         }
-    }
-
-    /// On one page, the navigation bar's items.
-    @ToolbarContentBuilder private var toolbarItems: some ToolbarContent {
-        if !duoLayout.twoPages {
-            if selecting {
-                ToolbarItem(placement: .topBarLeading) { selectAllButton }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { endSelecting() }.fontWeight(.semibold)
-                }
-            } else {
-                if !store.creatable.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) { newMenu }
-                }
-                ToolbarItem(placement: .topBarTrailing) { projectMenu }
-                if store.viaStudio, !visible.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Select") { withAnimation { editMode = .active } }
-                    }
-                }
-            }
+        if store.viaStudio, !visible.isEmpty {
+            list.append(ScreenAction(id: "select", title: "Select", systemImage: "checkmark.circle", run: { withAnimation { editMode = .active } }))
         }
+        let choices = [("", "All Projects"), ("none", "No Project")] + projects.map { ($0.id, $0.name) }
+        list.append(ScreenAction(id: "project", title: "Project", systemImage: project.isEmpty ? "folder" : "folder.fill",
+                                 children: choices.map { choice in
+                                     ScreenAction(id: "project-\(choice.0.isEmpty ? "all" : choice.0)", title: choice.1, systemImage: "folder",
+                                                  checked: project == choice.0, run: { project = choice.0 })
+                                 }))
+        return list
     }
 
     // MARK: Pages
@@ -789,7 +760,6 @@ struct StudioView: View {
                 }
             }
         }
-        .modifier(SidebarListMargins(enabled: duoLayout.twoPages && selectsDetail))
         .listSectionSpacing(.compact)
         .overlay {
             if !store.loaded {
@@ -918,49 +888,17 @@ struct StudioView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .foregroundStyle(selected ? Color.white : .primary)
-            // On the grouped sidebar, the secondary background matches the
-            // page in light mode; use the search field's fill there instead.
-            .background(selected ? AnyShapeStyle(Color.accentColor)
-                : duoLayout.twoPages && selectsDetail ? AnyShapeStyle(Color(uiColor: .tertiarySystemFill))
-                : AnyShapeStyle(.background.secondary), in: .capsule)
+            .background(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.background.secondary), in: .capsule)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
         .sensoryFeedback(.selection, trigger: selected)
     }
 
-    private var newMenu: some View {
-        Menu {
-            ForEach(store.creatable, id: \.id) { kind in
-                Button { Task { await create(kind) } } label: {
-                    Label("New \(kind.label)", systemImage: StudioKind.of(kind.id).symbol)
-                }
-            }
-        } label: {
-            Image(systemName: "plus").modifier(DuoHeaderMenuLabel())
-        }
-        .accessibilityLabel("New")
-    }
-
     /// Tags on at least one item, plus the one being filtered by.
     private var usedTags: [StudioTag] {
         let used = Set(store.items.flatMap { $0.tags ?? [] })
         return store.tags.filter { used.contains($0.id) || $0.id == tagFilter }
-    }
-
-    private var projectMenu: some View {
-        Menu {
-            Picker("Project", selection: $project) {
-                Text("All Projects").tag("")
-                Text("No Project").tag("none")
-                ForEach(projects, id: \.id) { project in
-                    Text(project.name).tag(project.id)
-                }
-            }
-        } label: {
-            Image(systemName: project.isEmpty ? "folder" : "folder.fill").modifier(DuoHeaderMenuLabel())
-        }
-        .accessibilityLabel("Project")
     }
 
     private var projects: [(id: String, name: String)] {
@@ -996,7 +934,6 @@ struct StudioView: View {
             }
         }
         .contextMenu { menu(item) }
-        .modifier(SidebarRowContent(enabled: duoLayout.twoPages && selectsDetail))
     }
 
     /// Opens the item the way every Studio row does: pushed on the phone,
@@ -1045,8 +982,7 @@ struct StudioView: View {
         return opener(item, id: "studioStarred") { StudioStarredRow(item: item) }
             .swipeActions(edge: .trailing) { starButton(item) }
             .contextMenu { menu(item) }
-            .modifier(SidebarRowContent(enabled: duoLayout.twoPages && selectsDetail))
-    }
+        }
 
     private func starButton(_ item: StudioItem) -> some View {
         let starred = store.isStarred(item)

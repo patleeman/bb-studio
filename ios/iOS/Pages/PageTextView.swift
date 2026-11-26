@@ -22,6 +22,16 @@ final class PageTextController {
         replace(view.selectedRange, with: string, cursorAtEnd: true)
     }
 
+    /// A block (a callout, a table, an image) on lines of its own, a blank line above and below.
+    func insertBlock(_ block: String) {
+        guard let view else { return }
+        let text = view.text as NSString
+        let at = view.selectedRange.location
+        let before = at == 0 ? "" : at >= 2 && text.substring(with: NSRange(location: at - 2, length: 2)) == "\n\n" ? "" :
+            text.substring(with: NSRange(location: at - 1, length: 1)) == "\n" ? "\n" : "\n\n"
+        replace(view.selectedRange, with: before + block + "\n\n", cursorAtEnd: true)
+    }
+
     fileprivate func replace(_ range: NSRange, with string: String, cursorAtEnd: Bool) {
         guard let view, let start = view.position(from: view.beginningOfDocument, offset: range.location),
               let end = view.position(from: start, offset: range.length),

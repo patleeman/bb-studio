@@ -15,13 +15,34 @@ struct DrawingView: View {
     @State private var pan: CGSize = .zero
     @GestureState private var pinch: CGFloat = 1
     @GestureState private var drag: CGSize = .zero
-    @State private var snapshot: Image?
+    /// The drawing as a PNG, for Share.
+    @State private var snapshotFile: URL?
     @State private var renaming = false
     @State private var newName = ""
     @State private var chatting = false
     @State private var editing = false
     @State private var showingRelated = false
     @State private var openedEmptyEditor = false
+
+    /// Edit and Related first; the rest under ⋯ (the Duo: the rail and its More).
+    private var actions: [ScreenAction] {
+        var list = [
+            ScreenAction(id: "edit", title: "Edit Drawing", systemImage: "pencil.tip.crop.circle", disabled: scene == nil, run: { editing = true }),
+            ScreenAction(id: "related", title: "Related", systemImage: "link", run: { showingRelated = true }),
+        ]
+        if let snapshotFile {
+            list.append(ScreenAction(id: "share", title: "Share", systemImage: "square.and.arrow.up", share: snapshotFile))
+        }
+        list.append(ScreenAction(id: "rename", title: "Rename", systemImage: "pencil", disabled: scene == nil, run: {
+            newName = name
+            renaming = true
+        }))
+        if StudioStore.shared.plugins.contains("studio") {
+            list.append(ScreenAction(id: "chat", title: "Chat About This", systemImage: "bubble.left.and.text.bubble.right",
+                                     disabled: scene == nil, run: { chatting = true }))
+        }
+        return list
+    }
 
     var body: some View {
         Group {
@@ -55,31 +76,9 @@ struct DrawingView: View {
                 ProgressView()
             }
         }
-        .modifier(RegularScrollingSurface())
         .background(Color(white: 0.98).ignoresSafeArea())
         .environment(\.colorScheme, .light)
-        .navigationTitle(name)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            Button { showingRelated = true } label: { Label("Related", systemImage: "link") }
-            Button { editing = true } label: { Image(systemName: "pencil.tip.crop.circle") }
-                .accessibilityLabel("Edit drawing")
-                .disabled(scene == nil)
-            if let snapshot {
-                ShareLink(item: snapshot, preview: SharePreview(name, image: snapshot))
-            }
-            Button {
-                newName = name
-                renaming = true
-            } label: { Image(systemName: "pencil") }
-            .accessibilityLabel("Rename")
-            .disabled(scene == nil)
-            if StudioStore.shared.plugins.contains("studio") {
-                Button { chatting = true } label: { Image(systemName: "bubble.left.and.text.bubble.right") }
-                    .accessibilityLabel("Chat About This")
-                    .disabled(scene == nil)
-            }
-        }
+        .screenToolbar(name, actions: actions)
         .studioChat(isPresented: $chatting, pluginId: "excalidraw", itemId: id, title: name, projectId: nil)
         .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "excalidraw", itemId: id) }
         .sheet(isPresented: $editing, onDismiss: { Task { await refresh() } }) {
@@ -131,14 +130,14 @@ struct DrawingView: View {
                 editing = true
             }
             error = nil
-            snapshot = render(drawing.scene)
+            snapshotFile = render(drawing.scene, name: drawing.name)
         } catch where BBClient.isCancellation(error) {
         } catch {
             if scene == nil { self.error = BBClient.describe(error, server: client.baseURL) }
         }
     }
 
-    private func render(_ scene: DrawingScene) -> Image? {
+    private func render(_ scene: DrawingScene, name: String) -> URL? {
         guard let bounds = scene.bounds else { return nil }
         let width = min(max(bounds.maxX - bounds.minX + 80, 200), 2400)
         let height = min(max(bounds.maxY - bounds.minY + 80, 200), 2400)
@@ -147,7 +146,9 @@ struct DrawingView: View {
             .background(.white)
             .environment(\.colorScheme, .light))
         renderer.scale = 2
-        return renderer.uiImage.map { Image(uiImage: $0) }
+        guard let png = renderer.uiImage?.pngData() else { return nil }
+        let url = FileManager.default.temporaryDirectory.appending(path: "\((name.isEmpty ? "Drawing" : name).replacingOccurrences(of: "/", with: "-")).png")
+        return (try? png.write(to: url)) != nil ? url : nil
     }
 }
 

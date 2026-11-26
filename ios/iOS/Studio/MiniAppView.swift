@@ -31,23 +31,14 @@ struct MiniAppView: View {
                 ProgressView()
             }
         }
-        .modifier(RegularScrollingSurface())
-        .navigationTitle(session?.mini?.displayName ?? "App")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            Menu {
-                Button {
-                    newName = session?.mini?.displayName ?? ""
-                    renaming = true
-                } label: { Label("Rename", systemImage: "pencil") }
-                .disabled(session?.mini == nil)
-                Button { showingWeb = true } label: { Label("Edit on Desktop or BB Web", systemImage: "safari") }
-                Button { showingRelated = true } label: { Label("Related", systemImage: "link") }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-            }
-            .accessibilityLabel("App options")
-        }
+        .screenToolbar(session?.mini?.displayName ?? "App", actions: [
+            ScreenAction(id: "rename", title: "Rename", systemImage: "pencil", disabled: session?.mini == nil, run: {
+                newName = session?.mini?.displayName ?? ""
+                renaming = true
+            }),
+            ScreenAction(id: "related", title: "Related", systemImage: "link", run: { showingRelated = true }),
+            ScreenAction(id: "web", title: "Edit on Desktop or BB Web", systemImage: "safari", run: { showingWeb = true }),
+        ])
         .alert("Rename app", isPresented: $renaming) {
             TextField("Name", text: $newName)
             Button("Cancel", role: .cancel) {}

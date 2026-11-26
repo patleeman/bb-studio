@@ -35,7 +35,7 @@ struct WorkbenchTabBody: View {
         case .diff(let path): WorkbenchDiffTab(path: path, threadId: threadId)
         case .browser(let url): WorkbenchBrowserTab(url: url)
         case .item(let route): WorkbenchItemTab(route: route)
-        case .terminal: NavigationStack { TerminalsView(scope: .thread(threadId), title: tab.title) }
+        case .terminal: WorkbenchItemTab(route: .terminals(scope: .thread(threadId), title: tab.title))
         case .thread(let id, let worker):
             WorkbenchTabCard(title: tab.title, detail: worker ? "A worker's transcript." : "A conversation.",
                              systemImage: "bubble.left.and.text.bubble.right", action: ("Open", { openThread(id) }))
@@ -95,19 +95,34 @@ enum WorkbenchTabKind: Equatable {
     }
 }
 
-/// A Studio item's own screen. These keep their own bar for now (parity.md).
+/// A screen the phone already has (a drawing, an app, an artifact, a
+/// recording, the terminals), shown in the tab without its bar: its own
+/// stack keeps its toolbar from reaching the conversation's bar, and the bar
+/// is hidden. Its screen actions reach the shell's More, with Open Full
+/// Screen, which pushes it as it is everywhere else.
 private struct WorkbenchItemTab: View {
     let route: Route
+    @EnvironmentObject private var app: AppModel
 
     var body: some View {
         NavigationStack {
-            switch route {
-            case .drawing(let id): DrawingView(id: id)
-            case .mini(let id): MiniAppView(id: id)
-            case .artifact(let id): ArtifactView(id: id)
-            case .recording(let id): RecordingDetailView(id: id)
-            default: EmptyView()
-            }
+            screen.toolbar(.hidden, for: .navigationBar)
+        }
+        // The screen's own actions come up from inside; Open Full Screen joins them.
+        .transformPreference(ScreenActionsKey.self) { actions in
+            actions.append(ScreenAction(id: "fullScreen", title: "Open Full Screen", systemImage: "arrow.up.left.and.arrow.down.right",
+                                        run: { app.push(route) }))
+        }
+    }
+
+    @ViewBuilder private var screen: some View {
+        switch route {
+        case .drawing(let id): DrawingView(id: id)
+        case .mini(let id): MiniAppView(id: id)
+        case .artifact(let id): ArtifactView(id: id)
+        case .recording(let id): RecordingDetailView(id: id)
+        case .terminals(let scope, let title): TerminalsView(scope: scope, title: title)
+        default: EmptyView()
         }
     }
 }
