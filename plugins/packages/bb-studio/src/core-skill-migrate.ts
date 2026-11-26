@@ -17,7 +17,7 @@ export interface CoreMigrationDeps {
   pageMarkdown(pageId: string): string | null;
 }
 
-export type CoreMigration = { state: "done" } | { state: "kept" | "moved" | "created"; skill: string; sourcePageId: string | null; chars: number };
+export type CoreMigration = { state: "done" } | { state: "moved" | "created"; skill: string; sourcePageId: string | null; chars: number };
 
 const hasTable = (db: Database.Database, name: string) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
 
@@ -42,11 +42,8 @@ export function migrateCoreSkill(deps: CoreMigrationDeps, botId: string, now = D
   if (deps.db.prepare("SELECT 1 FROM bot_core_skills WHERE bot_id = ?").get(botId)) return { state: "done" };
   const mark = (skill: string, sourcePageId: string | null, chars: number) =>
     deps.db.prepare("INSERT OR IGNORE INTO bot_core_skills (bot_id, skill_name, source_page_id, chars, migrated_at) VALUES (?, ?, ?, ?, ?)").run(botId, skill, sourcePageId, chars, now);
-  const already = deps.skills.alwaysOn(botId)[0];
-  if (already) {
-    mark(already.name, null, alwaysOnChars(already.body));
-    return { state: "kept", skill: already.name, sourcePageId: null, chars: alwaysOnChars(already.body) };
-  }
+  // Always a copy, even when the Bot already has an always-on skill (made by a tool or brought over before this
+  // ran): the profile page's text is the user's, and the marker (which lets the old tables go) follows the copy.
   const page = sourcePage(deps, botId);
   const text = page?.markdown.trim() ? `${page.markdown.trim()}\n` : CORE_TEMPLATE;
   const taken = (name: string) => !!deps.skills.get(botId, name);

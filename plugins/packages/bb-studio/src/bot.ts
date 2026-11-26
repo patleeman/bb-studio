@@ -1203,6 +1203,7 @@ export class Bots {
 
   setSkillAlwaysOn(name: string, on: boolean, botId?: string): boolean {
     const row = this.row(botId);
+    if (row && on) this.ensureCore(row.id);
     return row ? this.skillStore.setAlwaysOn(row.id, name, on) : false;
   }
 
@@ -1276,6 +1277,8 @@ export class Bots {
   /** Adds or replaces one of a Bot's own skills. Only its thread loads them. */
   writeSkill(input: { name: string; description: string; body: string; alwaysOn?: boolean; ifBody?: string | null }, botId?: string): BotSkillView {
     const id = this.need(botId).id;
+    // An always-on write before the Bot's core profile was moved: move it first, so the page's text is never skipped.
+    if (input.alwaysOn) this.ensureCore(id);
     const view = this.skillStore.write(id, input);
     // Always on means in every prompt: pinned, so the curator never retires it.
     if (input.alwaysOn) { this.skillStore.setAlwaysOn(id, input.name, true); return this.skillStore.list(id).find((skill) => skill.name === input.name) ?? view; }

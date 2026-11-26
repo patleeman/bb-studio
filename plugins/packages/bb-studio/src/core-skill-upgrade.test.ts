@@ -3,7 +3,7 @@
 // this Studio. Nothing of the old data may be lost: the records and the page
 // stay as they were, and the page's text moves whole into the always-on skill.
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { Bots } from "./bot";
 import { ALWAYS_ON_CAP } from "./core-skill";
 import { MIGRATIONS } from "./migrations";
@@ -107,4 +107,43 @@ it("holds the drop back when a Bot's copy fails, and doesn't wait on an external
   // An external Bot keeps its own memory and gets no core skill; it never holds the drop back.
   old.db.prepare("UPDATE bots SET provider_id = 'hermes' WHERE id = 'bot_main'").run();
   expect(failing.retireMemoryTables()).toMatchObject({ dropped: expect.arrayContaining(["memory_records"]) });
+});
+
+describe("the profile page is copied before anything marks the Bot", () => {
+  const botsFor = (old: ReturnType<typeof oldInstall>) => new Bots({ db: old.db, sdk: old.bb.sdk, leads: null as never, changed: () => {}, presenceChanged: () => {}, memory: { exists: (id: string) => !!old.pages.store.meta(id), markdown: (id: string) => (old.pages.store.meta(id) ? readMarkdown(old.pages.hub.open(id).doc) : null) } } as never);
+
+  it("copies it even when the Bot already has an always-on skill (brought over, or made by a tool)", () => {
+    const old = oldInstall();
+    old.bb.storage.migrate(old.db, MIGRATIONS);
+    const page = readMarkdown(old.pages.hub.open(old.profile).doc);
+    // As transfer-bot's bot_skills import writes it: rows straight into the table, no marker, no copy.
+    old.db.prepare("INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at, always_on) VALUES ('bot_main', 'core-profile', 'Brought over', '## Preferences\n\n- Brought over.\n', 1, 1, 1)").run();
+    const bots = botsFor(old);
+    expect(bots.ensureCore("bot_main")).toMatchObject({ state: "moved", skill: "core-profile-moved", sourcePageId: old.profile });
+    expect(bots.skill("core-profile-moved", "bot_main")!.body.trim()).toBe(page.trim());
+    expect(bots.skill("core-profile", "bot_main")!.body).toContain("Brought over");
+    expect(bots.coreSkill("bot_main")).toMatchObject({ name: "core-profile-moved" });
+  });
+
+  it("an always-on write before the move moves the page first", () => {
+    const old = oldInstall();
+    old.bb.storage.migrate(old.db, MIGRATIONS);
+    const page = readMarkdown(old.pages.hub.open(old.profile).doc);
+    const bots = botsFor(old);
+    bots.writeSkill({ name: "travel-rules", description: "Always on", body: "## Preferences\n\n- Aisle seats.\n", alwaysOn: true }, "bot_main");
+    expect(old.db.prepare("SELECT skill_name, source_page_id FROM bot_core_skills WHERE bot_id = 'bot_main'").get()).toEqual({ skill_name: "core-profile", source_page_id: old.profile });
+    expect(bots.skill("core-profile", "bot_main")!.body.trim()).toBe(page.trim());
+    expect(bots.coreSkill("bot_main")).toMatchObject({ name: "core-profile" });
+  });
+
+  it("turning a skill always on before the move moves the page first", () => {
+    const old = oldInstall();
+    old.bb.storage.migrate(old.db, MIGRATIONS);
+    const page = readMarkdown(old.pages.hub.open(old.profile).doc);
+    const bots = botsFor(old);
+    old.db.prepare("INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at) VALUES ('bot_main', 'travel-rules', 'On demand', 'b', 1, 1)").run();
+    expect(bots.setSkillAlwaysOn("travel-rules", true, "bot_main")).toBe(true);
+    expect(bots.skill("core-profile", "bot_main")!.body.trim()).toBe(page.trim());
+    expect(old.db.prepare("SELECT source_page_id FROM bot_core_skills WHERE bot_id = 'bot_main'").get()).toEqual({ source_page_id: old.profile });
+  });
 });
