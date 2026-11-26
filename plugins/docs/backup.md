@@ -30,7 +30,7 @@ use the CLI.
 | `artifacts/` | Studio (built-in Artifacts) | Each artifact with every version's bytes. Studio writes this section itself, under the old plugin's id, so backups from before the merge restore into it. |
 | `design/` | Studio (built-in designs) | Each design with its rounds, screens (as HTML files) and comments. Studio writes this section itself, under the old Design plugin's id, so backups from before the merge restore into it. Saved styles aren't included. |
 | `dashboards/` | Studio (built-in dashboards) | Each dashboard's widgets, layouts and pushed data, and the custom widget library. Fetched URL and script data is fetched again; script approvals are never restored, so a restored script waits for the user's approval. |
-| `studio/` | Studio | Tags and which items have them, project leads (the personal project's lead is the user's Bot) and their Heartbeat settings, the Bot (name, avatar, state, Memory page id) and its own skills, including state, pinning, last use and saved lint warnings (restored only when this BB has no Bot), item links, item chats, comments and activity. A `versions.json` or `views.json` from an older backup is ignored. |
+| `studio/` | Studio | Tags and which items have them, project leads (the personal project's lead is the user's Bot) and their Heartbeat settings, the Bot (name, avatar, state, old Memory page id) and its own skills, including state, pinning, last use, the always-on flag and saved lint warnings (restored only when this BB has no Bot), item links, item chats, comments and activity. A `versions.json` or `views.json` from an older backup is ignored. |
 
 ## What isn't
 

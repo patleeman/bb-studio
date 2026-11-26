@@ -3095,7 +3095,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     schedule; have several (Morning brief 8:00, Evening wrap-up 18:00). The
     Bot's original check-in (its project heartbeat) is listed first as
     **Check-in**, schedule unchanged; its instruction stays
-    the Memory page's `## Check-in` section, and it takes one repeating
+    the `## Check-in` section of the Bot's always-on core skill, and it takes one repeating
     cron. Turning it off keeps its schedule.
   - **Reminder**: one message to the Bot's thread at a time; done once it
     ran. **Run now** on a reminder does not use it up.
