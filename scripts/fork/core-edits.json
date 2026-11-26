@@ -845,6 +845,11 @@
       "seam": "sdk-tables",
       "intent": "PLUGIN_APP_COMPONENT_FIELDS spreads FORK_COMPONENT_FIELDS (plugin-app-component-fields.fork.ts, imported at the top of the file) first, so every fork slot kind lists its component fields for lazy loading and the component checks.",
       "budget": 2
+    },
+    "scripts/provider-literal-baseline.json": {
+      "seam": "agents-md-once",
+      "intent": "The provider-literal ratchet counts and allowlists the one \"pi\" literal in apps/server/src/services/threads/agents-md-dedupe.fork.ts (total raised by one), so the guard stays live for every other file.",
+      "budget": 9
     }
   }
 }

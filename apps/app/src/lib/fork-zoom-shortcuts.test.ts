@@ -1,8 +1,7 @@
 // Studio's semantic-zoom commands (⌃⌘− / ⌃⌘=, registered through
 // app.commands) against bb's own shortcut matcher, with the key and code a Mac
-// keyboard really reports. Option would turn "-" into "–" and "=" into "≠",
-// which the matcher can't map back (only letters and digits come from the
-// code), so the commands use Control instead.
+// keyboard really reports. bb matches by physical key, so Option's "–" and
+// "≠" still reach a Minus or Equal shortcut.
 import { describe, expect, it } from "vitest";
 import { matchesAppShortcut, type AppShortcut } from "@bb/domain";
 
@@ -35,11 +34,11 @@ describe("the zoom commands' shortcuts", () => {
     expect(matchesAppShortcut(press("=", "Equal", { meta: true }), ZOOM_IN, true)).toBe(false);
   });
 
-  it("would not match with Option: a Mac reports – and ≠", () => {
+  it("match by physical key with Option, though a Mac reports – and ≠", () => {
     const optionOut = shortcut("-", { mod: true, alt: true });
     const optionIn = shortcut("=", { mod: true, alt: true });
-    expect(matchesAppShortcut(press("–", "Minus", { meta: true, alt: true }), optionOut, true)).toBe(false);
-    expect(matchesAppShortcut(press("≠", "Equal", { meta: true, alt: true }), optionIn, true)).toBe(false);
+    expect(matchesAppShortcut(press("–", "Minus", { meta: true, alt: true }), optionOut, true)).toBe(true);
+    expect(matchesAppShortcut(press("≠", "Equal", { meta: true, alt: true }), optionIn, true)).toBe(true);
   });
 
   it("are Ctrl+− and Ctrl+= elsewhere", () => {
