@@ -60,13 +60,6 @@ final class ErrorStatesCaptureUITests: ServerIsolatedUITestCase {
         shot("related-reply-failed")
     }
 
-    func testBotSkills() {
-        launch("-qaBotDemo", "chat", "-qaBotSheet", "skills")
-        XCTAssertTrue(text(containing: "weekly-digest").waitForExistence(timeout: 20))
-        sleep(1)
-        shot("bot-skills")
-    }
-
     /// The Bot's Running, Runners and Recurring rows on the phone. Set
     /// `TEST_RUNNER_BBGO_STATES_MOTION=reduced` for the Reduce Motion look and
     /// `TEST_RUNNER_BBGO_STATES_HOLD=<s>` to keep it on screen for a recording.

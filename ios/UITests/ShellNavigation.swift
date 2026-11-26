@@ -14,7 +14,7 @@ extension XCUIApplication {
     /// Home, from wherever: Back on the iPhone, Home in the Duo's rail.
     func goHome(file: StaticString = #filePath, line: UInt = #line) {
         for _ in 0..<4 where !(home.exists && home.isHittable) {
-            let rail = buttons["rail-home"]
+            let rail = buttons.matching(NSPredicate(format: "identifier IN %@", ["rail-home", "rail-back"])).firstMatch
             if rail.exists, rail.isHittable { rail.tap() } else if navigationBars.buttons.firstMatch.exists {
                 navigationBars.buttons.element(boundBy: 0).tap()
             }
@@ -29,6 +29,8 @@ extension XCUIApplication {
         goHome(file: file, line: line)
         guard place != "conversations" else { return }
         let row = botMenuItem(place)
+        // Archive is Home's last row: scroll to it.
+        for _ in 0..<4 where place == "archive" && !(row.exists && row.isHittable) { home.swipeUp() }
         if !row.exists { openBotMenu(file: file, line: line) }
         XCTAssertTrue(row.waitForExistence(timeout: 10), "\(place) on Home", file: file, line: line)
         row.tap()
@@ -62,7 +64,7 @@ extension XCUIApplication {
     /// Back from a pushed screen: the bar's Back, or Home in the Duo's rail.
     func goBack(timeout: TimeInterval = 20, file: StaticString = #filePath, line: UInt = #line) {
         let bar = navigationBars.firstMatch
-        let rail = buttons["rail-home"]
+        let rail = buttons.matching(NSPredicate(format: "identifier IN %@", ["rail-back", "rail-home"])).firstMatch
         let shown = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             bar.buttons.firstMatch.exists || (rail.exists && rail.isHittable)
         }, object: nil)

@@ -5,7 +5,7 @@ enum LinkKind: String, CaseIterable, Hashable {
     case page, whiteboard, design, app, dashboard, artifact, recording
     case board
     case memory, library, automations, todos, archive
-    case automation, todo, record
+    case automation, todo
     case vscode
     case file, diff, browser, terminal, workflow
 
@@ -16,7 +16,7 @@ enum LinkKind: String, CaseIterable, Hashable {
         case .conversation, .worker, .board: .thread
         case .page, .whiteboard, .design, .app, .dashboard, .artifact, .recording: .item
         case .bot, .memory, .library, .automations, .todos, .archive: .bot
-        case .automation, .todo, .record: .entry
+        case .automation, .todo: .entry
         case .workflow: .run
         case .vscode, .terminal: .none
         case .file, .diff: .path
@@ -28,7 +28,6 @@ enum LinkKind: String, CaseIterable, Hashable {
         switch self {
         case .app: "App"
         case .board: "Visual Chat board"
-        case .record: "Memory record"
         case .vscode: "VS Code"
         case .workflow: "Workflow run"
         case .browser: "Browser"
@@ -58,7 +57,6 @@ enum LinkDestination: Equatable {
     case bot(String)
     case botPage(BotPage, botId: String?)
     case route(Route)
-    case record(String)
     case automation(String)
     case safari(URL)
     case threadFiles
@@ -126,6 +124,8 @@ enum Links {
         let tail = parts.count > 1 ? String(parts[1]) : ""
         // `bb://strands`: the Strands screen (Studio's link kind is still `todos`).
         if first == "strands" { return ref(.todos, tail.removingPercentEncoding) }
+        // Memory records are retired: an old record link opens Memory.
+        if first == "record" { return ref(.memory, nil) }
         if let kind = LinkKind(rawValue: first) {
             if tail.isEmpty { return ref(kind, nil) }
             guard let id = tail.removingPercentEncoding else { return nil }
@@ -183,7 +183,9 @@ enum Links {
         switch first {
         case "memory": return extra ? nil : LinkRef(kind: .memory, id: id)
         case "conversations": return extra ? nil : LinkRef(kind: .archive, id: id)
-        case "automation", "todo", "record":
+        // Memory records are retired: an old record link opens Memory.
+        case "record": return LinkRef(kind: .memory, id: nil)
+        case "automation", "todo":
             guard let id, !extra, let kind = LinkKind(rawValue: first) else { return nil }
             return LinkRef(kind: kind, id: id)
         case "bot":
@@ -200,8 +202,6 @@ enum Links {
 
     static func needsResolution(_ ref: LinkRef) -> Bool {
         guard ref.kind.ref != .none, ref.kind != .browser else { return false }
-        // Memory records are retired: an old record link just opens Memory, with nothing to look up.
-        if ref.kind == .record { return false }
         return ref.id != nil
     }
 
@@ -218,7 +218,6 @@ enum Links {
         case .archive: return .botPage(.archive, botId: id)
         case .automation: return id.map(LinkDestination.automation) ?? .botPage(.automations, botId: nil)
         case .todo: return .elsewhere("To-dos open in BB Studio on your Mac.")
-        case .record: return .botPage(.memory, botId: nil)
         case .page: return id.map { .route(.page(id: $0)) } ?? .elsewhere("That link names no page.")
         case .whiteboard: return id.map { .route(.drawing(id: $0)) } ?? .elsewhere("That link names no whiteboard.")
         case .design: return id.map { .route(.design(id: $0)) } ?? .elsewhere("That link names no design.")

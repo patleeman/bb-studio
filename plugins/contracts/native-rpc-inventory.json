@@ -286,42 +286,6 @@
     {
       "file": "ios/Shared/Bot.swift",
       "plugin": "studio",
-      "method": "bot_memory",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/Shared/Bot.swift",
-      "plugin": "studio",
-      "method": "bot_skills",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/Shared/Bot.swift",
-      "plugin": "studio",
-      "method": "bot_learning",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/Shared/Bot.swift",
-      "plugin": "studio",
-      "method": "bot_learning_set",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/Shared/Bot.swift",
-      "plugin": "studio",
-      "method": "bot_skill_pin",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/Shared/Bot.swift",
-      "plugin": "studio",
-      "method": "bot_skill_restore",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/Shared/Bot.swift",
-      "plugin": "studio",
       "method": "bot_set_thread",
       "coverage": "generated method"
     },
@@ -910,30 +874,6 @@
     {
       "file": "ios/iOS/Bot/BotPagesModel.swift",
       "plugin": "studio",
-      "method": "memory.overview",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Bot/BotPagesModel.swift",
-      "plugin": "studio",
-      "method": "memory.list",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Bot/BotPagesModel.swift",
-      "plugin": "studio",
-      "method": "memory.get",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Bot/BotPagesModel.swift",
-      "plugin": "studio",
-      "method": "memory.profile",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Bot/BotPagesModel.swift",
-      "plugin": "studio",
       "method": "bot_library",
       "coverage": "generated method"
     },
@@ -953,6 +893,72 @@
       "file": "ios/iOS/Bot/BotPagesModel.swift",
       "plugin": "studio",
       "method": "bot_reopen",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/MemoryClient.swift",
+      "plugin": "studio",
+      "method": "bot_core",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/MemoryClient.swift",
+      "plugin": "studio",
+      "method": "bot_skills",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/MemoryClient.swift",
+      "plugin": "studio",
+      "method": "bot_skill_write",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/MemoryClient.swift",
+      "plugin": "studio",
+      "method": "bot_skill_history",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/MemoryClient.swift",
+      "plugin": "studio",
+      "method": "bot_skill_revert",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/MemoryClient.swift",
+      "plugin": "studio",
+      "method": "bot_learning",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/MemoryClient.swift",
+      "plugin": "studio",
+      "method": "bot_learning_set",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/MemoryClient.swift",
+      "plugin": "studio",
+      "method": "bot_learning_review",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/MemoryClient.swift",
+      "plugin": "studio",
+      "method": "bot_summaries",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/MemoryClient.swift",
+      "plugin": "studio",
+      "method": "bot_conversations_all",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/MemoryClient.swift",
+      "plugin": "studio",
+      "method": "bot_conversations_search",
       "coverage": "generated method"
     },
     {

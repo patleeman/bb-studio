@@ -21,7 +21,6 @@ enum Route: Hashable {
     /// Visual Chat (the studio-visual-chat plugin): its chats, and one chat (nil: a new one).
     case visualChats
     case visualChat(threadId: String?)
-    case memoryRecord(id: String)
     /// A Bot conversation, over Home (in Chat or its Workbench).
     case conversation(id: String)
     /// One of the Bot's places: Memory, Library, Schedules, Archive.
@@ -302,9 +301,6 @@ final class AppModel: ObservableObject {
             open(.place(page, botId: botId))
         case .automation:
             open(.place(.automations, botId: nil))
-        case .record:
-            // Memory records are retired (Links.destination sends old record links to Memory); kept for older callers.
-            open(.place(.memory, botId: nil))
         case .route(let route):
             if let push { push(route) } else { open(.route(route)) }
         case .safari(let url):

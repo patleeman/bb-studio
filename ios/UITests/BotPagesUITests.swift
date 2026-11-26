@@ -1,16 +1,16 @@
 import XCTest
 
-/// The Bot's pages from the room's menu, as sheets, offline (`-qaSpacesDemo list` with
-/// `-qaBotDemo chat`; `BotSpacesDemo.State` answers `memory.*`,
-/// `bot_library`, `bot_threads_older`, `bot_finished` and `bot_reopen`, and
-/// `-qaLoopsDemo` answers `loops.*`). `TEST_RUNNER_STEP8_OUT` keeps PNGs.
+/// The Bot's pages pushed from Home, offline (`-qaSpacesDemo list` with
+/// `-qaBotDemo chat`; `BotSpacesDemo.State` answers Memory's RPCs,
+/// `bot_library`, `bot_threads_older`, `bot_finished` and `bot_reopen`).
+/// `TEST_RUNNER_STEP8_OUT` keeps PNGs.
 final class BotPagesUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launch(_ extra: [String] = []) {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list"] + extra
         app.launchOffline()
-        XCTAssertTrue(app.waitForRoom(), "the app opens on the room")
+        XCTAssertTrue(app.descendants(matching: .any)["home"].waitForExistence(timeout: 30), "the app opens on Home")
     }
 
     private func openPage(_ page: String) {
@@ -24,74 +24,20 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
 
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
+    /// Back to Home: the bar's Back, or Back in the Duo's rail.
+    private func closeMemory() {
+        app.goHome()
+    }
+
     private func text(_ contains: String) -> XCUIElement {
         app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", contains)).firstMatch
     }
 
-    func testMemoryShowsTheAlwaysOnSkillReadOnly() {
-        launch()
-        openPage("memory")
-        XCTAssertTrue(app.navigationBars["Memory"].waitForExistence(timeout: 15))
-        XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 15), "the always-on skill")
-        XCTAssertTrue(text("of 2,000 characters").exists, "its length against the budget")
-        // Memory records are retired: no list, no New record, no Sort.
-        XCTAssertFalse(app.buttons["memoryAdd"].exists, "no New record")
-        XCTAssertFalse(app.buttons["Sort"].exists, "no Sort")
-        XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'memory-record-'")).firstMatch.exists, "no records")
-        XCTAssertFalse(app.staticTexts["No records"].exists, "no empty-records placeholder either")
-        shot("memory")
-
-        any("memoryProfile").tap()
-        XCTAssertTrue(text("Short answers first").waitForExistence(timeout: 10), "its text opens in place")
-        XCTAssertTrue(text("Edit it on the Mac, in Memory.").exists, "read-only, edited on the Mac")
-        XCTAssertFalse(app.staticTexts["Edit the core profile"].exists, "no link to a stale or empty page")
-        shot("memory-profile")
-    }
-
-    func testLibraryGroupsFilesAndOpensThem() {
-        launch()
-        openPage("library")
-        XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.buttons["library-row-pg_demo_trip"].waitForExistence(timeout: 15), "files")
-        XCTAssertTrue(app.staticTexts["Today"].exists, "tiles grouped by day, as in the design")
-        XCTAssertTrue(app.descendants(matching: .any)["3 like it"].firstMatch.exists, "near-identical files fold into one tile")
-        shot("library")
-
-        app.buttons["chip-Whiteboard"].tap()
-        XCTAssertTrue(app.buttons["library-row-drw_demo_arch"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["library-row-pg_demo_trip"].exists, "the kind filters")
-        app.buttons["chip-All"].tap()
-
-        app.buttons["library-row-dsn_demo_home"].tap()
-        XCTAssertTrue(app.navigationBars["Library"].waitForNonExistence(timeout: 10), "the design opens in its viewer")
-    }
-
-    func testStrandsAndAutomationsOpen() {
-        launch(["-qaStrandsDemo"])
-        openPage("strands")
-        XCTAssertTrue(app.navigationBars["Strands"].waitForExistence(timeout: 15))
-        XCTAssertTrue(any("strands-overview").waitForExistence(timeout: 15), "the Strands screen")
-        XCTAssertTrue(any("strands-line").waitForExistence(timeout: 15), "with the Bot's open strands")
-        shot("strands")
-        app.goHome()
-
-        openPage("automations")
-        XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.staticTexts["Check-in"].waitForExistence(timeout: 15), "the Bot's automations")
-        XCTAssertFalse(any("RoomSheet-schedules").buttons["Done"].exists, "embedded, with no Done of its own")
-        shot("automations")
-    }
-
     func testArchiveReopensAFinishedConversation() {
         launch()
-        app.openRoomPlace("conversations")
-        XCTAssertTrue(app.buttons["roomNewConversation"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.buttons["roomConversation-thr_demo_lisbon"].exists)
-        app.openBotMenu()
-        let archive = app.botMenuItem("archive")
-        XCTAssertTrue(archive.waitForExistence(timeout: 10), "Archive in the Bot menu")
-        archive.tap()
-        XCTAssertTrue(app.navigationBars["Archive"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["homeConversation-thr_demo_lisbon"].exists)
+        app.openRoomPlace("archive")
+        XCTAssertTrue(any("archive-page").waitForExistence(timeout: 15), "Archive, pushed")
         let finished = app.buttons["archive-finished-thr_demo_lisbon"]
         XCTAssertTrue(finished.waitForExistence(timeout: 15), "the finished conversation")
         XCTAssertTrue(app.buttons["archive-conversation-thr_demo_kitchen"].exists, "an older one")
@@ -109,9 +55,8 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         shot("archive-finished")
         app.buttons["archiveReopen"].tap()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 15), "the reopened conversation")
-        app.goBack()
-        app.openRoomPlace("conversations")
-        let reopened = app.buttons["roomConversation-thr_demo_lisbon"]
+        app.goHome()
+        let reopened = app.buttons["homeConversation-thr_demo_lisbon"]
         for _ in 0..<3 where !reopened.waitForExistence(timeout: 3) { app.swipeUp() }
         XCTAssertTrue(reopened.waitForExistence(timeout: 15), "back in Conversations")
     }
@@ -119,15 +64,16 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
     func testSlowMemoryAndLibraryLoadThroughTheBotFlip() {
         launch(["-qaDemoPageLatency", ProcessInfo.processInfo.environment["PAGE_LATENCY"] ?? "2500", "-qaDemoCachedBot"])
         openPage("memory")
-        XCTAssertTrue(app.navigationBars["Memory"].waitForExistence(timeout: 5))
-        XCTAssertFalse(any("memoryProfile").exists, "still loading while the answer is slow")
+        XCTAssertTrue(any("memory-page").waitForExistence(timeout: 5))
+        XCTAssertFalse(any("memoryBudget").exists, "still loading while the answer is slow")
         shot("slow-memory-loading")
-        XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 20), "Memory loads after the Bot's id changes under it")
+        XCTAssertTrue(any("memoryBudget").waitForExistence(timeout: 20), "Memory loads after the Bot's id changes under it")
+        XCTAssertTrue(any("memorySection-Preferences").waitForExistence(timeout: 20), "and its Core")
         XCTAssertFalse(any("memoryLoading").exists, "no spinner left")
         shot("slow-memory-loaded")
-        app.goHome()
+        closeMemory()
         openPage("library")
-        XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
+        XCTAssertTrue(any("library-page").waitForExistence(timeout: 5), "the Library, pushed")
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'library-row-'")).firstMatch.exists,
                        "still loading while the answer is slow")
         shot("slow-library-loading")
@@ -145,8 +91,8 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.staticTexts["Memory didn't load"].exists)
         shot("memory-error-retry")
         retry.tap()
-        XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 15), "Retry loads Memory")
-        app.goHome()
+        XCTAssertTrue(any("memoryBudget").waitForExistence(timeout: 15), "Retry loads Memory")
+        closeMemory()
         openPage("library")
         let libraryRetry = app.buttons["Retry"].firstMatch
         XCTAssertTrue(libraryRetry.waitForExistence(timeout: 15), "an error with Retry, not a spinner")

@@ -97,7 +97,7 @@ enum BotSpacesDemo {
         }
 
         static func page(_ path: String) -> String? {
-            if path.contains("/rpc/memory.") { return "memory" }
+            if MemoryDemo.methods.contains(where: { path.hasSuffix("/rpc/\($0)") }) { return "memory" }
             if path.hasSuffix("/rpc/bot_library") { return "library" }
             if path.hasSuffix("/rpc/bot_threads_older") { return "archive" }
             return nil
@@ -207,7 +207,15 @@ enum BotSpacesDemo {
             ])
             conversations["bot_juniper", default: []].append(
                 Conversation(id: "thr_demo_lisbon", title: "Lisbon trip planning", at: now - 172_800_000, latest: "Booked the Alfama flat"))
-            finishedAt["thr_demo_lisbon"] = (now - 86_400_000, "Booked the Alfama flat for 14–18 Nov and the 09:40 flight. Saved the plan to memory.")
+            finishedAt["thr_demo_lisbon"] = (now - 86_400_000, """
+                **Decisions**
+                - Booked the Alfama flat for 14–18 Nov.
+                - Took the 09:40 flight out.
+                **Left open**
+                - Dinner on the last night.
+                **Made**
+                - The Lisbon itinerary page.
+                """)
             threads["thr_demo_lisbon"] = Thread(title: "Lisbon trip planning", rows: [
                 Self.row("lis-u1", "user", "Plan the Lisbon trip.", now - 180_000_000, seq: 1),
                 Self.row("lis-a1", "assistant", "Booked the Alfama flat for 14–18 Nov.", now - 172_800_000, seq: 2),
@@ -578,26 +586,6 @@ enum BotSpacesDemo {
                     }
                     return ok(["approval": approvalView(decision == "deny" ? "denied" : "approved")])
                 }
-            // Studio retired memory records: its memory RPC (src/memory/register.ts) answers from the Bot's always-on skill,
-            // lists no records and refuses writes. The demo answers the same way.
-            case "memory.overview":
-                return ok([
-                    "bot": ["id": "bot_juniper", "name": "Juniper"],
-                    "profile": ["pageId": "", "title": "Always on", "updatedAt": Self.now - 3_600_000,
-                                "chars": Self.profile.count, "cap": 2000, "over": false],
-                    "split": ["state": "none", "legacyPageId": NSNull(), "legacyTitle": NSNull(), "splitAt": NSNull()],
-                    "counts": ["current": 0, "replaced": 0, "archived": 0],
-                    "topics": [] as [Any],
-                ] as [String: Any])
-            case "memory.profile":
-                return ok(["profile": ["pageId": "", "title": "Always on", "updatedAt": Self.now - 3_600_000,
-                                       "chars": Self.profile.count, "cap": 2000, "over": false, "markdown": Self.profile] as [String: Any]])
-            case "memory.list":
-                return ok(["records": [] as [Any], "total": 0])
-            case "memory.get":
-                return ok(["record": NSNull()])
-            case "memory.add", "memory.update", "memory.archive":
-                return (400, Data(#"{"ok":false,"error":{"message":"Memory records are retired. Standing rules go in the Bot's always-on skill (Memory → Core), procedures in a skill, and what happened stays in the conversation history."}}"#.utf8))
             case "bot_library":
                 return ok(["botId": "bot_juniper", "items": libraryJSON()])
             case "bot_threads_older":
@@ -646,9 +634,6 @@ enum BotSpacesDemo {
                         if BurstDemo.enabled, id == BurstDemo.threadId { return ok(["found": true, "title": "Busy thread", "spec": NSNull()]) }
                         let title = threads[id]?.title ?? conversations.values.flatMap { $0 }.first { $0.id == id }?.title
                         return ok(["found": title != nil, "title": title ?? NSNull(), "spec": NSNull()])
-                    case "record":
-                        // Memory records are retired: none resolves.
-                        return ok(["found": false, "title": NSNull(), "spec": NSNull()])
                     default:
                         return ok(["found": true, "title": NSNull(), "spec": NSNull()])
                     }
@@ -663,8 +648,20 @@ enum BotSpacesDemo {
                 case "bot_research": return ok(["bot": ["defaultModel": NSNull()]])
                 default: return ok(["bot": ["defaultModel": ["providerId": "claude-code", "model": "claude-opus-5-5", "reasoningLevel": "high"]]])
                 }
+            case _ where MemoryDemo.methods.contains(name):
+                return MemoryDemo.shared.respond(name, input, history: lock.withLock { memoryHistory() })
             default:
                 return nil
+            }
+        }
+
+        /// The Bot's conversations as Memory's History lists them; under the lock.
+        private func memoryHistory() -> [MemoryDemo.Conversation] {
+            (conversations["bot_juniper"] ?? []).filter { !gone.contains($0.id) }.map { conversation in
+                let done = finished.contains(conversation.id) ? finishedAt[conversation.id] : nil
+                let text = (threads[conversation.id]?.rows ?? []).compactMap { $0["text"] as? String }
+                return MemoryDemo.Conversation(id: conversation.id, title: conversation.title, main: conversation.main, at: conversation.at,
+                                               latest: conversation.latest, archivedAt: done?.at, summary: done?.summary, messages: text)
             }
         }
 
@@ -738,14 +735,6 @@ enum BotSpacesDemo {
                 return Thread(title: worker.title, rows: rows)
             }
         }
-
-        static let profile = """
-            ## Preferences
-            - Short answers first, then detail on request.
-            - Ask before pushing or sending anything outside.
-            ## Check-in
-            - Anything waiting on me?
-            """
 
         private func libraryJSON() -> [[String: Any]] {
             let now = Self.now

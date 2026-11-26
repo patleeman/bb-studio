@@ -167,6 +167,31 @@ final class ShellUITests: ServerIsolatedUITestCase {
         capture("duo-folded-memory")
     }
 
+    /// One rail for every screen on the Duo: a pushed page, design or Memory hides its bar;
+    /// its title is the title line, and Back and its actions are in the rail.
+    func testPushedScreensUseTheOneRail() throws {
+        try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
+        launch(["-qaPageDemo", "-qaDesignDemo"])
+        XCTAssertTrue(element("home").waitForExistence(timeout: 30))
+        element("homeMemory").tap()
+        XCTAssertTrue(app.buttons["rail-back"].waitForExistence(timeout: 10), "Back in the rail")
+        XCTAssertTrue(app.buttons["rail-action-memorySearch"].exists, "Memory's Search in the rail")
+        XCTAssertFalse(app.navigationBars.firstMatch.exists, "no bar of its own")
+        capture("duo-folded-memory")
+        app.buttons["rail-back"].tap()
+        XCTAssertTrue(element("home").waitForExistence(timeout: 10), "Back is Home from one push away")
+
+        for (link, name) in [("page/qa-demo", "page"), ("design/dsn_demo", "design")] {
+            XCUIDevice.shared.system.open(URL(string: "bbstudio://" + link)!)
+            XCTAssertTrue(app.buttons["rail-back"].waitForExistence(timeout: 15), "\(name): Back in the rail")
+            sleep(2)
+            XCTAssertFalse(app.navigationBars.firstMatch.exists, "\(name): no bar of its own")
+            XCTAssertTrue(element("shellTitle").exists, "\(name): the title line")
+            capture("duo-folded-\(name)")
+            app.goHome()
+        }
+    }
+
     func testBookShowsConversationAndWorkbenchAndHomeOnRequest() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launchConversation(["-qaPosture", "book"])

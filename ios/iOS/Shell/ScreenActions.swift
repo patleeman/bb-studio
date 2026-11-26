@@ -79,3 +79,38 @@ struct ScreenActionItems: View {
         }
     }
 }
+
+/// A pushed screen that draws its own title line on the Duo (Memory's layer switch).
+struct ScreenDrawsTitleLineKey: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
+}
+
+/// What a pushed screen puts on the right page beside two pages (book, flat),
+/// in the Workbench's place while it shows: Memory's Skills | History beside
+/// its Core. `id` tells one companion from another.
+struct ScreenCompanion: Equatable {
+    let id: String
+    let view: AnyView
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id }
+}
+
+struct ScreenCompanionKey: PreferenceKey {
+    static let defaultValue: ScreenCompanion? = nil
+    static func reduce(value: inout ScreenCompanion?, nextValue: () -> ScreenCompanion?) {
+        if let next = nextValue() { value = next }
+    }
+}
+
+extension View {
+    /// The screen draws its own title line on the Duo; the shell's steps aside.
+    func screenDrawsTitleLine() -> some View {
+        preference(key: ScreenDrawsTitleLineKey.self, value: true)
+    }
+
+    /// The right page's content beside two pages while this screen shows.
+    func screenCompanion(id: String, @ViewBuilder _ content: () -> some View) -> some View {
+        preference(key: ScreenCompanionKey.self, value: ScreenCompanion(id: id, view: AnyView(content())))
+    }
+}

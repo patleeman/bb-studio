@@ -46,6 +46,17 @@ struct ShellRail: View {
                 .menuOrder(.fixed)
                 .tint(.primary)
                 .accessibilityIdentifier("rail-\(slot.id)")
+        case .action(let action) where !action.children.isEmpty:
+            Menu { ScreenActionItems(actions: action.children) } label: { RailLabel(slot: slot, large: large) }
+                .menuOrder(.fixed)
+                .tint(.primary)
+                .disabled(action.disabled)
+                .accessibilityIdentifier("rail-\(slot.id)")
+        case .action(let action):
+            Button { action.run() } label: { RailLabel(slot: slot, large: large) }
+                .buttonStyle(.plain)
+                .disabled(action.disabled)
+                .accessibilityIdentifier("rail-\(slot.id)")
         default:
             Button { actions.tap(slot) } label: { RailLabel(slot: slot, large: large) }
                 .buttonStyle(.plain)

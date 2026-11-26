@@ -79,6 +79,8 @@ enum RailSlot: Equatable, Identifiable {
     case more
     case new
     case search
+    /// A pushed screen's own action (Search, + New skill…), as a button of its own.
+    case action(ScreenAction)
 
     var id: String {
         switch self {
@@ -90,6 +92,7 @@ enum RailSlot: Equatable, Identifiable {
         case .more: "more"
         case .new: "new"
         case .search: "search"
+        case .action(let action): "action-\(action.id)"
         }
     }
 
@@ -103,6 +106,7 @@ enum RailSlot: Equatable, Identifiable {
         case .more: "More"
         case .new: "New"
         case .search: "Search"
+        case .action(let action): action.title
         }
     }
 
@@ -116,6 +120,7 @@ enum RailSlot: Equatable, Identifiable {
         case .more: "ellipsis"
         case .new: "square.and.pencil"
         case .search: "magnifyingglass"
+        case .action(let action): action.systemImage
         }
     }
 
@@ -124,6 +129,7 @@ enum RailSlot: Equatable, Identifiable {
         switch self {
         case .chat: true
         case .home(let lit): lit
+        case .action(let action): action.checked
         default: false
         }
     }
@@ -135,30 +141,52 @@ enum ShellScreen: Equatable {
     case home
     /// A conversation (or a pushed thread), in Chat or in its Workbench.
     case conversation(workbench: Bool)
-    /// Anything else pushed (Memory, a page, Settings…): its bar hides on the Duo, so Back and its actions are here.
-    case pushed(actions: Bool)
+    /// Anything else pushed (Memory, a page, Settings…): its bar hides on the Duo,
+    /// so Back and its actions are here. `depth`: how far over Home it is.
+    case pushed(actions: [ScreenAction], depth: Int)
 }
 
 /// The rail's buttons for a posture and what shows, bottom-up (9c–9f).
 enum RailLayout {
-    /// `paneBack`: beside two pages, something is pushed over the left page's
-    /// conversation; its Back comes lowest, and More holds its actions.
-    static func slots(_ posture: ShellPosture, screen: ShellScreen, tabs: Int, homeShown: Bool, paneBack: Bool = false) -> [RailSlot] {
-        let back: [RailSlot] = paneBack ? [.back] : []
+    /// A pushed screen's rail, lowest first: Back, its first two actions as
+    /// buttons, More for the rest, and Home when Back wouldn't already be Home.
+    static func pushed(_ actions: [ScreenAction], depth: Int) -> [RailSlot] {
+        let shown = actions.prefix(2).map(RailSlot.action)
+        let more: [RailSlot] = actions.count > 2 ? [.more] : []
+        let home: [RailSlot] = depth > 1 ? [.home(lit: false)] : []
+        return [.back] + shown + more + home
+    }
+
+    /// Beside two pages, something pushed over the left page's conversation:
+    /// its rail comes first (Back lowest), then Home alone when its companion
+    /// has the right page, else the Workbench's own buttons (one More: the
+    /// pushed screen's overflow when it has one).
+    static func panePushed(_ actions: [ScreenAction], companion: Bool, homeShown: Bool, own: [RailSlot]) -> [RailSlot] {
+        let screen = pushed(actions, depth: 1)
+        if companion { return screen + [.home(lit: homeShown)] }
+        return screen + own.filter { $0 != .more || !screen.contains(.more) }
+    }
+
+    /// The actions More holds once the first two are buttons of their own.
+    static func overflow(_ actions: [ScreenAction]) -> [ScreenAction] {
+        Array(actions.dropFirst(2))
+    }
+
+    static func slots(_ posture: ShellPosture, screen: ShellScreen, tabs: Int, homeShown: Bool) -> [RailSlot] {
         switch posture {
         case .phone:
             return []
         case .book:
             // Both panes show: no Chat/Workbench switch; Tabs is lowest (9d).
-            return back + (homeShown ? [.tabs, .home(lit: true), .new] : [.tabs, .home(lit: false), .more])
+            return homeShown ? [.tabs, .home(lit: true), .new] : [.tabs, .home(lit: false), .more]
         case .flat:
-            return back + [.tabs, .home(lit: homeShown), .new, .more]
+            return [.tabs, .home(lit: homeShown), .new, .more]
         case .folded, .vertical:
             switch screen {
             case .home: return [.new, .search]
             case .conversation(workbench: false): return [.workbench(tabs: tabs), .home(lit: false), .more]
             case .conversation(workbench: true): return [.chat, .home(lit: false), .tabs, .more]
-            case .pushed(let actions): return actions ? [.back, .home(lit: false), .more] : [.back, .home(lit: false)]
+            case .pushed(let actions, let depth): return pushed(actions, depth: depth)
             }
         }
     }

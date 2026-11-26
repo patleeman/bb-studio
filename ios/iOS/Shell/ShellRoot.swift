@@ -213,7 +213,7 @@ struct ShellPlace: View {
     var body: some View {
         switch page {
         case .memory: MemoryPageView(botId: bot.id, open: router.open(item:))
-        case .library: LibraryPageView(botId: bot.id, open: router.open(item:))
+        case .library: LibraryPageView(botId: bot.id)
         case .automations: BotAutomationsSheet(botId: bot.id, botName: bot.name, embedded: true, allAutomations: true).id(bot.id)
         case .archive: ArchivePageView(botId: bot.id, open: router.open(item:), refresh: { Task { await store.refresh() } })
         }
@@ -248,8 +248,10 @@ private struct ShellPages: View {
     let window: CGSize
     @ObservedObject private var router = Router.shared
     @Environment(\.shellPosture) private var posture
-    /// What's pushed over the left page's conversation offers: in the right page's More.
+    /// What's pushed over the left page's conversation offers: in the right page's rail.
     @State private var paneActions: [ScreenAction] = []
+    /// And what it puts on the right page in the Workbench's place.
+    @State private var paneCompanion: ScreenCompanion?
 
     static let hinge: CGFloat = 32
 
@@ -266,8 +268,10 @@ private struct ShellPages: View {
                 left(width: page)
                     .frame(width: page)
                 Color.clear.frame(width: Self.hinge).accessibilityHidden(true)
+                let pushed = !panePath.wrappedValue.isEmpty
                 ShellWorkbenchPage(threadId: conversation, bot: bot, store: store, homeShown: homeShown,
-                                   pushed: !panePath.wrappedValue.isEmpty, pushedActions: paneActions)
+                                   pushed: pushed, pushedActions: pushed ? paneActions : [],
+                                   companion: pushed ? paneCompanion : nil)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -312,6 +316,9 @@ private struct ShellPages: View {
         .onPreferenceChange(ScreenActionsKey.self) { value in
             MainActor.assumeIsolated { if paneActions != value { paneActions = value } }
         }
+        .onPreferenceChange(ScreenCompanionKey.self) { value in
+            MainActor.assumeIsolated { if paneCompanion != value { paneCompanion = value } }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("conversationColumn")
     }
@@ -355,6 +362,7 @@ private struct ShellWorkbenchPage: View {
     /// Something is pushed over the left page's conversation: Back lowest, and its actions in More.
     var pushed = false
     var pushedActions: [ScreenAction] = []
+    var companion: ScreenCompanion?
     @ObservedObject private var router = Router.shared
     @State private var workbench = WorkbenchStore.shared
     @State private var addingTab = false
@@ -364,15 +372,19 @@ private struct ShellWorkbenchPage: View {
     private var session: ConversationSession { ConversationSessions.shared.session(threadId) }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ShellTitleLine(title: workbench.selected(threadId)?.title ?? "Workbench", posture: posture) { tabMenu }
-            WorkbenchView(threadId: threadId, webURL: session.model.thread.map { app.client.webURL(forThread: $0) },
-                          openThread: { router.push(.thread(id: $0)) },
-                          actionsChanged: { if session.tabActions != $0 { session.tabActions = $0 } })
+        Group {
+            if let companion {
+                companion.view.id(companion.id)
+            } else {
+                VStack(spacing: 0) {
+                    ShellTitleLine(title: workbench.selected(threadId)?.title ?? "Workbench", posture: posture) { tabMenu }
+                    WorkbenchView(threadId: threadId, webURL: session.model.thread.map { app.client.webURL(forThread: $0) },
+                                  openThread: { router.push(.thread(id: $0)) },
+                                  actionsChanged: { if session.tabActions != $0 { session.tabActions = $0 } })
+                }
+            }
         }
-        .rail(RailLayout.slots(posture, screen: .conversation(workbench: true), tabs: workbench.count(threadId), homeShown: homeShown,
-                               paneBack: pushed),
-              actions: RailActions(tap: tap, tabs: AnyView(tabMenu), more: AnyView(moreMenu)))
+        .rail(slots, actions: RailActions(tap: tap, tabs: AnyView(tabMenu), more: AnyView(moreMenu)))
         .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("workbenchPage")
@@ -382,10 +394,18 @@ private struct ShellWorkbenchPage: View {
         WorkbenchTabMenuItems(threadId: threadId) { addingTab = true }
     }
 
-    /// The pushed screen's actions while one shows over the conversation; else the conversation's menu.
+    /// Something pushed over the conversation: Back lowest and its actions,
+    /// then (unless its companion has the page) the Workbench's own buttons.
+    private var slots: [RailSlot] {
+        let own = RailLayout.slots(posture, screen: .conversation(workbench: true), tabs: workbench.count(threadId), homeShown: homeShown)
+        guard pushed else { return own }
+        return RailLayout.panePushed(pushedActions, companion: companion != nil, homeShown: homeShown, own: own)
+    }
+
+    /// The pushed screen's overflow while one shows over the conversation; else the conversation's menu.
     @ViewBuilder private var moreMenu: some View {
-        if pushed, !pushedActions.isEmpty {
-            ScreenActionItems(actions: pushedActions)
+        if pushed, pushedActions.count > 2 {
+            ScreenActionItems(actions: RailLayout.overflow(pushedActions))
         } else {
             ConversationMenuItems(session: session, conversation: ShellContext.make(threadId, kind: .conversation, bot: bot, store: store),
                                   tabActions: session.tabActions)
