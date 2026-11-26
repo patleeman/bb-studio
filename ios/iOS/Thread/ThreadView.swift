@@ -479,8 +479,14 @@ struct ThreadView: View {
     }
 
     /// The timeline, find bar, composer, and toolbar; `body` adds sheets and tasks.
-    private var screen: some View {
-        transcriptV2Screen
+    ///
+    /// Type-erased, with its header parts (`transcriptV2Screen`): as one
+    /// nested generic type, Swift's runtime resolved its metadata recursively
+    /// on the first frame and overflowed the device's 1 MB main-thread stack
+    /// (TestFlight 20261126.0313 crashed on every launch). Simulator builds
+    /// link with that 1 MB stack too (project.yml), so the UI tests catch it.
+    private var screen: AnyView {
+        AnyView(transcriptV2Screen)
     }
 
     /// A plain thread's header actions. A Bot conversation's header is its
@@ -1887,7 +1893,7 @@ struct ChatSkeleton: View {
 /// `body`'s, shared with the SwiftUI transcript.
 extension ThreadView {
     fileprivate var transcriptV2Screen: some View {
-        transcriptV2Body
+        AnyView(transcriptV2Body)
             .modifier(TranscriptV2Hooks(view: self, sends: sends, outboxCount: outbox.messages.count, finding: finding,
                                         findQuery: findQuery))
             .environment(\.threadId, model.threadId)
@@ -1898,16 +1904,16 @@ extension ThreadView {
             .toolbar(duoLayout.twoPages || compactHeader ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
                 if !duoLayout.twoPages {
-                    ToolbarItemGroup(placement: .topBarTrailing) { threadActions }
+                    ToolbarItemGroup(placement: .topBarTrailing) { AnyView(threadActions) }
                 }
                 if conversation != nil && !duoLayout.twoPages {
-                    ToolbarItem(placement: .principal) { conversationTitle }
+                    ToolbarItem(placement: .principal) { AnyView(conversationTitle) }
                 }
                 if conversation == nil && !duoLayout.twoPages, let worker {
                     ToolbarItem(placement: .principal) { WorkerTitle(info: worker) }
                 }
             }
-            .overlay { if compactHeader && !lying { FoldedColumn { compactActions } } }
+            .overlay { if compactHeader && !lying { FoldedColumn { AnyView(compactActions) } } }
             .onAppear { roomSession?.transcript = transcriptV2 }
     }
 
@@ -1925,7 +1931,7 @@ extension ThreadView {
         } else {
             FoldedBackButton()
         }
-        if conversation != nil { railActions } else { threadActions }
+        if conversation != nil { AnyView(railActions) } else { AnyView(threadActions) }
         // The ↓ joins the rail's round buttons, so it never narrows the composer. With the
         // keyboard up the rail has no room under ⋯; sending jumps to the end anyway.
         if jumpState.shown && !composerFocused {

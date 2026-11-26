@@ -54,6 +54,12 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_FILE: iOS/Info.plist
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # A device gives the main thread 1 MB of stack; a simulator gives it 8 MB.
+        # Simulator builds get the device's 1 MB, so a view type nested deep
+        # enough to overflow it (TestFlight 20261126.0313) crashes in tests too.
+        "OTHER_LDFLAGS[sdk=iphonesimulator*]": "$(inherited) -Wl,-stack_size,0x100000"
+        # -stack_size needs the main executable, not Debug's debug dylib.
+        "ENABLE_DEBUG_DYLIB[sdk=iphonesimulator*]": NO
     scheme:
       testTargets:
         - BBStudioTests
