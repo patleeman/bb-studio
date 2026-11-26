@@ -126,7 +126,7 @@ import {
 } from "./bot-model";
 import { BotSkillStore } from "./bot-skills";
 import { addCheckinLine } from "./core-skill";
-import { migrateCoreSkill, type CoreMigration } from "./core-skill-migrate";
+import { dropRetiredMemory, migrateCoreSkill, type CoreMigration } from "./core-skill-migrate";
 import { BOT_RUN_PREFIX, heartbeatCron, PERSONAL_PROJECT_ID } from "./project-lead";
 import { readyProvider, type OnboardingProviderState } from "./onboarding";
 import { rpcErrorStatus } from "./kit/server/index";
@@ -1170,6 +1170,16 @@ export class Bots {
     const row = this.row(botId);
     if (!row || botKind(row.provider_id) === "external") return null;
     return migrateCoreSkill({ db: this.deps.db, skills: this.skillStore, pageMarkdown: (pageId) => this.deps.memory?.markdown?.(pageId) ?? null }, row.id);
+  }
+
+  /**
+   * Drops the retired memory tables once every Studio Bot has its core
+   * skill (src/core-skill-migrate.ts dropRetiredMemory); null while one
+   * hasn't.
+   */
+  retireMemoryTables(): { dropped: string[] } | null {
+    const rows = this.deps.db.prepare("SELECT id, provider_id FROM bots").all() as { id: string; provider_id: string | null }[];
+    return dropRetiredMemory(this.deps.db, rows.filter((row) => botKind(row.provider_id) !== "external").map((row) => row.id));
   }
 
   /** The Bot's always-on skills (made on first need), its core skill first. */

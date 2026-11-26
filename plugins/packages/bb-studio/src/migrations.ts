@@ -1252,17 +1252,10 @@ export const MIGRATIONS: string[] = [
        seq INTEGER NOT NULL,
        at INTEGER NOT NULL
      );`,
-  // Review fixes: the core skill's first user edit and last tidy ask, a review's source tip (its mark moves only on
-  // success), and the one-time export of the retired memory records to a Library page.
+  // Review fixes: the core skill's first user edit and last tidy ask, and a review's source tip (its mark moves only on success).
   `ALTER TABLE bot_core_skills ADD COLUMN user_edited_at INTEGER;
    ALTER TABLE bot_core_skills ADD COLUMN tidy_asked_at INTEGER;
-   ALTER TABLE bot_skill_reviews ADD COLUMN source_seq INTEGER;
-   CREATE TABLE memory_records_export (
-       bot_id TEXT PRIMARY KEY,
-       page_id TEXT,
-       records INTEGER NOT NULL,
-       exported_at INTEGER NOT NULL
-     );`,
+   ALTER TABLE bot_skill_reviews ADD COLUMN source_seq INTEGER;`,
   // Why a review ran (archive, daily, manual): the daily cap counts daily and archive passes only.
   `ALTER TABLE bot_skill_reviews ADD COLUMN reason TEXT;`,
 ];

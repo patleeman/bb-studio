@@ -106,7 +106,9 @@ function check(db: Database.Database): OwnData {
   if (threads.some((row) => row.bot_id !== bot?.id)) return has("it has conversations of another Bot");
   if (threads.filter((row) => row.is_main).length > 1 || threads.filter((row) => !row.is_main).length > 1) return has(`its Bot has ${threads.length} conversations`);
 
-  const profiles = db.prepare("SELECT bot_id, profile_page_id FROM memory_profiles").all() as { bot_id: string; profile_page_id: string }[];
+  // memory_profiles is dropped once every Bot's core profile is in its skill (src/core-skill-migrate.ts).
+  const hasProfiles = !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'memory_profiles'").get();
+  const profiles = (hasProfiles ? db.prepare("SELECT bot_id, profile_page_id FROM memory_profiles").all() : []) as { bot_id: string; profile_page_id: string }[];
   if (profiles.some((row) => row.bot_id !== bot?.id)) return has("it has another Bot's memory");
   const memoryPage = bot?.memory_page_id ?? profiles[0]?.profile_page_id ?? null;
   const pages = db.prepare("SELECT id, markdown FROM pages").all() as { id: string; markdown: string }[];

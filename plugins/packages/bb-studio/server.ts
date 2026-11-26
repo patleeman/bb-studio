@@ -1096,11 +1096,19 @@ export default async function plugin(bb: BbPluginApi) {
   // Every Studio Bot gets its always-on core skill, from its core profile page when it has one (once; src/core-skill-migrate.ts).
   const coreSkillStart = setTimeout(() => {
     if (disposed) return;
+    let failed = false;
     for (const bot of bots.list()) {
       try {
         const moved = bots.ensureCore(bot.id);
         if (moved && moved.state !== "done") bb.log.info(`Always-on skill for ${bot.id}: ${moved.state} ${moved.skill} (${moved.chars} characters${moved.chars > ALWAYS_ON_CAP ? ", over the budget: kept whole" : ""}).`);
-      } catch (error) { bb.log.warn(`Always-on skill for ${bot.id}: ${error instanceof Error ? error.message : String(error)}`); }
+      } catch (error) { failed = true; bb.log.warn(`Always-on skill for ${bot.id}: ${error instanceof Error ? error.message : String(error)}`); }
+    }
+    // Then, and only when every Bot's copy is in (its marker), the retired memory tables go.
+    if (!failed) {
+      try {
+        const retired = bots.retireMemoryTables();
+        if (retired?.dropped.length) bb.log.info(`Retired memory tables dropped: ${retired.dropped.join(", ")}.`);
+      } catch (error) { bb.log.warn(`Dropping the retired memory tables: ${error instanceof Error ? error.message : String(error)}`); }
     }
   }, 2_500);
   bb.onDispose(() => clearTimeout(coreSkillStart));

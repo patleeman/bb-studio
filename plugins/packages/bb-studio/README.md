@@ -3959,15 +3959,18 @@ start, and on first need, each Studio Bot gets its always-on skill once
 - A Bot without such a page gets the template (the three sections).
 - A Bot that already has an always-on skill is only marked.
 - The page itself is left as it was. No new core profile pages are made.
+- Then the retired memory tables are dropped (below).
 
 ### Retired: memory records
 
-The memory records subsystem is retired: the `memory_search`, `memory_add`
-and `memory_update` tools and the merged `memory` tool, the record tab, the
-old Memory page split, and the Conversations record archiving used to
-write. The `memory_records` table, its FTS index and `memory_profiles` are
-left untouched; nothing reads or writes them. Dropping them is a separate,
-later step.
+The memory records subsystem is gone: the `memory_search`, `memory_add` and
+`memory_update` tools and the merged `memory` tool, the record tab, the old
+Memory page split, and the Conversations records archiving used to write.
+At start, once every Studio Bot has its core skill (each Bot's marker in
+`bot_core_skills` is written in the same transaction as its skill, so a
+failed copy holds this back), Studio drops `memory_records`, its FTS index
+and triggers, and `memory_profiles` (`dropRetiredMemory` in
+`src/core-skill-migrate.ts`). Later starts find nothing to drop.
 
 ### Memory RPC
 

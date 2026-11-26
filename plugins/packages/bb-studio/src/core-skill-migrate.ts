@@ -1,7 +1,8 @@
 // Moves each Bot's core profile page into its always-on skill, once
 // (src/core-skill.ts). The page's text is copied whole: nothing is cut or
 // rewritten, and a text over the always-on budget is kept and flagged by the
-// skill's lint. The page and the retired memory tables stay as they are.
+// skill's lint. The page stays. Once every Bot has its core skill, the
+// retired memory tables are dropped (dropRetiredMemory).
 // A Bot without a core profile page gets the default template. The marker
 // (bot_core_skills) makes it run once per Bot, so a skill the user later
 // renames or deletes doesn't come back.
@@ -56,4 +57,27 @@ export function migrateCoreSkill(deps: CoreMigrationDeps, botId: string, now = D
     mark(name, page?.markdown.trim() ? page.id : null, alwaysOnChars(text));
   })();
   return { state: page?.markdown.trim() ? "moved" : "created", skill: name, sourcePageId: page?.markdown.trim() ? page.id : null, chars: alwaysOnChars(text) };
+}
+
+/** The retired memory subsystem's tables and their FTS triggers: dropped once every Bot's core profile is in its skill. */
+export const RETIRED_MEMORY_TABLES = ["memory_records_fts", "memory_records", "memory_profiles"] as const;
+const RETIRED_MEMORY_TRIGGERS = ["memory_records_fts_insert", "memory_records_fts_delete", "memory_records_fts_update"] as const;
+
+/**
+ * Drops the retired memory tables, only after every Studio Bot has its
+ * core skill: the marker (bot_core_skills) is written in the same
+ * transaction as the skill, so a Bot whose copy failed has no marker and
+ * holds the drop back. Returns what it dropped (empty once they're gone),
+ * or null when it held back.
+ */
+export function dropRetiredMemory(db: Database.Database, studioBotIds: readonly string[]): { dropped: string[] } | null {
+  const marked = db.prepare("SELECT 1 FROM bot_core_skills WHERE bot_id = ?");
+  if (studioBotIds.some((botId) => !marked.get(botId))) return null;
+  const present = RETIRED_MEMORY_TABLES.filter((name) => hasTable(db, name));
+  if (!present.length) return { dropped: [] };
+  db.transaction(() => {
+    for (const trigger of RETIRED_MEMORY_TRIGGERS) db.exec(`DROP TRIGGER IF EXISTS ${trigger}`);
+    for (const table of RETIRED_MEMORY_TABLES) db.exec(`DROP TABLE IF EXISTS ${table}`);
+  })();
+  return { dropped: present };
 }

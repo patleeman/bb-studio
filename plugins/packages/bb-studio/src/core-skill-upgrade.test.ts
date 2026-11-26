@@ -50,44 +50,61 @@ function oldInstall() {
   return { bb, db, pages, profile };
 }
 
-it("upgrades an install with memory records and a core profile without losing anything, once", () => {
+const tables = (db: import("better-sqlite3").Database) => (db.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'memory_%' ORDER BY name").all() as { name: string }[]).map((row) => row.name);
+
+it("upgrades an install with memory records and a core profile: the profile into the skill first, then the tables go, once", () => {
   const old = oldInstall();
-  const records = () => old.db.prepare("SELECT id, topic, text, archived, replaced_by_id FROM memory_records ORDER BY rowid").all();
-  const before = { records: records(), page: readMarkdown(old.pages.hub.open(old.profile).doc), fts: old.db.prepare("SELECT COUNT(*) AS n FROM memory_records_fts WHERE memory_records_fts MATCH 'launch'").get() };
-  expect(before.records).toHaveLength(274);
+  const page = readMarkdown(old.pages.hub.open(old.profile).doc);
+  expect(old.db.prepare("SELECT COUNT(*) AS n FROM memory_records").get()).toEqual({ n: 274 });
 
   old.bb.storage.migrate(old.db, MIGRATIONS);
   const bots = new Bots({ db: old.db, sdk: old.bb.sdk, leads: null as never, changed: () => {}, presenceChanged: () => {}, memory: { exists: (id: string) => !!old.pages.store.meta(id), markdown: (id: string) => (old.pages.store.meta(id) ? readMarkdown(old.pages.hub.open(id).doc) : null) } } as never);
+  // The migrations themselves drop nothing.
+  expect(tables(old.db)).toEqual(expect.arrayContaining(["memory_profiles", "memory_records", "memory_records_fts"]));
 
-  // The records, their index and the page are untouched; the records table keeps its name.
-  expect(records()).toEqual(before.records);
-  expect(old.db.prepare("SELECT COUNT(*) AS n FROM memory_records_fts WHERE memory_records_fts MATCH 'launch'").get()).toEqual(before.fts);
-  expect(readMarkdown(old.pages.hub.open(old.profile).doc)).toBe(before.page);
-  expect(old.db.prepare("SELECT profile_page_id FROM memory_profiles WHERE bot_id = 'bot_main'").get()).toEqual({ profile_page_id: old.profile });
-
-  // The page's text moves whole into the always-on skill, over the budget and flagged, not cut.
+  // Until every Bot's profile is in its skill, the tables stay.
   expect(bots.ensureCore("bot_main")).toMatchObject({ state: "moved", skill: "core-profile", sourcePageId: old.profile });
+  expect(bots.retireMemoryTables()).toBeNull();
+  expect(tables(old.db)).toContain("memory_profiles");
+
+  // The page's text moved whole into the always-on skill, over the budget and flagged, not cut.
   const skill = bots.skill("core-profile", "bot_main")!;
-  expect(skill.body.trim()).toBe(before.page.trim());
+  expect(skill.body.trim()).toBe(page.trim());
   expect(skill).toMatchObject({ alwaysOn: true, pinned: true });
   expect(skill.body.length).toBeGreaterThan(ALWAYS_ON_CAP);
-  expect(bots.skillBudget("bot_main")).toMatchObject({ over: true });
   expect(bots.skillLint({ name: "core-profile", body: skill.body }, "bot_main")).toEqual(expect.arrayContaining([expect.stringContaining("over the 2,000 budget")]));
-  // Its check-in section is what the check-in reads.
   expect(skill.body).toContain("## Check-in\n\n- Anything waiting on the user?\n- Garage sensor battery on the 1st.");
 
-  // A Bot without a profile page gets the template; a second run changes nothing.
+  // The second Bot (no page) gets the template; now every Bot is in, and the tables go.
   expect(bots.ensureCore("bot_two")).toMatchObject({ state: "created" });
+  expect(bots.retireMemoryTables()).toEqual({ dropped: ["memory_records_fts", "memory_records", "memory_profiles"] });
+  expect(tables(old.db)).toEqual([]);
+  expect(old.db.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'memory_%'").all()).toEqual([]);
+  // The page itself stays.
+  expect(readMarkdown(old.pages.hub.open(old.profile).doc)).toBe(page);
+
+  // A second start: no-op.
+  old.bb.storage.migrate(old.db, MIGRATIONS);
   expect(bots.ensureCore("bot_main")).toEqual({ state: "done" });
   expect(bots.ensureCore("bot_two")).toEqual({ state: "done" });
+  expect(bots.retireMemoryTables()).toEqual({ dropped: [] });
+  expect(bots.skill("core-profile", "bot_main")!.body).toBe(skill.body);
   expect(old.db.prepare("SELECT bot_id, skill_name, source_page_id FROM bot_core_skills ORDER BY bot_id").all()).toEqual([
     { bot_id: "bot_main", skill_name: "core-profile", source_page_id: old.profile },
     { bot_id: "bot_two", skill_name: "core-profile", source_page_id: null },
   ]);
   expect(old.db.prepare("SELECT COUNT(*) AS n FROM bot_skill_versions WHERE bot_id = 'bot_main' AND name = 'core-profile'").get()).toEqual({ n: 1 });
+});
 
-  // Running the migrations again (the next start) is a no-op.
+it("holds the drop back when a Bot's copy fails, and doesn't wait on an external Bot", () => {
+  const old = oldInstall();
   old.bb.storage.migrate(old.db, MIGRATIONS);
-  expect(records()).toEqual(before.records);
-  expect(bots.skill("core-profile", "bot_main")!.body).toBe(skill.body);
+  const failing = new Bots({ db: old.db, sdk: old.bb.sdk, leads: null as never, changed: () => {}, presenceChanged: () => {}, memory: { exists: () => true, markdown: () => { throw new Error("page store unavailable"); } } } as never);
+  expect(() => failing.ensureCore("bot_main")).toThrow("page store unavailable");
+  failing.ensureCore("bot_two");
+  expect(failing.retireMemoryTables()).toBeNull();
+  expect(old.db.prepare("SELECT COUNT(*) AS n FROM memory_records").get()).toEqual({ n: 274 });
+  // An external Bot keeps its own memory and gets no core skill; it never holds the drop back.
+  old.db.prepare("UPDATE bots SET provider_id = 'hermes' WHERE id = 'bot_main'").run();
+  expect(failing.retireMemoryTables()).toMatchObject({ dropped: expect.arrayContaining(["memory_records"]) });
 });
