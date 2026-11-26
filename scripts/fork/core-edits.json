@@ -835,6 +835,16 @@
       "seam": "sidebar",
       "intent": "SidebarThreadListContent renders PluginSidebarSections (ForkSidebarSections.tsx, imported at the top of the file) after the thread list, inside the scrolling SidebarContent, so plugin sections scroll under the list.",
       "budget": 2
+    },
+    "packages/plugin-sdk/src/internal/thread-event-gate.ts": {
+      "seam": "plugin-events",
+      "intent": "THREAD_OF_EVENT spreads FORK_THREAD_OF_EVENT (thread-event-gate.fork.ts, imported at the top of the file) first, so the fork's events (experimental_turn.interrupted, experimental_thread.fileChanged, experimental_host.connected/disconnected) name their thread, or none, for the delivery gate.",
+      "budget": 2
+    },
+    "packages/plugin-sdk/src/internal/plugin-app-component-fields.ts": {
+      "seam": "sdk-tables",
+      "intent": "PLUGIN_APP_COMPONENT_FIELDS spreads FORK_COMPONENT_FIELDS (plugin-app-component-fields.fork.ts, imported at the top of the file) first, so every fork slot kind lists its component fields for lazy loading and the component checks.",
+      "budget": 2
     }
   }
 }

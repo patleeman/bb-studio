@@ -15,7 +15,7 @@ import type {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { usePluginPanelActions } from "@/components/plugin/PluginPanelActions";
 import { resetAllCrashedPluginSlotsForTest } from "@/components/plugin/PluginSlotMount";
-import type { AppPanelController } from "@/lib/app-fixed-tab-navigation";
+import { useAppNavigationHostRef } from "@/lib/app-navigation-host";
 import {
   isThreadTab,
   resetPluginSlotStoreForTest,
@@ -265,7 +265,6 @@ describe("draggable New Tab rows", () => {
 });
 
 describe("action tabs kept off the New Tab page", () => {
-  const panel = {} as AppPanelController;
   const tab = {
     icon: "Bot",
     component: () => null,
@@ -280,7 +279,7 @@ describe("action tabs kept off the New Tab page", () => {
 
   function ThreadNewTab() {
     const pluginActions = usePluginPanelActions({
-      panel,
+      hostRef: useAppNavigationHostRef(),
       threadId: "thr_1",
       environmentId: "env_1",
       actions: usePluginSlots().tabs.filter(
@@ -343,7 +342,6 @@ describe("action tabs kept off the New Tab page", () => {
 });
 
 describe("grouped New Tab actions", () => {
-  const panel = {} as AppPanelController;
   const base = {
     icon: "Bot",
     component: () => null,
@@ -353,7 +351,7 @@ describe("grouped New Tab actions", () => {
 
   function ThreadNewTab() {
     const pluginActions = usePluginPanelActions({
-      panel,
+      hostRef: useAppNavigationHostRef(),
       threadId: "thr_1",
       environmentId: "env_1",
       actions: usePluginSlots().tabs.filter(
