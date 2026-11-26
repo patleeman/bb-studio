@@ -44,14 +44,6 @@ final class ReviewFixesTests: XCTestCase {
         XCTAssertEqual(store.knows(threadId: "thr_worker"), true)
         XCTAssertEqual(store.knows(threadId: "thr_plain_bb"), false)
     }
-
-    func testALateMemorySearchDoesNotReplaceTheCurrentOne() {
-        let asked = MemoryQuery(query: "old", topic: nil, sort: "newest")
-        XCTAssertFalse(asked.matches(query: "new", topic: nil, sort: "newest"))
-        XCTAssertFalse(asked.matches(query: "old", topic: "work", sort: "newest"))
-        XCTAssertFalse(asked.matches(query: "old", topic: nil, sort: "oldest"))
-        XCTAssertTrue(asked.matches(query: "old", topic: nil, sort: "newest"))
-    }
 }
 
 /// Review M9: forks show under their message and stay reachable.

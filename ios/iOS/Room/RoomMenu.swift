@@ -57,7 +57,7 @@ struct RoomPlaceSheet: View {
         case .memory:
             MemoryPageView(botId: bot.id, open: open)
         case .library:
-            LibraryPageView(botId: bot.id, open: open, tiles: true)
+            LibraryPageView(botId: bot.id)
         case .schedules:
             BotAutomationsSheet(botId: bot.id, botName: bot.name, embedded: true, allAutomations: true).id(bot.id)
         case .theme:

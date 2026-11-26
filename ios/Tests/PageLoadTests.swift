@@ -145,25 +145,24 @@ final class PageLoadTests: XCTestCase {
         load.cancel()
     }
 
-    func testMemoryOverviewErrorSurvivesRecordsLoading() async {
-        let server = URL(string: "https://memory-load.invalid")!
-        let client = BBClient(baseURL: server)
+    func testOneMemoryLayerFailingLeavesTheOthersLoaded() async {
+        let client = BBClient(baseURL: URL(string: "https://memory-load.invalid")!)
         client.transport = { _, path, _ in
-            if path.hasSuffix("/rpc/memory.overview") { return (500, Data(#"{"ok":false,"error":"overview broke"}"#.utf8)) }
-            if path.hasSuffix("/rpc/memory.list") { return (200, Data(#"{"ok":true,"result":{"records":[],"total":0}}"#.utf8)) }
+            if path.hasSuffix("/rpc/bot_core") { return (500, Data(#"{"ok":false,"error":"core broke"}"#.utf8)) }
+            if path.hasSuffix("/rpc/bot_summaries") { return (200, Data(#"{"ok":true,"result":{"botId":"bot","summaries":[]}}"#.utf8)) }
+            if path.hasSuffix("/rpc/bot_conversations_all") { return (200, Data(#"{"ok":true,"result":{"botId":"bot","conversations":[],"workers":[]}}"#.utf8)) }
             return (404, Data())
         }
-        let overview = PageLoad<MemoryOverview>()
-        let records = PageLoad<(records: [MemoryRecord], total: Int)>()
-        overview.run(key: "s|bot") { try await client.memoryOverview(botId: "bot") }
-        records.run(key: "s|bot|||newest", scope: "s|bot") { try await client.memoryRecords(botId: "bot", query: "", topic: nil, sort: .newest) }
-        await overview.settle()
-        await records.settle()
-        XCTAssertNotNil(overview.error)
-        XCTAssertNil(overview.value)
-        XCTAssertFalse(overview.waiting)
-        XCTAssertEqual(records.phase, .loaded)
-        XCTAssertNotNil(overview.error)
+        let store = MemoryStore(botId: "bot", client: client)
+        store.loadCore()
+        store.loadHistory()
+        await store.core.settle()
+        await store.summaries.settle()
+        await store.conversations.settle()
+        XCTAssertNotNil(store.core.error)
+        XCTAssertNil(store.core.value)
+        XCTAssertEqual(store.summaries.phase, .loaded)
+        XCTAssertEqual(store.conversations.value, [])
     }
 
     func testSlowLibraryThroughTheClientWithTheBotFlip() async {

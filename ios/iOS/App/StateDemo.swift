@@ -5,7 +5,7 @@ import WidgetKit
 /// Debug builds: `-qaStateDemo dictation|related|studio-chat|widgets[-bot|-work]` opens that sheet with local
 /// data, for screenshots of its states without a server. The app's client
 /// answers from fixtures here; sends and replies fail as if BB were
-/// unreachable. `-qaBotSheet skills` with `-qaBotDemo` gets its skills here too.
+/// unreachable.
 /// `-qaOutboxUnreadable` (see `Outbox.shared`) makes the outbox's file unreadable.
 enum StateDemo {
     static let threadId = "thr_statedemo1"
@@ -19,7 +19,7 @@ enum StateDemo {
 
     /// Answers the app's requests from fixtures, once per launch.
     @MainActor static func install(_ model: AppModel) {
-        guard variant != nil || BotDemo.sheet == "skills" else { return }
+        guard variant != nil else { return }
         BBClient.demoTransport = { method, path, _ in
             let rpc = "/api/v1/plugins/studio/rpc/"
             guard method == "POST", path.hasPrefix(rpc) else { throw URLError(.cannotConnectToHost) }
@@ -29,8 +29,6 @@ enum StateDemo {
             case Studio.Method.comments: return ok(comments)
             // The project's defaults fail (not RPC, so unreachable); the chat starts anyway.
             case Studio.Method.chat_start: return ok(#"{"threadId":"\#(BotDemo.threadId)"}"#)
-            case Studio.Method.bot_skills: return ok(skills)
-            case Studio.Method.bot_learning: return ok(learning)
             default: throw URLError(.cannotConnectToHost)
             }
         }
@@ -53,21 +51,6 @@ enum StateDemo {
          {"id":"c3","parentId":null,"actor":{"kind":"user","name":"You"},"body":"The pricing table still shows last quarter's tiers.","createdAt":\#(now - 1_800_000)}
         ]}
         """#
-    }
-
-    private static var skills: String {
-        #"""
-        {"skills":[
-         {"name":"weekly-digest","description":"Collects the week's merged PRs and open decisions into a Monday page.","updatedAt":\#(now - 86_400_000),"state":"active","pinned":true},
-         {"name":"triage-inbox","description":"Sorts new threads by who is waiting and drafts the replies.","updatedAt":\#(now - 3 * 86_400_000),"state":"active"},
-         {"name":"travel-budget","description":"Checks offsite costs against the budget sheet.","updatedAt":\#(now - 40 * 86_400_000),"state":"stale"},
-         {"name":"old-standup","description":"Posted the daily standup.","updatedAt":\#(now - 120 * 86_400_000),"state":"archived"}
-        ]}
-        """#
-    }
-
-    private static var learning: String {
-        #"{"enabled":true,"interval":10,"reviewing":false,"lastReview":{"at":\#(now - 7_200_000),"result":"Saved 1 skill"}}"#
     }
 }
 

@@ -172,7 +172,7 @@ struct RoomSpread: View {
         case .place(let place):
             switch place {
             case .strands: return "Pick a strand to open its conversation"
-            case .memory: return "Pick a memory to read it here"
+            case .memory: return ""
             case .library: return "Pick something to open it here"
             case .conversations: return "Pick a conversation to open it"
             case .schedules: return "Pick a schedule to see it here"

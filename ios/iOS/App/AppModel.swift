@@ -21,7 +21,6 @@ enum Route: Hashable {
     /// Visual Chat (the studio-visual-chat plugin): its chats, and one chat (nil: a new one).
     case visualChats
     case visualChat(threadId: String?)
-    case memoryRecord(id: String)
     /// A Bot's place (Strands, Memory, Library…) pushed in Home's list; only the list draws it.
     case roomPlace(String)
 }
@@ -301,9 +300,6 @@ final class AppModel: ObservableObject {
         case .todo(let id):
             // An old card's link: its read-only card over the room.
             open(id.isEmpty ? .place(.strands, botId: nil) : .sheet(.task(id: id)))
-        case .record:
-            // Memory records are retired (Links.destination sends old record links to Memory); kept for older callers.
-            open(.place(.memory, botId: nil))
         case .route(let route):
             if let push { push(route) } else { open(.route(route)) }
         case .safari(let url):

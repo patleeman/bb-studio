@@ -15,130 +15,37 @@ final class BotPagesTests: XCTestCase {
         return (client, { lock.withLock { calls } })
     }
 
-    private static func record(_ id: String, topic: String = "Work", text: String = "A fact", source: [String: Any] = ["kind": "manual", "id": NSNull(), "title": "Added by you", "section": NSNull()],
-                               state: Any = NSNull(), replacedBy: Any = NSNull(), replaces: Any = NSNull(), archived: Bool = false) -> [String: Any] {
-        ["id": id, "botId": "bot_a", "topic": topic, "text": text, "createdAt": 1_762_000_000_000.0, "updatedAt": 1_762_000_000_000.0, "source": source,
-         "sourceState": state, "replacesId": NSNull(), "replaces": replaces, "replacedById": replacedBy, "replacedAt": NSNull(), "archived": archived]
-    }
-
-    // MARK: Memory
-
-    func testMemoryOverviewAndListDecodeAndSplitReplaced() async throws {
-        let (client, calls) = makeClient { method, _ in
-            switch method {
-            case "memory.overview":
-                return ["bot": ["id": "bot_a", "name": "Juniper"], "profile": ["pageId": "pg_p", "title": "Profile", "updatedAt": 1, "chars": 2600, "cap": 2500, "over": true],
-                        "split": ["state": "none", "legacyPageId": NSNull(), "legacyTitle": NSNull(), "splitAt": NSNull()],
-                        "counts": ["current": 2, "replaced": 1, "archived": 0], "topics": [["topic": "Work", "count": 2]]]
-            default:
-                return ["records": [Self.record("r1"), Self.record("r0", replacedBy: "r1"), Self.record("r2", topic: "Home")], "total": 3]
-            }
-        }
-        let overview = try await client.memoryOverview(botId: "bot_a")
-        XCTAssertEqual(overview.botName, "Juniper")
-        XCTAssertEqual(overview.profile.map(MemoryPage.profileCount), "2,600 of 2,500 characters")
-        XCTAssertEqual(overview.profile?.over, true)
-        XCTAssertEqual(overview.topics.map(\.topic), ["Work"])
-
-        let result = try await client.memoryRecords(botId: "bot_a", query: "  ", topic: "Work", sort: .oldest)
-        let split = MemoryPage.split(result.records)
-        XCTAssertEqual(split.current.map(\.id), ["r1", "r2"])
-        XCTAssertEqual(split.replaced.map(\.id), ["r0"])
-        let input = calls().last!.1
-        XCTAssertEqual(input["botId"] as? String, "bot_a")
-        XCTAssertEqual(input["topic"] as? String, "Work")
-        XCTAssertEqual(input["sort"] as? String, "oldest")
-        XCTAssertNil(input["query"], "an empty search sends no query, not null")
-    }
-
-    func testSourceLabelsAndTargetsMatchDesktop() throws {
-        func record(_ source: [String: Any], state: Any = NSNull()) throws -> MemoryRecord {
-            let data = try JSONSerialization.data(withJSONObject: Self.record("r", source: source, state: state))
-            return try XCTUnwrap(MemoryRecord(try JSONDecoder().decode(Studio.MemoryListOutputRecordsItem.self, from: data)))
-        }
-        let main = try record(["kind": "conversation", "id": "thr_m", "title": "Main", "section": NSNull()])
-        XCTAssertEqual(MemoryPage.sourceLabel(main), "from Main")
-        XCTAssertEqual(MemoryPage.sourceTarget(main), .thread("thr_m"))
-        let finished = try record(["kind": "conversation", "id": "thr_l", "title": "Launch prep", "section": NSNull()], state: "finished")
-        XCTAssertEqual(MemoryPage.sourceLabel(finished), "from “Launch prep” (finished)")
-        let worker = try record(["kind": "worker", "id": "thr_w", "title": "Runner: staff sweep", "section": NSNull()])
-        XCTAssertEqual(MemoryPage.sourceLabel(worker), "from Runner: staff sweep")
-        let page = try record(["kind": "page", "id": "pg_1", "title": "Chief of Staff's Memory", "section": "Systems"])
-        XCTAssertEqual(MemoryPage.sourceLabel(page), "from “Chief of Staff's Memory” › Systems")
-        XCTAssertEqual(MemoryPage.sourceTarget(page), .page("pg_1"))
-        let gone = try record(["kind": "thread", "id": "thr_x", "title": "Old", "section": NSNull()], state: "missing")
-        XCTAssertEqual(MemoryPage.sourceLabel(gone), "from “Old” (removed)")
-        XCTAssertNil(MemoryPage.sourceTarget(gone))
-        let manual = try record(["kind": "manual", "id": NSNull(), "title": "Added by you", "section": NSNull()])
-        XCTAssertEqual(MemoryPage.sourceLabel(manual), "added by you")
-        XCTAssertNil(MemoryPage.sourceTarget(manual))
-    }
-
-    func testReplacesTopicsPromptAndSave() {
-        let now = Date()
-        var record = MemoryRecord(id: "r", botId: "b", topic: "Work", text: "x", createdAt: 0, source: .init(kind: .manual, title: "Added by you"))
-        XCTAssertNil(MemoryPage.replacesLabel(record))
-        record.replaces = (String(repeating: "word ", count: 20), now.timeIntervalSince1970 * 1000)
-        let label = MemoryPage.replacesLabel(record, now: now) ?? ""
-        XCTAssertTrue(label.hasPrefix("replaces “word word"), label)
-        XCTAssertTrue(label.contains("…”"), "a long text is cut")
-        XCTAssertEqual(MemoryPage.topicPills([("Work", 3), ("Home", 1)], picked: "Food"), ["Work", "Home", "Food"])
-        XCTAssertEqual(MemoryPage.topicPills([("Work", 3)], picked: "work"), ["Work"])
-        XCTAssertEqual(MemoryPage.searchPrompt(1), "Search 1 record")
-        XCTAssertEqual(MemoryPage.searchPrompt(1214), "Search 1,214 records")
-        XCTAssertFalse(MemoryPage.canSave(topic: "Work", text: "x", initial: ("Work", "x")), "nothing changed")
-        XCTAssertFalse(MemoryPage.canSave(topic: " ", text: "x", initial: ("", "")))
-        XCTAssertTrue(MemoryPage.canSave(topic: "Work", text: "y", initial: ("Work", "x")))
-        XCTAssertFalse(MemoryPage.canSave(topic: String(repeating: "t", count: 61), text: "y", initial: ("", "")))
-    }
-
     // MARK: Library
 
-    private func item(_ id: String, _ title: String, kind: BotLibraryItem.Kind = .artifact, plugin: String = "artifacts", at: Double,
-                      madeIn: BotLibraryItem.MadeIn? = nil) -> BotLibraryItem {
-        BotLibraryItem(pluginId: plugin, itemId: id, title: title, kind: kind, updatedAt: at, madeIn: madeIn)
+    private func item(_ id: String, _ title: String, kind: BotLibraryItem.Kind = .artifact, plugin: String = "artifacts", at: Double) -> BotLibraryItem {
+        BotLibraryItem(pluginId: plugin, itemId: id, title: title, kind: kind, updatedAt: at)
     }
 
-    func testLibraryGroupsByConversationFoldsLookalikesAndFilters() {
-        let main = BotLibraryItem.MadeIn(threadId: "thr_m", title: "Main", worker: false, conversationId: "thr_m", conversationTitle: "Main")
-        let worker = BotLibraryItem.MadeIn(threadId: "thr_w", title: "Fable lead", worker: true, conversationId: "thr_m", conversationTitle: "Main")
-        let items = [
-            item("a1", "Real explorer in BB colours: shot-1.png", at: 10, madeIn: worker),
-            item("a2", "Real explorer in BB colours: shot-2.png", at: 9, madeIn: worker),
-            item("p1", "Plan", kind: .page, plugin: "pages", at: 8, madeIn: main),
-            item("m1", "Mine", kind: .app, plugin: "minis", at: 20),
-        ]
-        let groups = LibraryPage.groups(items, query: "", kind: nil, groupBy: .conversation)
-        XCTAssertEqual(groups.map(\.title), ["Made by you", "Main"], "groups by their newest file")
-        XCTAssertEqual(groups[1].threadId, "thr_m")
-        XCTAssertEqual(groups[1].count, 3)
-        XCTAssertEqual(groups[1].rows.map(\.count), [2, 1], "lookalikes from one source fold")
-        XCTAssertEqual(LibraryPage.meta(items[0], groupBy: .conversation, now: Date(timeIntervalSince1970: 0)).hasPrefix("App · by Fable lead"), true)
-        XCTAssertEqual(LibraryPage.meta(items[2], groupBy: .conversation, now: Date(timeIntervalSince1970: 0)).hasPrefix("Page · "), true, "no 'made in' under its own group")
-        XCTAssertEqual(LibraryPage.provenance(items[3]), "made by you")
-        XCTAssertEqual(LibraryPage.groups(items, query: "", kind: .page, groupBy: .conversation).flatMap(\.rows).map(\.item.itemId), ["p1"])
-        XCTAssertEqual(LibraryPage.groups(items, query: "fable", kind: nil, groupBy: .conversation).flatMap(\.rows).map(\.item.itemId), ["a1"])
-        XCTAssertEqual(LibraryPage.filters.map(LibraryPage.chip), ["Page", "Whiteboard", "Design", "Apps"], "one chip for apps and artifacts")
-        XCTAssertEqual(Set(LibraryPage.groups(items, query: "", kind: .app, groupBy: .date).flatMap(\.rows).map(\.item.kind)), [.app, .artifact])
-        XCTAssertEqual(LibraryPage.groups(items, query: "", kind: nil, groupBy: .kind).map(\.title), ["Pages", "Apps"])
-        XCTAssertEqual([BotLibraryItem.Kind.artifact, .app].map(LibraryPage.label), ["App", "App"], "every app says App")
-        XCTAssertEqual([343, 427, 553].map { LibraryPage.tileColumnCount(width: $0, workbench: true) }, [3, 3, 4], "the workbench page")
-        XCTAssertEqual([334, 370].map { LibraryPage.tileColumnCount(width: $0, workbench: false) }, [2, 2], "a phone sheet")
-    }
-
-    func testLibraryFoldsLongGroupsAndGroupsByDate() {
-        let rows = (0..<11).map { BotLibraryRow(id: "\($0)", item: item("\($0)", "x\($0)", at: 0), count: 1) }
-        let folded = LibraryPage.folded(rows, open: false)
-        XCTAssertEqual(folded.shown.count, 8)
-        XCTAssertEqual(folded.more, 3)
-        XCTAssertEqual(LibraryPage.folded(rows, open: true).more, 0)
+    func testLibraryFiltersByKindSearchesTitlesAndSectionsByDate() {
         let now = Date()
         let ms = now.timeIntervalSince1970 * 1000
-        XCTAssertEqual(LibraryPage.dateGroup(ms, now: now).title, "Today")
-        XCTAssertEqual(LibraryPage.dateGroup(ms - 3 * 86_400_000, now: now).title, "This week")
-        XCTAssertEqual(LibraryPage.dateGroup(ms - 90 * 86_400_000, now: now).title, "Older")
-        XCTAssertEqual(LibraryPage.titleStem("Real explorer in BB colours: a.png"), "real explorer in bb colours")
-        XCTAssertEqual(LibraryPage.titleStem("Still 12.png"), "still #")
+        let day = 86_400_000.0
+        let items = [
+            item("p1", "Round notes", kind: .page, plugin: "pages", at: ms - 60_000),
+            item("d1", "Phone design", kind: .design, plugin: "design", at: ms - 120_000),
+            item("r1", "Morning walk", kind: .recording, plugin: "talk", at: ms - 3 * day),
+            item("w1", "Garden bed layout", kind: .whiteboard, plugin: "excalidraw", at: ms - 4 * day),
+            item("a1", "Habit tracker", kind: .app, plugin: "minis", at: ms - 40 * day),
+            item("a2", "Still 1.png", kind: .artifact, at: ms - 41 * day),
+        ]
+        let all = LibraryPage.sections(items, query: "", filter: .all, now: now)
+        XCTAssertEqual(all.map(\.title), ["Today", "This week", "Older"])
+        XCTAssertEqual(all[0].items.map(\.itemId), ["p1", "d1"], "newest first")
+        XCTAssertEqual(LibraryPage.sections(items, query: "", filter: .apps, now: now).flatMap(\.items).map(\.itemId), ["a1", "a2"], "apps and artifacts together")
+        XCTAssertEqual(LibraryPage.sections(items, query: "", filter: .drawings, now: now).flatMap(\.items).map(\.itemId), ["w1"])
+        XCTAssertEqual(LibraryPage.sections(items, query: "", filter: .recordings, now: now).flatMap(\.items).map(\.itemId), ["r1"])
+        XCTAssertEqual(LibraryPage.sections(items, query: "garden BED", filter: .all, now: now).flatMap(\.items).map(\.itemId), ["w1"], "every word, any case")
+        XCTAssertTrue(LibraryPage.sections(items, query: "garden", filter: .pages, now: now).isEmpty)
+        XCTAssertEqual(LibraryPage.Filter.allCases.map(\.title), ["All", "Pages", "Designs", "Recordings", "Drawings", "Apps"])
+        XCTAssertTrue(LibraryPage.meta(items[0], now: now).hasPrefix("Page · "))
+        XCTAssertEqual(LibraryPage.meta(items[4], now: now), "App · " + MemoryFormat.shortDate(ms - 40 * day, now: now))
+        XCTAssertEqual(LibraryPage.label(.whiteboard), "Drawing")
+        XCTAssertEqual(LibraryPage.dateGroup(ms - day + 1, now: Calendar.current.startOfDay(for: now).addingTimeInterval(3600)).title, "Yesterday")
     }
 
     func testLibraryItemsOpenInTheirViewers() async throws {
@@ -202,7 +109,6 @@ final class BotPagesTests: XCTestCase {
 
         let finished = try await client.botFinished(threadId: "thr_x")
         XCTAssertEqual(finished?.summary, "Shipped")
-        XCTAssertEqual(finished?.recordsLabel, "3 memory records")
         let notFinished = try await client.botFinished(threadId: "thr_o")
         XCTAssertNil(notFinished)
         try await client.botReopen(threadId: "thr_x")
@@ -220,19 +126,22 @@ final class BotPagesTests: XCTestCase {
 
     // MARK: Demo
 
-    func testDemoAnswersMemoryAsStudioDoesNow() async throws {
-        // Studio retired memory records: the demo, like Studio, lists none and serves the always-on skill as the profile.
+    func testDemoMemoryWritesAreCompareAndSwap() async throws {
         let client = BBClient(baseURL: URL(string: "https://pages-demo.invalid")!)
         client.transport = { method, path, body in
             BotSpacesDemo.State.shared.respond(method, path, body) ?? (404, Data())
         }
-        let home = try await client.memoryRecords(botId: "bot_juniper", query: "", topic: "Home", sort: .newest)
-        XCTAssertEqual(home.records.count, 0)
-        XCTAssertEqual(home.total, 0)
-        let overview = try await client.memoryOverview(botId: "bot_juniper")
-        XCTAssertEqual(overview.profile?.cap, 2000)
-        XCTAssertEqual(overview.topics.count, 0)
-        let profile = try await client.memoryProfile(botId: "bot_juniper")
-        XCTAssertTrue(profile?.contains("## Check-in") == true)
+        let core = try await client.memoryCore(botId: "bot_juniper")
+        let skill = try XCTUnwrap(core.coreSkill)
+        XCTAssertEqual(skill.name, "core-profile")
+        XCTAssertEqual(core.cap, 2000)
+        do {
+            try await client.memoryWriteSkill(botId: "bot_juniper", name: skill.name, description: skill.description, body: "x", ifBody: .string("stale"))
+            XCTFail("a write over text that changed is refused")
+        } catch {}
+        let after = try await client.memoryCore(botId: "bot_juniper")
+        XCTAssertEqual(after.coreSkill?.body, skill.body, "nothing was written")
+        let summaries = try await client.memorySummaries(botId: "bot_juniper")
+        XCTAssertEqual(summaries.map(\.threadId), ["thr_demo_lisbon"])
     }
 }
