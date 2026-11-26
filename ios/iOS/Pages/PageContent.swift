@@ -28,7 +28,6 @@ struct PageScroll: View {
                 .frame(maxWidth: 720, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
-            .modifier(RegularScrollingSurface())
             .refreshable {
                 async let tree: Void = PagesStore.shared.load(app.client)
                 await model.load(app.client)

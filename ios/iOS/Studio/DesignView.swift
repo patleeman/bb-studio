@@ -163,7 +163,6 @@ private struct DesignCanvas: View {
             }
             .padding(.vertical)
         }
-        .modifier(RegularScrollingSurface())
     }
 }
 

@@ -31,7 +31,6 @@ enum PageDialog: Identifiable {
 /// page draws no bar or composer of its own.
 struct PageView: View {
     @Environment(\.inWorkbench) private var inWorkbench
-    @Environment(\.duoLayout) private var duoLayout
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var app: AppModel
     @ObservedObject private var store = PagesStore.shared
@@ -78,22 +77,12 @@ struct PageView: View {
             }
     }
 
-    /// The content with its actions: the navigation bar's, the Duo's header's, or the shell's More.
+    /// The content with its actions: the navigation bar's, or the shell's More.
     @ViewBuilder private var chrome: some View {
         let actions = PageActions(page: meta, model: model, chats: chats, gone: gone, star: starItem, studio: studio,
                                   open: { sheet = $0 }, ask: { dialog = $0 }, act: act)
         if inWorkbench {
             content.workbenchTabActions(actions.all)
-        } else if duoLayout.twoPages {
-            content
-                .toolbar(.hidden, for: .navigationBar)
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    DuoHeader {
-                        Text(meta?.displayTitle ?? "Page").font(.headline).lineLimit(1)
-                    } actions: {
-                        PageToolbarButtons(actions: actions)
-                    }
-                }
         } else {
             content
                 .navigationTitle(meta?.displayTitle ?? "Page")
