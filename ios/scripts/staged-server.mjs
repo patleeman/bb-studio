@@ -211,14 +211,16 @@ async function start() {
   const thread = await bb("thread", "spawn", "--project", project.id, "--title", "Staged QA Thread", "--prompt", "Staged QA sample thread.", "--send-at", "30d");
 
   let botId = "";
-  try {
-    const bot = await rpc(serverUrl, "studio", "bot_create", {
-      name: "Staged Bot",
-      avatar: "🤖",
-      threadId: thread.id,
-    });
-    botId = bot?.id || bot?.bot?.id || "";
-  } catch {}
+  if (process.env.BB_STAGED_SKIP_BOT !== "1") {
+    try {
+      const bot = await rpc(serverUrl, "studio", "bot_create", {
+        name: "Staged Bot",
+        avatar: "🤖",
+        threadId: thread.id,
+      });
+      botId = bot?.id || bot?.bot?.id || "";
+    } catch {}
+  }
 
   let pageId = "";
   try {

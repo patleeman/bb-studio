@@ -1,5 +1,20 @@
 import SwiftUI
 
+/// What `ShellRoot` shows before or after Studio's Bots load.
+enum ShellBotState: Equatable {
+    case loading
+    case failed(String)
+    case empty
+    case ready(BotSpace)
+
+    static func resolve(spaces: BotSpacesResponse?, bot: BotSpace?, error: String?) -> ShellBotState {
+        if let bot { return .ready(bot) }
+        if spaces != nil { return .empty }
+        if let error, !error.isEmpty { return .failed(error) }
+        return .loading
+    }
+}
+
 /// The app once Studio's Bots answer (round 7). Home is the root and every
 /// other screen is pushed on its stack, laid out by the posture: one column
 /// on the iPhone and the folded or vertical Duo; panes side by side on the
@@ -19,14 +34,24 @@ struct ShellRoot: View {
 
     var body: some View {
         Group {
-            if let bot {
+            switch ShellBotState.resolve(spaces: store.spaces, bot: bot, error: store.error) {
+            case .ready(let bot):
                 if posture.splitsWorkbench {
                     ShellPages(bot: bot, store: store, width: geometry.paneWidth)
                 } else {
                     ShellColumn(bot: bot, store: store)
                 }
-            } else {
-                ProgressView()
+            case .empty:
+                EmptyBotsColumn(store: store, error: nil)
+            case .failed(let message):
+                EmptyBotsColumn(store: store, error: message)
+            case .loading:
+                ContentUnavailableView {
+                    Label("Loading Home", systemImage: "sparkles")
+                } description: {
+                    Text("Connecting to BB Studio.")
+                }
+                .accessibilityIdentifier("shellLoading")
             }
         }
         .environment(\.shellPosture, posture)
@@ -125,6 +150,78 @@ private struct ShellColumn: View {
             HomeScreen(bot: bot, store: store)
                 .shellSurface()
                 .navigationDestination(for: Route.self) { ShellDestination(route: $0, bot: bot, store: store).shellSurface() }
+        }
+    }
+}
+
+/// Home when the server has Studio installed with 0 Bots (or a load error):
+/// still mounts the normal NavigationStack so every deep link pushes cleanly.
+private struct EmptyBotsColumn: View {
+    @ObservedObject var store: BotSpacesStore
+    let error: String?
+    @ObservedObject private var router = Router.shared
+    @Environment(\.shellPosture) private var posture
+
+    var body: some View {
+        NavigationStack(path: $router.path) {
+            emptyHome
+                .shellSurface()
+                .navigationDestination(for: Route.self) { ShellNoBotDestination(route: $0).shellSurface() }
+        }
+    }
+
+    @ViewBuilder private var emptyHome: some View {
+        let content = ContentUnavailableView {
+            Label(error == nil ? "No Bot yet" : "Couldn't load Bots",
+                  systemImage: error == nil ? "sparkles" : "exclamationmark.triangle")
+        } description: {
+            Text(error ?? "Create a Bot in BB Studio on your computer to start Home here. Studio items, Automations, and Settings still open below.")
+        } actions: {
+            if error != nil {
+                Button("Try Again") { store.retryNow() }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("homeBotsRetry")
+            } else {
+                Button("Refresh") { Task { await store.refresh() } }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("homeNoBotsRefresh")
+                Button("Studio") { router.open(.studio(kind: nil, nil)) }
+                    .accessibilityIdentifier("homeNoBotsStudio")
+            }
+            Button("Settings") { router.open(.settings) }
+                .accessibilityIdentifier("homeNoBotsSettings")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(error == nil ? "homeNoBots" : "homeBotsError")
+
+        if posture.usesRail {
+            VStack(spacing: 0) {
+                ShellTitleLine(title: "Home", posture: posture)
+                content
+            }
+            .toolbar(.hidden, for: .navigationBar)
+        } else {
+            content
+                .navigationTitle("Home")
+                .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+/// Pushed destinations when the server has 0 Bots (no bot-scoped places).
+private struct ShellNoBotDestination: View {
+    let route: Route
+
+    var body: some View {
+        switch route {
+        case .conversation(let id), .thread(let id):
+            ConversationScreen(threadId: id, pane: false)
+        case .studio:
+            StudioView().modifier(PushedChrome(title: route.shellTitle))
+        case .settings:
+            SettingsView().modifier(PushedChrome(title: route.shellTitle))
+        default:
+            RouteDestination(route: route).modifier(PushedChrome(title: route.shellTitle))
         }
     }
 }
