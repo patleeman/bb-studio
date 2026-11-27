@@ -15,6 +15,9 @@ struct ShellGeometry: Equatable {
         ShellPosture.resolve(window: window, screen: screen, phone: phone, hinge: hinge, forced: ShellQA.posture)
     }
 
+    /// The room left of the rail, for the panes (`ShellPanes`).
+    var paneWidth: CGFloat { max(0, window.width - max(ShellPosture.railWidth, trailingInset)) }
+
     /// On the Duo's inner screen, whatever the window: it draws no home
     /// indicator, though iOS reports one (also beside another app).
     var innerScreen: Bool { Self.isInnerScreen(screen, phone: phone) }

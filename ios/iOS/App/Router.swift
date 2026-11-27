@@ -34,10 +34,10 @@ final class Router: ObservableObject {
     static let shared = Router()
 
     /// Home's stack: a conversation, Memory, Library, a page…
-    /// The one stack over Home. Anything pushed takes the book's left page
-    /// back from Home (it shows over the conversation column there).
+    /// The one stack over Home. Anything pushed closes Home over the
+    /// conversation column (it shows in that column).
     @Published var path: [Route] = [] {
-        didSet { if !path.isEmpty, homePane.shownInBook { homePane.pushed() } }
+        didSet { if !path.isEmpty, homePane.overlaid { homePane.pushed() } }
     }
     /// The conversation on screen (or last on screen): the conversation
     /// column beside two pages, and where Home's "You're here" points.
