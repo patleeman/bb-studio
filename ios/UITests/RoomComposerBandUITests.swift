@@ -2,7 +2,8 @@ import XCTest
 
 final class RoomComposerBandUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
-    private var duo: Bool { ProcessInfo.processInfo.environment["ROOM_DUO"] != nil }
+    /// The folded Duo: `TEST_RUNNER_ROOM_DUO`, or seen on screen (its title and side column).
+    private var duo: Bool { ProcessInfo.processInfo.environment["ROOM_DUO"] != nil || app.isFoldedDuo }
     private var device: String { duo ? "duo" : "iphone" }
     private var failures: [String] = []
     private var steps: [String] = []
@@ -11,13 +12,13 @@ final class RoomComposerBandUITests: ServerIsolatedUITestCase {
     static let lineAllowance: CGFloat = 22
 
     private func launch() {
-        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo", "-qaRoomTheme", "forest"]
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaStrandsDemo", "-qaRoomTheme", "forest"]
         app.launchOffline()
-        if !app.buttons["roomMic"].waitForExistence(timeout: 30) {
+        if !app.waitForRoom(timeout: 30) {
             app.terminate()
             app.launchOffline()
         }
-        XCTAssertTrue(app.buttons["roomMic"].waitForExistence(timeout: 60), "the app opens on the room")
+        XCTAssertTrue(app.waitForRoom(timeout: 60), "the app opens on the room")
     }
 
     private func command(_ path: String, wait: TimeInterval = 2) {
@@ -67,7 +68,7 @@ final class RoomComposerBandUITests: ServerIsolatedUITestCase {
         let height = min(band.maxY, keyboardTop) - band.minY
         let card = any("threadComposer").frame
         let text = field.frame
-        let parts = [("In flight", any("in-flight")), ("the worker pill", any("conversationWorkers")), ("the composer", any("threadComposer"))]
+        let parts = [("the strands box", any("strands-box")), ("the worker pill", any("conversationWorkers")), ("the composer", any("threadComposer"))]
             .filter { $0.1.exists }.map { ($0.0, $0.1.frame) }
         steps.append(String(format: "%@: band %.0f–%.0f (%.0f pt), stack from %.0f, field %.0f–%.0f, card %.0f–%.0f, jump %@",
                             when, band.minY, band.maxY, height, stack.minY, text.minY, text.maxY, card.minY, card.maxY,
@@ -84,7 +85,11 @@ final class RoomComposerBandUITests: ServerIsolatedUITestCase {
         steps.append("\(when): \(shown) lines shown")
         let budget = Self.bandBudget + CGFloat(shown - 1) * Self.lineAllowance
         if height > budget { failures.append(String(format: "%@: the band is %.0f pt, over the %.0f pt budget", when, height, budget)) }
-        if jump {
+        // The folded Duo's ↓ is on its rail (NewConversationUITests), which has no room for it under ⋯ with the keyboard up:
+        // it hides while you type, and never sits beside the composer.
+        if jump && duo {
+            if app.buttons["jumpToLatest"].exists { failures.append("\(when): the ↓ shows beside the composer with the keyboard up") }
+        } else if jump {
             let button = app.buttons["jumpToLatest"]
             guard let pill = rect(transcript["pill"]) ?? (button.exists ? button.frame : nil) else { return failures.append("\(when): the ↓ didn't show") }
             if pill.maxY < stack.minY - 0.5 && band.minY < stack.minY - 0.5 {
@@ -119,12 +124,12 @@ final class RoomComposerBandUITests: ServerIsolatedUITestCase {
 
     func testTheComposerGrowsWithItsTextAndTheBandStaysCompact() {
         launch()
-        app.buttons["roomInput"].tap()
+        app.textViews["Message"].tap()
         XCTAssertTrue(field.waitForExistence(timeout: 10), "the chat stands up")
         XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "the keyboard is up")
         let tip = app.buttons["Continue"]
         if tip.waitForExistence(timeout: 2) { tip.tap() }
-        XCTAssertTrue(any("in-flight").waitForExistence(timeout: 20), "In flight is in the stack")
+        XCTAssertTrue(any("strands-box").waitForExistence(timeout: 20), "the strands box is in the stack")
         for lines in [1, 3, 8] {
             clear()
             type(lines: lines)

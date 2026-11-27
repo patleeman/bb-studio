@@ -1,6 +1,7 @@
 // The model router's rules, as pure functions: the question Jev answers,
 // reading its answer (or the fallback model's), walking a chain to the first
 // available target, and reading a failed turn's structured error.
+import { isAcpAgent } from "../provider-family";
 import { DEFAULT_RULE, type NoticeKind, type Policy, type Rule, type Target } from "./contract";
 
 /** Jev's answer counts at or above this; below it the default chain is used. */
@@ -90,15 +91,40 @@ export function ruleForTarget(policy: Policy, target: Pick<Target, "providerId" 
 
 export type Availability = (target: Target) => string | null;
 
-/** The first target `why` has no objection to, and the ones it skipped with their reasons. */
-export function firstAvailable(chain: readonly Target[], why: Availability): { target: Target | null; skipped: { target: Target; why: string }[] } {
+/** Words for a target whose readiness BB can't tell (an ACP agent with no account check, a host it can't reach). */
+export const READINESS_UNKNOWN = "readiness unknown";
+export const UNSURE_PASSED = `${READINESS_UNKNOWN}; ready models first`;
+export const UNSURE_PICKED = `No ready model left in the chain, so Auto took one whose ${READINESS_UNKNOWN}.`;
+
+/**
+ * The first target `why` has no objection to, and the ones it skipped with
+ * their reasons. A target `unsure` names (readiness unknown) comes only after
+ * every ready one in the chain, in chain order; `note` says so when it is
+ * the one picked.
+ */
+export function firstAvailable(chain: readonly Target[], why: Availability, unsure?: Availability): { target: Target | null; skipped: { target: Target; why: string }[]; note?: string } {
   const skipped: { target: Target; why: string }[] = [];
+  const later: Target[] = [];
   for (const target of chain) {
     const reason = why(target);
-    if (reason === null) return { target, skipped };
-    skipped.push({ target, why: reason });
+    if (reason !== null) {
+      skipped.push({ target, why: reason });
+      continue;
+    }
+    if (unsure?.(target)) {
+      later.push(target);
+      continue;
+    }
+    return { target, skipped: [...skipped, ...later.map((each) => ({ target: each, why: UNSURE_PASSED }))] };
   }
+  const [fallback] = later;
+  if (fallback) return { target: fallback, skipped, note: UNSURE_PICKED };
   return { target: null, skipped };
+}
+
+/** Pi and ACP agents run models from several services; a limit or an outage belongs to the model, not the whole provider. */
+export function multiBackend(providerId: string): boolean {
+  return providerId === "pi" || isAcpAgent(providerId);
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +148,8 @@ export interface FailureReading {
 }
 
 const COOLDOWN_MS = 15 * 60_000;
+/** Credits and spend caps don't refill on their own soon: with no known reset, Auto keeps off the model this long. */
+export const CREDITS_COOLDOWN_MS = 60 * 60_000;
 
 /** A reset time as the person reads it: "23 Nov, 09:00" in their time zone (or `timeZone`). */
 export function formatReset(ms: number, timeZone?: string): string {
@@ -161,17 +189,18 @@ export function readFailure(failed: FailedTurn, now: number = Date.now(), timeZo
   if (info.category !== "rate-limit") return null;
   const limits = failed.rateLimits;
   const until = blockedUntil(failed);
-  if (limits?.status === "blocked" && limits.kind === "credits") return { kind: "usage-limit", reason: "out of credits", until };
-  if (limits?.status === "blocked" && limits.kind === "spend-control") return { kind: "usage-limit", reason: "spend limit reached", until };
+  if (limits?.status === "blocked" && limits.kind === "credits") return { kind: "usage-limit", reason: "out of credits", until: until ?? now + CREDITS_COOLDOWN_MS };
+  if (limits?.status === "blocked" && limits.kind === "spend-control") return { kind: "usage-limit", reason: "spend limit reached", until: until ?? now + CREDITS_COOLDOWN_MS };
   if (until !== null) return { kind: "usage-limit", reason: `usage limit until ${formatReset(until, timeZone)}`, until };
   if (limits?.status === "blocked") return { kind: "usage-limit", reason: "usage limit, reset unknown", until: now + COOLDOWN_MS };
   const status = info.httpStatusCode ? `${info.httpStatusCode} ` : "";
   return { kind: "usage-limit", reason: `${status}${code ?? "rate limit"}`, until: now + COOLDOWN_MS };
 }
 
-export function noticeText(input: { kind: NoticeKind; providerName: string; reason: string; targetName: string | null }): string {
+export function noticeText(input: { kind: NoticeKind; providerName: string; reason: string; targetName: string | null; modeUnknown?: boolean }): string {
   const what = input.kind === "sign-in" ? "a sign-in failure" : "a usage limit";
   const head = `The auto router detected ${what} on ${input.providerName} (${input.reason}).`;
+  if (input.modeUnknown) return `${head} This conversation's permission mode can't be read, so no model is offered to hand off to.`;
   return input.targetName ? `${head} Hand off to ${input.targetName}?` : `${head} No other model in its chain is available.`;
 }
 
@@ -198,4 +227,135 @@ export function narrowPermission(requested: string, supported: readonly string[]
   });
   below.sort((a, b) => PERMISSION_LADDER.indexOf(b) - PERMISSION_LADDER.indexOf(a));
   return below[0] ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Pi and ACP agents
+// ---------------------------------------------------------------------------
+
+type Category = "rate-limit" | "billing" | "unauthorized" | "context-window-exceeded" | "connection-failed";
+
+/** An error an ACP agent (or Pi) reported as text, read as the structured shapes the router already knows. */
+export interface AgentErrorReading extends FailedTurn {
+  errorInfo: { category: Category; providerCode: null; httpStatusCode: number | null };
+}
+
+// A status only with a word that makes it one ("HTTP 429", "status: 429", "code": 429, "API Error: 429"), never a number that starts a line ("429 tests passed").
+const HTTP_STATUS = /\b(?:HTTP(?:\/[\d.]+)?\s+|status(?:[_ ]?code)?["']?\s*[=:]?\s*|code["']?\s*[=:]\s*|error:?\s+)([45]\d{2})\b/i;
+const CONTEXT = /context (?:length|window)|maximum context|prompt is too long|too many (?:input )?tokens|context_length_exceeded/i;
+const CREDITS = /out of credits?|insufficient credits?|not enough credits?|credit balance (?:is )?too low|no credits? (?:left|remaining)|credits? (?:exhausted|depleted|used up)/i;
+const BILLING = /insufficient[_ ]quota|payment required|\bbilling\b|spend(?:ing)? (?:limit|cap)|budget (?:exceeded|limit)|monthly limit/i;
+// Only limits on how much the account may use: a turn, tool-call, recursion, step, token or context limit is not one.
+const RATE = /rate[_ -]?limit|too many requests|resource[_ ]exhausted|quota (?:exceeded|exhausted|reached)|exceeded (?:your |the )?(?:current )?quota|usage limit|exhausted your (?:capacity|quota)|(?:daily|hourly|weekly|monthly) (?:usage |request )?(?:limit|quota)|(?:rate|usage|request|quota|plan|subscription) limit (?:reached|exceeded|hit)|requests per (?:minute|hour|day)/i;
+// Sign-in words about the agent's own account. A bare "unauthorized" counts only with a 401 status, and never about an MCP server or a tool.
+const AUTH = /authentication (?:required|failed|error)|auth[_ ]required|not (?:logged|signed) in|please (?:log|sign) in|login required|invalid (?:api[_ ]?)?key|incorrect api[_ ]?key|api[_ ]?key (?:is )?(?:invalid|not valid|missing)|(?:auth |access |oauth )?(?:token|session|credentials) (?:has |have )?expired/i;
+const BARE_AUTH = /unauthori[sz]ed|unauthenticated/i;
+const NOT_THE_ACCOUNT = /\b(?:mcp|tool|tools|permission denied)\b/i;
+const CONNECTION = /\bE(?:CONNREFUSED|CONNRESET|TIMEDOUT|HOSTUNREACH|NOTFOUND)\b|connection refused|fetch failed|failed to connect|could not connect|socket hang up|network error|(?:host|server) (?:is )?unreachable/i;
+
+/** An error that says the agent or its model server couldn't be reached or started ("ECONNREFUSED", "provider_unavailable", "missing_executable"). */
+export function isConnectionError(text: string): boolean {
+  return CONNECTION.test(text) || /\b(?:provider_unavailable|missing_executable)\b/.test(text);
+}
+
+const UNIT_MS: Record<string, number> = { h: 3_600_000, m: 60_000, s: 1_000 };
+
+/** "3h12m", "5 minutes", "30s", "1 hour 5 minutes" as milliseconds. */
+function duration(text: string): number | null {
+  let total = 0;
+  let found = false;
+  for (const match of text.matchAll(/(\d+(?:\.\d+)?)\s*(h(?:ours?|rs?)?|m(?:in(?:ute)?s?)?|s(?:ec(?:ond)?s?)?)(?![a-z])/gi)) {
+    total += Number(match[1]) * (UNIT_MS[match[2]!.charAt(0).toLowerCase()] ?? 0);
+    found = true;
+  }
+  return found && total > 0 ? total : null;
+}
+
+/** When the agent says it can be tried again: "resets after 3h12m", "try again in 5 minutes", "retry after 30s", "resets at <ISO time>". */
+export function agentResetAt(text: string, now: number): number | null {
+  const at = text.match(/reset(?:s)?\s+(?:at|on)\s+["']?(\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)/i);
+  if (at) {
+    const ms = Date.parse(at[1]!);
+    if (Number.isFinite(ms) && ms > now) return ms;
+  }
+  const after = text.match(/(?:reset(?:s)?|try again|retry|retry[_-]?after|retryDelay)["']?\s*(?:after|in|:)?\s*["']?((?:\d+(?:\.\d+)?\s*[a-z]+\s*){1,3})/i);
+  const ms = after ? duration(after[1]!) : null;
+  return ms === null ? null : now + ms;
+}
+
+/**
+ * An ACP agent's (or Pi's) error text as a failed turn: rate and usage limits
+ * (Gemini's RESOURCE_EXHAUSTED, "quota exceeded", 429s), credits, billing,
+ * sign-in, a full context and a connection it couldn't make. Null for
+ * anything else. ACP has no error codes for these, so the words decide.
+ */
+export function readAgentError(text: string | null | undefined, now: number = Date.now()): AgentErrorReading | null {
+  if (!text?.trim()) return null;
+  text = text.slice(0, 2_000);
+  const status = text.match(HTTP_STATUS);
+  const httpStatusCode = status ? Number(status[1]) : null;
+  const info = (category: Category) => ({ category, providerCode: null, httpStatusCode });
+  const until = agentResetAt(text, now);
+  const windows = until === null ? [] : [{ label: null, status: "blocked", resetsAtMs: until }];
+  const limit = (kind: string): AgentErrorReading => ({ errorInfo: info("rate-limit"), rateLimits: { status: "blocked", kind, windows } });
+  if (CONTEXT.test(text)) return { errorInfo: info("context-window-exceeded"), rateLimits: null };
+  if (CREDITS.test(text)) return limit("credits");
+  if (httpStatusCode === 402 || BILLING.test(text)) return { errorInfo: info("billing"), rateLimits: null };
+  if (httpStatusCode === 429 || RATE.test(text)) return limit(until === null ? "unknown" : "usage");
+  if (!NOT_THE_ACCOUNT.test(text) && (AUTH.test(text) || (httpStatusCode === 401 && BARE_AUTH.test(text)))) return { errorInfo: info("unauthorized"), rateLimits: null };
+  if (CONNECTION.test(text)) return { errorInfo: info("connection-failed"), rateLimits: null };
+  return null;
+}
+
+/** What BB's provider/error event says, with no codes: its message, then the detail an ACP agent puts its error in. */
+export interface AgentErrorText {
+  message: string | null;
+  detail: string | null;
+}
+
+/** BB's own wrapper message for an ACP error, which says nothing about it. */
+const GENERIC_MESSAGE = /^(?:provider error|error|unknown error)$/i;
+
+/**
+ * An error event read the safe way round: the message first; the detail only
+ * when the message says nothing, and then only its first line, since the rest
+ * of a detail is often the agent's stderr or a tool's output ("429 tests
+ * passed", "quota exceeded" in a file it printed).
+ */
+export function readAgentErrorText(text: AgentErrorText | null | undefined, now: number = Date.now()): AgentErrorReading | null {
+  if (!text) return null;
+  const message = text.message?.trim() ?? "";
+  if (message && !GENERIC_MESSAGE.test(message)) {
+    const reading = readAgentError(message, now);
+    if (reading) return reading;
+  }
+  const firstLine = (text.detail ?? "").trim().split("\n")[0]?.slice(0, 500) ?? "";
+  return readAgentError(firstLine, now);
+}
+
+/** BB's usage snapshot for a provider (`system.usageLimits`), as much as the router reads of it. */
+export interface UsageSnapshot {
+  status: string;
+  windows?: readonly { label?: string | null; usedPercent: number; resetsAt: string | null; cost?: { usedUsdCents: number; limitUsdCents: number } }[];
+}
+
+/**
+ * Why a provider's usage snapshot rules it out now: out of credit, or a
+ * used-up window. Null when it doesn't. Sign-in is readiness's to say: a
+ * usage reader says "unauthenticated" for reasons that don't stop the agent
+ * (OpenCode with no Go key, Claude Code on an API key). A Pi or ACP agent's
+ * plan covers only some of its models, so its windows aren't read at all.
+ */
+export function usageProblem(usage: UsageSnapshot | null | undefined, now: number, timeZone?: string, providerId?: string): string | null {
+  if (!usage || usage.status !== "ok") return null;
+  if (providerId && multiBackend(providerId)) return null;
+  const full = (usage.windows ?? []).filter((window) => {
+    if (window.usedPercent < 100) return false;
+    const reset = window.resetsAt === null ? null : Date.parse(window.resetsAt);
+    return reset === null || !Number.isFinite(reset) || reset > now;
+  });
+  if (full.length === 0) return null;
+  if (full.some((window) => window.cost)) return "out of credit";
+  const resets = full.map((window) => (window.resetsAt === null ? Number.NaN : Date.parse(window.resetsAt))).filter(Number.isFinite);
+  return resets.length === full.length ? `usage limit until ${formatReset(Math.max(...resets), timeZone)}` : "usage limit reached";
 }

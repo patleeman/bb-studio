@@ -144,7 +144,7 @@ describe("bb startup module graph", () => {
   it("loads only the named command group for `bb thread`", async () => {
     const run = await runCli("source", ["thread", "--help"]);
 
-    expect(run.stdout).toContain("Usage: bb thread");
+    expect(run.stdout).toContain("Usage: bbs thread");
     expect(loaded(run, "/apps/cli/src/commands/thread/index.ts")).toHaveLength(
       1,
     );
@@ -230,16 +230,18 @@ describe("bb startup module graph", () => {
         process.execPath,
         [distEntry, "status"],
         { cwd: cliRoot, env },
-      );
+      ).catch((error: { stdout: string; stderr: string }) => error);
 
       expect(stdout).toContain("Project: (not set)");
-      expect(stderr).toBe("");
+      expect(stderr).toBe(
+        "Error: The bb server at http://127.0.0.1:1 did not answer: fetch failed: bad port\n",
+      );
     }, 30_000);
 
     it("loads only the thread chunk for `bb thread`", async () => {
       const run = await runCli("dist", ["thread", "--help"]);
 
-      expect(run.stdout).toContain("Usage: bb thread");
+      expect(run.stdout).toContain("Usage: bbs thread");
       expect(loaded(run, `${chunkDirUrl}thread-`)).toHaveLength(1);
 
       const otherGroups = CORE_COMMAND_GROUPS.map((group) => group.name).filter(
@@ -326,6 +328,13 @@ describe("bb startup module graph", () => {
           serverUrl,
         );
         expect(direct.stdout).toBe("fixture ran: inspect fixture-1\n");
+        const coreGroupChunks = direct.urls.filter((url) =>
+          CORE_COMMAND_GROUPS.some((group) =>
+            new RegExp(`/index-chunks/${group.name}-[A-Z0-9]+\\.js$`).test(url),
+          ),
+        );
+        expect(coreGroupChunks).toEqual([]);
+        expect(loaded(direct, `${chunkDirUrl}json-shapes-`)).toEqual([]);
 
         const raw = await runCli(
           "dist",

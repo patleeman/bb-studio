@@ -8,7 +8,7 @@ export interface LinkResolveDeps {
   threadTitle(threadId: string): Promise<string | null>;
   itemTitle(id: string): string | null;
   botName(id: string): string | null;
-  entryTitle(kind: "automation" | "todo" | "record", id: string): Promise<string | null>;
+  entryTitle(kind: "automation" | "todo", id: string): Promise<string | null>;
   fileTarget(threadId: string, path: string): Promise<FileTarget | null>;
   workspacePath(threadId: string, path: string): Promise<string>;
   fileExists?(threadId: string, path: string): Promise<boolean>;
@@ -38,7 +38,7 @@ export async function resolveLink(input: { kind: string; id: string | null; thre
       return name === null ? missing : present(entry.id === "bot" ? name : entry.name);
     }
     case "entry": {
-      if (!id || (entry.id !== "automation" && entry.id !== "todo" && entry.id !== "record")) return missing;
+      if (!id || (entry.id !== "automation" && entry.id !== "todo")) return missing;
       const title = await deps.entryTitle(entry.id, id);
       return title === null ? missing : present(title.trim() || entry.name);
     }

@@ -9,6 +9,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   ExperimentalThreadHeaderRegistration,
@@ -78,6 +79,7 @@ function target(id: string): PluginThreadActionTarget {
     parentNotifications: "auto",
     archivedAt: null,
     pinnedAt: null,
+    isHidden: false,
     sectionId: null,
     isUnread: false,
     status: "idle",
@@ -87,12 +89,15 @@ function target(id: string): PluginThreadActionTarget {
 
 function Host({ children }: { children: ReactNode }) {
   const controller = useRenameController();
+  const [queryClient] = useState(() => new QueryClient());
   return (
-    <RenameControllerProvider controller={controller}>
-      <PaneContext.Provider value={PANE_CONTEXT}>
-        {children}
-      </PaneContext.Provider>
-    </RenameControllerProvider>
+    <QueryClientProvider client={queryClient}>
+      <RenameControllerProvider controller={controller}>
+        <PaneContext.Provider value={PANE_CONTEXT}>
+          {children}
+        </PaneContext.Provider>
+      </RenameControllerProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -153,6 +158,32 @@ describe("thread header decorations", () => {
     rerender(header("thr_plain", "Plain title"));
     expect(screen.getByText("Plain title")).toBeTruthy();
     expect(screen.queryByText("Running")).toBeNull();
+  });
+
+  it("draws the decoration's end at the header's right, and keeps both parts out of the window's drag strip", () => {
+    const clicked = vi.fn();
+    register("studio", [
+      {
+        id: "chat",
+        useDecoration: () => ({
+          after: <b>Running</b>,
+          end: <button type="button" onClick={clicked}>Strands</button>,
+        }),
+      },
+    ]);
+    render(header("thr_bot", "Real title"), { wrapper: Host });
+    const end = screen.getByText("Strands");
+    // Not in the title row: the right end, before bb's own actions.
+    expect(screen.getByTestId("center").contains(end)).toBe(false);
+    expect(end.closest("[data-thread-header-workflow-actions]")).not.toBeNull();
+    const endSpan = end.closest<HTMLElement>("[data-fork-thread-header-end]")!;
+    const afterSpan = screen.getByText("Running").closest<HTMLElement>("[data-fork-thread-header-after]")!;
+    for (const span of [endSpan, afterSpan]) {
+      expect(span.className).toContain("[-webkit-app-region:no-drag]");
+      expect(span.className).toContain("[app-region:no-drag]");
+    }
+    fireEvent.click(end);
+    expect(clicked).toHaveBeenCalledTimes(1);
   });
 
   it("edits and saves the real title, not the decorated one", async () => {

@@ -42,77 +42,22 @@ final class BotShellTests: XCTestCase {
 
     // MARK: Gate
 
-    func testGateKeepsTheTabBarUntilSpacesAreAvailable() {
-        XCTAssertFalse(BotShell.usesSpaces(support: .unknown, showing: false, idle: true))
-        XCTAssertFalse(BotShell.usesSpaces(support: .unavailable, showing: true, idle: true))
-        XCTAssertTrue(BotShell.usesSpaces(support: .available, showing: false, idle: true))
-        XCTAssertFalse(BotShell.usesSpaces(support: .available, showing: false, idle: false), "never swaps the UI out from under an open thread")
-        XCTAssertTrue(BotShell.usesSpaces(support: .available, showing: true, idle: false), "once shown it stays")
+    func testLaunchLoadsUntilStudioAnswersThenShowsTheRoom() {
+        XCTAssertEqual(StudioLaunch.shown(support: .unknown, failed: false, timedOut: false), .loading, "loading while Studio hasn't answered")
+        XCTAssertEqual(StudioLaunch.shown(support: .available, failed: false, timedOut: false), .room)
+        XCTAssertEqual(StudioLaunch.shown(support: .available, failed: true, timedOut: true), .room, "an answer from before (the cache) wins")
     }
 
-    func testLaunchShowsTheRoomWhenSpacesAnswerBeforeTheFallback() {
-        var launch = SpacesLaunch()
-        XCTAssertEqual(launch.update(support: .unknown, idle: true), .loading, "neutral while support is unknown")
-        XCTAssertEqual(launch.update(support: .available, idle: true), .room, "straight to the room, no classic flash")
-        launch.timedOut = true
-        XCTAssertEqual(launch.update(support: .available, idle: false), .room, "once shown it stays")
-    }
-
-    func testLaunchFallsBackToClassicThenSwitchesToTheRoomWhenIdle() {
-        var launch = SpacesLaunch()
-        XCTAssertEqual(launch.update(support: .unknown, idle: true), .loading)
-        launch.timedOut = true
-        XCTAssertEqual(launch.update(support: .unknown, idle: true), .classic, "classic after the fallback")
-        XCTAssertEqual(launch.update(support: .unknown, idle: true), .classic, "never back to loading")
-        XCTAssertEqual(launch.update(support: .available, idle: false), .classic, "a draft, a sheet or an open thread holds the switch")
-        XCTAssertEqual(launch.update(support: .available, idle: true), .room, "switches on its own once idle")
-        XCTAssertEqual(launch.update(support: .available, idle: false), .room, "and stays while the chat stands up")
-    }
-
-    func testLaunchOnAnOlderStudioIsClassicAtOnce() {
-        var launch = SpacesLaunch()
-        XCTAssertEqual(launch.update(support: .unknown, idle: true), .loading)
-        XCTAssertEqual(launch.update(support: .unavailable, idle: true), .classic)
-        XCTAssertEqual(launch.update(support: .unknown, idle: true), .classic)
-    }
-
-    func testLaunchWithALinkSkipsTheLoadingState() {
-        var launch = SpacesLaunch()
-        XCTAssertEqual(launch.update(support: .unknown, idle: false), .classic, "a linked thread opens at once")
-        XCTAssertEqual(launch.update(support: .unknown, idle: true), .classic)
-    }
-
-    func testLaunchWithKnownSupportNeverShowsLoading() {
-        XCTAssertEqual(SpacesLaunch().next(support: .available, idle: true), .room)
-        XCTAssertEqual(SpacesLaunch().next(support: .unavailable, idle: true), .classic)
-    }
-
-    func testAnExistingUserWithASheetAtLaunchGetsTheRoomAtOnce() {
-        var launch = SpacesLaunch()
-        XCTAssertEqual(launch.update(support: .available, idle: true, quiet: false), .room, "the first decision ignores a sheet, as before")
-    }
-
-    func testOnlyAQuietClassicChatSwitchesToTheRoom() {
-        var launch = SpacesLaunch(shown: .classic, timedOut: true)
-        XCTAssertEqual(launch.update(support: .available, idle: true, quiet: false), .classic, "a sheet, a draft, reading or a touch holds it")
-        XCTAssertEqual(launch.update(support: .available, idle: true, quiet: true), .room)
-        XCTAssertEqual(launch.update(support: .available, idle: false, quiet: false), .room, "the room stays")
-        XCTAssertEqual(launch.update(support: .unavailable, idle: true), .classic, "an older Studio after a reconnect")
-    }
-
-    func testALoopsLinkOrASheetDuringLoadingShowsClassic() {
-        XCTAssertEqual(SpacesLaunch().next(support: .unknown, idle: true, linked: true), .classic, "classic opens the Loops")
-        XCTAssertEqual(SpacesLaunch().next(support: .unknown, idle: true, quiet: false), .classic, "classic shows the sheet")
-        XCTAssertEqual(SpacesLaunch().next(support: .unknown, idle: false), .classic, "a draft for the Bot chat")
-    }
-
-    func testAServerThatAnsweredWithAnErrorSkipsLoading() {
-        XCTAssertEqual(SpacesLaunch(timedOut: true).next(support: .unknown, idle: true), .classic)
+    func testOnlyARealFailureOrTheTimeoutShowsUnreachable() {
+        XCTAssertEqual(StudioLaunch.shown(support: .unknown, failed: false, timedOut: true), .unreachable, "no answer in time")
+        XCTAssertEqual(StudioLaunch.shown(support: .unknown, failed: true, timedOut: false), .unreachable, "the server answered with an error")
+        XCTAssertEqual(StudioLaunch.shown(support: .unavailable, failed: false, timedOut: false), .unreachable, "Studio isn't installed")
+        XCTAssertEqual(StudioLaunch.timeout, .seconds(10))
     }
 
     func testRetriesBackOff() {
-        XCTAssertEqual((0..<5).map { SpacesLaunch.retryDelay($0) }, [.seconds(5), .seconds(15), .seconds(60), .seconds(60), .seconds(60)])
-        XCTAssertEqual(SpacesLaunch.retryDelay(0, delays: []), .seconds(60))
+        XCTAssertEqual((0..<5).map { StudioLaunch.retryDelay($0) }, [.seconds(5), .seconds(15), .seconds(60), .seconds(60), .seconds(60)])
+        XCTAssertEqual(StudioLaunch.retryDelay(0, delays: []), .seconds(60))
     }
 
     @MainActor
@@ -148,7 +93,7 @@ final class BotShellTests: XCTestCase {
     @MainActor
     func testLaunchLandsOnMainOnce() throws {
         let store = BotSpacesStore(serverURL: server)
-        let shell = BotShellModel()
+        let shell = Router()
         shell.land(store)
         XCTAssertFalse(shell.landed, "nothing to land on before spaces load")
         store.seedForDemo(try Self.spaces(), views: [:])
@@ -227,7 +172,7 @@ final class BotShellTests: XCTestCase {
     func testSwitchingWatchesTheShownBotAndUnwatchesTheLastOne() throws {
         let store = BotSpacesStore(serverURL: server)
         store.seedForDemo(try Self.spaces(), views: [:])
-        let shell = BotShellModel()
+        let shell = Router()
         shell.land(store)
         shell.show("bot_b", store: store, compact: true)
         XCTAssertEqual(shell.shownBotId, "bot_b")
@@ -248,13 +193,13 @@ final class BotShellTests: XCTestCase {
     func testBotLinksOpenThatBotsMain() throws {
         let store = BotSpacesStore(serverURL: server)
         store.seedForDemo(try Self.spaces(current: "bot_b"), views: [:])
-        let shell = BotShellModel()
-        shell.open(.primary, store: store)
+        let shell = Router()
+        shell.follow(.bot(nil), store: store)
         XCTAssertEqual(shell.shownBotId, "bot_a")
         XCTAssertEqual(shell.selection, .conversation("thr_a_main"))
-        shell.open(.bot("bot_b"), store: store)
+        shell.follow(.bot("bot_b"), store: store)
         XCTAssertEqual(shell.selection, .conversation("thr_b_main"))
-        shell.open(.list, store: store)
+        shell.follow(.list, store: store)
         XCTAssertNil(shell.selection)
         XCTAssertEqual(shell.compactColumn, .sidebar)
     }

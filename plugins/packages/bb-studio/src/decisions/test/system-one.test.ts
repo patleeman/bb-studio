@@ -27,7 +27,7 @@ test("a caller's questions and state reach Jev unchanged, and every answer comes
     return Response.json({ answers: { ...answers, extra: { type: "noul", noul: 1 } } });
   });
   const result = await askSystemOne({ zenApiKey: "k" }, { state: { message: "hi" }, questions }, signal(), env);
-  assert.equal(result.via, "OpenCode Zen");
+  assert.equal(result.via, "OpenCode Go");
   assert.deepEqual(result.answers, answers, "only the questions asked are returned");
   assert.deepEqual(bodies[0]!.questions, questions);
   assert.deepEqual(JSON.parse(bodies[0]!.state), { message: "hi" });
@@ -41,7 +41,7 @@ test("an answer outside a choice's options, or a missing one, moves to the next 
   vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json(replies.shift()));
   await assert.rejects(
     askSystemOne({ typesafeApiKey: "a", zenApiKey: "b" }, { state: {}, questions }, signal(), env),
-    /TypeSafe returned an unknown decision option\. OpenCode Zen omitted a required decision\./,
+    /OpenCode Go returned an unknown decision option\. TypeSafe omitted a required decision\./,
   );
 });
 
@@ -63,4 +63,20 @@ test("the public contract bounds what other plugins can send", () => {
   assert.equal(model.safeParse(request).success, true);
   assert.equal(model.safeParse({ ...request, prompt: "" }).success, false);
   assert.equal(model.safeParse({ ...request, projectId: "proj_1" }).success, false);
+});
+
+test("askSystemOne aborts promptly if the caller signal aborts while apiKeyCommand is running", async () => {
+  const controller = new AbortController();
+  const started = Date.now();
+  setTimeout(() => controller.abort(new Error("caller gave up")), 40);
+  await assert.rejects(
+    askSystemOne(
+      { jevProvider: "custom", customJevEndpoint: "http://localhost:9999/v1/systemone", customJevModel: "jev-local", customJevApiKeyCommand: "sleep 5 && echo tok" },
+      { state: {}, questions },
+      controller.signal,
+      env,
+    ),
+    /caller gave up/,
+  );
+  assert.ok(Date.now() - started < 1000, `expected prompt abort, took ${Date.now() - started}ms`);
 });

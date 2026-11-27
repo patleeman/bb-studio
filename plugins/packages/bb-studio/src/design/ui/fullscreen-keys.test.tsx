@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // Space and the slide keys on the design canvas and in the full-screen
 // player must never take a key typed into the composer, a comment box or any
 // other text field in BB.

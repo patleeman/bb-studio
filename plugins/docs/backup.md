@@ -7,11 +7,11 @@ what's missing. A second restore changes nothing, and work that is newer on
 the BB you restore to is never overwritten.
 
 ```sh
-bb studio backup                      # bb-studio-backup-<time>.zip in the current folder
-bb studio backup --out ~/Backups      # into a folder, or name a file
-bb studio restore <file>              # shows what would change; changes nothing
-bb studio restore <file> --yes        # restores
-bb studio restore <file> --dry-run    # shows what would change, explicitly
+bbs studio backup                      # bb-studio-backup-<time>.zip in the current folder
+bbs studio backup --out ~/Backups      # into a folder, or name a file
+bbs studio restore <file>              # shows what would change; changes nothing
+bbs studio restore <file> --yes        # restores
+bbs studio restore <file> --dry-run    # shows what would change, explicitly
 ```
 
 On Studio's Setup page, **Backup and restore** has the same two actions.
@@ -30,7 +30,7 @@ use the CLI.
 | `artifacts/` | Studio (built-in Artifacts) | Each artifact with every version's bytes. Studio writes this section itself, under the old plugin's id, so backups from before the merge restore into it. |
 | `design/` | Studio (built-in designs) | Each design with its rounds, screens (as HTML files) and comments. Studio writes this section itself, under the old Design plugin's id, so backups from before the merge restore into it. Saved styles aren't included. |
 | `dashboards/` | Studio (built-in dashboards) | Each dashboard's widgets, layouts and pushed data, and the custom widget library. Fetched URL and script data is fetched again; script approvals are never restored, so a restored script waits for the user's approval. |
-| `studio/` | Studio | Tags and which items have them, project leads (the personal project's lead is the user's Bot) and their Heartbeat settings, the Bot (name, avatar, state, Memory page id) and its own skills, including state, pinning, last use and saved lint warnings (restored only when this BB has no Bot), item links, item chats, comments and activity. A `versions.json` or `views.json` from an older backup is ignored. |
+| `studio/` | Studio | Tags and which items have them, project leads (the personal project's lead is the user's Bot) and their Heartbeat settings, the Bot (name, avatar, state, old Memory page id) and its own skills, including state, pinning, last use, the always-on flag and saved lint warnings (restored only when this BB has no Bot), item links, item chats, comments and activity. A `versions.json` or `views.json` from an older backup is ignored. |
 
 ## What isn't
 
@@ -124,7 +124,7 @@ Restore runs in this order:
    BB, trying these in order: the same id (restoring on the same BB), then
    Personal, then the same folder path, then the only project with the same
    name. If no project matches, its items become global items. The summary
-   lists those projects, and you can move the items with `bb studio move`.
+   lists those projects, and you can move the items with `bbs studio move`.
 4. **Restore each add-on, then Studio.** Each add-on gets
    `studio_restore({ session, dryRun, version, projects })` and decides each
    item by its original id and `updatedAt`:
@@ -198,7 +198,7 @@ upload path. These parts haven't been checked on a running BB yet:
 
 ## Decisions in Studio
 
-Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (`decisions_` setting keys), or run `bb studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
+Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (`decisions_` setting keys), or run `bbs studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
 
 The Decisions migration is complete. Studio stores its settings, keys,
 fallback model and recent decisions; these are server configuration and are

@@ -17,6 +17,7 @@ import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, expe
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
+import { errorMessage } from "../../kit/format";
 import type { BotActivityView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
@@ -160,7 +161,12 @@ export function BotsList({ onNavigate, activeThreadId, threadId }: { onNavigate(
       {bots.length ? bots.map((bot) => bot.id === selected?.id
         ? <BotEntry key={bot.id} view={view.data!} onNavigate={onNavigate} active={activeThreadId} onThread={!!threadId} providers={providers} />
         : <BotRow key={bot.id} bot={bot} onNavigate={onNavigate} />)
-        : none ? null : <p className="px-2 text-xs text-muted-foreground">{list.loading || view.loading ? "Loading…" : list.error ?? view.error}</p>}
+        : none ? null : list.loading || view.loading ? <p className="px-2 text-xs text-muted-foreground">Loading…</p> : (
+          <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground" role="alert">
+            <span className="min-w-0 flex-1">{list.error ?? view.error}</span>
+            <button type="button" onClick={() => { void list.refresh(); void view.refresh(); }} className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-[11px] text-foreground hover:bg-state-hover">Retry</button>
+          </div>
+        )}
     </nav>
   );
 }
@@ -205,7 +211,7 @@ function useThreadDrop(bot: BotSummary): { over: boolean; props: { onDragOver(ev
         event.preventDefault();
         call("bot_thread_adopt", { botId: bot.id, threadId }).then(
           () => toast.success(`Moved to ${bot.name}`),
-          (error: unknown) => toast.error(`Couldn't move it to ${bot.name}: ${error instanceof Error ? error.message : String(error)}`),
+          (error: unknown) => toast.error(`Couldn't move it to ${bot.name}: ${errorMessage(error)}`),
         );
       },
     },

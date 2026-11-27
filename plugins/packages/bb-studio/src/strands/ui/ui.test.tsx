@@ -10,14 +10,14 @@ const MIN = 60_000;
 
 const view = (id: string, title: string, over: Partial<StrandView> = {}): StrandView => ({
   id, title, summary: null, named: true, state: "active", detail: null, asks: [], workers: [], lastAt: NOW - 10 * MIN, firstAt: NOW - 3 * 60 * MIN, firstSeq: 4,
-  latestSeq: 10, latestTurnId: `t_${id}`, messages: 1, unsure: 0, pinned: false, origin: "jev", taskId: null, ...over,
+  latestSeq: 10, latestTurnId: `t_${id}`, messages: 1, unsure: 0, pinned: false, origin: "jev", taskId: null, parentId: null, trunk: false, ...over,
 });
-const approval = (id: string, label: string) => ({ id, kind: "approval" as const, threadId: "thr_main", label, details: ["Command: npm publish --tag latest --access public --otp-from-env", "Cwd: /tmp/release"], turnId: "t5" as string | null, decisions: ["deny", "allow_once"] as ("deny" | "allow_once")[] });
+const approval = (id: string, label: string) => ({ id, kind: "approval" as const, threadId: "thr_main", label, details: ["Command: npm publish --tag latest --access public --otp-from-env", "Cwd: /tmp/release"], turnId: "t5" as string | null, decisions: ["deny", "allow_once"] as ("deny" | "allow_once")[], seq: null as number | null });
 const LIST: StrandList = {
   threadId: "thr_main", enabled: true, backfill: { done: true, at: NOW - 60 * MIN, messages: 300, sorted: 300 }, jevCallsToday: 12, jevDailyCap: 300, sortingTurn: false,
   strands: [
     view("s_doc", "Blood pressure log", { state: "needs-you", asks: [approval("int_1", "Approve: npm publish")] }),
-    view("s_pr", "bb-plugins PR #15", { state: "needs-you", asks: [{ id: "int_2", kind: "question", threadId: "thr_worker", label: "PR fix: Which branch?", details: [], turnId: null, decisions: [] }] }),
+    view("s_pr", "bb-plugins PR #15", { state: "needs-you", asks: [{ id: "int_2", kind: "question", threadId: "thr_worker", label: "PR fix: Which branch?", details: [], turnId: null, decisions: [], seq: null }] }),
     view("s_hvac", "Furnace tune-up", { state: "needs-you", detail: "Router fix needs you" }),
     view("s_cx", "CodexBar quota", { state: "running", detail: "codexbar-fix", summary: "Moving the quota read to the new usage endpoint.", latestSeq: 40, messages: 4, workers: [{ threadId: "thr_w", title: "codexbar-fix tests", status: "running", endedAt: null }] }),
     view("s_red4", "red4 mitigation", { state: "waiting", detail: "Unraid's fix" }),
@@ -85,22 +85,28 @@ const state = vi.hoisted(() => ({
   toThread: vi.fn(),
   openTab: vi.fn(() => true),
   composerThread: "thr_main" as string | null,
-  overview: null as unknown,
+  error: null as string | null,
+  refresh: vi.fn(),
   toast: vi.fn((_message: string, _options?: { action?: { label: string; onClick(): void } }) => undefined),
 }));
+const { submittedComposer, submitted } = vi.hoisted(() => {
+  const submitted = new Set<() => void>();
+  return { submitted, submittedComposer: { scope: { kind: "thread", threadId: "thr_main" }, onSubmitted: (listener: () => void) => { submitted.add(listener); return () => { submitted.delete(listener); }; } } };
+});
 vi.mock("@get-bb/plugin-sdk/app", () => ({
+  useComposer: () => submittedComposer,
   useBbNavigate: () => ({ toThread: state.toThread, experimental_toAppPath: state.toAppPath }),
   experimental_useAppPanel: () => ({ openTab: state.openTab }),
   experimental_InfoSection: ({ label, children }: { label: string; children?: React.ReactNode }) => <section aria-label={label}>{children}</section>,
 }));
 vi.mock("../../ui/live", () => ({
-  useLive: (method: string) => ({ data: method === "strands.list" ? state.list : method === "strands.tags" ? state.tags : method === "strands.overview" ? state.overview : null, error: null, loading: false, refresh: vi.fn() }),
+  useLive: (method: string) => ({ data: method === "strands.list" ? state.list : method === "strands.tags" ? state.tags : null, error: state.error, loading: false, refresh: state.refresh }),
   useCall: () => state.call,
+  peekLive: (method: string) => (method === "strands.list" ? state.list : null),
 }));
 vi.mock("../../kit/ui/index", async () => ({ ...(await import("../../loops/ui/test-kit")).kitUi, Tooltip: ({ children }: { children?: React.ReactNode }) => <>{children}</> }));
-vi.mock("../../kit/app/route", () => ({ usePathname: () => "/threads/thr_main" }));
+vi.mock("../../kit/app/route", () => ({ usePathname: () => "/threads/thr_main", currentPathname: () => "/threads/thr_main" }));
 vi.mock("../../kit/composer", () => ({ useComposerThread: () => state.composerThread }));
-vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ values: { strandsOverview: true } }) }));
 vi.mock("../../kit/app/index", () => ({ PageColumn: ({ children }: { children?: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("../../ui/conversations/bot-thread-owners", () => ({ useIsBotThread: () => true }));
 vi.mock("sonner", () => ({ toast: Object.assign(state.toast, { error: vi.fn() }) }));
@@ -108,16 +114,16 @@ vi.mock("sonner", () => ({ toast: Object.assign(state.toast, { error: vi.fn() })
 const { StrandsBoxBanner } = await import("./Strip");
 const { ContextInfoSection } = await import("./ContextInfoSection");
 const { promptStackSource, resetPromptStackForTests } = await import("./prompt-stack");
-const { StrandsOverview } = await import("./Overview");
-const { StrandTag } = await import("./Tag");
+const { StrandMarks, StrandTag } = await import("./Tag");
 const { StrandsTab } = await import("./Tab");
-const { select, registerTimelineFilter, timelineFilterOf, resetSelectionForTests } = await import("./selection");
+const { select, selectionOf, registerTimelineFilter, timelineFilterOf, resetSelectionForTests } = await import("./selection");
+const { flashReply, resetAskMarksForTests, takeFlash } = await import("./ask-mark");
 
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  Object.assign(state, { list: LIST, tags: TAGS, composerThread: "thr_main" });
-  state.call.mockClear(); state.toast.mockClear(); state.toAppPath.mockClear(); state.toThread.mockClear(); state.openTab.mockClear();
+  Object.assign(state, { list: LIST, tags: TAGS, composerThread: "thr_main", error: null });
+  state.call.mockClear(); state.toast.mockClear(); state.toAppPath.mockClear(); state.toThread.mockClear(); state.openTab.mockClear(); state.refresh.mockClear();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -128,6 +134,29 @@ const render = (node: React.ReactNode) => act(() => root.render(node));
 const box2 = () => container.querySelector('[data-testid="strands-strip"]');
 const click = (element: Element | null | undefined) => act(() => { (element as HTMLElement).click(); });
 const text = (element: Element | null | undefined) => element?.textContent ?? "";
+
+describe("sending a message", () => {
+  it("clears the strand filter and zoom, so the new message is drawn at once", async () => {
+    const { setZoom, zoomOf } = await import("./selection");
+    render(<StrandsBoxBanner />);
+    act(() => { select("thr_main", { strandId: "s1", seq: 3, turnIds: ["turn_1"] }); setZoom("thr_main", 1); });
+    expect(timelineFilterOf("thr_main")).not.toBeNull();
+    act(() => { for (const listener of submitted) listener(); });
+    expect(selectionOf("thr_main")).toBeNull();
+    expect(timelineFilterOf("thr_main")).toBeNull();
+    expect(zoomOf("thr_main")).toBe(0);
+  });
+
+  it("from another conversation's composer leaves this one's filter alone", async () => {
+
+    state.composerThread = "thr_other";
+    render(<StrandsBoxBanner />);
+    act(() => { select("thr_main", { strandId: "s1", seq: 3, turnIds: ["turn_1"] }); });
+    act(() => { for (const listener of submitted) listener(); });
+    expect(selectionOf("thr_main")).not.toBeNull();
+    expect(timelineFilterOf("thr_main")).not.toBeNull();
+  });
+});
 
 describe("the strands box above a conversation's composer", () => {
   const box = () => container.querySelector('[data-testid="strands-strip"]');
@@ -182,6 +211,25 @@ describe("the strands box above a conversation's composer", () => {
     expect(input.value).toBe("");
     key(input, "Escape");
     expect(container.querySelector('[data-testid="strands-menu"]')).toBeNull();
+  });
+
+  it("under a filter, a jump to the conversation's opening message (BB's filter never shows it) lands on its reply, or doesn't navigate", async () => {
+    state.tags = { ...TAGS, opening: { seq: 4, replySeq: 6 } };
+    render(<StrandsBoxBanner />);
+    click(container.querySelector("[data-strands-line]"));
+    await typeInto(box()!.querySelector<HTMLInputElement>("[data-strand-query]")!, "codex");
+    key(box()!.querySelector("[data-strand-query]")!, "Enter");
+    const previous = () => click(box()!.querySelector('[aria-label="Previous message in this strand"]'));
+    previous(); previous(); previous();
+    expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=8", { replace: true });
+    previous();
+    expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=6", { replace: true });
+    state.tags = { ...TAGS, opening: { seq: 4, replySeq: null } };
+    render(<StrandsBoxBanner />);
+    state.toAppPath.mockClear();
+    click(box()!.querySelector('[aria-label="Next message in this strand"]'));
+    previous();
+    expect(state.toAppPath.mock.calls.map((call) => call[0])).toEqual(["/threads/thr_main#msg=8"]);
   });
 
   it("applies the picked strand as a filter: a token with ×, BB's timeline filter, stepping; × and Esc clear it", async () => {
@@ -308,15 +356,32 @@ describe("the strands box above a conversation's composer", () => {
   });
 });
 
-describe("the tag above each message", () => {
+describe("the strand tag in each message's footer row", () => {
   const message = (turnId: string, role: "user" | "assistant") => ({ id: `m_${turnId}_${role}`, threadId: "thr_main", turnId, role, createdAt: NOW, ...(role === "user" ? { initiator: "user" as const } : {}) });
-  const row = (turnId: string, role: "user" | "assistant") => <div data-timeline-row-id={`${turnId}-${role}`}><StrandTag message={message(turnId, role) as never} /></div>;
+  const row = (turnId: string, role: "user" | "assistant") => (
+    <div data-timeline-row-id={`${turnId}-${role}`}>
+      <div data-above><StrandMarks message={message(turnId, role) as never} /></div>
+      <div data-footer><StrandTag message={message(turnId, role) as never} /></div>
+    </div>
+  );
 
-  it("draws a divider with the strand's name where the strand changes, and the muted name otherwise", () => {
+  it("draws the strand's name and Move to… in the footer of user and assistant messages, and nothing above them", () => {
     render(<>{row("t4", "user")}{row("t5", "user")}{row("t5", "assistant")}</>);
-    expect(container.querySelectorAll("[data-strand-divider]")).toHaveLength(1);
-    expect(text(container.querySelector('[data-strand-divider="s_hvac"] button'))).toBe("Furnace tune-up");
-    expect([...container.querySelectorAll("[data-strand-tag]")].map(text)).toEqual(["CodexBar quota", "Furnace tune-up"]);
+    expect(container.querySelectorAll("[data-strand-divider]")).toHaveLength(0);
+    for (const above of container.querySelectorAll("[data-above]")) expect(above.innerHTML).toBe("");
+    expect([...container.querySelectorAll("[data-footer] [data-strand-tag]")].map(text)).toEqual(["CodexBar quota", "Furnace tune-up", "Furnace tune-up"]);
+    expect(container.querySelectorAll("[data-footer] [data-strand-move]")).toHaveLength(3);
+    expect(container.querySelector("[data-strand-move]")!.getAttribute("aria-haspopup")).toBe("menu");
+  });
+
+  it("filters to the strand on click, and clears on a second click", () => {
+    render(row("t4", "user"));
+    const tag = container.querySelector<HTMLButtonElement>('[data-strand-tag="s_cx"]')!;
+    click(tag);
+    expect(selectionOf("thr_main")?.strandId).toBe("s_cx");
+    expect(tag.getAttribute("aria-pressed")).toBe("true");
+    click(tag);
+    expect(selectionOf("thr_main")).toBeNull();
   });
 
   it("dims the other strands' messages while one is picked, only where BB's timeline can't hide them", () => {
@@ -329,6 +394,118 @@ describe("the tag above each message", () => {
     registerTimelineFilter({ experimental_timelineFilter: () => {} });
     act(() => select("thr_main", { strandId: "s_cx", seq: null }));
     expect(container.querySelectorAll("[data-studio-strand-dim]")).toHaveLength(0);
+  });
+});
+
+describe("replies that need you, marked in place (design: Replies that need you, round 3 option a)", () => {
+  // The Custom Highlight API and range geometry, which jsdom lacks.
+  class FakeHighlight { ranges = new Set<Range>(); add(range: Range) { this.ranges.add(range); } delete(range: Range) { this.ranges.delete(range); } }
+  const highlights = new Map<string, FakeHighlight>();
+  beforeEach(() => {
+    highlights.clear();
+    resetAskMarksForTests();
+    vi.stubGlobal("Highlight", FakeHighlight);
+    (globalThis.CSS as unknown as { highlights?: unknown }) = Object.assign(globalThis.CSS ?? {}, { highlights });
+    (Range.prototype as unknown as { getClientRects: () => DOMRect[] }).getClientRects = () => [{ left: 10, right: 300, top: 40, bottom: 58, width: 290, height: 18 } as DOMRect];
+  });
+  const marked = (name = "studio-reply-ask") => [...(highlights.get(name)?.ranges ?? [])].map((range) => range.toString());
+  const msg = (id: string, turnId: string, createdAt: number) => ({ id, threadId: "thr_main", turnId, role: "assistant" as const, createdAt });
+  const row = (key: string, id: string, turnId: string, createdAt: number, text: string) => (
+    <div key={key} data-timeline-row-id={key}>
+      <div aria-label="Message metadata"><StrandMarks message={msg(id, turnId, createdAt) as never} /></div>
+      <p>{text}</p>
+    </div>
+  );
+  const replies: Tags["replies"] = [
+    { turnId: "t5", seq: 22, tag: "needs-you", ask: "Want me to book Ace for Saturday 9 AM?", resolved: false },
+    { turnId: "t4", seq: 18, tag: "status", ask: null, resolved: false },
+    { turnId: "t6", seq: 26, tag: "needs-you", ask: "Should I merge it?", resolved: true },
+  ];
+
+  it("highlights only the asking sentence of the turn's newest message; nothing is added above it, and status replies look as they are", () => {
+    state.tags = { ...TAGS, replies };
+    render(<>
+      {row("a", "m5a", "t5", NOW - 2_000, "Looking at the slots now.")}
+      {row("b", "m5b", "t5", NOW - 1_000, "Ace has Saturday 9 AM open. Want me to book Ace for Saturday 9 AM? I'll confirm by email.")}
+      {row("c", "m4", "t4", NOW - 5_000, "Freed 18 GB.")}
+      {row("d", "m6", "t6", NOW, "Merged. Should I merge it?")}
+    </>);
+    expect(marked()).toEqual(["Want me to book Ace for Saturday 9 AM?"]);
+    expect(container.querySelector("[data-reply-needs-you]")).toBeNull();
+    expect(container.textContent).not.toContain("Needs you");
+    expect(container.querySelectorAll("[data-studio-reply-status]")).toHaveLength(0);
+    expect(container.querySelectorAll("[data-reply-done-mark]")).toHaveLength(1);
+  });
+
+  it("marks the last paragraph when Jev named no sentence", () => {
+    state.tags = { ...TAGS, replies: [{ turnId: "t5", seq: 22, tag: "needs-you", ask: null, resolved: false }] };
+    render(row("a", "m5", "t5", NOW, "Ace has Saturday 9 AM open; it needs your account."));
+    expect(marked()).toEqual(["Ace has Saturday 9 AM open; it needs your account."]);
+  });
+
+  it("marks nothing when the named sentence isn't there, and the reply's own one when it was quoted earlier", () => {
+    state.tags = { ...TAGS, replies };
+    render(row("b", "m5b", "t5", NOW, "Ace has Saturday 9 AM open; it needs your account."));
+    expect(marked()).toEqual([]);
+    render(<div data-timeline-row-id="q">
+      <div aria-label="Message metadata"><StrandMarks message={msg("m5q", "t5", NOW) as never} /></div>
+      <p>You asked: Want me to book Ace for Saturday 9 AM?</p>
+      <p>Two slots are open. Want me to book Ace for Saturday 9 AM?</p>
+    </div>);
+    const ranges = [...(highlights.get("studio-reply-ask")?.ranges ?? [])];
+    expect(ranges).toHaveLength(1);
+    expect(ranges[0]!.startContainer.textContent).toBe("Two slots are open. Want me to book Ace for Saturday 9 AM?");
+  });
+
+  it("Done shows on hover or keyboard focus of the sentence, and marks the reply done", async () => {
+    state.tags = { ...TAGS, replies };
+    render(row("b", "m5b", "t5", NOW, "Ace has Saturday 9 AM open. Want me to book Ace for Saturday 9 AM?"));
+    const done = container.querySelector<HTMLButtonElement>("[data-reply-done-mark]")!;
+    expect(done.getAttribute("aria-label")).toBe("Done: this reply no longer needs you");
+    expect(done.hasAttribute("data-shown")).toBe(false);
+    act(() => { container.querySelector("[data-timeline-row-id]")!.dispatchEvent(new MouseEvent("mousemove", { clientX: 100, clientY: 50, bubbles: true })); });
+    expect(done.hasAttribute("data-shown")).toBe(true);
+    act(() => { container.querySelector("[data-timeline-row-id]")!.dispatchEvent(new MouseEvent("mousemove", { clientX: 100, clientY: 200, bubbles: true })); });
+    expect(done.hasAttribute("data-shown")).toBe(false);
+    act(() => { done.focus(); });
+    expect(done.hasAttribute("data-shown")).toBe(true);
+    state.call.mockResolvedValueOnce({ ok: true });
+    await act(async () => { done.click(); });
+    expect(state.call).toHaveBeenCalledWith("strands.resolveReply", { threadId: "thr_main", seq: 22 });
+  });
+
+  it("Jump to reply flashes the marked sentence", () => {
+    vi.useFakeTimers();
+    try {
+      state.tags = { ...TAGS, replies };
+      render(row("b", "m5b", "t5", NOW, "Ace has Saturday 9 AM open. Want me to book Ace for Saturday 9 AM?"));
+      act(() => flashReply("thr_main", 22));
+      act(() => { vi.advanceTimersByTime(350); });
+      expect(marked("studio-reply-ask-flash")).toEqual(["Want me to book Ace for Saturday 9 AM?"]);
+      act(() => { vi.advanceTimersByTime(1_300); });
+      expect(marked("studio-reply-ask-flash")).toEqual([]);
+      expect(marked()).toEqual(["Want me to book Ace for Saturday 9 AM?"]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("lists the reply in the box under Needs you; Jump to reply opens it and asks for the flash, Done marks it done", async () => {
+    const ask = { id: "reply:22", kind: "reply" as const, threadId: "thr_main", label: "Want me to book Ace for Saturday 9 AM?", details: [], decisions: [], turnId: "t5", seq: 22 };
+    state.list = { ...LIST, strands: [view("s_hvac", "Furnace tune-up", { state: "needs-you", asks: [ask], latestSeq: 30 }), ...LIST.strands.filter((strand) => strand.id !== "s_hvac" && strand.state !== "needs-you")] };
+    render(<StrandsBoxBanner />);
+    expect(text(box2())).toContain("1 need you");
+    click(box2()!.querySelector("[data-strands-needs]"));
+    const boxRow = box2()!.querySelector('[data-strand-row="s_hvac"]')!;
+    expect(text(boxRow)).toContain("Want me to book Ace for Saturday 9 AM?");
+    state.call.mockResolvedValueOnce({ ok: true });
+    await act(async () => { (boxRow.querySelector("[data-reply-done]") as HTMLElement).click(); });
+    expect(state.call).toHaveBeenCalledWith("strands.resolveReply", { threadId: "thr_main", seq: 22 });
+    click(boxRow.querySelector("[data-reply-jump]"));
+    expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=22", { replace: true });
+    expect(takeFlash("thr_main", 22)).toBe(true);
+    expect(container.querySelector('[data-testid="strands-menu"]')).toBeNull();
+    click(box2()!.querySelector("[data-strands-needs]"));
+    click(box2()!.querySelector('[data-strand-option="s_hvac"]'));
+    expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=22", { replace: true });
   });
 });
 
@@ -376,7 +553,7 @@ describe("the filter keeps what waits for an answer, and gives the scroll back",
   });
 });
 
-describe("Move to… on a message's tag", () => {
+describe("Move to… in a message's footer", () => {
   const message = { id: "m_t4", threadId: "thr_main", turnId: "t4", role: "user" as const, initiator: "user" as const, createdAt: NOW };
 
   it("moves the message's turn to another strand, or starts a new strand from it", async () => {
@@ -436,32 +613,6 @@ describe("the Strands tab's row menu", () => {
     expect(state.call).toHaveBeenCalledWith("strands.unmerge", { strandId: "s_cx" });
     // The menu's clicks don't select the row.
     expect(state.toAppPath).not.toHaveBeenCalled();
-  });
-});
-
-describe("the strands overview", () => {
-  it("shows each conversation with up to 2 asks, then chips; a chip opens the conversation at that strand", () => {
-    state.overview = {
-      needs: 3, running: 1,
-      conversations: [
-        { threadId: "thr_main", title: "Main", isMain: true, lastActiveAt: NOW, strands: LIST.strands },
-        { threadId: "thr_studio", title: "BB Studio", isMain: false, lastActiveAt: NOW, strands: [view("s_ws", "Workspace fix", { state: "running", latestSeq: 7 })] },
-      ],
-    };
-    render(<StrandsOverview botId="bot_1" now={NOW} />);
-    expect(text(container.querySelector("h1"))).toBe("Strands3 need you · 1 running");
-    expect(container.querySelectorAll("[data-overview-conversation]")).toHaveLength(2);
-    const main = container.querySelector('[data-overview-conversation="thr_main"]')!;
-    expect(main.querySelectorAll("[data-strand-ask]")).toHaveLength(2);
-    // Main's card says "Main" once.
-    expect(text(main.querySelector("header"))).toBe("MainOpen");
-    expect(text(main)).toContain("1 more need you");
-    expect(text(main)).toContain("Command: npm publish --tag latest --access public --otp-from-env");
-    expect([...main.querySelectorAll("[data-strand-chip]")].map((chip) => chip.getAttribute("data-strand-chip"))).toEqual(["s_cx", "s_red4", "s_macos"]);
-    click(container.querySelector('[data-overview-conversation="thr_studio"] [data-strand-chip="s_ws"]'));
-    expect(state.toAppPath.mock.calls.at(-1)?.[0]).toBe("/threads/thr_studio#msg=7");
-    click([...container.querySelectorAll('[data-overview-conversation="thr_studio"] button')].find((button) => text(button).startsWith("Open")));
-    expect(state.toThread).toHaveBeenCalledWith("thr_studio");
   });
 });
 
@@ -537,5 +688,19 @@ describe("one box above the composer: what Studio hides of BB's stack, thread by
     state.list = { ...LIST, enabled: false, strands: [], earlier: [] };
     render(<ContextInfoSection threadId="thr_main" projectId="proj" environment={null} />);
     expect(container.innerHTML).toBe("");
+  });
+});
+
+describe("error states with Retry", () => {
+  it("renders a Retry button on a StrandsTab error that invokes refresh()", () => {
+    state.list = null as never;
+    state.error = "Studio is starting";
+
+    render(<StrandsTab threadId="thr_main" environment={null} params={null} />);
+    const tabRetry = [...container.querySelectorAll("button")].find((b) => b.textContent === "Retry");
+    expect(tabRetry).toBeTruthy();
+    expect(container.textContent).toContain("Studio is starting");
+    act(() => { tabRetry!.click(); });
+    expect(state.refresh).toHaveBeenCalledTimes(1);
   });
 });

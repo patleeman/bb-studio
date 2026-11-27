@@ -7,6 +7,7 @@
 //   bb studio settings reset <key>           back to the default
 import { parseSettingText, SETTINGS_GROUPS, STUDIO_SETTINGS, STUDIO_SETTING_KEYS, type StudioSetting } from "./schema";
 import type { StudioSettingsStore } from "./store";
+import { redactedValues, withoutRedactedEcho } from "./redacted";
 
 export const SETTINGS_USAGE = "bb studio settings [list|get <key>|set <key> <value>|reset <key>] [--json]";
 
@@ -24,7 +25,7 @@ export async function settingsCli(argv: string[], store: StudioSettingsStore): P
   const args = argv.filter((arg) => arg !== "--json");
   const [command = "list", key, ...rest] = args;
   const usage = (message?: string): CliResult => ({ exitCode: 1, stderr: `${message ? `${message}\n` : ""}Usage: ${SETTINGS_USAGE}\n` });
-  const values = store.current() as Record<string, unknown>;
+  const values = redactedValues(store.current() as Record<string, unknown>);
   const changed = new Set(Object.keys(store.explicit()));
   const unknown = (name: string) => usage(`There's no Studio setting called ${name}. See them all: bb studio settings list`);
 
@@ -63,13 +64,15 @@ export async function settingsCli(argv: string[], store: StudioSettingsStore): P
       if (!Object.hasOwn(STUDIO_SETTINGS, key)) return unknown(key);
       const parsed = parseSettingText(key, rest.join(" "));
       if (!parsed.ok) return { exitCode: 1, stderr: `${parsed.error}\n` };
-      const next = await store.set({ [key]: parsed.value }) as Record<string, unknown>;
+      let patch: Record<string, unknown>;
+      try { patch = withoutRedactedEcho({ [key]: parsed.value }, store.current() as Record<string, unknown>); } catch (error) { return { exitCode: 1, stderr: `${(error as Error).message}\n` }; }
+      const next = redactedValues(await store.set(patch as never) as Record<string, unknown>);
       return { exitCode: 0, stdout: json ? `${JSON.stringify({ key, value: next[key] })}\n` : `${key} = ${show(next[key])}\n` };
     }
     case "reset": {
       if (!key || rest.length) return usage();
       if (!Object.hasOwn(STUDIO_SETTINGS, key)) return unknown(key);
-      const next = await store.set({ [key]: null }) as Record<string, unknown>;
+      const next = redactedValues(await store.set({ [key]: null }) as Record<string, unknown>);
       return { exitCode: 0, stdout: json ? `${JSON.stringify({ key, value: next[key] })}\n` : `${key} = ${show(next[key])} (default)\n` };
     }
     default:

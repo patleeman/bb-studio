@@ -160,37 +160,6 @@ extension EnvironmentValues {
     }
 }
 
-struct DuoTabRail: View {
-    @Binding var selection: Tab
-
-    var body: some View {
-        VStack(spacing: 12) {
-            tab(.bot, "Bot", "face.smiling")
-            tab(.inbox, "Threads", "bubble.left.and.bubble.right")
-            tab(.studio, "Studio", "square.stack")
-            Spacer()
-            tab(.settings, "Settings", "gear")
-        }
-        .padding(.vertical, 12)
-        .frame(width: 64)
-    }
-
-    private func tab(_ value: Tab, _ title: String, _ icon: String) -> some View {
-        Button { selection = value } label: {
-            VStack(spacing: 4) {
-                Image(systemName: icon).font(.title3)
-                Text(title).font(.caption2)
-            }
-            .frame(width: 60, height: 52)
-            .background(selection == value ? Color.accentColor.opacity(0.15) : .clear, in: .rect(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
-        .background { StatusBarTapMarker { selection = value } }
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(selection == value ? .isSelected : [])
-    }
-}
-
 /// Observes the window rather than the keyboard-reduced SwiftUI proposal. It
 /// does not alter safe areas, keyboard avoidance or the transcript hierarchy.
 struct WindowGeometry: UIViewRepresentable {

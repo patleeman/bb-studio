@@ -28,7 +28,9 @@ public struct Artifact: Decodable, Identifiable, Hashable, Sendable {
 
     /// `art_` and 16 lowercase letters or digits.
     public static func isId(_ value: String) -> Bool {
-        value.wholeMatch(of: /art_[0-9a-z]{16}/) != nil
+        let utf8 = value.utf8
+        guard utf8.count == 20, value.hasPrefix("art_") else { return false }
+        return utf8.dropFirst(4).allSatisfy { ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x61 && $0 <= 0x7A) }
     }
 }
 

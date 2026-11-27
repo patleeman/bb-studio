@@ -6,6 +6,7 @@
 // each with one action. Then the week at full width with Paused below it
 // (AutomationsCalendar.tsx), then Recent in plain words and Runners. The top of BB's Info tab on a Bot's thread is BotInfoRows.tsx.
 import { OUTLINE_BUTTON, GHOST_BUTTON, ICON_BUTTON, PRIMARY_BUTTON, openAppPath } from "../../kit/app/index";
+import { useNow } from "../../kit/app/visible-poll";
 import { Icon } from "../../kit/ui/index";
 import { useEffect, useState, type ReactNode } from "react";
 import { experimental_useProviders as useProviders } from "@get-bb/plugin-sdk/app";
@@ -64,8 +65,7 @@ export function useBotPageModel(view: BotView) {
   const call = useCall();
   const openThread = useOpenThread();
   const authNeeds = useAuthNeeds(bot.primary !== false);
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(timer); }, []);
+  const now = useNow(30_000);
   const tz = zone();
   const names = page.data?.groupNames ?? {};
   const { sources, runners, activity } = jobs;

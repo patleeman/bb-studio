@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { expect, it, vi } from "vitest";
 
 vi.mock("@get-bb/plugin-sdk/app", () => ({ ThreadTitle: () => null, experimental_Icon: () => null }));

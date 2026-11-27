@@ -30,7 +30,6 @@ export const TAB_IDS = {
   bot: "bot",
   studio: STUDIO_TAB,
   code: CODE_TAB,
-  todos: "loops",
   memory: "memory",
   skills: "bot-skills",
   library: "library",
@@ -38,7 +37,6 @@ export const TAB_IDS = {
   archive: "archive",
   automation: "automation",
   todo: "todo",
-  record: "memory-record",
   /** Visual Chat's own tab (packages/bb-studio-visual-chat): a board, `{ threadId }`. */
   board: "board",
 } as const;
@@ -47,8 +45,8 @@ export type TabKindId =
   | "conversation" | "worker" | "bot"
   | "page" | "whiteboard" | "design" | "app" | "artifact" | "recording"
   | "board"
-  | "memory" | "skills" | "library" | "automations" | "todos" | "archive"
-  | "automation" | "todo" | "record"
+  | "memory" | "skills" | "library" | "automations" | "archive"
+  | "automation" | "todo"
   | "vscode"
   | "file" | "diff" | "browser" | "terminal" | "workflow";
 
@@ -58,7 +56,7 @@ export interface TabRef { kind: TabKindId; id: string | null }
 /** The surfaces the audit checks, in its column order. */
 export const SURFACES = ["newTab", "recent", "sidebarDrag", "workbenchOpen", "chatLink"] as const;
 export type Surface = (typeof SURFACES)[number];
-export const SURFACE_NAMES: Record<Surface, string> = { newTab: "New tab", recent: "Recent", sidebarDrag: "Sidebar drag", workbenchOpen: "workbench_open", chatLink: "Chat link" };
+export const SURFACE_NAMES: Record<Surface, string> = { newTab: "New tab", recent: "Recent", sidebarDrag: "Sidebar drag", workbenchOpen: "workbench (op: open)", chatLink: "Chat link" };
 
 /** Whether a surface reaches a kind: it did before the registry, it does now, or it can't (with why). */
 export type SurfaceStatus = "had" | "added" | { na: string };
@@ -92,7 +90,7 @@ export type Listing =
   | "bots"
   /** This window's record of the tabs of this kind opened last (src/ui/opened-tabs.ts); search matches the kind's name. */
   | "opened"
-  /** The Bot pages' rows (automations, todos, memory records), searched by title on the server. */
+  /** The Bot pages' rows (automations, todos), searched by title on the server. */
   | "entries"
   /** bb's own (its recent files, its file search). */
   | "bb";
@@ -193,16 +191,14 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
     ...botPage("automations", "Scheduled", "ListTodo", TAB_IDS.automations),
     actions: [], recents: null,
     surfaces: {
-      newTab: { na: "The Strands page is the one entry; this address opens it." },
-      recent: { na: "Recent lists the Strands page once, under Strands." },
+      newTab: { na: "Scheduled has no New Tab action; a bb://automations link or workbench (op: open) opens it." },
+      recent: { na: "Recent doesn't list Scheduled." },
       sidebarDrag: "added", workbenchOpen: "added", chatLink: "had",
     },
   },
-  botPage("todos", "Strands", "LayoutList", TAB_IDS.todos),
   botPage("archive", "Conversations", "studio/conversations", TAB_IDS.archive),
   pageRow("automation", "Automation", "Automations", "Clock", TAB_IDS.automation, "Automations page"),
-  pageRow("todo", "To-do", "To-dos", "ListTodo", TAB_IDS.todo, "Strands page"),
-  pageRow("record", "Memory record", "Memory records", "Brain", TAB_IDS.record, "Memory page"),
+  pageRow("todo", "To-do", "To-dos", "ListTodo", TAB_IDS.todo, "Scheduled page"),
   {
     id: "vscode", name: "VS Code", plural: "VS Code", icon: CODE_ICON, owner: "studio", ref: "none", open: { via: "studio", tabId: CODE_TAB },
     actions: [{ tabId: CODE_TAB, group: "Open" }], dragFrom: null, recents: "opened", agentType: "vscode",
@@ -211,7 +207,7 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
   bb("file", "File", "Files", "File", "file", "file", { newTab: "had", recent: "had", sidebarDrag: { na: "bb's own: files are dragged from Finder, which bb attaches to the composer." }, workbenchOpen: "had", chatLink: "had" }),
   bb("diff", "Diff", "Diffs", "FileDiff", "diff", "diff", { newTab: { na: "bb's New Tab page lists no diffs; bb's Git panel opens them." }, recent: { na: "bb keeps no recent diffs." }, sidebarDrag: { na: "bb's own: no row." }, workbenchOpen: "had", chatLink: { na: "Replies don't link a diff; bb's change cards open it." } }),
   bb("browser", "Browser", "Browser tabs", "Globe", "url", "url", { newTab: "had", recent: { na: "bb keeps no recent browser tabs." }, sidebarDrag: { na: "bb's own: no row." }, workbenchOpen: "had", chatLink: "had" }),
-  bb("terminal", "Terminal", "Terminals", "Terminal", "terminal", null, { newTab: "had", recent: { na: "bb keeps no recent terminals." }, sidebarDrag: { na: "bb's own: no row." }, workbenchOpen: { na: "A terminal opens by starting one; the agent has no terminal id to open. workbench_tab action \"focus\" selects an open one." }, chatLink: { na: "Replies don't link a terminal." } }),
+  bb("terminal", "Terminal", "Terminals", "Terminal", "terminal", null, { newTab: "had", recent: { na: "bb keeps no recent terminals." }, sidebarDrag: { na: "bb's own: no row." }, workbenchOpen: { na: "A terminal opens by starting one; the agent has no terminal id to open. workbench (op: tab) action \"focus\" selects an open one." }, chatLink: { na: "Replies don't link a terminal." } }),
   {
     ...bb("workflow", "Workflow run", "Workflow runs", "Workflow", "plugin-tab", "workflow", { newTab: "had", recent: { na: "bb keeps no recent workflow runs." }, sidebarDrag: { na: "bb's own: no row." }, workbenchOpen: "added", chatLink: "had" }),
     // The Workflows plugin lets other plugins open its run tab (`experimental_openableByPlugins`).
@@ -226,6 +222,26 @@ export function tabKindEntry(id: TabKindId): TabKindEntry {
 }
 
 export const isTabKindId = (value: unknown): value is TabKindId => typeof value === "string" && BY_ID.has(value as TabKindId);
+
+/** Every kind's id, in registry order. */
+export const TAB_KIND_IDS = TAB_KIND_REGISTRY.map((entry) => entry.id) as [TabKindId, ...TabKindId[]];
+
+/**
+ * How the phone shows a workbench tab of each kind (the Workspace sheet):
+ * native, a view of its own; web, the in-app BB web view; desktopOnly, a
+ * card that says to open it on the desktop. A Record, so a new kind can't be
+ * added without saying.
+ */
+export type MobileSupport = "native" | "web" | "desktopOnly";
+export const MOBILE_SUPPORT: Readonly<Record<TabKindId, MobileSupport>> = {
+  conversation: "native", worker: "native", bot: "web",
+  page: "native", whiteboard: "native", design: "native", app: "native", artifact: "native", recording: "web",
+  board: "web",
+  memory: "web", skills: "web", library: "web", automations: "web", archive: "web",
+  automation: "web", todo: "web",
+  vscode: "desktopOnly",
+  file: "native", diff: "native", browser: "web", terminal: "native", workflow: "web",
+};
 
 /** The types workbench_open takes, in registry order. */
 export const AGENT_TYPES: readonly string[] = TAB_KIND_REGISTRY.flatMap((entry) => (entry.agentType ? [entry.agentType] : []));
@@ -320,10 +336,9 @@ export function pathFor(ref: TabRef): string | null {
     case "skills": return `${STUDIO_ROOT}/skills${id ? `/${enc(id)}` : ""}`;
     case "library": return STUDIO_ROOT;
     case "automations": return "/plugins/studio/automations";
-    case "todos": return id ? `${STUDIO_ROOT}/bot/${enc(id)}/strands` : null;
     case "archive": return `${STUDIO_ROOT}/conversations${id ? `/${enc(id)}` : ""}`;
     case "vscode": return "/plugins/studio/vscode";
-    case "automation": case "todo": case "record": return id ? `${STUDIO_ROOT}/${ref.kind}/${enc(id)}` : null;
+    case "automation": case "todo": return id ? `${STUDIO_ROOT}/${ref.kind}/${enc(id)}` : null;
     case "file": case "diff": case "browser": case "terminal": case "workflow": return null;
     default: {
       const segment = itemSegment(ref.kind);
@@ -355,10 +370,9 @@ export function refOfPath(pathname: string): TabRef | null {
   if (first === "memory") return rest.length || third ? null : { kind: "memory", id };
   if (first === "skills") return rest.length || third ? null : { kind: "skills", id };
   if (first === "conversations") return rest.length || third ? null : { kind: "archive", id };
-  if (first === "automation" || first === "todo" || first === "record") return id && !third && !rest.length ? { kind: first, id } : null;
+  if (first === "automation" || first === "todo") return id && !third && !rest.length ? { kind: first, id } : null;
   if (first === "bot") {
     if (!id || id === "new") return null;
-    if ((third === "loops" || third === "strands") && !rest.length) return { kind: "todos", id };
     return third ? null : { kind: "bot", id };
   }
   const kind = id ? itemKindOfId(id) : null;
@@ -399,7 +413,7 @@ export function newTabFields(tabId: string): { experimental_newTabGroup?: NewTab
 }
 
 /** Kinds whose name or plural a search query names ("whiteboard", "todos"): their rows answer it. */
-const FORMER_NAMES: Partial<Record<TabKindId, readonly string[]>> = { todos: ["Todos", "Tasks"], todo: ["Todo", "Todos", "Task", "Tasks"], archive: ["Archive"] };
+const FORMER_NAMES: Partial<Record<TabKindId, readonly string[]>> = { todo: ["Todo", "Todos", "Task", "Tasks"], archive: ["Archive"] };
 
 export function kindsNamedBy(query: string): TabKindId[] {
   const text = query.trim().toLocaleLowerCase();

@@ -17,12 +17,23 @@ export function sameLayout(a: SceneLayout, b: SceneLayout): boolean {
   return a.width === b.width && a.height === b.height && a.sidebar === b.sidebar && sameRect(a.panel, b.panel);
 }
 
+const gapCache = new WeakMap<Document, Element | null>();
+
+function findGap(doc: Document): Element | null {
+  const cached = gapCache.get(doc);
+  if (cached && cached.isConnected && cached.getAttribute("data-sidebar") === "gap") return cached;
+  const found = doc.querySelector(SIDEBAR_SELECTOR);
+  gapCache.set(doc, found);
+  return found;
+}
+
 export function measureLayout(doc: Document): LayoutSample {
   const view = doc.defaultView;
   const width = view?.innerWidth ?? 0, height = view?.innerHeight ?? 0;
-  const gap = doc.querySelector(SIDEBAR_SELECTOR)?.getBoundingClientRect();
+  const gap = findGap(doc)?.getBoundingClientRect();
   const sidebar = gap && gap.width > 0 ? Math.max(0, gap.right) : 0;
-  const asides = [...doc.querySelectorAll(PANEL_SELECTOR)];
+  if (doc.getElementsByTagName("aside").length === 0) return { width, height, sidebar, panel: undefined };
+  const asides = doc.querySelectorAll(PANEL_SELECTOR);
   if (!asides.length) return { width, height, sidebar, panel: undefined };
   for (const aside of asides) {
     if (aside.getAttribute("aria-hidden") === "true" || aside.hasAttribute("inert")) continue;

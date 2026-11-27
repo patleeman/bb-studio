@@ -394,3 +394,57 @@ describe("bb studio settings", () => {
     expect(settingDefaults().dictationAudioDays).toBe(1);
   });
 });
+
+describe("Studio's settings never print a secret", () => {
+  const SERVER = "https://transcriber:hunter2pass@homelab.example:8000";
+  const JEV = "https://gateway.example.com/v1/systemone?token=jevSECRET0123456789abcdEF42";
+  const HEADERS = "source: bb; authorization: Bearer jevBEARER0123456789abcdWXYZ";
+  const secrets = ["hunter2pass", "jevSECRET", "jevBEARER"];
+  const clean = (text: string) => { for (const secret of secrets) expect(text).not.toContain(secret); };
+
+  async function seeded() {
+    const store = new StudioSettingsStore(memoryKv());
+    await store.load();
+    await store.set({ callServerUrl: SERVER, decisions_customJevEndpoint: JEV, decisions_customJevHeaders: HEADERS } as never);
+    return store;
+  }
+
+  it("redacts bbs studio settings list and get, in text and JSON, and after set and reset", async () => {
+    const store = await seeded();
+    for (const argv of [["list"], ["list", "--json"], ["get", "callServerUrl"], ["get", "decisions_customJevEndpoint", "--json"], ["get", "decisions_customJevHeaders"]]) {
+      const result = await settingsCli(argv, store);
+      expect(result.exitCode).toBe(0);
+      clean(result.stdout ?? "");
+    }
+    expect((await settingsCli(["get", "callServerUrl"], store)).stdout).toBe('"https://[redacted]@homelab.example:8000"\n');
+    expect((await settingsCli(["get", "decisions_customJevHeaders"], store)).stdout).toBe('"source: bb; authorization: [redacted …WXYZ]"\n');
+    clean((await settingsCli(["set", "decisions_customJevEndpoint", JEV.replace("42", "43")], store)).stdout ?? "");
+    expect((store.current() as Record<string, unknown>).decisions_customJevEndpoint).toBe(JEV.replace("42", "43"));
+  });
+
+  it("keeps the stored value when the shown value is set back, and refuses an edited one", async () => {
+    const store = await seeded();
+    const shown = JSON.parse((await settingsCli(["get", "decisions_customJevEndpoint", "--json"], store)).stdout!).value as string;
+    expect(shown).toBe("https://gateway.example.com/v1/systemone?token=[redacted …EF42]");
+    expect((await settingsCli(["set", "decisions_customJevEndpoint", shown], store)).exitCode).toBe(0);
+    expect((store.current() as Record<string, unknown>).decisions_customJevEndpoint).toBe(JEV);
+    const edited = await settingsCli(["set", "decisions_customJevEndpoint", shown.replace("gateway", "other")], store);
+    expect(edited.exitCode).toBe(1);
+    expect(edited.stderr).toContain("holds a redacted secret");
+    expect((store.current() as Record<string, unknown>).decisions_customJevEndpoint).toBe(JEV);
+  });
+
+  it("redacts the settings.get and settings.set RPCs", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "studio-settings-"));
+    const host = createFakePluginHost({ pluginId: "studio", dataDir, sdk: { plugins: { reload: vi.fn(async () => ({})), list: async () => ({ plugins: [] }) } as never } });
+    await registerSettings(host.bb, "studio");
+    const set = await host.harness.behavior.callRpc("settings.set", { values: { callServerUrl: SERVER, decisions_customJevHeaders: HEADERS } }) as { values: Record<string, unknown> };
+    clean(JSON.stringify(set));
+    const got = await host.harness.behavior.callRpc("settings.get", null) as { values: Record<string, unknown> };
+    clean(JSON.stringify(got));
+    expect(got.values.callServerUrl).toBe("https://[redacted]@homelab.example:8000");
+    await host.harness.behavior.callRpc("settings.set", { values: { callServerUrl: got.values.callServerUrl, autoTitle: false } });
+    await expect(host.harness.behavior.callRpc("settings.set", { values: { callServerUrl: "https://[redacted]@other:8000" } })).rejects.toThrow(/holds a redacted secret/u);
+    await host.harness.lifecycle.dispose();
+  });
+});

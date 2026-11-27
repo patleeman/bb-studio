@@ -18,11 +18,13 @@ export function sceneMode(env: Pick<SceneEnvironment, "visible" | "focused" | "r
 }
 
 export const MAX_PIXEL_RATIO = 2;
+/** Ambient WebGL backdrop scale cap on AC power: 2.56x fewer fragment pixels on 2x Retina than 2.0 while staying sharp in open gutters. */
+export const MAX_SCENE_SCALE = 1.25;
 
 export function renderScale(env: Pick<SceneEnvironment, "onBattery" | "batteryLevel" | "pixelRatio">): number {
   const ratio = Math.min(Math.max(env.pixelRatio || 1, 1), MAX_PIXEL_RATIO);
-  if (!env.onBattery) return ratio;
-  return Math.max(0.35, (env.batteryLevel < 0.2 ? 0.35 : 0.5) * ratio);
+  if (!env.onBattery) return Math.min(ratio, MAX_SCENE_SCALE);
+  return Math.min(MAX_SCENE_SCALE, Math.max(0.35, (env.batteryLevel < 0.2 ? 0.35 : 0.5) * ratio));
 }
 
 interface BatteryLike extends EventTarget { charging: boolean; level: number }

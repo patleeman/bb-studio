@@ -40,6 +40,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import { mapPool } from "./kit/pool";
 
 type Sdk = BbPluginApi["sdk"];
 type Listed = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
@@ -240,13 +241,13 @@ export class BotOwnedThreads {
   async claimChains(): Promise<number> {
     const chains = this.chains();
     const recorded = this.recorded();
-    let hid = 0;
-    for (const [threadId, botId] of chains) {
-      if (recorded.has(threadId)) continue;
+    const candidates = [...chains].filter(([threadId]) => !recorded.has(threadId));
+    const results = await mapPool(candidates, 6, async ([threadId, botId]) => {
       const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null);
-      if (!thread || !this.eligible(thread as ThreadLike, recorded)) continue;
-      if (await this.hide(threadId, botId, "chain")) hid++;
-    }
+      if (!thread || !this.eligible(thread as ThreadLike, recorded)) return false;
+      return this.hide(threadId, botId, "chain");
+    });
+    const hid = results.filter(Boolean).length;
     if (hid) this.deps.changed?.();
     return hid;
   }

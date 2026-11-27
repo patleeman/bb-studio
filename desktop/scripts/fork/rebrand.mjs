@@ -178,17 +178,7 @@ const replacements = [
     `All your machines connect to one central ${NAME} server, where your\n              conversations and settings are stored.`,
   ],
   [
-    "apps/app/src/components/settings/MachineAccessSettings.tsx",
-    "Choose how your devices reach this bb server.",
-    `Choose how your devices reach this ${NAME} server.`,
-  ],
-  [
     "apps/app/src/components/machines/machine-server-access.ts",
-    '"Configure how machines should connect to this bb server."',
-    `"Configure how machines should connect to this ${NAME} server."`,
-  ],
-  [
-    "apps/app/src/components/machines/machine-server-access.test.ts",
     '"Configure how machines should connect to this bb server."',
     `"Configure how machines should connect to this ${NAME} server."`,
   ],
@@ -503,34 +493,29 @@ const replacements = [
     "",
   ],
   [
-    "apps/app/src/components/settings/SidebarThreadListSetting.tsx",
+    "apps/app/src/components/settings/PluginChoiceSettings.tsx",
     '"Which plugin draws your threads in the sidebar."',
     '"Which plugin draws your conversations in the sidebar."',
   ],
   [
-    "apps/app/src/components/settings/CodeRendererSettings.tsx",
+    "apps/app/src/components/settings/PluginChoiceSettings.tsx",
     '"Syntax highlighting and gutters from the bb code theme."',
     '"Syntax highlighting and gutters from the built-in code theme."',
   ],
   [
-    "apps/app/src/components/settings/CodeRendererSettings.tsx",
-    '"Applies to file diffs in threads, the diff panel, and plugin views."',
-    '"Applies to file diffs in conversations, the diff panel, and plugin views."',
+    "apps/app/src/components/settings/PluginChoiceSettings.tsx",
+    '"File diffs in threads, the diff panel, and plugin views."',
+    '"File diffs in conversations, the diff panel, and plugin views."',
   ],
   [
-    "apps/app/src/components/settings/CodeRendererSettings.tsx",
+    "apps/app/src/components/settings/PluginChoiceSettings.tsx",
     '"Unified and split diffs from the bb code theme."',
     '"Unified and split diffs from the built-in code theme."',
   ],
   [
-    "apps/app/src/components/settings/ReplacementProviderSetting.tsx",
-    'title: "bb (built-in)",',
-    `title: "${NAME} (built-in)",`,
-  ],
-  [
-    "apps/app/src/components/settings/CodeRendererSettings.test.tsx",
-    'expect(items[3]).toContain("bb (built-in)");',
-    `expect(items[3]).toContain("${NAME} (built-in)");`,
+    "apps/app/src/components/settings/PluginChoiceSettings.tsx",
+    'const BB_BUILT_IN = "bb (built-in)";',
+    `const BB_BUILT_IN = "${NAME} (built-in)";`,
   ],
   [
     "apps/app/src/views/SettingsView.tsx",
@@ -747,23 +732,27 @@ const replacements = [
     "Conversations keep their history and pick up on your next message.",
   ],
   [
-    "apps/app/src/components/settings/CodeRendererSettings.tsx",
+    "apps/app/src/components/settings/PluginChoiceSettings.tsx",
     "The prompt box in threads, the New thread screen, and message editors.",
     "The prompt box in conversations, the New conversation screen, and message editors.",
   ],
   [
-    "apps/app/src/components/settings/SidebarNavigationProviderSetting.tsx",
+    "apps/app/src/components/settings/PluginChoiceSettings.tsx",
     "What draws New thread, Plugins,",
     "What draws New conversation, Plugins,",
   ],
   [
-    "apps/app/src/components/settings/SidebarThreadListSetting.tsx",
+    "apps/app/src/components/settings/PluginChoiceSettings.tsx",
     "Sidebar thread list",
     "Sidebar conversation list",
-    2,
   ],
   [
-    "apps/app/src/components/settings/SidebarThreadListSetting.test.tsx",
+    "apps/app/src/components/settings/useSettingsSearchConditions.ts",
+    "Sidebar thread list",
+    "Sidebar conversation list",
+  ],
+  [
+    "apps/app/src/lib/pinned-replacement-surfaces.test.tsx",
     "Sidebar thread list",
     "Sidebar conversation list",
   ],
@@ -949,6 +938,245 @@ const replacements = [
     "apps/app/src/views/thread-detail/ThreadDetailPromptArea.test.tsx",
     '"Create new thread (Enter)",',
     '"Send in a new conversation (Enter)",',
+  ],
+  // Studio's CLI is `bbs` (alias `bb-studio`); stock bb keeps `bb`.
+  // packages/config/src/studio-cli.fork.ts has the names and the env guard.
+  ["apps/cli/src/index.ts", '.name("bb")', '.name("bbs")'],
+  [
+    "apps/cli/src/index.ts",
+    '.description("BB CLI - manage your AI coding agents")',
+    `.description("${NAME} CLI (bbs, also bb-studio) - manage your AI coding agents")`,
+  ],
+  [
+    "apps/cli/src/index.ts",
+    "  bb status\n  bb project list\n  bb thread show <id>\n  bb thread spawn ",
+    "  bbs status\n  bbs project list\n  bbs thread show <id>\n  bbs thread spawn ",
+  ],
+  [
+    "apps/cli/src/index.ts",
+    "`bb ${candidate} is provided by the",
+    "`bbs ${candidate} is provided by the",
+  ],
+  [
+    "apps/cli/src/index.ts",
+    "`run \\`bb plugin enable ${disabledId}\\`",
+    "`run \\`bbs plugin enable ${disabledId}\\`",
+  ],
+  [
+    "apps/cli/src/commands/guide.ts",
+    "const head = [`bb ${names.join(\"\")}`",
+    "const head = [`bbs ${names.join(\"\")}`",
+  ],
+  [
+    "apps/cli/src/commands/guide.ts",
+    '"\\nRun `bb guide commands <group>` (for example `bb guide commands thread`) to include every option. Commands contributed by plugins are listed by `bb plugin list`.",',
+    '"\\nRun `bbs guide commands <group>` (for example `bbs guide commands thread`) to include every option. Commands contributed by plugins are listed by `bbs plugin list`.",',
+  ],
+  [
+    "apps/cli/src/commands/guide.ts",
+    '"Show the BB system overview and CLI guide; `bb guide commands [group]` lists every core command on one page",',
+    `"Show the ${NAME} overview and CLI guide; \`bbs guide commands [group]\` lists every core command on one page",`,
+  ],
+  [
+    "apps/server/src/services/system/cli-command.ts",
+    "`bb is already on your PATH at ${shadow.path}, installed by npm.`,",
+    "`bbs is already on your PATH at ${shadow.path}, installed by npm.`,",
+  ],
+  [
+    "apps/server/src/services/system/cli-command.ts",
+    "`Another bb at ${shadow.path} comes first on your PATH. Remove it, or run bb's command directly at ${context.launcherPath}.`,",
+    `\`Another bbs at \${shadow.path} comes first on your PATH. Remove it, or run ${NAME}'s command directly at \${context.launcherPath}.\`,`,
+  ],
+  [
+    "apps/server/src/services/system/cli-command.ts",
+    "`Another bb command is already installed, or no folder on your PATH is writable. Run bb's command directly at ${context.launcherPath}.`,",
+    `\`Another bbs command is already installed, or no folder on your PATH is writable. Run ${NAME}'s command directly at \${context.launcherPath}.\`,`,
+  ],
+  [
+    "apps/app/src/components/settings/CliCommandSettingsSection.tsx",
+    'const CLI_COMMAND_SETTING_LABEL = "bb CLI";',
+    'const CLI_COMMAND_SETTING_LABEL = "bbs CLI";',
+  ],
+  [
+    "apps/app/src/components/settings/CliCommandSettingsSection.tsx",
+    "? `Installed at ${status.installedPath}. You can control bb from any terminal, and so can agents outside bb, such as Claude Code or Codex.`",
+    `? \`Installed at \${status.installedPath} as bbs and bb-studio. bb is left as it is.\``,
+  ],
+  [
+    "apps/app/src/components/settings/CliCommandSettingsSection.tsx",
+    ": `Installed at ${status.installedPath}, but its folder is not on your PATH. Add the folder to your PATH to use bb outside bb.`;",
+    ": `Installed at ${status.installedPath}, but its folder is not on your PATH.`;",
+  ],
+  [
+    "apps/app/src/components/settings/CliCommandSettingsSection.tsx",
+    '"Install the bb CLI for use outside bb. You can control bb from any terminal, and so can agents outside bb, such as Claude Code or Codex. Threads in bb already have it.";',
+    `"Installs bbs and bb-studio for terminals and outside agents. bb is left as it is. Conversations in ${NAME} already have bbs and bb.";`,
+  ],
+  [
+    "apps/app/src/components/settings/CliCommandSettingsSection.tsx",
+    "return `Already installed for use outside bb at ${status.shadowedBy.path}, by npm.`;",
+    "return `bbs is already installed at ${status.shadowedBy.path}, by npm.`;",
+  ],
+  [
+    "apps/app/src/components/settings/CliCommandSettingsSection.tsx",
+    "return `The bb machine on this computer added a bb at ${status.shadowedBy.path} that can run an older bb. Install replaces it with this one.`;",
+    "return `The machine on this computer added a bbs at ${status.shadowedBy.path} that can run an older bbs. Install replaces it with this one.`;",
+  ],
+  [
+    "apps/app/src/components/settings/CliCommandSettingsSection.tsx",
+    "return `Another bb at ${status.shadowedBy.path} comes first on your PATH. Remove it to install this one.`;",
+    "return `Another bbs at ${status.shadowedBy.path} comes first on your PATH. Remove it to install this one.`;",
+  ],
+  [
+    "apps/cli/src/__tests__/startup-graph.test.ts",
+    'expect(run.stdout).toContain("Usage: bb thread");',
+    'expect(run.stdout).toContain("Usage: bbs thread");',
+    2,
+  ],
+  [
+    "apps/cli/src/__tests__/cli-entry-errors.e2e.test.ts",
+    'toContain("Usage: bb machine");',
+    'toContain("Usage: bbs machine");',
+  ],
+  [
+    "apps/cli/src/__tests__/command-output/guide.test.ts",
+    '"bb terminal output|read <terminalId>',
+    '"bbs terminal output|read <terminalId>',
+  ],
+  [
+    "apps/cli/src/__tests__/command-output/guide.test.ts",
+    'toContain("bb thread tell|message|send <id> [message]\\n");',
+    'toContain("bbs thread tell|message|send <id> [message]\\n");',
+  ],
+  [
+    "apps/cli/src/__tests__/command-output/guide.test.ts",
+    'toContain("bb guide commands <group>");',
+    'toContain("bbs guide commands <group>");',
+  ],
+  [
+    "apps/app/src/components/settings/settings-search.ts",
+    'title: "bb CLI",\n        keywords: ["command line", "terminal", "path", "install"],',
+    'title: "bbs CLI",\n        keywords: ["command line", "terminal", "path", "install", "bbs", "bb-studio"],',
+  ],
+  [
+    "apps/cli/src/command-resolution.ts",
+    "return target === null ? null : `bb ${target}`;",
+    "return target === null ? null : `bbs ${target}`;",
+  ],
+  [
+    "apps/cli/src/command-resolution.ts",
+    "return `bb ${[...invocation.path, match].join(\" \")}`;",
+    "return `bbs ${[...invocation.path, match].join(\" \")}`;",
+  ],
+  [
+    "apps/cli/src/command-resolution.ts",
+    'const prefix = ["bb", ...invocation.path].join(" ");',
+    'const prefix = ["bbs", ...invocation.path].join(" ");',
+  ],
+  [
+    "apps/cli/src/commander-errors.ts",
+    '"List desktop browser instances with `bb browser instances --host <id> --json`."',
+    '"List desktop browser instances with `bbs browser instances --host <id> --json`."',
+  ],
+  [
+    "apps/cli/src/commander-errors.ts",
+    '"List project IDs with `bb project list`."',
+    '"List project IDs with `bbs project list`."',
+  ],
+  [
+    "apps/cli/src/commander-errors.ts",
+    '"List thread IDs with `bb thread list`."',
+    '"List thread IDs with `bbs thread list`."',
+  ],
+  [
+    "apps/cli/src/commander-errors.ts",
+    '"List terminal IDs with `bb terminal list --thread <id>`."',
+    '"List terminal IDs with `bbs terminal list --thread <id>`."',
+  ],
+  [
+    "apps/cli/src/commander-errors.ts",
+    "`List this thread's terminal IDs with \\`bb terminal list --thread ${threadId}\\`.`",
+    "`List this thread's terminal IDs with \\`bbs terminal list --thread ${threadId}\\`.`",
+  ],
+  [
+    "apps/cli/src/commander-errors.ts",
+    "check \\`bb plugin list\\`.`",
+    "check \\`bbs plugin list\\`.`",
+  ],
+  [
+    "apps/app/src/components/sidebar/SidebarUpdatesBadge.tsx",
+    "\"Restart bb now\"",
+    `\`Restart ${NAME} now\``,
+  ],
+  [
+    "apps/app/src/components/sidebar/SidebarUpdatesBadge.tsx",
+    "`Restart into bb ${bb.version} now`",
+    `\`Restart into ${NAME} \${bb.version} now\``,
+  ],
+  [
+    "apps/app/src/components/settings/MachineAccessSettings.tsx",
+    "\"Anyone on this network can use bb; only add it on a network you trust.\"",
+    `\`Anyone on this network can use ${NAME}; only add it on a network you trust.\``,
+  ],
+  [
+    "apps/app/src/components/settings/MachineAccessSettings.tsx",
+    "description=\"Other machines and your phone connect to bb over these routes.\"",
+    `description="Other machines and your phone connect to ${NAME} over these routes."`,
+  ],
+  [
+    "apps/app/src/components/settings/MachineAccessSettings.tsx",
+    "emptyMessage=\"Only this computer can reach bb right now. Add a route so other machines and your phone can connect.\"",
+    `emptyMessage="Only this computer can reach ${NAME} right now. Add a route so other machines and your phone can connect."`,
+  ],
+  [
+    "apps/app/src/components/settings/MachineAccessSettings.tsx",
+    "Your phone reaches bb over the same routes as your machines.",
+    `Your phone reaches ${NAME} over the same routes as your machines.`,
+  ],
+  [
+    "apps/app/src/components/settings/ReplacementProviderSetting.tsx",
+    "`Chooses ${builtIn?.title ?? \"bb\"}.`",
+    `\`Chooses \${builtIn?.title ?? "${NAME}"}.\``,
+  ],
+  [
+    "apps/app/src/components/settings/ReplacementProviderSetting.tsx",
+    "\"from bb\"",
+    `"from ${NAME}"`,
+  ],
+  [
+    "apps/app/src/components/settings/ReplacementProviderSetting.tsx",
+    "`${titleOf(slot)} (from bb)`",
+    `\`\${titleOf(slot)} (from ${NAME})\``,
+  ],
+  [
+    "apps/app/src/components/settings/PluginChoiceSettings.tsx",
+    "\"bb's file preview.\"",
+    `"${NAME}'s file preview."`,
+  ],
+  [
+    "apps/app/src/components/settings/PluginChoiceSettings.tsx",
+    "\"bb's code block.\"",
+    `"${NAME}'s code block."`,
+  ],
+  [
+    "apps/app/src/components/settings/UpdatesSettingsSection.tsx",
+    "updated outside bb. This page",
+    `updated outside ${NAME}. This page`,
+  ],
+  [
+    "apps/app/src/components/settings/PluginChoiceSettings.test.tsx",
+    "/^tasks \\(from bb\\)/u",
+    "/^tasks \\(from BB Studio\\)/u",
+  ],
+  [
+    "apps/app/src/components/sidebar/SidebarUpdatesBadge.test.tsx",
+    'name: "Restart into bb 0.49.0 now"',
+    `name: "Restart into ${NAME} 0.49.0 now"`,
+  ],
+  [
+    "apps/app/src/components/settings/MachineAccessSettings.test.tsx",
+    "/Only this computer can reach bb/",
+    "/Only this computer can reach BB Studio/",
   ],
 ];
 for (const [file, from, to, expected = 1] of replacements) {

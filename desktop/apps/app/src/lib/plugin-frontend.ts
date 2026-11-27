@@ -1,4 +1,3 @@
-import * as questionFormHost from "@bb/shared-ui/question-form-host";
 import * as voiceInputTextarea from "@bb/shared-ui/voice-input-textarea";
 import * as react from "react";
 import * as reactDom from "react-dom";
@@ -26,7 +25,8 @@ import { BbHttpError } from "@bb/sdk/browser";
 import { isCancelledError, type QueryClient } from "@tanstack/react-query";
 import { markEnabledPluginListStale } from "@/hooks/cache-owners/plugin-cache-owner";
 import { pluginListQueryOptions } from "@/hooks/queries/plugin-settings-queries";
-import { createPluginToast } from "@/lib/notifications/plugin-toast";
+import { toast as pluginToast } from "@/lib/plugin-sonner";
+import { isOfficialPlugin } from "@/lib/official-plugins";
 import { appQueryClient } from "./app-query-client";
 import {
   setServerPluginsStarting,
@@ -54,7 +54,20 @@ import {
 } from "./plugin-app-definition";
 import { setPluginAssetIcons } from "@bb/shared-ui/icon-registry";
 import { setPluginLogoUrls, type PluginLogoUrls } from "./plugin-logos";
-import { pluginRuntimeGroupsFor } from "./plugin-runtime-groups";
+import {
+  pluginRuntimeGroupsFor,
+  warmPluginRuntimeGroups,
+} from "./plugin-runtime-groups";
+import { queueSplitPreload } from "./split-prefetch";
+import { loadLazyComponents, ORDERED_REVEAL_BOUND_MS } from "./lazy-parts";
+import {
+  holdsPage,
+  namesPlugin,
+  restoredLazyParts,
+  restoredPartComponents,
+  type RestoredLazyPart,
+} from "./restored-lazy-parts";
+import { readStoredPanelTabs } from "./fixed-panel-tabs-state";
 import { whenScreenPainted } from "./screen-paint";
 import {
   pluginSdkAppImplementation,
@@ -65,7 +78,10 @@ import {
   flushPluginSlotChanges,
   removePluginSlotRegistrations,
   setBuiltinPluginIds,
+  setOfficialMarketplacePluginIds,
+  setLoadingPluginFrontends,
   setPluginSlotRegistrations,
+  settleLoadingPluginFrontend,
   type PluginRegistrationSet,
 } from "./plugin-slots";
 import {
@@ -83,11 +99,19 @@ interface PluginFrontendBundle {
   sdkVersion: string;
   compatible: boolean;
   runtimeSlots: string[];
+  staticChunkUrls: string[];
+  lazyChunkUrls: string[];
+  lazyRuntimeSlots: string[];
 }
 
 export interface PluginFrontendCandidate {
   pluginId: string;
   bundle: PluginFrontendBundle;
+}
+
+export interface PluginFrontendCandidates {
+  candidates: PluginFrontendCandidate[];
+  startingPluginIds: string[];
 }
 
 type PluginFrontendRecord =
@@ -160,6 +184,7 @@ export async function loadPluginFrontend(
     };
   }
   try {
+    for (const url of bundle.staticChunkUrls) deps.prefetchModule(url);
     const runtimeGroups = pluginRuntimeGroupsFor(bundle.runtimeSlots);
     if (runtimeGroups.length > 0) {
       const slotsProvided = Promise.all(
@@ -174,6 +199,12 @@ export async function loadPluginFrontend(
     const mod = await deps.importModule(bundle.jsUrl);
     if (typeof mod !== "object" || mod === null) {
       throw new Error("bundle did not evaluate to a module namespace");
+    }
+    if (bundle.lazyChunkUrls.length > 0 || bundle.lazyRuntimeSlots.length > 0) {
+      queueSplitPreload(async () => {
+        for (const url of bundle.lazyChunkUrls) deps.prefetchModule(url);
+        warmPluginRuntimeGroups(bundle.lazyRuntimeSlots);
+      });
     }
     return {
       pluginId,
@@ -215,8 +246,8 @@ export interface BbPluginRuntime {
   tailwindMerge: unknown;
   classVarianceAuthority: unknown;
   sharedUiIcon: unknown;
-  questionFormHost: typeof questionFormHost;
   voiceInputTextarea: typeof voiceInputTextarea;
+  loadRuntimeSlot: (slot: string) => Promise<void>;
 }
 
 type RuntimeHost = typeof globalThis & { __bbPluginRuntime?: BbPluginRuntime };
@@ -243,14 +274,18 @@ export function installPluginRuntime(): BbPluginRuntime {
     radixPopover,
     radixSelect,
     radixTooltip,
-    sonner: { ...sonner, toast: createPluginToast(sonner.toast) },
+    sonner: { ...sonner, toast: pluginToast },
     vaul,
     clsx,
     tailwindMerge,
     classVarianceAuthority,
     sharedUiIcon,
-    questionFormHost,
     voiceInputTextarea,
+    loadRuntimeSlot: async (slot) => {
+      for (const group of pluginRuntimeGroupsFor([slot])) {
+        Object.assign(installPluginRuntime(), await group.load());
+      }
+    },
   };
   return host.__bbPluginRuntime;
 }
@@ -276,7 +311,7 @@ async function fetchEnabledPluginList(
 export async function fetchFrontendCandidates(
   queryClient: QueryClient,
   freshness: PluginListFreshness,
-): Promise<PluginFrontendCandidate[]> {
+): Promise<PluginFrontendCandidates> {
   let plugins;
   try {
     plugins = await fetchEnabledPluginList(queryClient, freshness);
@@ -288,13 +323,14 @@ export async function fetchFrontendCandidates(
     ) {
       setPluginLogoUrls(new Map());
       setPluginAssetIcons(new Map());
-      return [];
+      return { candidates: [], startingPluginIds: [] };
     }
     throw error;
   }
-  setServerPluginsStarting(
-    plugins.some((plugin) => plugin.enabled && plugin.status === "starting"),
+  const startingPluginIds = plugins.flatMap((plugin) =>
+    plugin.enabled && plugin.status === "starting" ? [plugin.id] : [],
   );
+  setServerPluginsStarting(startingPluginIds.length > 0);
   const candidates: PluginFrontendCandidate[] = [];
   const logoUrls = new Map<string, PluginLogoUrls>();
   const assetIcons = new Map<string, string>();
@@ -328,7 +364,10 @@ export async function fetchFrontendCandidates(
       plugin.provenance === "builtin" ? [plugin.id] : [],
     ),
   );
-  return candidates;
+  setOfficialMarketplacePluginIds(
+    plugins.flatMap((plugin) => (isOfficialPlugin(plugin) ? [plugin.id] : [])),
+  );
+  return { candidates, startingPluginIds };
 }
 
 export { applyPluginCss } from "./plugin-css";
@@ -401,7 +440,7 @@ export function createPluginFrontendReconcileState(): PluginFrontendReconcileSta
 }
 
 export interface PluginFrontendReconcileDeps {
-  fetchCandidates: () => Promise<PluginFrontendCandidate[]>;
+  fetchCandidates: () => Promise<PluginFrontendCandidates>;
   importModule: (url: string) => Promise<unknown>;
   importRetryDelaysMs: readonly number[];
   applyCss: (pluginId: string, url: string | null) => void | Promise<void>;
@@ -414,10 +453,13 @@ export interface PluginFrontendReconcileDeps {
     registrations: PluginRegistrationSet,
   ) => void;
   removeRegistrations: (pluginId: string) => void;
+  setLoadingPlugins: (pluginIds: readonly string[]) => void;
+  settlePluginLoad: (pluginId: string) => void;
   beginSlotBatch: () => () => void;
   flushSlotBatch: () => void;
   warn: (message: string) => void;
   priorityPluginIds: () => readonly string[];
+  restoredLazyParts: () => readonly RestoredLazyPart[];
   whenScreenPainted: () => Promise<void>;
   mountTimeoutMs?: number;
   cssReadyTimeoutMs?: number;
@@ -715,7 +757,7 @@ export async function reconcilePluginFrontends(
   onChanges?: () => void,
 ): Promise<void> {
   if (state.discarded) return;
-  const candidates = await deps.fetchCandidates();
+  const { candidates, startingPluginIds } = await deps.fetchCandidates();
   if (state.discarded) return;
   const candidateIds = new Set(candidates.map((c) => c.pluginId));
   if (
@@ -724,6 +766,12 @@ export async function reconcilePluginFrontends(
   ) {
     onChanges?.();
   }
+  deps.setLoadingPlugins([
+    ...startingPluginIds,
+    ...candidates
+      .filter((candidate) => !isCandidateApplied(candidate, state))
+      .map((candidate) => candidate.pluginId),
+  ]);
   for (const pluginId of [...state.records.keys()]) {
     if (candidateIds.has(pluginId)) continue;
     state.pendingControllers.get(pluginId)?.abort();
@@ -773,6 +821,9 @@ async function reconcileCandidates(
       }
       prefetched.add(candidate.pluginId);
       deps.prefetchModule(candidate.bundle.jsUrl);
+      for (const url of candidate.bundle.staticChunkUrls) {
+        deps.prefetchModule(url);
+      }
     }
   };
   if (pendingPriority === 0) priorityLoaded();
@@ -788,6 +839,7 @@ async function reconcileCandidates(
       try {
         await reconcileCandidate(candidate, state, deps);
       } finally {
+        deps.settlePluginLoad(candidate.pluginId);
         if (priorityPluginIds.includes(candidate.pluginId)) {
           pendingPriority -= 1;
           if (pendingPriority === 0) priorityLoaded();
@@ -807,6 +859,29 @@ function isCandidateApplied(
     previous.status !== "failed" &&
     state.appliedHashes.get(candidate.pluginId) === candidate.bundle.hash
   );
+}
+
+function startRestoredLazyParts(
+  parts: readonly RestoredLazyPart[],
+  pluginId: string,
+  registrations: ReturnType<typeof collectPluginAppRegistrations>,
+): Promise<void> | null {
+  const pageComponents: unknown[] = [];
+  const shownComponents: unknown[] = [];
+  for (const part of parts) {
+    const components = restoredPartComponents(part, pluginId, registrations);
+    (holdsPage(part) ? pageComponents : shownComponents).push(...components);
+  }
+  void loadLazyComponents(shownComponents);
+  const loading = loadLazyComponents(pageComponents);
+  if (loading === null) return null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    loading,
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, ORDERED_REVEAL_BOUND_MS);
+    }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 async function reconcileCandidate(
@@ -844,6 +919,10 @@ async function reconcileCandidate(
     );
   if (candidate.bundle.cssUrl !== null)
     deps.prefetchCss(candidate.bundle.cssUrl);
+  const restoredParts = deps.restoredLazyParts();
+  if (restoredParts.some((part) => namesPlugin(part, pluginId))) {
+    for (const url of candidate.bundle.lazyChunkUrls) deps.prefetchModule(url);
+  }
   let record = await importAttempt();
   for (const delayMs of deps.importRetryDelaysMs) {
     if (record.status !== "failed" || state.discarded) break;
@@ -915,9 +994,15 @@ async function reconcileCandidate(
     return;
   }
 
+  const restoredPage = startRestoredLazyParts(
+    restoredParts,
+    pluginId,
+    collected,
+  );
   const generation = (state.generationByPluginId.get(pluginId) ?? 0) + 1;
   state.generationByPluginId.set(pluginId, generation);
   await applyCssBeforePublish(pluginId, candidate.bundle.cssUrl, deps);
+  if (restoredPage !== null) await restoredPage;
   const replacesActiveGeneration = state.activeGenerations.has(pluginId);
   const cssRelease =
     collected.contentScripts.length > 0 ? deps.retainCss(pluginId) : null;
@@ -1068,10 +1153,14 @@ const browserReconcileDeps: PluginFrontendReconcileDeps = {
   prefetchModule: prefetchPluginModule,
   retainCss: retainPluginCss,
   priorityPluginIds: () => frontendPriorityPluginIds(window.location.pathname),
+  restoredLazyParts: () =>
+    restoredLazyParts(window.location.pathname, readStoredPanelTabs),
   whenScreenPainted: whenScreenPainted,
   resetCrashedSlots: resetCrashedPluginSlots,
   setRegistrations: setPluginSlotRegistrations,
   removeRegistrations: removePluginSlotRegistrations,
+  setLoadingPlugins: setLoadingPluginFrontends,
+  settlePluginLoad: settleLoadingPluginFrontend,
   beginSlotBatch: () =>
     beginPluginSlotBatch({ maxHoldMs: PLUGIN_SLOT_BATCH_MAX_HOLD_MS }),
   flushSlotBatch: flushPluginSlotChanges,

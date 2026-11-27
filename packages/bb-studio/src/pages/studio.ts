@@ -23,7 +23,7 @@ export const PAGE_KIND: StudioKind = {
   mentionProviderId: "page",
 
   blurb: "Documents.",
-  agentHint: "Read it with pages_read and change it with pages_edit; comments are in pages_comments.",
+  agentHint: "Read it with pages_read and change it with pages_edit; comments are in pages_read (comments).",
 };
 
 const PREVIEW_CHARS = 140;

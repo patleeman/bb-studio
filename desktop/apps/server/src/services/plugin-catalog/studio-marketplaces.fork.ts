@@ -2,7 +2,6 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   getPluginMarketplace,
-  listPluginMarketplaces,
   upsertPluginMarketplace,
   type DbConnection,
 } from "@bb/db";
@@ -106,21 +105,6 @@ function moveStudioMarketplaceOffGit(db: DbConnection): void {
     lastAttemptedRefreshAt: null,
     lastError: row.lastError,
   });
-}
-
-export function refreshAnchor(db: DbConnection): number | null {
-  const curated = getPluginMarketplace(db, CURATED_PLUGIN_MARKETPLACE_NAME);
-  if (curated !== undefined) return curated.lastAttemptedRefreshAt;
-  const rows = listPluginMarketplaces(db).filter(
-    (row) => row.name !== BUNDLED_MARKETPLACE_NAME,
-  );
-  if (rows.length === 0) return Date.now();
-  let oldest = Number.POSITIVE_INFINITY;
-  for (const row of rows) {
-    if (row.lastAttemptedRefreshAt === null) return null;
-    oldest = Math.min(oldest, row.lastAttemptedRefreshAt);
-  }
-  return oldest;
 }
 
 export function withoutForkBuiltins<

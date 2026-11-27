@@ -10,7 +10,6 @@ import {
 import { createMigratedConnection } from "@bb/db/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPluginCatalogService } from "../../../src/services/plugin-catalog/plugin-catalog-service.js";
-import { refreshAnchor } from "../../../src/services/plugin-catalog/studio-marketplaces.fork.js";
 import type { MarketplaceFetch } from "../../../src/services/plugin-catalog/marketplace-http.js";
 
 const GETBB_URL = "https://getbb.app/marketplace/v2/marketplace.json";
@@ -262,21 +261,5 @@ describe("BB Studio's default marketplaces", () => {
       sourceGitCommit: null,
       lastAttemptedRefreshAt: null,
     });
-  });
-
-  it("times the periodic refresh from the catalogs it fetches: a never-fetched one is due now", () => {
-    service("");
-    expect(refreshAnchor(db)).toBeNull();
-    const studio = getPluginMarketplace(db, "bb-studio");
-    if (studio === undefined) throw new Error("expected bb-studio");
-    upsertPluginMarketplace(db, { ...studio, lastAttemptedRefreshAt: 2_000 });
-    expect(refreshAnchor(db)).toBe(2_000);
-  });
-
-  it("schedules the next refresh 2 hours out when only the built-in catalog is left", async () => {
-    const catalog = service("");
-    await catalog.removeMarketplace("bb-studio");
-    const before = Date.now();
-    expect(refreshAnchor(db)).toBeGreaterThanOrEqual(before);
   });
 });

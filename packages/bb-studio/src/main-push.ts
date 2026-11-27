@@ -7,6 +7,14 @@
 // thread (a runner's or worker's report, BB's notice that a child finished)
 // unless the answer carries a card that needs the user. Studio Mobile groups them:
 // one push per conversation per few minutes (push-window.ts there).
+//
+// Where strands tag replies (src/strands/reply.ts), Jev's tag decides first:
+// a status reply doesn't push, and one that needs the user pushes with its
+// ask as the body, even when another thread started the turn or a task push
+// just went out (an ask is never swallowed). The tag is read first (up to 20
+// seconds), then whether the user read the reply or muted Main, so a reply
+// read during the wait doesn't push. Each push is for its own turn's reply,
+// and one turn pushes once. When the tag isn't known, it pushes as before.
 import { isPassOutput } from "./kit/silent";
 import { isPingRequest } from "./bot-cache";
 
@@ -78,6 +86,10 @@ export interface MainPushDeps {
   notify(input: MainPushInput): Promise<void>;
   needsUser?(card: { kind: "work" | "loop"; id: string }): boolean;
   pushedTaskSince?(botId: string, since: number): boolean;
+  /** The seq of the message that started the thread's newest turn (src/strands/service.ts newestRequest). */
+  lastRequestSeq?(threadId: string): Promise<number | null>;
+  /** The tag of the reply of the turn that `requestSeq` started (src/strands/service.ts replyPush): push with its ask, stay quiet, or unknown. */
+  replyTag?(threadId: string, requestSeq: number | null): Promise<{ decision: "push" | "quiet" | "unknown"; ask: string | null }>;
   defaultProjectId: string;
   delayMs?: number;
   log?(message: string): void;
@@ -104,21 +116,38 @@ export class MainPushes {
     this.timers.set(thread.id, timer);
   }
 
+  /** The turn (its request seq) each thread last pushed for: one turn pushes once. */
+  private readonly pushedTurn = new Map<string, number>();
+
   async send(threadId: string, bot: { botId: string; name: string }, reply: string): Promise<boolean> {
-    const [thread, request] = await Promise.all([this.deps.thread(threadId), this.deps.lastRequest(threadId).catch(() => null)]);
-    if (!thread || isPingRequest(request)) return false;
-    if ((thread.lastReadAt ?? 0) >= (thread.latestAttentionAt ?? 0) && thread.latestAttentionAt !== undefined) return false;
-    if (!(await this.deps.allowed(threadId))) return false;
-    if (fromAnotherThread(request)) {
-      // Main answering a runner or a worker: only a card that needs the user is worth the phone.
-      const cards = cardsIn(reply);
-      if (!cards.length || !this.deps.needsUser || !cards.some((card) => this.deps.needsUser!(card))) return false;
+    const [first, request, requestSeq] = await Promise.all([
+      this.deps.thread(threadId), this.deps.lastRequest(threadId).catch(() => null), this.deps.lastRequestSeq?.(threadId).catch(() => null) ?? Promise.resolve(null),
+    ]);
+    const unread = (thread: Thread | null) => !!thread && !((thread.lastReadAt ?? 0) >= (thread.latestAttentionAt ?? 0) && thread.latestAttentionAt !== undefined);
+    if (!first || isPingRequest(request) || !unread(first)) return false;
+    // Jev's tag first; then everything that can change while it was awaited.
+    const tag = await this.deps.replyTag?.(threadId, requestSeq).catch(() => null) ?? null;
+    if (tag?.decision === "quiet") return false;
+    const thread = tag ? await this.deps.thread(threadId).catch(() => null) : first;
+    if (!thread || !unread(thread) || !(await this.deps.allowed(threadId))) return false;
+    // A reply that needs the user always pushes; the rest by the old rules.
+    const asks = tag?.decision === "push";
+    if (!asks) {
+      if (fromAnotherThread(request)) {
+        // Main answering a runner or a worker: only a card that needs the user is worth the phone.
+        const cards = cardsIn(reply);
+        if (!cards.length || !this.deps.needsUser || !cards.some((card) => this.deps.needsUser!(card))) return false;
+      }
+      const cards = plainPreview(reply) ? [] : cardsIn(reply);
+      if (cards.length && this.deps.needsUser && !cards.some((card) => this.deps.needsUser!(card))) return false;
+      if (this.deps.pushedTaskSince?.(bot.botId, Date.now() - TASK_PUSH_QUIET_MS)) return false;
     }
-    const cards = plainPreview(reply) ? [] : cardsIn(reply);
-    if (cards.length && this.deps.needsUser && !cards.some((card) => this.deps.needsUser!(card))) return false;
-    if (this.deps.pushedTaskSince?.(bot.botId, Date.now() - TASK_PUSH_QUIET_MS)) return false;
+    if (requestSeq !== null) {
+      if (this.pushedTurn.get(threadId) === requestSeq) return false;
+      this.pushedTurn.set(threadId, requestSeq);
+    }
     await this.deps.notify({
-      title: bot.name, body: previewOf(reply), kind: "turn-finished", threadId,
+      title: bot.name, body: asks && tag?.ask ? tag.ask : previewOf(reply), kind: "turn-finished", threadId,
       projectId: thread.projectId || this.deps.defaultProjectId, botId: bot.botId, conversationId: threadId,
     });
     return true;

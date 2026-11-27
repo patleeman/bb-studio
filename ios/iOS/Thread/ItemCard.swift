@@ -11,14 +11,17 @@ enum ReplyItem: Hashable {
     case recording(String)
     case mini(String)
 
+    nonisolated(unsafe) private static let idRegex = /[A-Za-z0-9_-]{1,80}/
+    nonisolated(unsafe) private static let recordingIdRegex = /rec_[a-z0-9]{8,32}/
+
     init?(_ directive: Directive) {
         guard let id = directive.attributes["id"]?.trimmingCharacters(in: .whitespaces), !id.isEmpty,
-              id.wholeMatch(of: /[A-Za-z0-9_-]{1,80}/) != nil else { return nil }
+              id.wholeMatch(of: Self.idRegex) != nil else { return nil }
         switch directive.name {
         case "page": self = .page(id)
         case "drawing": self = .drawing(id)
         case "design" where BBClient.isDesignId(id): self = .design(id)
-        case "recording" where id.wholeMatch(of: /rec_[a-z0-9]{8,32}/) != nil: self = .recording(id)
+        case "recording" where id.wholeMatch(of: Self.recordingIdRegex) != nil: self = .recording(id)
         case "mini" where MiniApp.isId(id): self = .mini(id)
         default: return nil
         }
@@ -140,7 +143,7 @@ struct StudioCardChrome<Icon: View, Preview: View>: View {
                                 .padding(.vertical, 5)
                                 .background(.fill.tertiary, in: .capsule)
                         } else {
-                            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                         }
                     }
                     .contentShape(.rect)
@@ -203,9 +206,18 @@ private struct ReplyItemSummaryCard: View {
         var preview: ReplyPreview?
     }
 
+    private final class SummaryBox {
+        let value: Summary
+        init(_ value: Summary) { self.value = value }
+    }
+
     /// Replies re-render often; a card starts from what the last one showed,
-    /// then checks for changes.
-    @MainActor private static var cache: [String: Summary] = [:]
+    /// then checks for changes. Bounded so long sessions don't retain every preview.
+    @MainActor private static let cache: NSCache<NSString, SummaryBox> = {
+        let cache = NSCache<NSString, SummaryBox>()
+        cache.countLimit = 150
+        return cache
+    }()
 
     var body: some View {
         StudioCardChrome(
@@ -229,14 +241,14 @@ private struct ReplyItemSummaryCard: View {
             if let preview = summary?.preview { ReplyPreviewView(preview: preview, route: item.route) }
         }
         .task(id: item) {
-            let key = ServerScope.key("\(item.kind.id):\(item.id)", serverURL: client.baseURL)
-            if let cached = Self.cache[key] { summary = cached }
+            let key = ServerScope.key("\(item.kind.id):\(item.id)", serverURL: client.baseURL) as NSString
+            if let cached = Self.cache.object(forKey: key) { summary = cached.value }
             do {
                 if let found = try await load() {
-                    Self.cache[key] = found
+                    Self.cache.setObject(SummaryBox(found), forKey: key)
                     summary = found
                 } else {
-                    Self.cache[key] = nil
+                    Self.cache.removeObject(forKey: key)
                     missing = true
                 }
             } catch {
@@ -248,8 +260,10 @@ private struct ReplyItemSummaryCard: View {
     private func load() async throws -> Summary? {
         switch item {
         case .page(let id):
-            guard let page = try await client.page(id) else { return nil }
-            let markdown = (try? await client.pageMarkdown(id)) ?? ""
+            async let pageRequest = client.page(id)
+            async let markdownRequest = try? client.pageMarkdown(id)
+            guard let page = try await pageRequest else { return nil }
+            let markdown = await markdownRequest ?? ""
             let empty = markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             return Summary(title: page.displayTitle, emoji: page.icon, preview: empty ? .note("This page is empty.") : .markdown(markdown))
         case .drawing(let id):

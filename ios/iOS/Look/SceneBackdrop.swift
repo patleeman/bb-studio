@@ -42,6 +42,31 @@ struct PhoneSceneLayout: Equatable {
     }
 }
 
+/// Tonight's Sky stays night at every hour: its day is too bright behind the
+/// room. Its look is the dark variant (`LookRoot.fixedScheme`), and its scene's
+/// page reads a clock set to tonight, so the sky driver draws the night and
+/// never asks for the light variant.
+enum SceneNight {
+    static let themes: Set<String> = ["tonights-sky"]
+
+    /// 23:00 local today, moving on from there and back every four hours, before dawn.
+    static let clock = """
+    if (!Date.bbNight) {
+        const real = Date.now.bind(Date), start = real(), base = new Date();
+        base.setHours(23, 0, 0, 0);
+        const night = base.getTime();
+        Date.now = () => night + ((real() - start) % 14400000);
+        Date.bbNight = true;
+    }
+    """
+
+    /// Sets the night clock on a scene's page before the scene starts, for these themes.
+    static func prepare(_ host: LookWebView, theme: String) async {
+        guard themes.contains(theme) else { return }
+        _ = try? await host.call(clock)
+    }
+}
+
 /// Desktop's scene signals from a Bot's threads view: workers and conversations.
 enum SceneSignals {
     static func payload(botId: String?, view: BotThreadsView?) -> [String: Any] {
@@ -70,7 +95,11 @@ enum SceneSignals {
 final class SceneStills {
     static let shared = SceneStills()
 
-    private var memory: [String: UIImage] = [:]
+    private let memory: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.totalCostLimit = 48 << 20
+        return cache
+    }()
     private var inFlight: [String: Task<UIImage?, Never>] = [:]
     private(set) var renders = 0
     private(set) var lastError: String?
@@ -79,6 +108,10 @@ final class SceneStills {
     init(directory: URL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appending(path: "LookStills", directoryHint: .isDirectory)) {
         self.directory = directory
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    private static func imageCost(_ image: UIImage) -> Int {
+        Int(image.size.width * image.size.height * image.scale * image.scale * 4)
     }
 
     static func key(theme: LookTheme, mode: LookTheme.Mode, size: CGSize, scale: CGFloat, now: Date = Date(), light: SceneLight? = nil) -> String {
@@ -93,6 +126,7 @@ final class SceneStills {
 
     /// Remembers a driver's chosen mode with its still, and hands it to the look.
     static func chose(_ mode: LookTheme.Mode, theme: String, key: String) {
+        guard !SceneNight.themes.contains(theme) else { return }
         UserDefaults.standard.set(mode.rawValue, forKey: "look.sceneMode." + key)
         if LookStore.shared.sceneModes[theme] != mode { LookStore.shared.sceneModes[theme] = mode }
     }
@@ -102,9 +136,10 @@ final class SceneStills {
     }
 
     func cached(_ key: String) -> UIImage? {
-        if let image = memory[key] { return image }
+        let cacheKey = key as NSString
+        if let image = memory.object(forKey: cacheKey) { return image }
         guard let data = try? Data(contentsOf: directory.appending(path: key + ".jpg")), let image = UIImage(data: data) else { return nil }
-        memory[key] = image
+        memory.setObject(image, forKey: cacheKey, cost: Self.imageCost(image))
         return image
     }
 
@@ -128,6 +163,7 @@ final class SceneStills {
             guard message["kind"] as? String == "scene-mode", let raw = message["mode"] as? String, let mode = LookTheme.Mode(rawValue: raw) else { return }
             Self.chose(mode, theme: theme.id, key: key)
         }
+        await SceneNight.prepare(host, theme: theme.id)
         do {
             let layout = PhoneSceneLayout(size: size, light: light)
             let started = try await host.call("return BBLook.scene.start(options)",
@@ -142,8 +178,11 @@ final class SceneStills {
             }
             try await host.call("BBLook.scene.stop()")
             renders += 1
-            memory[key] = image
-            if let data = image.jpegData(compressionQuality: 0.9) { try? data.write(to: directory.appending(path: key + ".jpg"), options: .atomic) }
+            memory.setObject(image, forKey: key as NSString, cost: Self.imageCost(image))
+            let target = directory.appending(path: key + ".jpg")
+            await Task.detached(priority: .utility) {
+                if let data = image.jpegData(compressionQuality: 0.9) { try? data.write(to: target, options: .atomic) }
+            }.value
             return image
         } catch {
             lastError = error.localizedDescription
@@ -157,7 +196,7 @@ final class SceneStills {
         return UIImage(data: data, scale: 1)
     }
 
-    func clearMemory() { memory.removeAll() }
+    func clearMemory() { memory.removeAllObjects() }
 }
 
 /// Look web views that render off screen sit under the app's root view, so
@@ -320,6 +359,7 @@ struct LiveSceneView: UIViewRepresentable {
             let paused = paused
             coordinator.paused = paused
             Task {
+                await SceneNight.prepare(host, theme: theme)
                 _ = try? await host.call("return BBLook.scene.start(options)", ["options": options])
                 if paused { _ = try? await host.call("BBLook.scene.pause()") }
             }

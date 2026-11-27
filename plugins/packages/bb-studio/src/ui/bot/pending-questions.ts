@@ -1,6 +1,7 @@
 // The Bot chat's pending questions and approvals, for the Bot page's Needs you.
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
+import { visiblePoll } from "../../kit/app/visible-poll";
 
 /** `text`: the question's own words, when it has them (the Bot page's Needs you shows it). */
 export type Pending = { id: string; reason: string; createdAt: number; text?: string | null };
@@ -22,8 +23,8 @@ export function usePendingQuestions(threadId: string | null): Pending[] {
       setPending(items);
     }, () => {});
     load();
-    const timer = setInterval(load, 30_000);
-    return () => { live = false; clearInterval(timer); };
+    const stop = visiblePoll(load, 30_000);
+    return () => { live = false; stop(); };
   }, [sdk, threadId]);
   return pending;
 }

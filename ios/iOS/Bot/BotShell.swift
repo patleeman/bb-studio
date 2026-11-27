@@ -63,32 +63,21 @@ struct BotSpaceDot: Equatable, Identifiable {
     var label: String { name + (amber ? ", needs you" : "") }
 }
 
-struct SpacesLaunch: Equatable {
-    enum Shown: Equatable { case loading, classic, room }
+/// What the root shows: the room once Studio's Bots answer (or from what
+/// they answered last time), loading until then, and Studio unreachable after
+/// a real failure (not installed, or an error answer) or `timeout`.
+enum StudioLaunch {
+    enum Shown: Equatable { case loading, room, unreachable }
 
-    static let fallback: Duration = .seconds(3)
+    static let timeout: Duration = .seconds(10)
     static let retries: [Duration] = [.seconds(5), .seconds(15), .seconds(60)]
 
-    var shown = Shown.loading
-    var timedOut = false
-
-    func next(support: BotSpacesSupport, idle: Bool, quiet: Bool = true, linked: Bool = false) -> Shown {
-        switch shown {
-        case .room:
-            return support == .available ? .room : .classic
-        case .loading:
-            if support == .available, idle { return .room }
-            if support == .unknown, idle, quiet, !linked, !timedOut { return .loading }
-            return .classic
-        case .classic:
-            return support == .available && idle && quiet ? .room : .classic
+    static func shown(support: BotSpacesSupport, failed: Bool, timedOut: Bool) -> Shown {
+        switch support {
+        case .available: .room
+        case .unavailable: .unreachable
+        case .unknown: failed || timedOut ? .unreachable : .loading
         }
-    }
-
-    @discardableResult
-    mutating func update(support: BotSpacesSupport, idle: Bool, quiet: Bool = true, linked: Bool = false) -> Shown {
-        shown = next(support: support, idle: idle, quiet: quiet, linked: linked)
-        return shown
     }
 
     static func retryDelay(_ attempt: Int, delays: [Duration] = retries) -> Duration {
@@ -98,11 +87,6 @@ struct SpacesLaunch: Equatable {
 }
 
 enum BotShell {
-    static func usesSpaces(support: BotSpacesSupport, showing: Bool, idle: Bool) -> Bool {
-        guard support == .available else { return false }
-        return showing || idle
-    }
-
     static func shownBot(_ spaces: BotSpaces?, chosen: String?) -> BotSpace? {
         guard let spaces else { return nil }
         return spaces.bots.first { $0.id == chosen } ?? spaces.current
@@ -176,16 +160,6 @@ enum BotShell {
             botPause: bot.paused ? (bot.state ?? "paused") : nil)
     }
 
-    @MainActor
-    static func startConversation(_ text: String, bot: BotSpace, view: BotThreadsView?, client: BBClient) async throws -> String {
-        var projectId = view?.main?.projectId
-        if projectId == nil, let main = mainThreadId(bot, view: view) {
-            projectId = try await client.thread(main).projectId
-        }
-        guard let projectId else { throw BBError(status: 0, message: "\(bot.name) has no Main conversation to start from.") }
-        return try await client.startConversation(botId: bot.id, projectId: projectId, text: text)
-    }
-
     static func shortAge(_ at: Double, now: Date = Date()) -> String {
         WorkerInfo.age(at, now: now)
     }
@@ -199,136 +173,5 @@ enum BotShell {
         }
         guard workers > 0 else { return state }
         return state + " · " + (workers == 1 ? "1 worker" : "\(workers) workers")
-    }
-}
-
-@MainActor
-final class BotShellModel: ObservableObject {
-    @Published var shownBotId: String? {
-        didSet { BotSpacesStore.shared.shownBotId = shownBotId }
-    }
-    @Published var selection: BotShellItem?
-    @Published var compactColumn: NavigationSplitViewColumn = .sidebar
-    @Published var detailPath: [Route] = []
-    @Published var roomOpen: BotPage?
-    @Published var roomFocus: String?
-    private var landing = false
-
-    func takeLanding() -> Bool {
-        defer { landing = false }
-        return landing
-    }
-    @Published var themeOverride: [String: String] = [:]
-    @Published var botToast: String?
-    private(set) var landed = false
-
-    func openConversation(_ threadId: String) {
-        landed = true
-        detailPath = []
-        selection = .conversation(threadId)
-        compactColumn = .detail
-    }
-
-    func open(_ item: BotShellItem) {
-        landed = true
-        detailPath = []
-        selection = item
-        compactColumn = .detail
-    }
-
-    private var pendingPush: Route?
-
-    func takePendingPush() -> [Route] {
-        defer { pendingPush = nil }
-        return pendingPush.map { [$0] } ?? []
-    }
-
-    func follow(_ link: BotShellLink, store: BotSpacesStore) {
-        switch link {
-        case .thread(let id, let worker):
-            open(worker ? .worker(id) : .conversation(id))
-        case .page(let page, let botId):
-            if let botId, botId != BotShell.shownBot(store.spaces, chosen: shownBotId)?.id, store.spaces?.bots.contains(where: { $0.id == botId }) == true {
-                show(botId, store: store, compact: true)
-            }
-            open(.page(page))
-        case .push(let route):
-            landed = true
-            compactColumn = .detail
-            if selection == nil, let bot = BotShell.shownBot(store.spaces, chosen: shownBotId),
-               let main = BotShell.mainThreadId(bot, view: store.view(for: bot.id)) {
-                pendingPush = route
-                selection = .conversation(main)
-            } else {
-                detailPath.append(route)
-            }
-        }
-    }
-
-    func showList() {
-        detailPath = []
-        selection = nil
-        compactColumn = .sidebar
-    }
-
-    func land(_ store: BotSpacesStore) {
-        guard !landed, let bot = BotShell.shownBot(store.spaces, chosen: shownBotId),
-            let main = BotShell.mainThreadId(bot, view: store.view(for: bot.id))
-        else { return }
-        landed = true
-        shownBotId = bot.id
-        landing = true
-        selection = .conversation(main)
-        compactColumn = .detail
-    }
-
-    func show(_ botId: String, store: BotSpacesStore, compact: Bool) {
-        let previous = BotShell.shownBot(store.spaces, chosen: shownBotId)?.id
-        guard botId != previous, store.spaces?.bots.contains(where: { $0.id == botId }) == true else { return }
-        if let previous, previous != store.spaces?.current?.id { store.unwatch(previous) }
-        store.watch(botId)
-        shownBotId = botId
-        landed = true
-        if compact {
-            selection = nil
-            compactColumn = .sidebar
-        } else {
-            let bot = BotShell.shownBot(store.spaces, chosen: botId)
-            selection = BotShell.mainThreadId(bot, view: store.view(for: botId)).map(BotShellItem.conversation)
-        }
-    }
-
-    func step(_ step: Int, store: BotSpacesStore, compact: Bool) {
-        guard let next = BotShell.step(store.spaces, from: BotShell.shownBot(store.spaces, chosen: shownBotId)?.id, by: step) else { return }
-        show(next, store: store, compact: compact)
-    }
-
-    func open(_ route: BotRoute, store: BotSpacesStore) {
-        switch route {
-        case .list:
-            selection = nil
-            compactColumn = .sidebar
-        case .primary, .bot:
-            var botId = store.spaces?.bots.first(where: \.primary)?.id ?? store.spaces?.current?.id
-            if case .bot(let id) = route { botId = id }
-            guard let botId, let bot = store.spaces?.bots.first(where: { $0.id == botId }) else { return }
-            if bot.id != BotShell.shownBot(store.spaces, chosen: shownBotId)?.id {
-                show(bot.id, store: store, compact: false)
-            }
-            landed = true
-            selection = BotShell.mainThreadId(bot, view: store.view(for: bot.id)).map(BotShellItem.conversation)
-            compactColumn = .detail
-        }
-    }
-}
-
-extension BotShellModel {
-    /// Follows a pending link, then a pending route, once the Bots are loaded.
-    /// Returns which were used, for the caller to clear.
-    func consume(link: BotShellLink?, route: BotRoute?, store: BotSpacesStore) -> (link: Bool, route: Bool) {
-        guard store.spaces != nil else { return (false, false) }
-        if let link { follow(link, store: store) }
-        if let route { open(route, store: store) }
-        return (link != nil, route != nil)
     }
 }

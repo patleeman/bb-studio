@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // An item dropped on a page's body: what it becomes, where it lands, and the
 // bar that shows where.
 import { act } from "react";

@@ -1,3 +1,4 @@
+import "./vitest-live-guard.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,6 +7,8 @@ import { beforeEach } from "vitest";
 interface SkipEntry {
   file: string;
   title: string;
+  localOnly?: boolean;
+  reason?: string;
 }
 
 const root = path.resolve(
@@ -34,7 +37,11 @@ const entryFor = (file: string) => {
   byFile.set(file, created);
   return created;
 };
-for (const { file, title } of list.skip) entryFor(file).titles.add(title);
+const onCi = process.env.CI !== undefined && process.env.CI !== "";
+for (const { file, title, localOnly } of list.skip) {
+  if (localOnly === true && onCi) continue;
+  entryFor(file).titles.add(title);
+}
 for (const { file, title } of list.skipEach ?? []) {
   entryFor(file).patterns.push(templatePattern(title));
 }

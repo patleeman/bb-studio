@@ -1,8 +1,7 @@
 import XCTest
 
-/// The new chat transcript (Settings ▸ Diagnostics ▸ New chat transcript,
-/// `-qaTranscriptV2`) with the real composer and keyboard, offline on the
-/// local Bot demo. In the Bot chat, a Bot thread and a normal thread, it
+/// The chat transcript (UIKit, `iOS/Transcript`) with the real composer and
+/// keyboard, offline on the local Bot demo. In the Bot chat, a Bot thread and a normal thread, it
 /// checks the rules the SwiftUI transcript broke:
 ///
 /// - never past the end, and at the end while following, sampled through
@@ -142,7 +141,11 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
 
         // Your last message: Edit puts it back in the composer. Sent from
         // here: the demo's answer is short, so it stays on screen.
-        composerField.tap()
+        // A closing menu can swallow the first tap.
+        for _ in 0..<3 where !app.keyboards.firstMatch.exists {
+            composerField.tap()
+            _ = app.keyboards.firstMatch.waitForExistence(timeout: 3)
+        }
         composerField.typeText("Edit me please")
         app.buttons["Send"].firstMatch.tap()
         command("dismiss")
@@ -232,7 +235,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     /// Mini cards (`-qaDuoMinis`): offline they show their placeholder, which
     /// resizes as it loads; the chat stays at its end.
     func testMiniCards() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaTranscriptV2", "-qaScrollLog", "-qaBotDemo", "duo",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog", "-qaBotDemo", "duo",
             "-qaDuoMinis", "mini_0000000000000a01,mini_0000000000000b02,mini_0000000000000c03", "-qaDark", "-qaDuoPhone", "-openURL", "bbstudio://thread/thr_botdemo01"]
         if layout == "split" { app.launchArguments += ["-qaDuoColdWide"] }
         app.launchOffline()
@@ -266,7 +269,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     /// and its card is at the end; Quote, Select Text and Edit work.
     func testThreadParity() throws {
         guard layout == "split" else { throw XCTSkip("The demo lists its normal thread only on the Duo's inner screen") }
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaTranscriptV2", "-qaScrollLog", "-qaBotDemo", "duo",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog", "-qaBotDemo", "duo",
             "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles", "-qaDemoLatency", "300", "-qaDemoColdCache",
             "-qaDemoUnread", "8", "-qaDark", "-openURL", "bbstudio://bot"]
         app.launchOffline()
@@ -387,8 +390,11 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         // newest in the tree.
         let matching = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != 'bot-reply-copy'", item))
         let before = matching.count
+        let beforeFrames = Set(matching.allElementsBoundByIndex.map { "\($0.frame)" })
         var opened = false
         for _ in 0..<2 where !opened {
+            // The reply is at the end; a closed menu can leave the view elsewhere.
+            if !element.exists { command("bottom"); _ = element.waitForExistence(timeout: 5) }
             let until = Date().addingTimeInterval(5)
             while !(element.exists && element.isHittable), Date() < until { Thread.sleep(forTimeInterval: 0.25) }
             element.press(forDuration: 1)
@@ -396,7 +402,9 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
             while matching.count <= before, Date() < deadline { Thread.sleep(forTimeInterval: 0.2) }
             opened = matching.count > before
         }
-        if opened { matching.element(boundBy: matching.count - 1).tap() } else { failures.append("\(step): no \(item) in the menu") }
+        // The menu's item: not one that was there before the press (a code block's Copy).
+        let added = matching.allElementsBoundByIndex.last { !beforeFrames.contains("\($0.frame)") }
+        if opened { (added ?? matching.element(boundBy: matching.count - 1)).tap() } else { failures.append("\(step): no \(item) in the menu") }
         Thread.sleep(forTimeInterval: 0.8)
     }
 
@@ -458,15 +466,16 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         let afterBurst = record("\(name): a burst while reading")
         moved(from: reading, to: afterBurst, "\(name): a burst while reading")
         if !pill.label.contains("new") { failures.append("\(name): the pill doesn't count new rows (\(pill.label))") }
+        let watched = anchor()
         composerField.tap()
         expectKeyboard(true, "\(name): keyboard up while reading")
-        let keyboardUp = record("\(name): keyboard up while reading")
-        moved(from: afterBurst, to: keyboardUp, "\(name): keyboard up while reading")
+        record("\(name): keyboard up while reading")
+        anchorMoved(watched, "\(name): keyboard up while reading")
         shot("\(name)-reading-keyboard-up")
         command("dismiss")
         expectKeyboard(false, "\(name): keyboard down while reading")
-        let keyboardDown = record("\(name): keyboard down while reading")
-        moved(from: keyboardUp, to: keyboardDown, "\(name): keyboard down while reading")
+        record("\(name): keyboard down while reading")
+        anchorMoved(watched, "\(name): keyboard down while reading")
 
         // The pill: back to the end, following again.
         pill.tap()
@@ -480,7 +489,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     // MARK: - Harness
 
     private func open(cold: Bool = true) {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaTranscriptV2", "-qaScrollLog",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog",
             "-qaBotDemo", layout == "phone" ? "chat" : "duo", "-qaDark", "-openURL", "bbstudio://bot"]
             + (cold ? ["-qaDemoLatency", "300", "-qaDemoColdCache"] : [])
         switch layout {
@@ -497,10 +506,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     }
 
     private func standUpTheRoom() {
-        if inRoom { XCTAssertTrue(app.buttons["RoomStage"].waitForExistence(timeout: 30), "the room shows on the folded Duo") }
-        guard app.buttons["RoomStage"].waitForExistence(timeout: 10) else { return }
-        app.standRoomChat()
-        XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10), "the room's chat stands up")
+        if inRoom { XCTAssertTrue(app.waitForRoom(timeout: 30), "the conversation shows on the folded Duo") }
     }
 
     /// The split's right page on the simulator's screen (it's only as wide as the outer one).
@@ -548,12 +554,13 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         if visible != shown { failures.append("\(step): the pill is \(visible ? "shown" : "hidden")") }
     }
 
-    /// The composer's resting gap: 8 pt over the home indicator (phone, outer
-    /// screen), or 8 pt over the window's edge beside two pages.
+    /// The composer's resting gap: on the home indicator's inset (phone, outer
+    /// screen; the room has no tab bar to sit 8 pt above), or 8 pt over the
+    /// window's edge beside two pages.
     private func expectGap(_ step: String) {
         guard let geometry = window() else { return failures.append("\(step): no layout") }
         let below = geometry.height - composer.frame.maxY - (layout == "split" ? 0 : app.frame.minY)
-        let expected: CGFloat = layout == "split" ? 8 : layout == "outer" ? geometry.safeBottom : 8 + geometry.safeBottom
+        let expected: CGFloat = layout == "split" ? 8 : geometry.safeBottom
         steps.append(String(format: "%@: composer gap %.1f (expected %.1f, safe bottom %.1f)", step, below, expected, geometry.safeBottom))
         // A tab bar under the Bot chat on a phone holds the composer higher.
         if layout == "split" ? abs(below - expected) > 2 : below < expected - 2 {
@@ -571,7 +578,8 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         let probe = window()?.keyboardTop ?? .nan
         steps.append(String(format: "%@: frames: composer bottom %.1f, keyboard frame top %.1f, XCUITest keyboard top %.1f",
                             step, composer.frame.maxY, probe, app.keyboards.firstMatch.frame.minY))
-        guard let gap = drawnGapUnderComposer() ?? (inRoom && probe.isFinite ? probe - composer.frame.maxY : nil) else {
+        // The room's backdrop draws no black band to measure: then the keyboard frame the app is told.
+        guard let gap = drawnGapUnderComposer() ?? (probe.isFinite ? probe - composer.frame.maxY : nil) else {
             return failures.append("\(step): no keyboard drawn under the composer")
         }
         steps.append(String(format: "%@: composer %.1f pt above the keyboard (drawn)", step, gap))
@@ -604,6 +612,33 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         guard let bandStart = column.firstIndex(where: { $0 <= 4 }),
               let bandEnd = column[bandStart...].firstIndex(where: { $0 >= 12 }) else { return nil }
         return CGFloat(bandEnd - bandStart) / scale
+    }
+
+    /// A message's text in the upper half of the screen and where it sits:
+    /// what the reader sees. The content offset alone can't say: a row above
+    /// that changes height (one measures in, or the keyboard changes a safe
+    /// area) moves the offset and the content together, and nothing on
+    /// screen moves (HeaderTapUITests, B16).
+    private func anchor() -> (label: String, y: CGFloat)? {
+        let screen = app.frame
+        for text in app.staticTexts.allElementsBoundByIndex.prefix(80) where text.exists {
+            let frame = text.frame
+            let label = text.label
+            guard label.count > 12, frame.minY > screen.minY + 140, frame.maxY < screen.midY,
+                  app.staticTexts.matching(NSPredicate(format: "label == %@", label)).count == 1 else { continue }
+            return (label, frame.minY)
+        }
+        return nil
+    }
+
+    /// Fails `step` when the anchor's text moved on screen (or left it).
+    private func anchorMoved(_ anchor: (label: String, y: CGFloat)?, _ step: String) {
+        guard let anchor else { return failures.append("\(step): no message in view to watch") }
+        let text = app.staticTexts.matching(NSPredicate(format: "label == %@", anchor.label)).firstMatch
+        guard text.exists else { return failures.append("\(step): \"\(anchor.label.prefix(30))\" left the screen") }
+        let delta = text.frame.minY - anchor.y
+        steps.append(String(format: "%@: the text on screen moved %.1f", step, delta))
+        if abs(delta) > 2 { failures.append(String(format: "%@: the rows moved %.1f pt on screen", step, delta)) }
     }
 
     private func moved(from before: Scroll?, to after: Scroll?, _ step: String) {

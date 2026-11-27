@@ -9,7 +9,7 @@
 import { CALL_RETENTION_OPTIONS, CALL_STT_OPTIONS, HOLD_KEY_OPTIONS } from "../kit/talk-contract";
 import { DEFAULT_REPLIES } from "../kit/pages-contract";
 import { DEFAULT_EMOJI_ITEMS } from "../reactions/emoji-items";
-import { jevProviderChoices } from "../decisions/server/jev-providers";
+import { jevProviderChoices, renamedJevProviders } from "../decisions/server/jev-providers";
 import { isTimeZone } from "../loops/clock";
 import { ALL_VOICES, BACKEND_MODELS, DEFAULT_BACKEND_MODEL, DEFAULT_CAP_USD, DEFAULT_VOICE, LIVE_MODELS } from "../voice/live/shared";
 
@@ -24,7 +24,7 @@ export type StudioSetting = Base & (
   | { type: "boolean"; default: boolean }
   | { type: "number"; default: number; min: number; max: number; integer?: boolean }
   | { type: "string"; default: string; maxLength: number; multiline?: boolean; timeZone?: true }
-  | { type: "select"; default: string; options: readonly string[]; optionLabels?: Record<string, string> }
+  | { type: "select"; default: string; options: readonly string[]; optionLabels?: Record<string, string>; /** Old option values and the option each now means. */ renamedOptions?: Record<string, string> }
 );
 export type SettingValue = boolean | number | string;
 
@@ -81,13 +81,14 @@ export const STUDIO_SETTINGS = {
   launcherHotkey: { group: "windows", type: "string", label: "Launcher shortcut", description: "Written like Alt+Space or Control+Shift+L. Empty for none.", default: "Alt+Space", maxLength: 40 },
 
   // Smart Queue model
-  decisions_jevProvider: { group: "jev", type: "select", label: "Provider", description: "The decision model Smart Queue asks first: it decides whether a message to a busy thread steers it or waits. Auto tries each provider with a key.", options: jevProviderChoices, optionLabels: { auto: "Auto", typesafe: "TypeSafe", vercel: "Vercel AI Gateway", openrouter: "OpenRouter", "opencode-zen": "OpenCode Zen", custom: "Your own endpoint" }, default: "auto" },
+  decisions_jevProvider: { group: "jev", type: "select", label: "Provider", description: "The decision model Smart Queue asks first: it decides whether a message to a busy thread steers it or waits. Auto tries each provider with a key.", options: jevProviderChoices, optionLabels: { auto: "Auto", typesafe: "TypeSafe", vercel: "Vercel AI Gateway", openrouter: "OpenRouter", "opencode-go": "OpenCode Go", custom: "Your own endpoint" }, renamedOptions: renamedJevProviders, default: "auto" },
   decisions_customJevEndpoint: { group: "jev", type: "string", label: "Endpoint URL", description: "Any endpoint that speaks TypeSafe’s System One API, such as https://gateway.example.com/v1/systemone. HTTPS except on localhost.", default: "", maxLength: 2000 },
   decisions_customJevApiKeyCommand: { group: "jev", type: "string", label: "Or a command that prints the key", description: "Runs on this computer; the token is reused until its JWT expires, or for five minutes.", default: "", maxLength: 2000 },
   decisions_customJevHeaders: { group: "jev", type: "string", label: "Extra headers", description: "`name: value` pairs separated by semicolons, such as `source: bb; org-id: 2`.", default: "", maxLength: 4000 },
   decisions_customJevModel: { group: "jev", type: "string", label: "Model name", description: "The model the endpoint expects, such as jev-latest.", default: "", maxLength: 200 },
 
   // Advanced
+  strands_richSorting: { group: "advanced", type: "boolean", label: "Richer strand sorting", description: "Experimental. Jev also reads each strand's newest lines, the turn before and where quoted text came from, and may file a message under a second strand or say what a new strand grew out of. Off sorts as before, with the links the conversation states.", default: false },
   decisions_batchConfidence: { group: "advanced", type: "number", label: "Smart Queue batch confidence", description: "From 0 to 1. When a thread frees up, queued follow-ups the decision model is this sure belong together go as one turn. 1 sends each on its own.", default: 0.5, min: 0, max: 1 },
 
   // Bot ▸ Controls ▸ Attention
@@ -132,7 +133,8 @@ export function checkSetting(key: string, value: unknown): { ok: true; value: Se
       if (setting.timeZone && value.trim() && !isTimeZone(value)) return { ok: false, error: `${value} isn't a time zone, such as America/Los_Angeles.` };
       return { ok: true, value: setting.timeZone ? value.trim() : value };
     case "select": {
-      const known = typeof value === "string" ? setting.options.find((option) => option === value || value.startsWith(`${option} (`)) : undefined;
+      const renamed = typeof value === "string" && setting.renamedOptions && Object.hasOwn(setting.renamedOptions, value) ? setting.renamedOptions[value] : value;
+      const known = typeof renamed === "string" ? setting.options.find((option) => option === renamed || renamed.startsWith(`${option} (`)) : undefined;
       return known !== undefined
         ? { ok: true, value: known }
         : { ok: false, error: `${key} is one of: ${setting.options.join(", ")}.` };

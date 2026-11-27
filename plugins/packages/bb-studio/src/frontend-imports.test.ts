@@ -47,7 +47,7 @@ describe("frontend bundle", () => {
   });
 
   it("never imports the root plugin SDK from views loaded on demand", () => {
-    for (const entry of ["src/pages/ui/PagePanel.tsx", "src/pages/ui/route.tsx", "src/memory/ui/MemoryView.tsx", "src/memory/ui/ProfilePane.tsx"]) {
+    for (const entry of ["src/pages/ui/PagePanel.tsx", "src/pages/ui/route.tsx", "src/memory/ui/MemoryView.tsx"]) {
       expect(importersOf(join(packageDir, entry), (spec) => spec === "@get-bb/plugin-sdk")).toEqual([]);
     }
   });

@@ -46,6 +46,7 @@ import { post } from "./src/code/file-opener";
 import { registerItemDrops } from "./src/ui/item-drop";
 import { withPageTabs } from "./src/ui/page-tab-requests";
 import { RetireFixedBotTabs } from "./src/ui/bot/retire-fixed-tabs";
+import { RetireStrandsTabs } from "./src/ui/bot/retire-strands-tabs";
 import { ITEM_TAB_ICON } from "./src/ui/item-icons";
 import { registerItemWindows } from "./src/ui/item-window";
 import { registerHostWindow } from "./src/kit/app/windows";
@@ -93,7 +94,6 @@ import { registerExploreApp } from "./src/explore/app";
 import { registerReactionsApp } from "./src/reactions/app";
 import "./src/pages/ui/styles.css";
 import "./src/ui/bot/timeline.css";
-import "./src/dashboards/ui/dashboards.css";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, showLibrary, StudioPanel } from "./src/ui/StudioPanel";
@@ -123,10 +123,10 @@ import { TaskDirective } from "./src/tasks/ui/TaskCard";
 import { STRANDS_TAB, StrandsBoxBanner } from "./src/strands/ui/Strip";
 import { ContextInfoSection } from "./src/strands/ui/ContextInfoSection";
 import { registerTimelineFilter } from "./src/strands/ui/selection";
-import { StrandTag } from "./src/strands/ui/Tag";
+import { canZoom, ZoomView, zoomThreadBy } from "./src/strands/ui/Zoom";
+import { StrandMarks, StrandTag } from "./src/strands/ui/Tag";
 import { StrandsTab } from "./src/strands/ui/Tab";
 import "./src/work/ui/work.css";
-import { TodosTabName } from "./src/loops/ui/tab-name";
 import { OFF_NEW_TAB, onThreadTabOpen, registerThreadTab, ThreadTabReceiver } from "./src/kit/app/thread-panel";
 import { forgetView } from "./src/ui/studio-tab/view-state";
 import { registerThreadHeader } from "./src/ui/thread-header";
@@ -210,8 +210,8 @@ function StudioRootView({ subPath }: { subPath: string }) {
   // The Bot sidebar's "N older conversations" and "N older workers": `conversations` or `conversations/<botId>`.
   if (path === OLDER_SUBPATH || path.startsWith(`${OLDER_SUBPATH}/`)) return <Suspense fallback={null}><OlderPage botId={olderBotFromPath(path)} /></Suspense>;
   if (path === SKILLS_SUBPATH || path.startsWith(`${SKILLS_SUBPATH}/`)) return <Suspense fallback={null}><SkillsPage botId={skillsBotFromPath(path)} /></Suspense>;
-  const entry = /^(automation|todo|record)\/([^/]+)$/.exec(path);
-  if (entry) return <EntryView kind={entry[1] as "automation" | "todo" | "record"} id={decodeSegment(entry[2]!)} />;
+  const entry = /^(automation|todo)\/([^/]+)$/.exec(path);
+  if (entry) return <EntryView kind={entry[1] as "automation" | "todo"} id={decodeSegment(entry[2]!)} />;
   // A Bot's + New: BB's new-thread composer on its default model (`new-conversation/<botId>[/<projectId>]`).
   const fresh = newConversationRoute(path);
   if (fresh) return <NewConversationPage botId={fresh.botId} projectId={fresh.projectId} />;
@@ -370,10 +370,11 @@ export default definePluginApp((app) => {
   registerItemDrops(app.slots);
   // Main tabs kept each Bot as a fixed workbench tab; those close once.
   app.slots.experimental_appOverlay({ id: "retire-fixed-tabs", component: RetireFixedBotTabs });
-  app.slots.experimental_appOverlay({ id: "todos-tab-name", component: TodosTabName });
-  // `studio/automations`: the Bot's Todos page (src/ui/automations/AutomationsPanel.tsx).
+  // The old Strands page's workbench tabs (tab id "loops") close too.
+  app.slots.experimental_appOverlay({ id: "retire-strands-tabs", component: RetireStrandsTabs });
+  // `studio/automations`: the Bot's Scheduled page (src/ui/automations/AutomationsPanel.tsx).
   // Its title row is the page's own, in BB's title bar (headerContent), as the Library's is: one row, not two.
-  app.slots.navPanel({ id: AUTOMATIONS_PANEL, title: "Tasks", icon: "ListTodo", path: AUTOMATIONS_PANEL, component: withPageTabs(AutomationsPanel, AUTOMATIONS_PANEL), headerContent: StudioBarSlot, ...OFF_RAIL });
+  app.slots.navPanel({ id: AUTOMATIONS_PANEL, title: "Scheduled", icon: "ListTodo", path: AUTOMATIONS_PANEL, component: withPageTabs(AutomationsPanel, AUTOMATIONS_PANEL), headerContent: StudioBarSlot, ...OFF_RAIL });
   // VS Code, its own page in BB's rail (`studio/vscode`): the workspace used
   // last, else the picker (src/code/vscode-panel.tsx).
   app.slots.navPanel({ id: VSCODE_PANEL, title: "VS Code", icon: CODE_ICON, path: VSCODE_PANEL, component: VsCodePanel, headerContent: StudioBarSlot, experimental_usePageTitle: useCodePageTitle, ...OFF_RAIL });
@@ -392,12 +393,19 @@ export default definePluginApp((app) => {
   app.slots.messageDirective({ id: "work", component: TaskDirective });
   // The strands box above a Bot conversation's composer (src/strands/ui), in In flight's old place; and the timeline filter it applies.
   app.composer.customize({ id: "strands", scopes: ["thread"], banners: [{ id: "strands", component: StrandsBoxBanner }] });
-  registerTimelineFilter(app.slots);
+  // Semantic zoom (the fork's zoom seam): a zoomed-out conversation shows its strands in the timeline's place.
+  registerTimelineFilter(app.slots, ZoomView);
+  // ⌃⌘− / ⌃⌘=: Control keeps the key "-" and "="; Option would make them "–" and "≠", which BB's matcher can't map back.
+  // macOS-only by design: elsewhere mod+control is plain Ctrl+− / Ctrl+=, which BB's View menu uses for page zoom.
+  app.commands.register({ id: "zoom-out", title: "Studio: Zoom out (Messages → Strands)", defaultShortcut: { key: "-", mod: true, control: true }, isAvailable: (context) => canZoom(context.threadId), run: (context) => { zoomThreadBy(context.threadId, 1); } });
+  app.commands.register({ id: "zoom-in", title: "Studio: Zoom in (Strands → Messages)", defaultShortcut: { key: "=", mod: true, control: true }, isAvailable: (context) => canZoom(context.threadId), run: (context) => { zoomThreadBy(context.threadId, -1); } });
   // BB's thread context row (parent, changed files, pull request) in a strands conversation's Info tab; hidden above its composer (prompt-stack.ts).
   const infoSection = member(app.slots, "experimental_threadInfoSection");
   if (typeof infoSection === "function") infoSection.call(app.slots, { id: "thread-context", group: "0_context", order: 10, component: ContextInfoSection });
-  app.slots.experimental_messageMetadata({ id: "strand-tag", placement: "above", component: StrandTag });
-  registerThreadTab(app, { id: STRANDS_TAB, title: "Strands", icon: "LayoutList", layout: "flush", component: StrandsTab, ...OFF_NEW_TAB });
+  // A message's strand: its name and "Move to…" in the footer row after the time; the dim and the asking mark from above, with nothing drawn there.
+  app.slots.experimental_messageMetadata({ id: "strand-tag", placement: "actionRow", component: StrandTag });
+  app.slots.experimental_messageMetadata({ id: "strand-marks", placement: "above", component: StrandMarks });
+  registerThreadTab(app, { id: STRANDS_TAB, title: "Strands", icon: "ListView", layout: "flush", component: StrandsTab, ...OFF_NEW_TAB });
   // The Bot's other pages as tabs (Memory, Library, Automations, the Archive) and the New Tab page's "New …" actions (src/tab-kinds.ts).
   registerTabKindTabs(app);
   // Hands-free voice (src/voice/live/ui): a session is its own thread. Its

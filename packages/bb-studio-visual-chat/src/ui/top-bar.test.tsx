@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // The header: a faint bar on the page in BB's main view, and the window's
 // title bar (one draggable row, after the traffic lights) with the window's
 // shortcuts in a window of its own.

@@ -1,28 +1,22 @@
 import SwiftUI
 
 /// Each Bot's strands overview (`strands.overview`), polled every 30 s while
-/// the Strands screen shows (as the desktop's page does). A Studio without
-/// strands answers "unknown method": the screen asks to update it then.
+/// the Strands screen shows (as the desktop's page does).
 @MainActor @Observable
 final class StrandOverviewModel {
     static let shared = StrandOverviewModel()
 
     enum Shown: Equatable {
         case loading
-        /// An older Studio: no `strands.overview`.
-        case update
         case failed(String)
         case empty
         case cards(StrandOverview)
     }
 
-    static let updateText = "Update BB Studio on your Mac to see strands."
     static let emptyText = "No open strands"
 
     private(set) var overviews: [String: StrandOverview] = [:]
     private(set) var errors: [String: String] = [:]
-    /// Per server: nil until asked, false when Studio has no strands overview.
-    private(set) var supported: [URL: Bool] = [:]
     private let client: @MainActor () -> BBClient
 
     init(client: @escaping @MainActor () -> BBClient = { AppModel.shared.client }) {
@@ -34,12 +28,8 @@ final class StrandOverviewModel {
     /// Strands that need the user in the Bot's conversations (the ⋯ menu's count).
     func needs(_ botId: String?) -> Int { botId.flatMap { overviews[$0]?.needs } ?? 0 }
 
-    /// Studio has the overview, or hasn't answered yet.
-    var available: Bool { supported[client().baseURL] != false }
-
     func shown(_ botId: String?) -> Shown {
-        if supported[client().baseURL] == false { return .update }
-        guard let botId else { return .update }
+        guard let botId else { return .empty }
         if let overview = overviews[botId] { return overview.conversations.isEmpty ? .empty : .cards(overview) }
         if let error = errors[botId] { return .failed(error) }
         return .loading
@@ -51,12 +41,8 @@ final class StrandOverviewModel {
         do {
             let next = try await client.strandsOverview(botId: botId)
             guard base == self.client().baseURL else { return }
-            supported[base] = true
             errors[botId] = nil
             if overviews[botId] != next { overviews[botId] = next }
-        } catch where BBClient.isUnknownRPC(error) {
-            guard base == self.client().baseURL else { return }
-            supported[base] = false
         } catch {
             guard base == self.client().baseURL, !(error is CancellationError) else { return }
             errors[botId] = BBClient.describe(error, server: base)
@@ -67,8 +53,7 @@ final class StrandOverviewModel {
     func poll(_ botId: String) async {
         while !Task.isCancelled {
             await load(botId)
-            if supported[client().baseURL] == false { return }
-            try? await Task.sleep(for: .seconds(30))
+            await EnergyGate.shared.pollWait(.seconds(30))
         }
     }
 }
@@ -92,8 +77,6 @@ struct StrandsOverviewView: View {
                 switch shown {
                 case .loading:
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
-                case .update:
-                    notice(StrandOverviewModel.updateText, id: "strands-update")
                 case .failed(let message):
                     notice(message, id: "strands-failed")
                 case .empty:

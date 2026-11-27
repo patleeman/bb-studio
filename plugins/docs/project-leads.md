@@ -29,10 +29,11 @@ project's Heartbeat is the Bot's check-in, with a prompt that uses its
 name. The Bot sees every project in `studio_list_items`. Setup → Project
 leads doesn't list the personal project; it links to the Bot's home.
 
-Each Bot has one Memory page (a Studio page; its `## Check-in` section is
-the check-in list) and its own skills, which only its thread loads until
-the user shares one into BB's user skills. Its check-in prompt points at
-the page and asks it to stay silent unless something matters. Its
+Each Bot has an always-on core skill (its `## Check-in` section is the
+check-in list; see the Studio README's "Memory") and its own on-demand
+skills, which only its threads load until the user shares one into BB's
+user skills. Its check-in prompt points at that section and asks it to
+stay silent unless something matters. Its
 instructions come from `agents.configure` for its thread; a new Bot's
 thread is spawned with `pluginMetadata: { bot }` so its first turn gets
 them before it becomes the lead.

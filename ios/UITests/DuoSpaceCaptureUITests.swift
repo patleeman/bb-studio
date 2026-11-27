@@ -7,10 +7,9 @@ import XCTest
 /// and its reply); the server is a closed local port.
 ///
 /// Checks that the composer rests on the home indicator's inset (not 8
-/// points above it), one row until it's focused; that no row draws over
-/// your message; and, on the folded Duo, that the header is one line with
-/// its buttons in the right column, where back works from a thread the Bot
-/// tab opened. With
+/// points above it) as one row; that no row draws over your message; and,
+/// on the folded Duo, that the header is one line with its buttons in the
+/// right column, where back works from a thread the Bot started. With
 /// `TEST_RUNNER_DUO_SPACE_OUT` naming a folder, it also writes PNGs and a
 /// JSON of measured frames as `<TAG>-<device>-<surface>-kb<down|up>`:
 /// `TEST_RUNNER_DUO_SPACE_TAG` names the build (before, fix, proposal),
@@ -81,31 +80,30 @@ final class DuoSpaceCaptureUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(seen, "Scrolled up to your message")
     }
 
-    /// The folded Duo: a thread the Bot started opens inside the Bot tab,
+    /// The folded Duo: a thread the Bot started opens over its conversation,
     /// and the column's back returns to the chat.
-    func testFoldedBackFromThreadInBotTab() throws {
+    func testFoldedBackFromAStartedThread() throws {
         guard device == "duo" else { throw XCTSkip("Folded Duo only (466 × 678)") }
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaDark", "-qaReduceMotion", "-openURL", "bbstudio://bot"]
         app.launchOffline()
         let title = app.staticTexts["foldedChatTitle"]
         XCTAssertTrue(title.waitForExistence(timeout: 30))
         XCTAssertTrue(title.label.hasPrefix("Juniper"))
-        let started = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Lisbon offsite options")).firstMatch
+        let started = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Review open PRs")).firstMatch
         XCTAssertTrue(started.waitForExistence(timeout: 10))
         started.tap()
         let back = app.buttons["folded-back"]
         XCTAssertTrue(back.waitForExistence(timeout: 10), "The thread has back in the column")
-        XCTAssertFalse(app.buttons["Hands-free"].exists, "The Bot's buttons go with its chat")
         back.tap()
         expectation(for: NSPredicate(format: "exists == true AND label BEGINSWITH 'Juniper'"), evaluatedWith: app.staticTexts["foldedChatTitle"])
         waitForExpectations(timeout: 10)
-        XCTAssertTrue(app.buttons["Hands-free"].waitForExistence(timeout: 5), "Back in the Bot's chat")
+        XCTAssertTrue(app.buttons["conversationHandsFree"].waitForExistence(timeout: 5), "Back in the Bot's chat")
     }
 
     // MARK: -
 
     private var yourMessage: XCUIElement {
-        app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'You: Mobile app'")).firstMatch
+        app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Mobile app, get rid'")).firstMatch
     }
 
     private func launch(_ extra: [String], url: String) {
@@ -118,7 +116,8 @@ final class DuoSpaceCaptureUITests: ServerIsolatedUITestCase {
     }
 
     private func assertNothingOver(_ bubble: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
-        let worked = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Worked'")).allElementsBoundByIndex
+        // The turn's summary row ("3 tool calls"), once "Worked…".
+        let worked = app.buttons.matching(NSPredicate(format: "label ENDSWITH ' tool call' OR label ENDSWITH ' tool calls'")).allElementsBoundByIndex
         for row in worked where row.exists && row.frame.minY > bubble.frame.minY {
             XCTAssertGreaterThanOrEqual(row.frame.minY, bubble.frame.maxY - 1,
                                         "The Worked row (\(row.frame)) draws over your message (\(bubble.frame))", file: file, line: line)
@@ -147,20 +146,19 @@ final class DuoSpaceCaptureUITests: ServerIsolatedUITestCase {
             }
         }
         if yourMessage.exists { assertNothingOver(yourMessage) }
-        // One row until it's focused: no model chip yet.
-        XCTAssertFalse(app.buttons["Model & permissions"].exists, "The composer is one row while it's not focused")
-        if card.exists { XCTAssertLessThan(card.frame.height, 60, "One row: + field mic send") }
+        // One row: + field mic (the model chip left the input bar for the header).
+        XCTAssertFalse(app.buttons["Model & permissions"].exists, "No model chip in the composer")
+        XCTAssertLessThan(composer.frame.height, 50, "One row: + field mic send")
         if device == "duo" {
             XCTAssertTrue(app.staticTexts["foldedChatTitle"].exists, "One line for the name and status")
             XCTAssertEqual(app.navigationBars.count, 0, "No navigation bar on the folded Duo")
-            XCTAssertTrue(app.buttons["Hands-free"].exists && app.buttons["bot-menu"].exists || surface == "thread",
-                          "The Bot's buttons are in the column")
+            XCTAssertTrue(app.buttons["conversationHandsFree"].exists && app.conversationMore.exists || surface == "thread",
+                          "The conversation's buttons are in the column")
         }
         record(surface: surface, keyboard: "down")
         composer.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10))
         sleep(2)
-        XCTAssertTrue(app.buttons["Model & permissions"].exists, "The model chip shows with the keyboard")
         record(surface: surface, keyboard: "up")
     }
 

@@ -547,3 +547,297 @@ test("Studio-owned visible work remains eligible after queue ownership moves to 
   assert.equal(queue.eligibleThread(thread({ originPluginId: "studio", visibility: "hidden" })), false);
   queue.dispose();
 });
+
+const sleepMs = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("a message the composer steered steers when Jev misses the decision budget", async () => {
+  const { queue, calls } = harness(new Promise<Verdict>(() => {}), { decideBudgetMs: 20 });
+  queue.queued(row());
+  await sleepMs(40);
+  await settle();
+  assert.deepEqual(calls.steered, ["q_1"]);
+  const [record] = calls.records as { verdict: Verdict; ms: number }[];
+  assert.equal(record.verdict.source, "default");
+  assert.equal(record.verdict.action, "steer");
+});
+
+test("a message the owner queued stays a follow-up when Jev misses the budget", async () => {
+  let routed: QueuedRow | null = null;
+  const { queue, calls } = harness(new Promise<Verdict>(() => {}), {
+    decideBudgetMs: 20,
+    route: async (r) => {
+      routed = r;
+    },
+  });
+  queue.queued(row({ id: "q_core", waitingOn: { kind: "thread-busy" } }));
+  await settle();
+  assert.ok(routed);
+  // The re-sent copy comes back held by Smart Queue under a new id.
+  queue.queued(row({ id: "q_held" }));
+  await sleepMs(40);
+  await settle();
+  assert.deepEqual(calls.steered, []);
+  const [record] = calls.records as { verdict: Verdict }[];
+  assert.equal(record.verdict.action, "followup");
+});
+
+test("no classifier answering sends the message the way BB would", async () => {
+  const { queue, calls } = harness({ action: "followup", source: "default", confidence: null, note: "Jev: down" });
+  queue.queued(row());
+  await settle();
+  assert.deepEqual(calls.steered, ["q_1"]);
+});
+
+test("a turn kept open only by background work is not busy: the message steers without asking Jev", async () => {
+  const { queue, calls } = harness(followup, { mainRunIdle: async () => true });
+  queue.queued(row());
+  await settle();
+  assert.equal(calls.classified, 0);
+  assert.deepEqual(calls.steered, ["q_1"]);
+});
+
+test("held follow-ups are sent once the agent's run ends, oldest first", async () => {
+  let idle = false;
+  const { queue, calls } = harness(followup, { mainRunIdle: async () => idle });
+  queue.queued(row({ id: "q_b", createdAt: 2 }));
+  queue.queued(row({ id: "q_a", createdAt: 1 }));
+  await settle();
+  await queue.releaseFinished();
+  assert.deepEqual(calls.steered, [], "still running: they wait");
+  idle = true;
+  await queue.releaseFinished();
+  assert.deepEqual(calls.steered, ["q_a", "q_b"]);
+  await queue.releaseFinished();
+  assert.deepEqual(calls.steered, ["q_a", "q_b"], "sent once");
+});
+
+test("on a background-only turn, a new message waits for older held follow-ups: A then B", async () => {
+  let idle = false;
+  const verdicts = new Map<string, Verdict>([["q_a", followup]]);
+  const { queue, calls } = harness(followup, {
+    mainRunIdle: async () => idle,
+    classify: async (r) => verdicts.get(r.id) ?? steer,
+  });
+  queue.queued(row({ id: "q_a", createdAt: 1 }));
+  await settle();
+  assert.deepEqual(calls.steered, [], "A is held as a follow-up");
+  idle = true;
+  queue.queued(row({ id: "q_b", createdAt: 2, content: [{ type: "text", text: "and this", mentions: [] }] }));
+  await settle();
+  assert.deepEqual(calls.steered, ["q_a", "q_b"]);
+  await queue.releaseFinished();
+  assert.deepEqual(calls.steered, ["q_a", "q_b"], "nothing is sent twice");
+});
+
+test("a Jev answer that arrives after the budget is dropped: one steer, one record", async () => {
+  const late = new Promise<Verdict>((resolve) => setTimeout(() => resolve(steer), 40));
+  const { queue, calls } = harness(late, { decideBudgetMs: 20 });
+  queue.queued(row());
+  await sleepMs(70);
+  await settle();
+  assert.deepEqual(calls.steered, ["q_1"]);
+  assert.equal(calls.records.length, 1);
+  assert.equal((calls.records[0] as { verdict: Verdict }).verdict.source, "default");
+});
+
+test("a turn still running (a tool, a pending approval) asks Jev and holds a follow-up", async () => {
+  const { queue, calls } = harness(followup, { mainRunIdle: async () => false });
+  queue.queued(row());
+  await settle();
+  assert.equal(calls.classified, 1);
+  assert.deepEqual(calls.steered, []);
+});
+
+test("a release that fails partway keeps the order and retries the rest once", async () => {
+  let idle = false;
+  let failB = true;
+  const steered: string[] = [];
+  const warnings: string[] = [];
+  const { queue } = harness(followup, {
+    mainRunIdle: async () => idle,
+    steer: async (r) => {
+      if (r.id === "q_b" && failB) {
+        failB = false;
+        throw new Error("bridge busy");
+      }
+      steered.push(r.id);
+    },
+    warn: (message) => warnings.push(message),
+  });
+  queue.queued(row({ id: "q_a", createdAt: 1 }));
+  queue.queued(row({ id: "q_b", createdAt: 2 }));
+  queue.queued(row({ id: "q_c", createdAt: 3 }));
+  await settle();
+  idle = true;
+  await queue.releaseFinished();
+  assert.deepEqual(steered, ["q_a"], "B failed, so C waits behind it");
+  const b = queue.entries.get("q_b");
+  assert.equal(b?.state === "decided" ? b.verdict.action : null, "followup");
+  await queue.releaseFinished();
+  assert.deepEqual(steered, ["q_a", "q_b", "q_c"]);
+  assert.equal(warnings.length, 1);
+});
+
+test("a release error never puts back a row that was sent or cancelled meanwhile, and warns once", async () => {
+  const warnings: string[] = [];
+  let queueRef: SmartQueue | null = null;
+  const { queue } = harness(followup, {
+    mainRunIdle: async () => idleNow,
+    steer: async (r) => {
+      queueRef!.gone({ id: r.id });
+      throw new Error("bridge busy");
+    },
+    warn: (message) => warnings.push(message),
+  });
+  let idleNow = false;
+  queueRef = queue;
+  queue.queued(row());
+  await settle();
+  idleNow = true;
+  await queue.releaseFinished();
+  assert.equal(queue.entries.has("q_1"), false);
+  await queue.releaseFinished();
+  assert.equal(warnings.filter((w) => w.includes("could not release")).length, 1);
+});
+
+test("a re-send that never comes back held does not make a later steer a follow-up", async () => {
+  let at = 0;
+  const { queue, calls } = harness(new Promise<Verdict>(() => {}), {
+    decideBudgetMs: 20,
+    now: () => at,
+    route: async () => {},
+  });
+  queue.queued(row({ id: "q_core", waitingOn: { kind: "thread-busy" } }));
+  await settle();
+  at += 10_000; // The copy was never held.
+  queue.queued(row({ id: "q_steer" }));
+  await sleepMs(40);
+  await settle();
+  assert.deepEqual(calls.steered, ["q_steer"]);
+});
+
+test("the decision budget starts when the hook held the message", async () => {
+  let at = 1_000;
+  const { queue, calls } = harness(new Promise<Verdict>(() => {}), { decideBudgetMs: 1_500, now: () => at });
+  await queue.dispatch(context({ input: { blocks: [], text: "Actually use SQLite" } } as never));
+  at += 1_490; // message.queued arrived late.
+  queue.queued(row());
+  await sleepMs(40);
+  await settle();
+  assert.deepEqual(calls.steered, ["q_1"], "only ~10 ms of budget was left");
+});
+
+test("gone() bounds departed map, forget() clears releaseWarnedAt, and dispose() clears all tracking maps", async () => {
+  let at = 1_000;
+  const { queue } = harness(new Promise<Verdict>(() => {}), { now: () => at });
+  const internal = queue as unknown as {
+    departed: Map<string, number>;
+    releaseWarnedAt: Map<string, number>;
+    heldAt: Map<string, number>;
+  };
+
+  // Bound departed map to maxDeparted even when sync() is never called.
+  for (let i = 0; i < 550; i += 1) {
+    queue.routed.add(`r_${i}`);
+    queue.gone({ id: `r_${i}` });
+  }
+  assert.equal(internal.departed.size, 500);
+
+  // Evict expired departed entries by TTL.
+  at += 6 * 60_000;
+  queue.routed.add("r_fresh");
+  queue.gone({ id: "r_fresh" });
+  assert.equal(internal.departed.size, 1);
+
+  // forget() clears releaseWarnedAt for forgotten thread rows.
+  queue.queued(row({ id: "q_warn", threadId: "thr_1" }));
+  internal.releaseWarnedAt.set("q_warn", at);
+  queue.forget("thr_1");
+  assert.equal(internal.releaseWarnedAt.has("q_warn"), false);
+
+  // dispose() clears departed, releaseWarnedAt, heldAt, and routed.
+  queue.routed.add("r_keep");
+  internal.heldAt.set("thr_1\0hi", at);
+  internal.releaseWarnedAt.set("q_other", at);
+  queue.dispose();
+  assert.equal(internal.departed.size, 0);
+  assert.equal(internal.releaseWarnedAt.size, 0);
+  assert.equal(internal.heldAt.size, 0);
+  assert.equal(queue.routed.size, 0);
+});
+
+test("releaseWarnedAt is cleared on 404 and not written when a row disappeared mid-release", async () => {
+  let at = 1_000;
+  let steerCall = 0;
+  const warnings: string[] = [];
+  const { queue } = harness(
+    { action: "followup", source: "jev", confidence: 0.9, note: null },
+    {
+      now: () => at,
+      warn: (msg) => warnings.push(msg),
+      steer: async ({ id }) => {
+        steerCall += 1;
+        if (steerCall === 1) throw new Error("temporary network error");
+        if (steerCall === 2) throw new Error("HTTP 404: not found");
+        // 3rd call: row vanishes via gone() while steer is failing
+        queue.gone({ id });
+        throw new Error("temporary network error");
+      },
+    },
+  );
+  const internal = queue as unknown as { releaseWarnedAt: Map<string, number> };
+
+  // Row 1: first release fails (sets releaseWarnedAt), second hits 404 (must delete releaseWarnedAt).
+  queue.queued(row({ id: "q_404", threadId: "thr_1", createdAt: 1 }));
+  await settle();
+  await (queue as unknown as { releaseThread(t: string, before: QueuedRow): Promise<void> }).releaseThread("thr_1", row({ id: "q_after", createdAt: 2 }));
+  assert.equal(internal.releaseWarnedAt.has("q_404"), true);
+
+  await (queue as unknown as { releaseThread(t: string, before: QueuedRow): Promise<void> }).releaseThread("thr_1", row({ id: "q_after", createdAt: 2 }));
+  assert.equal(queue.entries.has("q_404"), false);
+  assert.equal(internal.releaseWarnedAt.has("q_404"), false);
+
+  // Row 2: gone() runs while steer fails -> must not write releaseWarnedAt.
+  queue.queued(row({ id: "q_vanished", threadId: "thr_1", createdAt: 3 }));
+  await settle();
+  await (queue as unknown as { releaseThread(t: string, before: QueuedRow): Promise<void> }).releaseThread("thr_1", row({ id: "q_after2", createdAt: 4 }));
+  assert.equal(internal.releaseWarnedAt.has("q_vanished"), false);
+  assert.equal(warnings.length, 2);
+});
+
+test("after departed TTL expires, a stale sync snapshot from before the row left hits 404 and is ignored without sending", async () => {
+  let at = 1_000;
+  const warnings: string[] = [];
+  const steered: string[] = [];
+  const { queue } = harness(
+    { action: "steer", source: "jev", confidence: 0.9, note: null },
+    {
+      now: () => at,
+      warn: (msg) => warnings.push(msg),
+      steer: async ({ id }) => {
+        if (id === "q_stale") throw new Error("HTTP 404: not found");
+        steered.push(id);
+      },
+    },
+  );
+
+  // Row was tracked and then left the queue.
+  const staleRow = row({ id: "q_stale", threadId: "thr_1", createdAt: 1 });
+  const listedBeforeGone = at;
+  queue.queued(staleRow);
+  queue.gone(staleRow);
+
+  // Advance past departedTtlMs and trigger eviction via another gone() row.
+  at += 6 * 60_000;
+  queue.routed.add("q_other");
+  queue.gone({ id: "q_other" });
+
+  // Stale snapshot taken before q_stale left arrives after departed TTL expired.
+  queue.sync([staleRow], listedBeforeGone);
+  await settle();
+
+  // The stale row hits 404 on steer, is dropped cleanly, never sent, and produces no warning.
+  assert.deepEqual(steered, []);
+  assert.equal(queue.entries.has("q_stale"), false);
+  assert.deepEqual(warnings, []);
+});

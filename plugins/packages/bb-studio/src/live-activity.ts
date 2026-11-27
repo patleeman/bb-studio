@@ -21,14 +21,18 @@
 //   name; on a BB without it nothing is registered). bb gives it to the
 //   agent with the turn's input, agent-only and not stored; it waits at most
 //   500 ms for all plugins, so the provider only reads Studio's database.
+//   bb attaches it only to a turn started in "start" mode: in practice the
+//   thread's first turn (later messages go in "auto" mode). Kept that way.
 // - `bot_activity_lookup { threadId }`: one thread's details for the Bot
 //   that owns it: state, latest reply, needs-you, owner or workers, a
 //   finished conversation's summary, and its last tool calls (read from BB's
 //   events, with a short timeout).
+import { sessionTitlePrefix } from "./decisions/server/classifier";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { turnContext, type ThreadSeeds } from "./thread-seeds";
+import type { ProviderMoveInput } from "./provider-move/handoff";
 import { taskTitle } from "./tasks/store";
 import { latestLine, repoTag, threadRunning, type BotThreads, type ThreadFacts, type WorkerStatus } from "./bot-threads";
 
@@ -183,10 +187,10 @@ function workerLine(row: DigestWorker, now: number): string {
 
 export const DIGEST_HEADER = "Elsewhere with the user (your other conversations and your workers, newest first; not this conversation):";
 const NOTHING = "Elsewhere: no other conversation was active in the last day, and no worker is running or finished in the last 6 hours.";
-const footer = (more: number) => `${more ? `…and ${more} more. ` : ""}Details: bot_activity_lookup { threadId }; the full list: bot_conversations.`;
+const footer = (more: number) => `${more ? `…and ${more} more. ` : ""}Details: bot_info { view: "thread", threadId }; the full list: bot_info { view: "conversations" }.`;
 
 /**
- * The digest a conversation gets at each turn: other conversations, then
+ * The digest a conversation gets with its first turn: other conversations, then
  * workers, each newest first, within `cap` characters; what doesn't fit is
  * counted. Short when nothing else is going on.
  */
@@ -263,6 +267,8 @@ export function digestFor(db: Database.Database, threadId: string, now: number, 
       continue;
     }
     if (!each.a_state) continue;
+    // A Studio Decisions classifier thread is Studio's own, not the Bot's work.
+    if ([each.title, each.a_title].some((title) => title?.startsWith(sessionTitlePrefix))) continue;
     const status = workerStatusOf(each.a_state);
     const at = status === "running" || status === "needs-you" ? Math.max(each.a_started ?? 0, each.a_updated ?? 0) : Math.max(each.a_ended ?? 0, each.activity_at ?? 0) || each.a_updated || 0;
     if ((status === "failed" || status === "done") && now - at > DIGEST_WORKERS_MS) continue;
@@ -315,6 +321,8 @@ export interface LiveActivityDeps {
   log(message: string): void;
   now?(): number;
   seeds?: ThreadSeeds;
+  /** The catch-up for the first turn after a provider move (src/provider-move/handoff.ts). */
+  moves?: { forTurn(threadId: string, move: ProviderMoveInput): Promise<string | null>; settled(threadId: string): Promise<void> };
 }
 
 /** A thread's details for the lookup tool. */
@@ -345,16 +353,37 @@ export async function lookUp(sdk: Sdk, activity: LiveActivity, threads: BotThrea
 
 type Bb = Pick<BbPluginApi, "events" | "sdk" | "agents"> & { experimental_hooks?: object };
 
-interface TurnContextHooks { experimental_turnContext?: (provider: (context: { threadId: string }) => string | null | Promise<string | null>) => void }
+/** The hook's input. `providerMove`: set by BB while the first turn after a provider move hasn't started. */
+export interface TurnContextInput { threadId: string; providerMove?: ProviderMoveInput }
+/** `providerMove: true` opts in to the move handoff: BB then gives this hook `providerMove` and the history budget (and refuses a move with no such hook). */
+interface TurnContextHooks { experimental_turnContext?: (provider: (context: TurnContextInput) => string | null | Promise<string | null>, options?: { providerMove?: boolean }) => void }
 
 /** Registers the per-turn digest on a BB that has the hook. Answers whether it did. */
-export function registerTurnContext(bb: { experimental_hooks?: object }, provider: (threadId: string) => string | null): boolean {
+export function registerTurnContext(bb: { experimental_hooks?: object }, provider: (threadId: string, context: TurnContextInput) => string | null | Promise<string | null>, options: { providerMove?: boolean } = {}): boolean {
   const hooks = bb.experimental_hooks as TurnContextHooks | undefined;
   if (typeof hooks?.experimental_turnContext !== "function") return false;
-  hooks.experimental_turnContext(({ threadId }) => {
-    try { return provider(threadId); } catch { return null; }
-  });
+  hooks.experimental_turnContext((context) => {
+    try {
+      const text = provider(context.threadId, context);
+      return text instanceof Promise ? text.catch(() => null) : text;
+    } catch { return null; }
+  }, options.providerMove ? { providerMove: true } : undefined);
   return true;
+}
+
+/** The per-turn text: the handoff first on a moved thread's first turn, then the seed and digest. */
+export function turnText(threadId: string, context: TurnContextInput, base: () => string | null, moves: LiveActivityDeps["moves"]): string | null | Promise<string | null> {
+  if (!moves) return base();
+  if (!context.providerMove) {
+    // A turn without a move: any stored handoff was delivered (or is stale). Not awaited: the hook stays fast.
+    void moves.settled(threadId).catch(() => undefined);
+    return base();
+  }
+  const move = context.providerMove;
+  // A move turn answers with the history only (core asks move-history plugins alone on a move turn; the
+  // digest stays for turn starts), or null when it couldn't be read: core takes any text as "history
+  // delivered", and null makes it hold the turn and ask again. The handoff is built to fit core's budget.
+  return moves.forTurn(threadId, move).catch(() => null);
 }
 
 /**
@@ -372,7 +401,7 @@ export function registerLiveActivity(bb: Bb, db: Database.Database, deps: LiveAc
   bb.events.on("interaction.pending", ({ thread }) => safe("pending", () => activity.pending(thread as ThreadFacts)));
   bb.events.on("thread.deleted", ({ thread }) => safe("deleted", () => { activity.deleted(thread.id); deps.seeds?.forget(thread.id); }));
 
-  const hooked = registerTurnContext(bb, (threadId) => turnContext(deps.seeds?.take(threadId) ?? null, digestFor(db, threadId, now())));
+  const hooked = registerTurnContext(bb, (threadId, context) => turnText(threadId, context, () => turnContext(deps.seeds?.take(threadId) ?? null, digestFor(db, threadId, now())), deps.moves), { providerMove: !!deps.moves });
   if (hooked) deps.seeds?.enable();
 
   bb.agents.registerTool({
@@ -382,7 +411,7 @@ export function registerLiveActivity(bb: Bb, db: Database.Database, deps: LiveAc
     execute: async ({ threadId }, ctx) => {
       const mine = (ctx.threadId ? deps.threads.get(ctx.threadId)?.botId : null) ?? await deps.actingBot(ctx.threadId);
       const target = deps.threads.get(threadId);
-      if (!target || (mine && target.botId !== mine)) return `${threadId} isn't one of your conversations or workers. List them with bot_conversations.`;
+      if (!target || (mine && target.botId !== mine)) return `${threadId} isn't one of your conversations or workers. List them with bot_info (view: conversations).`;
       return lookUp(bb.sdk, activity, deps.threads, threadId, now());
     },
   });

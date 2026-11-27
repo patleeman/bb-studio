@@ -1,6 +1,6 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FAST_TITLE_DELAY_MS } from "./fast-title";
+import { FAST_TITLE_DELAY_MS, installFastTitles } from "./fast-title";
 
 const tip = () => document.querySelector("[data-bb-fast-title-tip]");
 const over = (el: Element) => el.dispatchEvent(new MouseEvent("pointerover", { bubbles: true }));
@@ -72,5 +72,45 @@ describe("fast titles", () => {
     over(document.getElementById("frame")!);
     vi.advanceTimersByTime(FAST_TITLE_DELAY_MS);
     expect(tip()).toBeNull();
+  });
+
+  it("replaces mid-hover across same-owner installs, keeps first-wins across owners, and tolerates legacy `true` markers", async () => {
+    const a = document.getElementById("a")!;
+    const b = document.getElementById("b")!;
+    const firstDispose = installFastTitles(document, { replace: true, owner: "studio" });
+    over(a);
+    vi.advanceTimersByTime(FAST_TITLE_DELAY_MS);
+    expect(tip()?.textContent).toBe("Reload");
+    expect(a.hasAttribute("title")).toBe(false);
+
+    // Same-owner replace mid-hover restores the held title, removes the old tooltip, and hands over to the new install.
+    const secondDispose = installFastTitles(document, { replace: true, owner: "studio" });
+    expect(tip()).toBeNull();
+    expect(a.getAttribute("title")).toBe("Reload");
+    over(b);
+    vi.advanceTimersByTime(FAST_TITLE_DELAY_MS);
+    expect(tip()?.textContent).toBe("Close");
+
+    // Different owner does NOT replace an active owner ("first wins").
+    const otherDispose = installFastTitles(document, { replace: true, owner: "visual-chat" });
+    expect(tip()?.textContent).toBe("Close");
+    otherDispose();
+    expect(tip()?.textContent).toBe("Close");
+
+    secondDispose();
+    firstDispose();
+    expect(tip()).toBeNull();
+    expect(b.getAttribute("title")).toBe("Close");
+
+    // Legacy `true` marker from an older bundle must not throw on import or install.
+    const key = Symbol.for("bb-studio.fast-title");
+    (window as unknown as Record<symbol, unknown>)[key] = true;
+    vi.resetModules();
+    await expect(import("./fast-title")).resolves.toBeDefined();
+    expect((window as unknown as Record<symbol, unknown>)[key]).toBe(true);
+
+    // Restore fresh install for subsequent tests.
+    delete (window as unknown as Record<symbol, unknown>)[key];
+    installFastTitles(document, { replace: true });
   });
 });

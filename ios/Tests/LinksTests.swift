@@ -79,20 +79,32 @@ final class LinksTests: XCTestCase {
         XCTAssertEqual(LinkRef(kind: .browser, id: "https://a.b/c d").link, "bb://browser/https%3A%2F%2Fa.b%2Fc%20d")
     }
 
-    func testAppLinksRouteNewKindsAlwaysAndOldOnesInSpaces() {
-        func target(_ text: String, spaces: Bool) -> LinkRef? {
-            guard case .entity(let ref)? = AppModel.linkTarget(URL(string: text)!, inSpaces: spaces) else { return nil }
+    func testAppLinksGoThroughTheLinkRouter() {
+        func target(_ text: String) -> LinkRef? {
+            guard case .entity(let ref)? = AppModel.linkTarget(URL(string: text)!) else { return nil }
             return ref
         }
-        XCTAssertEqual(target("bbstudio://memory", spaces: false), LinkRef(kind: .memory, id: nil))
-        XCTAssertEqual(target("bbstudio://worker/thr_w", spaces: false), LinkRef(kind: .worker, id: "thr_w"))
-        XCTAssertNil(target("bbstudio://page/pg_x", spaces: false), "old hosts keep their old screens without spaces")
-        XCTAssertEqual(target("bbstudio://page/pg_x", spaces: true), LinkRef(kind: .page, id: "pg_x"))
-        XCTAssertNil(target("bbstudio://thread/thr_x", spaces: false))
-        XCTAssertEqual(target("bbstudio://thread/thr_x", spaces: true), LinkRef(kind: .conversation, id: "thr_x"), "a thread opens in the Bot's list")
-        XCTAssertNil(target("bbstudio://file/a", spaces: true), "files open from their thread")
-        XCTAssertNil(target("bbstudio://bot", spaces: true), "the bare Bot link keeps its old meaning")
-        XCTAssertNil(target("bbstudio://capture", spaces: true))
+        XCTAssertEqual(target("bbstudio://memory"), LinkRef(kind: .memory, id: nil))
+        XCTAssertEqual(target("bbstudio://worker/thr_w"), LinkRef(kind: .worker, id: "thr_w"))
+        XCTAssertEqual(target("bbstudio://page/pg_x"), LinkRef(kind: .page, id: "pg_x"))
+        XCTAssertEqual(target("bbstudio://thread/thr_x"), LinkRef(kind: .conversation, id: "thr_x"), "a thread opens in the room")
+        XCTAssertNil(target("bbstudio://file/a"), "files open from their thread")
+        XCTAssertNil(target("bbstudio://capture"))
+    }
+
+    @MainActor func testStudioAndBotLinksOpenTheirItemNotTheList() {
+        func to(_ text: String) -> Destination? {
+            let url = URL(string: text)!
+            return AppModel.destination(url, id: url.pathComponents.dropFirst().first)
+        }
+        XCTAssertEqual(to("bbstudio://design/dsn_1"), .studio(kind: "design", .design(id: "dsn_1")))
+        XCTAssertEqual(to("bbstudio://page/pg_1"), .studio(kind: nil, .page(id: "pg_1")))
+        XCTAssertEqual(to("bbstudio://artifact/art_1"), .studio(kind: "artifact", .artifact(id: "art_1")))
+        XCTAssertEqual(to("bbstudio://recording/rec_1"), .studio(kind: "recording", .recording(id: "rec_1")))
+        XCTAssertEqual(to("bbstudio://bot/bot_2"), .bot("bot_2"))
+        XCTAssertEqual(to("bbstudio://automations"), .route(.automations))
+        XCTAssertEqual(to("bbstudio://new"), .compose(""), "New is a Bot conversation")
+        XCTAssertEqual(to("bbstudio://nonsense"), .list)
     }
 
     func testDestinations() {
@@ -101,7 +113,9 @@ final class LinksTests: XCTestCase {
         XCTAssertEqual(Links.destination(LinkRef(kind: .app, id: "mini_1")), .route(.mini(id: "mini_1")))
         XCTAssertEqual(Links.destination(LinkRef(kind: .dashboard, id: "dsh_0123456789abcdef")), .elsewhere("Dashboards open in BB on your Mac."))
         XCTAssertEqual(Links.destination(LinkRef(kind: .board, id: "thr_v")), .route(.visualChat(threadId: "thr_v")))
-        XCTAssertEqual(Links.destination(LinkRef(kind: .record, id: "mem_1")), .record("mem_1"))
+        // Memory records are retired: an old record link opens Memory, with nothing to look up.
+        XCTAssertEqual(Links.destination(LinkRef(kind: .record, id: "mem_1")), .botPage(.memory, botId: nil))
+        XCTAssertFalse(Links.needsResolution(LinkRef(kind: .record, id: "mem_1")))
         XCTAssertEqual(Links.destination(LinkRef(kind: .browser, id: "https://a.b")), .safari(URL(string: "https://a.b")!))
         XCTAssertEqual(Links.destination(LinkRef(kind: .diff, id: "a.swift")), .threadFiles)
         if case .elsewhere = Links.destination(LinkRef(kind: .vscode, id: nil)) {} else { XCTFail("VS Code opens on the Mac") }

@@ -1,10 +1,22 @@
+diff --git a/apps/app/.ladle/ladle.css b/apps/app/.ladle/ladle.css
+index 098b00286f..0efcde83a7 100644
+--- a/apps/app/.ladle/ladle.css
++++ b/apps/app/.ladle/ladle.css
+@@ -6,7 +6,6 @@
+    silently rendered unstyled here while working in the real app, which builds
+    the plugin's CSS separately. */
+ @source "../../../plugins/automations";
+-@source "../../../plugins/workflows";
+ @source "../../../plugins/provider-usage";
+ @source "../../../plugins/secrets";
+ @source "../../../plugins/provider-codex";
 diff --git a/apps/app/.ladle/machine-story-fixtures.ts b/apps/app/.ladle/machine-story-fixtures.ts
-index ef0d418bc7..7ba7598f4e 100644
+index 633d455539..8aed7162b3 100644
 --- a/apps/app/.ladle/machine-story-fixtures.ts
 +++ b/apps/app/.ladle/machine-story-fixtures.ts
-@@ -4,7 +4,9 @@ import type {
+@@ -3,7 +3,9 @@ import type {
+   SystemMachineProvider,
  } from "@bb/server-contract";
- import { machineServerAccessBlockedReason } from "../src/components/machines/machine-server-access";
  import type { MachineAccessState } from "../src/components/settings/MachineAccessSettings";
 -import modalLogoUrl from "../../../plugins/environment-modal-sandbox/modal-logo.svg";
 +
@@ -12,12 +24,12 @@ index ef0d418bc7..7ba7598f4e 100644
 +  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E";
  
  const noop = () => {};
- const noopAsync = async () => {};
+ 
 diff --git a/apps/app/src/components/onboarding/onboarding-model.ts b/apps/app/src/components/onboarding/onboarding-model.ts
-index 3e495a5baa..e8400f5367 100644
+index 91e743bbb1..346bbb82a1 100644
 --- a/apps/app/src/components/onboarding/onboarding-model.ts
 +++ b/apps/app/src/components/onboarding/onboarding-model.ts
-@@ -27,10 +27,6 @@ export const ONBOARDING_PLUGIN_MARKETPLACE = "bb-official";
+@@ -28,10 +28,6 @@ export const ONBOARDING_PLUGIN_MARKETPLACE = OFFICIAL_PLUGIN_MARKETPLACE;
  
  export const ONBOARDING_PLUGIN_ENTRY_IDS: readonly string[] = [
    "browser-automation",
@@ -49,6 +61,26 @@ index b427084784..ff54ae9b2a 100644
  const localHost = makeHost({ id: HOST_IDS.local });
  const remoteHost = makeHost({ id: HOST_IDS.local, name: "studio-mac-mini" });
  const longRemoteHost = makeHost({
+diff --git a/apps/app/src/components/plugin/management/BrowsePluginsTab.tsx b/apps/app/src/components/plugin/management/BrowsePluginsTab.tsx
+index 13c3cc2696..43eabea7e4 100644
+--- a/apps/app/src/components/plugin/management/BrowsePluginsTab.tsx
++++ b/apps/app/src/components/plugin/management/BrowsePluginsTab.tsx
+@@ -6,7 +6,6 @@ import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
+ import { Icon } from "@bb/shared-ui/icon";
+ import { appToast } from "@/components/ui/app-toast";
+ import bbLogoUrl from "../../../../../../assets/bb-logo.svg";
+-import { OpenPluginGuideButton } from "./OpenPluginGuideButton";
+ import { cn } from "@bb/shared-ui/lib/utils";
+ import {
+   ResourceCollectionViewport,
+@@ -241,7 +240,6 @@ export function BrowsePluginsTab({
+               </ResourceTabDescription>
+             ) : (
+               <div className="flex items-center justify-between gap-3">
+-                <OpenPluginGuideButton />
+                 {createAction}
+               </div>
+             )}
 diff --git a/apps/app/src/components/promptbox/banner/ThreadMachineStatus.stories.tsx b/apps/app/src/components/promptbox/banner/ThreadMachineStatus.stories.tsx
 index 105c0bc6af..e4003065c4 100644
 --- a/apps/app/src/components/promptbox/banner/ThreadMachineStatus.stories.tsx
@@ -67,7 +99,7 @@ index 105c0bc6af..e4003065c4 100644
    title: "promptbox/banner/Machine Status",
  };
 diff --git a/apps/server/src/services/plugins/builtin-registry.ts b/apps/server/src/services/plugins/builtin-registry.ts
-index 7b8f53a390..dfb6691fcf 100644
+index 1fc0a25966..a085a86eb3 100644
 --- a/apps/server/src/services/plugins/builtin-registry.ts
 +++ b/apps/server/src/services/plugins/builtin-registry.ts
 @@ -35,11 +35,6 @@ export function accountPoolDefaultEnabled(
@@ -82,7 +114,7 @@ index 7b8f53a390..dfb6691fcf 100644
    {
      name: "bb-guide",
      pluginId: "bb-guide",
-@@ -60,26 +55,6 @@ export const BUILTIN_PLUGINS = [
+@@ -60,21 +55,6 @@ export const BUILTIN_PLUGINS = [
      pluginId: "automations",
      defaultEnabled: true,
    },
@@ -101,15 +133,10 @@ index 7b8f53a390..dfb6691fcf 100644
 -    pluginId: "connect",
 -    defaultEnabled: true,
 -  },
--  {
--    name: "connect-next",
--    pluginId: "bb--connect-next",
--    defaultEnabled: false,
--  },
    {
      name: "environment-project-checkout",
      pluginId: "environment-project-checkout",
-@@ -95,26 +70,6 @@ export const BUILTIN_PLUGINS = [
+@@ -90,26 +70,6 @@ export const BUILTIN_PLUGINS = [
      pluginId: "environment-personal-workspace",
      defaultEnabled: true,
    },
@@ -136,7 +163,7 @@ index 7b8f53a390..dfb6691fcf 100644
    {
      name: "pdf-preview",
      pluginId: "pdf-preview",
-@@ -150,11 +105,6 @@ export const BUILTIN_PLUGINS = [
+@@ -145,11 +105,6 @@ export const BUILTIN_PLUGINS = [
      pluginId: "keep-awake",
      defaultEnabled: true,
    },
@@ -148,7 +175,7 @@ index 7b8f53a390..dfb6691fcf 100644
    {
      name: "provider-retry",
      pluginId: "provider-retry",
-@@ -195,92 +145,32 @@ export const BUILTIN_PLUGINS = [
+@@ -190,51 +145,21 @@ export const BUILTIN_PLUGINS = [
      pluginId: "navigation",
      defaultEnabled: true,
    },
@@ -197,9 +224,10 @@ index 7b8f53a390..dfb6691fcf 100644
 -    pluginId: "bb--github-star",
 -    defaultEnabled: true,
 -  },
- ].map((plugin): BundledPluginDefinition => ({
-   ...plugin,
-   autoInstall: true,
+   {
+     name: "server-switcher",
+     pluginId: "bb--server-switcher",
+@@ -246,41 +171,11 @@ export const BUILTIN_PLUGINS = [
  }));
  
  export const OFFICIAL_PLUGINS = [
@@ -238,9 +266,9 @@ index 7b8f53a390..dfb6691fcf 100644
 -    pluginId: "theme-preview",
 -    defaultEnabled: true,
 -  },
- ].map((plugin): BundledPluginDefinition => ({
-   ...plugin,
-   autoInstall: false,
+   {
+     name: "tailscale",
+     pluginId: "bb--tailscale",
 diff --git a/apps/server/test/services/plugins/builtin-registry.test.ts b/apps/server/test/services/plugins/builtin-registry.test.ts
 index 8fed7050ef..3200acc709 100644
 --- a/apps/server/test/services/plugins/builtin-registry.test.ts
@@ -310,7 +338,7 @@ index 0182b482d9..81bc29fd76 100644
      const guide = bundledMarketplace().plugins.find(
        (entry) => entry.id === "bb-guide",
 diff --git a/apps/web/src/marketplace/bundled-marketplace.ts b/apps/web/src/marketplace/bundled-marketplace.ts
-index 0a0baadc44..1f0f846d3f 100644
+index 7ce4baf398..18a841dc09 100644
 --- a/apps/web/src/marketplace/bundled-marketplace.ts
 +++ b/apps/web/src/marketplace/bundled-marketplace.ts
 @@ -11,7 +11,6 @@ export const UNLISTED_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
@@ -321,7 +349,7 @@ index 0a0baadc44..1f0f846d3f 100644
    "provider-acp",
    "provider-claude-code",
    "provider-codex",
-@@ -20,24 +19,10 @@ export const UNLISTED_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
+@@ -20,25 +19,12 @@ export const UNLISTED_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
  
  export const INSTALL_ON_REQUEST_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
    "browser-automation",
@@ -329,6 +357,7 @@ index 0a0baadc44..1f0f846d3f 100644
 -  "environment-modal-sandbox",
 -  "github",
 -  "memory",
+   "tailscale",
 -  "tasks",
 -  "theme-preview",
  ]);
@@ -336,16 +365,1274 @@ index 0a0baadc44..1f0f846d3f 100644
  export const OFF_BY_DEFAULT_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
 -  "agent-annotations",
    "ask-user-question",
--  "connect-next",
 -  "mcp",
 -  "monaco-editor",
 -  "plugin-api-docs",
 -  "prompt-library",
+   "server-switcher",
 -  "storage-retention",
 -  "workflows",
  ]);
  
  export type BundledPluginSetup =
+diff --git a/packages/db/scripts/query-costs/cases.ts b/packages/db/scripts/query-costs/cases.ts
+index 6f7081b7f5..33d7ac5404 100644
+--- a/packages/db/scripts/query-costs/cases.ts
++++ b/packages/db/scripts/query-costs/cases.ts
+@@ -6,7 +6,6 @@ import { PLUGINS_COST_GROUP } from "./plugins-cases.js";
+ import {
+   ACCOUNT_POOL_COST_GROUP,
+   AUTOMATIONS_COST_GROUP,
+-  WORKFLOWS_COST_GROUP,
+ } from "./plugin-databases-cases.js";
+ import { QUEUED_THREAD_MESSAGES_COST_CASES } from "./queued-thread-messages-cases.js";
+ import { THREAD_FILES_COST_GROUP } from "./thread-files-cases.js";
+@@ -29,7 +28,6 @@ const ALL_GROUPS: readonly RegisteredCostGroup[] = [
+   PLUGINS_COST_GROUP,
+   ACCOUNT_POOL_COST_GROUP,
+   AUTOMATIONS_COST_GROUP,
+-  WORKFLOWS_COST_GROUP,
+   SETTINGS_MAINTENANCE_COST_GROUP,
+   CREDENTIALS_ATTACHMENTS_COST_GROUP,
+   THREAD_FILES_COST_GROUP,
+diff --git a/packages/db/scripts/query-costs/plugin-databases-cases.ts b/packages/db/scripts/query-costs/plugin-databases-cases.ts
+index 5cdbaac411..4802dc1095 100644
+--- a/packages/db/scripts/query-costs/plugin-databases-cases.ts
++++ b/packages/db/scripts/query-costs/plugin-databases-cases.ts
+@@ -23,75 +23,20 @@ import {
+   setAutomationRunThread,
+   updateAutomation,
+ } from "../../../../plugins/automations/src/data.js";
+-import {
+-  abandonOriginNotifications,
+-  activeChildThreadsForRun,
+-  attachCallThread,
+-  beginNotificationAttempt,
+-  cancelRun,
+-  claimQueuedRun,
+-  countCallsForRun,
+-  createRun,
+-  deleteTerminalRuns,
+-  getCall,
+-  getCallByChildThread,
+-  getLatestRunForOriginThread,
+-  getRun,
+-  getRunRequired,
+-  hasWorker,
+-  incrementRepairAttempts,
+-  isWorkerRetired,
+-  listActiveRunsForOriginThread,
+-  listCallsForRun,
+-  listCallsForRunPage,
+-  listExpiredTerminalRuns,
+-  listPendingNotificationRuns,
+-  listRunningCalls,
+-  listRuns,
+-  listTimedOutRuns,
+-  markCallReplayedSameRun,
+-  markNotificationSent,
+-  nextMaintenanceDueAt,
+-  ownWorker,
+-  queueCallProviderRetry,
+-  recordNotificationFailure,
+-  recordWorkerCleanup,
+-  recoverInterruptedRuns,
+-  reopenFailedCallOnWorker,
+-  retiredWorkers,
+-  settleCall,
+-  settleNotificationUndeliverable,
+-  settleRun,
+-  startCall,
+-  storeStructuredResult,
+-  updateRunPhase,
+-  workerOrigins,
+-} from "../../../../plugins/workflows/src/data.js";
+ import { registerCostGroup, type QueryCostCase } from "./case.js";
+ import {
+   POOL_AFFINITY_BINDINGS,
+   POOL_AFFINITY_IDLE_TTL_MS,
+   seedAccountPool,
+   seedAutomations,
+-  seedWorkflows,
+   type AccountPoolSeed,
+   type AutomationsSeed,
+-  type WorkflowsSeed,
+ } from "./plugin-databases-seed.js";
+ 
+ const ACCOUNT_POOL = "plugins/account-pool/src/store.ts";
+ const AUTOMATIONS = "plugins/automations/src/data.ts";
+-const WORKFLOWS = "plugins/workflows/src/data.ts";
+-const RETENTION_SWEEP_REASON =
+-  "Known linear cost: the retention sweep walks every retained run (3,000 at full scale) to keep resumed chains whole, once an expired run exists";
+-
+-let expiredRunIds: string[] = [];
+ const AUTOMATION_RUNS_PAGE = 50;
+ const DUE_AUTOMATION_BATCH = 25;
+-const WORKFLOW_RUNS_PAGE = 50;
+-const WORKFLOW_CALLS_PAGE = 50;
+-const WORKFLOW_RETENTION_SWEEP_RUNS = 20;
+-const WORKFLOW_SWEEP_LIMIT = 100;
+ 
+ const ACCOUNT_POOL_CASES: readonly QueryCostCase<AccountPoolSeed>[] = [
+   {
+@@ -332,298 +277,6 @@ const AUTOMATIONS_CASES: readonly QueryCostCase<AutomationsSeed>[] = [
+   },
+ ];
+ 
+-const WORKFLOWS_CASES: readonly QueryCostCase<WorkflowsSeed>[] = [
+-  {
+-    name: `${WORKFLOWS}#createRun`,
+-    run: (db, _fixture, seed) =>
+-      createRun(db.$client, {
+-        projectId: seed.projectId,
+-        originThreadId: seed.originThreadId,
+-        environmentId: "env_workflow",
+-        originProvider: "provider-a",
+-        originModel: "gpt-5",
+-        originReasoningLevel: "high",
+-        originPermissionMode: "accept-edits",
+-        name: "review",
+-        source: "export const meta = { name: 'review' };",
+-        sourceHash: "hash-new",
+-        argsJson: "{}",
+-        settingsJson:
+-          '{"maxActiveRuns":4,"maxConcurrentAgents":8,"maxAgentCalls":100,"totalRunTimeoutMs":86400000,"retentionDays":30,"maxNotificationBytes":16384}',
+-        resumedFromRunId: null,
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#getRun`,
+-    run: (db, _fixture, seed) => getRun(db.$client, seed.runningRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#getRunRequired`,
+-    run: (db, _fixture, seed) => getRunRequired(db.$client, seed.terminalRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#getLatestRunForOriginThread`,
+-    run: (db, _fixture, seed) =>
+-      getLatestRunForOriginThread(db.$client, seed.originThreadId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listActiveRunsForOriginThread`,
+-    run: (db, _fixture, seed) =>
+-      listActiveRunsForOriginThread(db.$client, seed.originThreadId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listRuns`,
+-    run: (db, _fixture, seed) =>
+-      listRuns(db.$client, {
+-        projectId: seed.projectId,
+-        limit: WORKFLOW_RUNS_PAGE,
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#claimQueuedRun`,
+-    run: (db) => claimQueuedRun(db.$client, 8),
+-  },
+-  {
+-    name: `${WORKFLOWS}#settleRun`,
+-    run: (db, _fixture, seed) =>
+-      settleRun(db.$client, {
+-        id: seed.runningRunId,
+-        status: "failed",
+-        result: null,
+-        error: "Workflow threw",
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#updateRunPhase`,
+-    run: (db, _fixture, seed) =>
+-      updateRunPhase(db.$client, seed.runningRunId, "Verify"),
+-  },
+-  {
+-    name: `${WORKFLOWS}#markNotificationSent`,
+-    run: (db, _fixture, seed) =>
+-      markNotificationSent(db.$client, seed.pendingNotificationRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#settleNotificationUndeliverable`,
+-    run: (db, _fixture, seed) =>
+-      settleNotificationUndeliverable(
+-        db.$client,
+-        seed.pendingNotificationRunId,
+-        "Origin thread is gone",
+-      ),
+-  },
+-  {
+-    name: `${WORKFLOWS}#recordNotificationFailure`,
+-    run: (db, _fixture, seed) =>
+-      recordNotificationFailure(db.$client, {
+-        id: seed.pendingNotificationRunId,
+-        error: "Server busy",
+-        nextAttemptAt: seed.now + 30_000,
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#beginNotificationAttempt`,
+-    run: (db, _fixture, seed) =>
+-      beginNotificationAttempt(db.$client, seed.pendingNotificationRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#recoverInterruptedRuns`,
+-    run: (db) => recoverInterruptedRuns(db.$client),
+-  },
+-  {
+-    name: `${WORKFLOWS}#getCall`,
+-    run: (db, _fixture, seed) => getCall(db.$client, seed.runningRunId, 0),
+-  },
+-  {
+-    name: `${WORKFLOWS}#getCallByChildThread`,
+-    run: (db, _fixture, seed) =>
+-      getCallByChildThread(db.$client, seed.runningChildThreadId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listCallsForRun`,
+-    run: (db, _fixture, seed) => listCallsForRun(db.$client, seed.largestRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listCallsForRunPage`,
+-    run: (db, _fixture, seed) =>
+-      listCallsForRunPage(db.$client, {
+-        runId: seed.largestRunId,
+-        afterCallIndex: 10,
+-        limit: WORKFLOW_CALLS_PAGE,
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#countCallsForRun`,
+-    run: (db, _fixture, seed) =>
+-      countCallsForRun(db.$client, seed.largestRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listRunningCalls`,
+-    run: (db) => listRunningCalls(db.$client),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listTimedOutRuns`,
+-    run: (db, _fixture, seed) =>
+-      listTimedOutRuns(
+-        db.$client,
+-        seed.now + 2 * 86_400_000,
+-        WORKFLOW_SWEEP_LIMIT,
+-      ),
+-  },
+-  {
+-    name: `${WORKFLOWS}#startCall`,
+-    run: (db, _fixture, seed) =>
+-      startCall(db.$client, {
+-        runId: seed.runningRunId,
+-        callIndex: seed.nextCallIndex,
+-        cacheKey: "cache-new",
+-        prompt: "Review the remaining files.",
+-        options: {
+-          selection: null,
+-          outputSchema: null,
+-          title: null,
+-          phase: null,
+-        },
+-        selection: {
+-          providerId: "provider-a",
+-          model: "gpt-5",
+-          reasoningLevel: "high",
+-          permissionMode: "accept-edits",
+-        },
+-        replay: null,
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#markCallReplayedSameRun`,
+-    run: (db, _fixture, seed) => {
+-      const call = getCall(db.$client, seed.largestRunId, 0);
+-      if (call === null) throw new Error("Expected a call");
+-      markCallReplayedSameRun(db.$client, call.id);
+-    },
+-  },
+-  {
+-    name: `${WORKFLOWS}#attachCallThread`,
+-    run: (db, _fixture, seed) =>
+-      attachCallThread(db.$client, seed.queuedCallId, "thr_workflow_call_new"),
+-  },
+-  {
+-    name: `${WORKFLOWS}#reopenFailedCallOnWorker`,
+-    run: (db, _fixture, seed) =>
+-      reopenFailedCallOnWorker(db.$client, seed.failedCallId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#queueCallProviderRetry`,
+-    run: (db, _fixture, seed) =>
+-      queueCallProviderRetry(
+-        db.$client,
+-        seed.failedCallId,
+-        "Provider overloaded",
+-      ),
+-  },
+-  {
+-    name: `${WORKFLOWS}#storeStructuredResult`,
+-    run: (db, _fixture, seed) =>
+-      storeStructuredResult(db.$client, seed.runningCallId, { findings: [] }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#incrementRepairAttempts`,
+-    run: (db, _fixture, seed) =>
+-      incrementRepairAttempts(db.$client, seed.runningCallId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#settleCall`,
+-    run: (db, _fixture, seed) =>
+-      settleCall(db.$client, {
+-        id: seed.runningCallId,
+-        status: "succeeded",
+-        result: { findings: [] },
+-        error: null,
+-      }),
+-  },
+-  {
+-    name: `${WORKFLOWS}#cancelRun`,
+-    run: (db, _fixture, seed) => cancelRun(db.$client, seed.runningRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#activeChildThreadsForRun`,
+-    run: (db, _fixture, seed) =>
+-      activeChildThreadsForRun(db.$client, seed.runningRunId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listPendingNotificationRuns`,
+-    run: (db, _fixture, seed) =>
+-      listPendingNotificationRuns(db.$client, seed.now, WORKFLOW_SWEEP_LIMIT),
+-  },
+-  {
+-    name: `${WORKFLOWS}#listExpiredTerminalRuns`,
+-    growsWith: { history: RETENTION_SWEEP_REASON },
+-    run: (db, _fixture, seed) =>
+-      listExpiredTerminalRuns(
+-        db.$client,
+-        seed.now,
+-        WORKFLOW_RETENTION_SWEEP_RUNS,
+-      ),
+-  },
+-  {
+-    name: `${WORKFLOWS}#deleteTerminalRuns`,
+-    prepare: (db, _fixture, seed) => {
+-      expiredRunIds = listExpiredTerminalRuns(
+-        db.$client,
+-        seed.now,
+-        WORKFLOW_RETENTION_SWEEP_RUNS,
+-      ).runIds;
+-    },
+-    run: (db) => deleteTerminalRuns(db.$client, expiredRunIds),
+-  },
+-  {
+-    name: `${WORKFLOWS}#ownWorker`,
+-    run: (db, _fixture, seed) =>
+-      ownWorker(
+-        db.$client,
+-        "thr_workflow_worker_new",
+-        seed.runningRunId,
+-        seed.runningCallId,
+-        seed.originThreadId,
+-      ),
+-  },
+-  {
+-    name: `${WORKFLOWS}#workerOrigins`,
+-    run: (db, _fixture, seed) => workerOrigins(db.$client, seed.now),
+-  },
+-  {
+-    name: `${WORKFLOWS}#retiredWorkers`,
+-    run: (db, _fixture, seed) => retiredWorkers(db.$client, seed.now),
+-  },
+-  {
+-    name: `${WORKFLOWS}#nextMaintenanceDueAt`,
+-    run: (db) => nextMaintenanceDueAt(db.$client),
+-  },
+-  {
+-    name: `${WORKFLOWS}#isWorkerRetired`,
+-    run: (db, _fixture, seed) =>
+-      isWorkerRetired(db.$client, seed.retiredWorkerThreadId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#recordWorkerCleanup`,
+-    growsWith: {
+-      history:
+-        "Known linear cost: each worker cleanup also deletes archived workers whose run is gone, which scans every archived worker",
+-    },
+-    run: (db, _fixture, seed) =>
+-      recordWorkerCleanup(db.$client, seed.retiredWorkerThreadId, true),
+-  },
+-  {
+-    name: `${WORKFLOWS}#hasWorker`,
+-    run: (db, _fixture, seed) =>
+-      hasWorker(db.$client, seed.archivedWorkerThreadId),
+-  },
+-  {
+-    name: `${WORKFLOWS}#abandonOriginNotifications`,
+-    run: (db, _fixture, seed) =>
+-      abandonOriginNotifications(db.$client, seed.originThreadId),
+-  },
+-];
+-
+ export const ACCOUNT_POOL_COST_GROUP = registerCostGroup({
+   name: "account-pool",
+   pluginDatabase: { auditedTables: [], allowedFindings: [] },
+@@ -648,29 +301,3 @@ export const AUTOMATIONS_COST_GROUP = registerCostGroup({
+   seed: (db, _fixture, scale) => seedAutomations(db, scale),
+   cases: AUTOMATIONS_CASES,
+ });
+-
+-export const WORKFLOWS_COST_GROUP = registerCostGroup({
+-  name: "workflows",
+-  pluginDatabase: {
+-    auditedTables: ["workflow_runs", "workflow_calls", "workflow_workers"],
+-    allowedFindings: [
+-      ...(["full-scan", "correlated-subquery", "nested-loop"] as const).map(
+-        (rule) => ({
+-          rule,
+-          table: "workflow_runs",
+-          caller: `${WORKFLOWS}#listExpiredTerminalRuns`,
+-          reason: RETENTION_SWEEP_REASON,
+-        }),
+-      ),
+-      {
+-        rule: "full-scan",
+-        table: "workflow_workers",
+-        caller: `${WORKFLOWS}#recordWorkerCleanup`,
+-        reason:
+-          "Known linear cost: deleting archived workers whose run is gone scans every archived worker",
+-      },
+-    ],
+-  },
+-  seed: (db, _fixture, scale) => seedWorkflows(db, scale),
+-  cases: WORKFLOWS_CASES,
+-});
+diff --git a/packages/db/scripts/query-costs/plugin-databases-seed.ts b/packages/db/scripts/query-costs/plugin-databases-seed.ts
+index ac11a16697..c8d062efda 100644
+--- a/packages/db/scripts/query-costs/plugin-databases-seed.ts
++++ b/packages/db/scripts/query-costs/plugin-databases-seed.ts
+@@ -12,7 +12,6 @@ import {
+   QUOTA_MIGRATIONS,
+   QuotaStore,
+ } from "../../../../plugins/account-pool/src/store.js";
+-import { migrations as WORKFLOWS_MIGRATIONS } from "../../../../plugins/workflows/src/data.js";
+ import type { DbConnection } from "../../src/connection.js";
+ import { scaled } from "./case.js";
+ 
+@@ -27,19 +26,6 @@ const AUTOMATIONS = 20;
+ const AUTOMATION_RUNS = 13_000;
+ const AUTOMATION_PROJECTS = 4;
+ 
+-const WORKFLOW_PROJECTS = 8;
+-const WORKFLOW_RETAINED_RUNS = 3_000;
+-const WORKFLOW_RUNS_PER_ORIGIN_THREAD = 10;
+-const WORKFLOW_CALLS_PER_RUN = 20;
+-const WORKFLOW_LARGEST_RUN_CALLS = 100;
+-const WORKFLOW_RUNNING_RUNS = 4;
+-const WORKFLOW_RUNNING_CALLS_PER_RUN = 8;
+-const WORKFLOW_QUEUED_RUNS = 6;
+-const WORKFLOW_EXPIRED_RUNS = 40;
+-const WORKFLOW_PENDING_NOTIFICATION_RUNS = 6;
+-const WORKFLOW_UNARCHIVED_RETIRED_RUNS = 5;
+-const WORKFLOW_RETENTION_DAYS = 30;
+-const WORKFLOW_SOURCE = `export const meta = { name: "review", description: "Review the change" };\n${"const step = await agent(`Review the diff and report findings`, { label: 'review' });\n".repeat(16)}`;
+ 
+ export interface AccountPoolSeed {
+   accountId: string;
+@@ -60,23 +46,6 @@ export interface AutomationsSeed {
+   now: number;
+ }
+ 
+-export interface WorkflowsSeed {
+-  projectId: string;
+-  originThreadId: string;
+-  runningRunId: string;
+-  largestRunId: string;
+-  runningCallId: string;
+-  runningChildThreadId: string;
+-  queuedCallId: string;
+-  failedCallId: string;
+-  nextCallIndex: number;
+-  pendingNotificationRunId: string;
+-  terminalRunId: string;
+-  retiredWorkerThreadId: string;
+-  archivedWorkerThreadId: string;
+-  now: number;
+-}
+-
+ function migrateStatements(
+   client: Database.Database,
+   statements: readonly string[],
+@@ -331,268 +300,3 @@ export function seedAutomations(
+     now,
+   };
+ }
+-
+-interface SeededRun {
+-  id: string;
+-  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+-  originThreadId: string;
+-  projectId: string;
+-  createdAt: number;
+-  finishedAt: number | null;
+-  notificationSent: boolean;
+-  resumedFromRunId: string | null;
+-  calls: number;
+-  workersArchived: boolean;
+-}
+-
+-export function seedWorkflows(db: DbConnection, scale: number): WorkflowsSeed {
+-  const client = db.$client;
+-  migrateStatements(client, WORKFLOWS_MIGRATIONS);
+-  const now = Date.now();
+-  const retained = scaled(WORKFLOW_RETAINED_RUNS, scale);
+-  const originThreads = Math.max(
+-    1,
+-    Math.ceil(retained / WORKFLOW_RUNS_PER_ORIGIN_THREAD),
+-  );
+-  const runs: SeededRun[] = [];
+-  const originOf = (index: number) =>
+-    `thr_workflow_origin_${index % originThreads}`;
+-  const projectOf = (index: number) =>
+-    `proj_workflow_${index % WORKFLOW_PROJECTS}`;
+-  const retentionSpanMs = (WORKFLOW_RETENTION_DAYS - 1) * DAY_MS;
+-  for (let index = 0; index < retained; index += 1) {
+-    const finishedAt =
+-      now - retentionSpanMs + Math.floor((index / retained) * retentionSpanMs);
+-    const previous = runs[runs.length - 1];
+-    runs.push({
+-      id: `wfr_retained_${index.toString().padStart(6, "0")}`,
+-      status:
+-        index % 13 === 0
+-          ? "failed"
+-          : index % 17 === 0
+-            ? "cancelled"
+-            : "succeeded",
+-      originThreadId: originOf(index),
+-      projectId: projectOf(index),
+-      createdAt: finishedAt - 20 * MINUTE_MS,
+-      finishedAt,
+-      notificationSent: true,
+-      resumedFromRunId:
+-        index % 10 === 9 && previous !== undefined ? previous.id : null,
+-      calls: index === 0 ? WORKFLOW_LARGEST_RUN_CALLS : WORKFLOW_CALLS_PER_RUN,
+-      workersArchived: index < retained - WORKFLOW_UNARCHIVED_RETIRED_RUNS,
+-    });
+-  }
+-  for (let index = 0; index < WORKFLOW_EXPIRED_RUNS; index += 1) {
+-    const finishedAt =
+-      now - (WORKFLOW_RETENTION_DAYS + 1) * DAY_MS - index * MINUTE_MS;
+-    runs.push({
+-      id: `wfr_expired_${index.toString().padStart(6, "0")}`,
+-      status: "succeeded",
+-      originThreadId: originOf(index),
+-      projectId: projectOf(index),
+-      createdAt: finishedAt - 20 * MINUTE_MS,
+-      finishedAt,
+-      notificationSent: true,
+-      resumedFromRunId: null,
+-      calls: WORKFLOW_CALLS_PER_RUN,
+-      workersArchived: true,
+-    });
+-  }
+-  for (let index = 0; index < WORKFLOW_PENDING_NOTIFICATION_RUNS; index += 1) {
+-    runs.push({
+-      id: `wfr_pending_${index}`,
+-      status: "succeeded",
+-      originThreadId: originOf(index),
+-      projectId: projectOf(index),
+-      createdAt: now - 30 * MINUTE_MS,
+-      finishedAt: now - 5 * MINUTE_MS + index,
+-      notificationSent: false,
+-      resumedFromRunId: null,
+-      calls: WORKFLOW_CALLS_PER_RUN,
+-      workersArchived: false,
+-    });
+-  }
+-  for (let index = 0; index < WORKFLOW_RUNNING_RUNS; index += 1) {
+-    runs.push({
+-      id: `wfr_running_${index}`,
+-      status: "running",
+-      originThreadId: originOf(0),
+-      projectId: projectOf(0),
+-      createdAt: now - 10 * MINUTE_MS + index,
+-      finishedAt: null,
+-      notificationSent: false,
+-      resumedFromRunId: null,
+-      calls: WORKFLOW_CALLS_PER_RUN,
+-      workersArchived: false,
+-    });
+-  }
+-  for (let index = 0; index < WORKFLOW_QUEUED_RUNS; index += 1) {
+-    runs.push({
+-      id: `wfr_queued_${index}`,
+-      status: "queued",
+-      originThreadId: originOf(index + 1),
+-      projectId: projectOf(index + 1),
+-      createdAt: now - MINUTE_MS + index,
+-      finishedAt: null,
+-      notificationSent: false,
+-      resumedFromRunId: null,
+-      calls: 0,
+-      workersArchived: false,
+-    });
+-  }
+-  const insertRun = client.prepare(
+-    `INSERT INTO workflow_runs (
+-       id, project_id, origin_thread_id, environment_id, origin_provider,
+-       origin_model, origin_reasoning_level, origin_permission_mode, name,
+-       source, source_hash, args_json, status, resumed_from_run_id,
+-       result_json, error, phase, notification_sent, notification_outcome,
+-       replay_safety_version, created_at, started_at, finished_at
+-     ) VALUES (
+-       @id, @projectId, @originThreadId, 'env_workflow', 'provider-a', 'gpt-5',
+-       'high', 'accept-edits', 'review', @source, @sourceHash, '{"pr":42}',
+-       @status, @resumedFromRunId, @resultJson, @error, @phase,
+-       @notificationSent, @notificationOutcome, 1, @createdAt, @startedAt,
+-       @finishedAt
+-     )`,
+-  );
+-  const insertCall = client.prepare(
+-    `INSERT INTO workflow_calls (
+-       id, run_id, call_index, cache_key, prompt, options_json,
+-       resolved_provider, resolved_model, resolved_reasoning_level,
+-       resolved_permission_mode, status, child_thread_id, result_json, error,
+-       created_at, started_at, last_activity_at, finished_at
+-     ) VALUES (
+-       @id, @runId, @callIndex, @cacheKey, @prompt, @optionsJson, 'provider-a',
+-       'gpt-5', 'high', 'accept-edits', @status, @childThreadId, @resultJson,
+-       @error, @createdAt, @startedAt, @lastActivityAt, @finishedAt
+-     )`,
+-  );
+-  const insertWorker = client.prepare(
+-    `INSERT INTO workflow_workers (
+-       thread_id, run_id, call_id, origin_thread_id, archived_at, next_cleanup_at
+-     ) VALUES (?, ?, ?, ?, ?, ?)`,
+-  );
+-  const prompt = `Review the files changed in pull request 42 for correctness bugs. ${"Report each finding with the file, line and a failing scenario. ".repeat(6)}`;
+-  const resultJson = JSON.stringify({
+-    findings: [{ file: "src/a.ts", line: 12, summary: "Stale cache read" }],
+-  });
+-  let callCounter = 0;
+-  let runningCallId = "";
+-  let runningChildThreadId = "";
+-  let queuedCallId = "";
+-  let failedCallId = "";
+-  let retiredWorkerThreadId = "";
+-  let archivedWorkerThreadId = "";
+-  client.transaction(() => {
+-    for (const run of runs) {
+-      const terminal = run.status !== "queued" && run.status !== "running";
+-      insertRun.run({
+-        id: run.id,
+-        projectId: run.projectId,
+-        originThreadId: run.originThreadId,
+-        source: WORKFLOW_SOURCE,
+-        sourceHash: `hash-${run.id}`,
+-        status: run.status,
+-        resumedFromRunId: run.resumedFromRunId,
+-        resultJson: run.status === "succeeded" ? resultJson : null,
+-        error: run.status === "failed" ? "Agent call failed" : null,
+-        phase: run.status === "running" ? "Review" : null,
+-        notificationSent: run.notificationSent ? 1 : 0,
+-        notificationOutcome: run.notificationSent ? "delivered" : "pending",
+-        createdAt: run.createdAt,
+-        startedAt: run.status === "queued" ? null : run.createdAt + 1_000,
+-        finishedAt: run.finishedAt,
+-      });
+-      for (let callIndex = 0; callIndex < run.calls; callIndex += 1) {
+-        callCounter += 1;
+-        const id = `wfc_${callCounter.toString().padStart(8, "0")}`;
+-        const running = run.status === "running";
+-        const status = running
+-          ? callIndex < WORKFLOW_RUNNING_CALLS_PER_RUN
+-            ? "running"
+-            : callIndex === WORKFLOW_RUNNING_CALLS_PER_RUN
+-              ? "failed"
+-              : callIndex < WORKFLOW_CALLS_PER_RUN - 2
+-                ? "succeeded"
+-                : "queued"
+-          : run.status === "cancelled" && callIndex > 10
+-            ? "cancelled"
+-            : "succeeded";
+-        const childThreadId =
+-          status === "queued" || status === "cancelled"
+-            ? null
+-            : `thr_workflow_call_${callCounter}`;
+-        const startedAt = run.createdAt + 2_000 + callIndex * 1_000;
+-        insertCall.run({
+-          id,
+-          runId: run.id,
+-          callIndex,
+-          cacheKey: `cache-${run.id}-${callIndex}`,
+-          prompt,
+-          optionsJson: JSON.stringify({
+-            selection: null,
+-            outputSchema: null,
+-            title: `Review shard ${callIndex}`,
+-            phase: "Review",
+-          }),
+-          status,
+-          childThreadId,
+-          resultJson: status === "succeeded" ? resultJson : null,
+-          error: status === "failed" ? "Provider overloaded" : null,
+-          createdAt: startedAt,
+-          startedAt: status === "queued" ? null : startedAt,
+-          lastActivityAt: status === "running" ? now - callIndex * 1_000 : null,
+-          finishedAt:
+-            status === "running" || status === "queued"
+-              ? null
+-              : (run.finishedAt ?? now) - 1_000,
+-        });
+-        if (childThreadId !== null) {
+-          const archivedAt =
+-            terminal && run.workersArchived
+-              ? (run.finishedAt ?? now) + MINUTE_MS
+-              : null;
+-          insertWorker.run(
+-            childThreadId,
+-            run.id,
+-            id,
+-            run.originThreadId,
+-            archivedAt,
+-            archivedAt === null && terminal ? now - 1_000 : now + DAY_MS,
+-          );
+-          if (archivedAt !== null && archivedWorkerThreadId === "") {
+-            archivedWorkerThreadId = childThreadId;
+-          }
+-          if (archivedAt === null && terminal && retiredWorkerThreadId === "") {
+-            retiredWorkerThreadId = childThreadId;
+-          }
+-        }
+-        if (run.id === "wfr_running_0") {
+-          if (status === "running" && runningCallId === "") {
+-            runningCallId = id;
+-            runningChildThreadId = childThreadId ?? "";
+-          }
+-          if (status === "queued" && queuedCallId === "") queuedCallId = id;
+-          if (status === "failed") failedCallId = id;
+-        }
+-      }
+-    }
+-  })();
+-  return {
+-    projectId: projectOf(0),
+-    originThreadId: originOf(0),
+-    runningRunId: "wfr_running_0",
+-    largestRunId: "wfr_retained_000000",
+-    runningCallId,
+-    runningChildThreadId,
+-    queuedCallId,
+-    failedCallId,
+-    nextCallIndex: WORKFLOW_CALLS_PER_RUN,
+-    pendingNotificationRunId: "wfr_pending_0",
+-    terminalRunId: `wfr_retained_${(retained - 1).toString().padStart(6, "0")}`,
+-    retiredWorkerThreadId,
+-    archivedWorkerThreadId,
+-    now,
+-  };
+-}
+diff --git a/packages/templates/src/templates/bb-guide-machines.md b/packages/templates/src/templates/bb-guide-machines.md
+index 33d64c3604..ad8e8b8181 100644
+--- a/packages/templates/src/templates/bb-guide-machines.md
++++ b/packages/templates/src/templates/bb-guide-machines.md
+@@ -334,16 +334,6 @@ a getbb.app machine credential that `bb machine remove` revokes; if that
+ revocation fails, the machine is still removed and the response carries a
+ warning (printed to stderr) to revoke the machine in the getbb.app dashboard.
+ 
+-Remote access through getbb.app comes from the bundled bb account and Connect
+-plugins: `bb account login|status|logout` signs this server in (bb-account
+-skill), and `bb connect status|on|off|expose|unexpose|unexpose-all|shares`
+-serves it at `<handle>.getbb.app` and shares HTTP ports from any enrolled host
+-(share-server-links skill). `bb connect servers` lists every bb on the account.
+-`bb connect machine-code` mints a one-time, 10-minute code that pairs the bb
+-mobile app (also shown under Settings → Mobile → Add mobile device); `--json`
+-prints `{code, serverUrl, apex, expiresAt}`. Without an installed bb, pair a
+-dashboard code with `npx -p bb-app@latest bb connect --code <code>`.
+-
+ ## Move the server
+ 
+ Moving the server is experimental and off by default. Turn on the `serverMove`
+diff --git a/packages/templates/src/templates/bb-guide-plugins.md b/packages/templates/src/templates/bb-guide-plugins.md
+index ac40c1984d..beb2dcf990 100644
+--- a/packages/templates/src/templates/bb-guide-plugins.md
++++ b/packages/templates/src/templates/bb-guide-plugins.md
+@@ -193,17 +193,9 @@ Each bundled plugin documents its commands and behavior in its own skill.
+ - MCP server (builtin, disabled by default): `bb plugin enable bb--mcp` lets
+   ChatGPT, Claude, or another MCP client control this bb; an approved app can
+   run any `bb` command. `bb mcp status|clients|revoke`; see the `mcp` skill.
+-- Storage & retention (builtin, disabled by default): enable with
+-  `bb plugin enable bb--storage-retention`. Owns thread retention policies
+-  and machine storage cleanup through its sidebar panel and `bb storage`
+-  commands; see the `storage-retention` skill.
+ - Automations (builtin): recurring or one-shot agent prompts and stored
+   server scripts. `bb automation create|list|show|update|pause|resume|run|runs|delete`;
+   see the `automations` skill.
+-- Workflows (builtin, off by default): durable JavaScript orchestration of
+-  worker threads. Run `bb plugin enable workflows`, then
+-  `bb workflows validate|run|status|history|list|stop`; see the `workflows`
+-  skill.
+ - Memory (official, `bb plugin install memory`): durable cross-provider
+   agent memory. `bb memory catalog|search|get|add|update|forget|history`;
+   see the `memory` skill.
+diff --git a/packages/templates/src/templates/bb-guide-threads.md b/packages/templates/src/templates/bb-guide-threads.md
+index c1a3c09e83..e0a59cacf2 100644
+--- a/packages/templates/src/templates/bb-guide-threads.md
++++ b/packages/templates/src/templates/bb-guide-threads.md
+@@ -191,8 +191,7 @@ Editing a sent message:
+   replacement history. If the thread is running,
+   submission stops the current turn and waits for it to settle. Provider-owned
+   background commands, agents, and workflows are stopped before replacing the
+-  session, and retained task cards keep their terminal status. Durable runs
+-  managed by the Workflows plugin continue independently. It then
++  session, and retained task cards keep their terminal status. It then
+   replaces the selected turn and every later turn while retaining workspace
+   changes. Unsent queued messages remain in the queue and dispatch after the
+   replacement turn when their waits clear. An already-sending queued message
+diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/src/surfaces.ts
+index 3195133f9b..8fa8bd9ce0 100644
+--- a/plugins/plugin-api-docs/src/surfaces.ts
++++ b/plugins/plugin-api-docs/src/surfaces.ts
+@@ -115,7 +115,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "BbNavigate.toPluginPanel",
+           "BbNavigate.experimental_openTerminal",
+         ],
+-        firstParty: ["Automations", "Docs", "GitHub", "Tasks", "Theme Preview"],
++        firstParty: ["Automations"],
+       },
+       {
+         id: "thread-row-status",
+@@ -411,13 +411,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginMessageDirectiveProps",
+           "PluginMessageDirectiveOpenWorkspaceFile",
+         ],
+-        firstParty: [
+-          "Browser Automation",
+-          "Docs",
+-          "Inline visualizations",
+-          "Tasks",
+-          "Workflows",
+-        ],
++        firstParty: ["Browser Automation"],
+       },
+       {
+         id: "code-fence-renderers",
+@@ -458,7 +452,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginMessageActionRegistration.experimental_surfaces",
+           "ExperimentalMessageActionSurface",
+         ],
+-        firstParty: ["Side chat"],
++        firstParty: [],
+       },
+       {
+         id: "message-metadata",
+@@ -566,7 +560,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "ExperimentalPluginBrowserPageEvaluateOptions",
+           "ExperimentalPluginBrowserPageWorld",
+         ],
+-        firstParty: ["Agent Annotations"],
++        firstParty: [],
+         experimental: true,
+       },
+       {
+@@ -610,14 +604,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "ExperimentalThreadTabActionContext",
+           "ExperimentalPluginActionContext.panel",
+         ],
+-        firstParty: [
+-          "Docs",
+-          "Git",
+-          "GitHub",
+-          "Side chat",
+-          "Tasks",
+-          "Workflows",
+-        ],
++        firstParty: ["Git"],
+       },
+       {
+         id: "file-opener",
+@@ -635,7 +622,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginFileOpenerProps",
+           "PluginFileOpenerSource",
+         ],
+-        firstParty: ["Docs", "File Editor", "PDF preview"],
++        firstParty: ["PDF preview"],
+       },
+       {
+         id: "app-overlay",
+@@ -702,7 +689,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "experimental_matchesShortcutKey",
+           "ExperimentalShortcutKeyEvent",
+         ],
+-        firstParty: ["File Editor", "Tasks"],
++        firstParty: [],
+       },
+     ],
+   },
+@@ -785,7 +772,6 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         ],
+         firstParty: [
+           "Send later",
+-          "Workflows",
+           "GitHub PR Status",
+           "Codex provider",
+         ],
+@@ -815,7 +801,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginComposerApi.insert",
+           "ComposerMention",
+         ],
+-        firstParty: ["Agent Annotations", "Docs", "Send later", "Workflows"],
++        firstParty: ["Send later"],
+       },
+       {
+         id: "mention-provider",
+@@ -832,7 +818,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginMentionSearchContext",
+           "PluginMentionItem",
+         ],
+-        firstParty: ["Agent Annotations", "Docs", "GitHub", "Tasks"],
++        firstParty: [],
+       },
+       {
+         id: "composer-rich-text",
+@@ -1006,16 +992,11 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         ],
+         firstParty: [
+           "ACP providers",
+-          "bb connect",
+           "BB guide",
+           "Claude Code provider",
+           "Codex provider",
+-          "Custom instructions",
+-          "GitHub",
+-          "Modal Sandbox [Experimental]",
+           "Provider retry",
+           "Push notifications",
+-          "Workflows",
+         ],
+       },
+       {
+@@ -1039,12 +1020,8 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         ],
+         firstParty: [
+           "Account Pooler [Experimental]",
+-          "bb account",
+-          "bb connect",
+           "Concurrency limit",
+           "Keep Awake",
+-          "Memory",
+-          "Modal Sandbox [Experimental]",
+           "Provider usage",
+           "Push notifications",
+         ],
+@@ -1068,12 +1045,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Send them to Settings; saving a changed value loads the plugin again",
+         ],
+         apiSymbols: ["PluginStatusApi"],
+-        firstParty: [
+-          "Account Pooler [Experimental]",
+-          "GitHub",
+-          "Modal Sandbox [Experimental]",
+-          "Workflows",
+-        ],
++        firstParty: ["Account Pooler [Experimental]"],
+       },
+     ],
+   },
+@@ -1147,23 +1119,13 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         firstParty: [
+           "Account Pooler [Experimental]",
+           "Automations",
+-          "bb account",
+-          "bb cloud AI",
+-          "bb connect",
+           "Browser Automation",
+           "Concurrency limit",
+-          "Custom instructions",
+-          "Docs",
+-          "GitHub",
+           "Keep Awake",
+-          "Memory",
+-          "Modal Sandbox [Experimental]",
+           "Provider retry",
+           "Push notifications",
+           "Secrets",
+-          "Tasks",
+           "Thread list",
+-          "Workflows",
+         ],
+       },
+       {
+@@ -1186,29 +1148,17 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         firstParty: [
+           "Account Pooler [Experimental]",
+           "ACP providers",
+-          "Agent Annotations",
+           "Ask User Question",
+           "Automations",
+-          "bb account",
+-          "bb cloud AI",
+-          "bb connect",
+           "BB guide",
+           "Browser Automation",
+           "Claude Code provider",
+           "Codex provider",
+           "Concurrency limit",
+-          "Custom instructions",
+-          "Docs",
+-          "Inline visualizations",
+-          "Memory",
+-          "Modal Sandbox [Experimental]",
+           "Pi provider",
+           "Provider retry",
+           "Secrets",
+-          "Tasks",
+-          "Theme Preview",
+           "Thread list",
+-          "Workflows",
+         ],
+       },
+       {
+@@ -1227,17 +1177,9 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Account Pooler [Experimental]",
+           "ACP providers",
+           "Automations",
+-          "bb account",
+-          "bb connect",
+           "Concurrency limit",
+-          "Docs",
+-          "GitHub",
+           "Keep Awake",
+-          "Modal Sandbox [Experimental]",
+           "Push notifications",
+-          "Side chat",
+-          "Theme Preview",
+-          "Workflows",
+         ],
+       },
+       {
+@@ -1308,30 +1250,16 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         firstParty: [
+           "Account Pooler [Experimental]",
+           "ACP providers",
+-          "Agent Annotations",
+           "Automations",
+-          "bb account",
+-          "bb cloud AI",
+-          "bb connect",
+           "Browser Automation",
+           "Claude Code provider",
+           "Codex provider",
+           "Concurrency limit",
+-          "Docs",
+-          "File Editor",
+-          "GitHub",
+           "GitHub PR Status",
+-          "Inline visualizations",
+           "Keep Awake",
+-          "Memory",
+-          "Modal Sandbox [Experimental]",
+           "Provider usage",
+           "Push notifications",
+-          "Side chat",
+-          "Tasks",
+-          "Theme Preview",
+           "Thread list",
+-          "Workflows",
+           "Worktree",
+         ],
+       },
+@@ -1355,15 +1283,11 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         ],
+         firstParty: [
+           "Automations",
+-          "bb connect",
+           "Browser Automation",
+           "Concurrency limit",
+-          "Modal Sandbox [Experimental]",
+           "Provider retry",
+           "Provider usage",
+           "Push notifications",
+-          "Tasks",
+-          "Workflows",
+         ],
+       },
+       {
+@@ -1405,7 +1329,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "ThreadDeleteFinalizeHookContext",
+           "ThreadDeleteFinalizeHookDecision",
+         ],
+-        firstParty: ["Storage & retention [Experimental]"],
++        firstParty: [],
+         experimental: true,
+       },
+       {
+@@ -1457,12 +1381,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginEnvironmentProviderLocateContext",
+           "PluginBbSdk.environments.experimental_create",
+         ],
+-        firstParty: [
+-          "Modal Sandbox [Experimental]",
+-          "Personal workspace",
+-          "Project checkout",
+-          "Worktree",
+-        ],
++        firstParty: ["Personal workspace", "Project checkout", "Worktree"],
+         experimental: true,
+       },
+       {
+@@ -1508,7 +1427,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginMachineProviderResource",
+           "PluginMachineProviderRemoveResult",
+         ],
+-        firstParty: ["Modal Sandbox [Experimental]"],
++        firstParty: [],
+         experimental: true,
+       },
+       {
+@@ -1531,7 +1450,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginHosts.ensureSharedPortTunnel",
+           "PluginSharedPortTunnelIdentity",
+         ],
+-        firstParty: ["bb connect"],
++        firstParty: [],
+         experimental: true,
+       },
+       {
+@@ -1710,24 +1629,12 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         apiSymbols: ["PluginStorage"],
+         firstParty: [
+           "Account Pooler [Experimental]",
+-          "Agent Annotations",
+           "Automations",
+-          "bb account",
+-          "bb cloud AI",
+-          "bb connect",
+           "Browser Automation",
+           "Concurrency limit",
+-          "Custom instructions",
+-          "Docs",
+-          "GitHub",
+           "Keep Awake",
+-          "Memory",
+-          "Modal Sandbox [Experimental]",
+           "Push notifications",
+-          "Side chat",
+-          "Tasks",
+           "Thread list",
+-          "Workflows",
+         ],
+       },
+       {
+@@ -1807,29 +1714,17 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Account Pooler [Experimental]",
+           "ACP providers",
+           "Automations",
+-          "bb cloud AI",
+-          "bb connect",
+           "Browser Automation",
+           "Claude Code provider",
+           "Codex provider",
+           "Concurrency limit",
+-          "Docs",
+-          "File Editor",
+-          "GitHub",
+-          "Inline visualizations",
+           "Keep Awake",
+-          "Modal Sandbox [Experimental]",
+           "Project checkout",
+           "Provider retry",
+           "Provider usage",
+           "Push notifications",
+           "Secrets",
+-          "Side chat",
+-          "Storage & retention [Experimental]",
+-          "Tasks",
+-          "Theme Preview",
+           "Thread list",
+-          "Workflows",
+           "Worktree",
+         ],
+       },
+@@ -1851,7 +1746,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "ReadonlyJsonValue",
+           "BbPluginApi",
+         ],
+-        firstParty: ["Push notifications", "Workflows"],
++        firstParty: ["Push notifications"],
+       },
+       {
+         id: "desktop-browsers",
+@@ -1892,7 +1787,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginAiServiceDeclaration",
+           "PluginAiServiceStatus",
+         ],
+-        firstParty: ["bb cloud AI", "Codex provider"],
++        firstParty: ["Codex provider"],
+         experimental: true,
+       },
+       {
+@@ -1963,15 +1858,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         firstParty: [
+           "Account Pooler [Experimental]",
+           "Automations",
+-          "bb account",
+-          "bb connect",
+-          "Docs",
+-          "File Editor",
+-          "GitHub",
+-          "Inline visualizations",
+           "Provider usage",
+-          "Side chat",
+-          "Tasks",
+           "Thread list",
+         ],
+       },
+@@ -1993,7 +1880,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Hosts that stack entries reveal one only after the entries above it are ready, holding the rest for at most 3 seconds behind a slow entry, which then appears in its place when it loads; a page waits for the lazy parts of the plugin that owns it. bb's own core contributions use the same helper.",
+         ],
+         apiSymbols: ["experimental_lazy", "ExperimentalLazyComponent"],
+-        firstParty: ["Account Pooler [Experimental]", "Automations", "bb connect", "Git"],
++        firstParty: ["Account Pooler [Experimental]", "Automations", "Git"],
+         experimental: true,
+       },
+       {
+@@ -2035,26 +1922,15 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         firstParty: [
+           "Account Pooler [Experimental]",
+           "ACP providers",
+-          "Agent Annotations",
+           "Ask User Question",
+           "Automations",
+-          "bb account",
+-          "bb cloud AI",
+-          "bb connect",
+           "BB guide",
+           "Browser Automation",
+           "Claude Code provider",
+           "Codex provider",
+           "Concurrency limit",
+-          "Custom instructions",
+-          "Docs",
+           "Drafts",
+-          "File Editor",
+-          "GitHub",
+-          "Inline visualizations",
+           "Keep Awake",
+-          "Memory",
+-          "Modal Sandbox [Experimental]",
+           "PDF preview",
+           "Personal workspace",
+           "Pi provider",
+@@ -2064,11 +1940,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Push notifications",
+           "Secrets",
+           "Send later",
+-          "Side chat",
+-          "Tasks",
+-          "Theme Preview",
+           "Thread list",
+-          "Workflows",
+           "Worktree",
+         ],
+       },
 diff --git a/plugins/plugin-api-docs/test/mobile-guide.test.ts b/plugins/plugin-api-docs/test/mobile-guide.test.ts
 index c3d5714694..a7db19b973 100644
 --- a/plugins/plugin-api-docs/test/mobile-guide.test.ts
@@ -404,521 +1691,3 @@ index be5bfd5d01..538601f93e 100644
      "plugins/provider-codex",
    ]);
    const queue = [...pluginDirs].sort(
-diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/src/surfaces.ts
-index 30c5f2d50a..3628d8f45e 100644
---- a/plugins/plugin-api-docs/src/surfaces.ts
-+++ b/plugins/plugin-api-docs/src/surfaces.ts
-@@ -113,7 +113,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "BbNavigate.toPluginPanel",
-           "BbNavigate.experimental_openTerminal",
-         ],
--        firstParty: ["Automations", "Docs", "GitHub", "Tasks", "Theme Preview"],
-+        firstParty: ["Automations"],
-       },
-       {
-         id: "thread-row-status",
-@@ -370,13 +370,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "PluginMessageDirectiveProps",
-           "PluginMessageDirectiveOpenWorkspaceFile",
-         ],
--        firstParty: [
--          "Browser Automation",
--          "Docs",
--          "Inline visualizations",
--          "Tasks",
--          "Workflows",
--        ],
-+        firstParty: ["Browser Automation"],
-       },
-       {
-         id: "code-fence-renderers",
-@@ -411,7 +405,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "PluginMessageActionContext",
-           "ThreadChatMessageReference",
-         ],
--        firstParty: ["Side chat"],
-+        firstParty: [],
-       },
-       {
-         id: "message-metadata",
-@@ -518,7 +512,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "ExperimentalPluginBrowserPageEvaluateOptions",
-           "ExperimentalPluginBrowserPageWorld",
-         ],
--        firstParty: ["Agent Annotations"],
-+        firstParty: [],
-         experimental: true,
-       },
-       {
-@@ -565,14 +559,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "PluginThreadActionItemInput.experimental_panel",
-           "PluginNewThreadPanelActionContext.experimental_panel",
-         ],
--        firstParty: [
--          "Docs",
--          "Git",
--          "GitHub",
--          "Side chat",
--          "Tasks",
--          "Workflows",
--        ],
-+        firstParty: ["Git"],
-       },
-       {
-         id: "file-opener",
-@@ -590,7 +577,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "PluginFileOpenerProps",
-           "PluginFileOpenerSource",
-         ],
--        firstParty: ["Docs", "File Editor", "PDF preview"],
-+        firstParty: ["PDF preview"],
-       },
-       {
-         id: "app-overlay",
-@@ -652,7 +639,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "PluginCommandContext",
-           "PluginCommandShortcut",
-         ],
--        firstParty: ["File Editor"],
-+        firstParty: [],
-       },
-     ],
-   },
-@@ -734,7 +721,6 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-         ],
-         firstParty: [
-           "Send later",
--          "Workflows",
-           "GitHub PR Status",
-           "Codex provider",
-         ],
-@@ -762,7 +748,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "PluginComposerApi.insert",
-           "ComposerMention",
-         ],
--        firstParty: ["Agent Annotations", "Docs", "Send later", "Workflows"],
-+        firstParty: ["Send later"],
-       },
-       {
-         id: "mention-provider",
-@@ -779,7 +765,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "PluginMentionSearchContext",
-           "PluginMentionItem",
-         ],
--        firstParty: ["Agent Annotations", "Docs", "GitHub", "Tasks"],
-+        firstParty: [],
-       },
-       {
-         id: "composer-rich-text",
-@@ -948,16 +934,11 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-         ],
-         firstParty: [
-           "ACP providers",
--          "bb connect",
-           "BB guide",
-           "Claude Code provider",
-           "Codex provider",
--          "Custom instructions",
--          "GitHub",
--          "Modal Sandbox [Experimental]",
-           "Provider retry",
-           "Push notifications",
--          "Workflows",
-         ],
-       },
-       {
-@@ -976,12 +957,8 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-         ],
-         firstParty: [
-           "Account Pooler [Experimental]",
--          "bb account",
--          "bb connect",
-           "Concurrency limit",
-           "Keep Awake",
--          "Memory",
--          "Modal Sandbox [Experimental]",
-           "Provider usage",
-           "Push notifications",
-         ],
-@@ -1005,12 +982,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "Send them to Settings, then reload after they save",
-         ],
-         apiSymbols: ["PluginStatusApi"],
--        firstParty: [
--          "Account Pooler [Experimental]",
--          "GitHub",
--          "Modal Sandbox [Experimental]",
--          "Workflows",
--        ],
-+        firstParty: ["Account Pooler [Experimental]"],
-       },
-     ],
-   },
-@@ -1081,23 +1053,13 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-         firstParty: [
-           "Account Pooler [Experimental]",
-           "Automations",
--          "bb account",
--          "bb cloud AI",
--          "bb connect",
-           "Browser Automation",
-           "Concurrency limit",
--          "Custom instructions",
--          "Docs",
--          "GitHub",
-           "Keep Awake",
--          "Memory",
--          "Modal Sandbox [Experimental]",
-           "Provider retry",
-           "Push notifications",
-           "Secrets",
--          "Tasks",
-           "Thread list",
--          "Workflows",
-         ],
-       },
-       {
-@@ -1120,29 +1082,17 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-         firstParty: [
-           "Account Pooler [Experimental]",
-           "ACP providers",
--          "Agent Annotations",
-           "Ask User Question",
-           "Automations",
--          "bb account",
--          "bb cloud AI",
--          "bb connect",
-           "BB guide",
-           "Browser Automation",
-           "Claude Code provider",
-           "Codex provider",
-           "Concurrency limit",
--          "Custom instructions",
--          "Docs",
--          "Inline visualizations",
--          "Memory",
--          "Modal Sandbox [Experimental]",
-           "Pi provider",
-           "Provider retry",
-           "Secrets",
--          "Tasks",
--          "Theme Preview",
-           "Thread list",
--          "Workflows",
-         ],
-       },
-       {
-@@ -1161,17 +1111,9 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "Account Pooler [Experimental]",
-           "ACP providers",
-           "Automations",
--          "bb account",
--          "bb connect",
-           "Concurrency limit",
--          "Docs",
--          "GitHub",
-           "Keep Awake",
--          "Modal Sandbox [Experimental]",
-           "Push notifications",
--          "Side chat",
--          "Theme Preview",
--          "Workflows",
-         ],
-       },
-       {
-@@ -1241,30 +1183,16 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-         firstParty: [
-           "Account Pooler [Experimental]",
-           "ACP providers",
--          "Agent Annotations",
-           "Automations",
--          "bb account",
--          "bb cloud AI",
--          "bb connect",
-           "Browser Automation",
-           "Claude Code provider",
-           "Codex provider",
-           "Concurrency limit",
--          "Docs",
--          "File Editor",
--          "GitHub",
-           "GitHub PR Status",
--          "Inline visualizations",
-           "Keep Awake",
--          "Memory",
--          "Modal Sandbox [Experimental]",
-           "Provider usage",
-           "Push notifications",
--          "Side chat",
--          "Tasks",
--          "Theme Preview",
-           "Thread list",
--          "Workflows",
-           "Worktree",
-         ],
-       },
-@@ -1287,15 +1215,11 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-         ],
-         firstParty: [
-           "Automations",
--          "bb connect",
-           "Browser Automation",
-           "Concurrency limit",
--          "Modal Sandbox [Experimental]",
-           "Provider retry",
-           "Provider usage",
-           "Push notifications",
--          "Tasks",
--          "Workflows",
-         ],
-       },
-       {
-@@ -1361,12 +1285,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "PluginEnvironmentProviderRemoveContext",
-           "PluginEnvironmentProviderRemoveResult",
-         ],
--        firstParty: [
--          "Modal Sandbox [Experimental]",
--          "Personal workspace",
--          "Project checkout",
--          "Worktree",
--        ],
-+        firstParty: ["Personal workspace", "Project checkout", "Worktree"],
-         experimental: true,
-       },
-       {
-@@ -1412,7 +1331,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "PluginMachineProviderResource",
-           "PluginMachineProviderRemoveResult",
-         ],
--        firstParty: ["Modal Sandbox [Experimental]"],
-+        firstParty: [],
-         experimental: true,
-       },
-       {
-@@ -1433,7 +1352,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "PluginHosts.ensureSharedPortTunnel",
-           "PluginSharedPortTunnelIdentity",
-         ],
--        firstParty: ["bb connect"],
-+        firstParty: [],
-         experimental: true,
-       },
-       {
-@@ -1605,24 +1524,12 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-         apiSymbols: ["PluginStorage"],
-         firstParty: [
-           "Account Pooler [Experimental]",
--          "Agent Annotations",
-           "Automations",
--          "bb account",
--          "bb cloud AI",
--          "bb connect",
-           "Browser Automation",
-           "Concurrency limit",
--          "Custom instructions",
--          "Docs",
--          "GitHub",
-           "Keep Awake",
--          "Memory",
--          "Modal Sandbox [Experimental]",
-           "Push notifications",
--          "Side chat",
--          "Tasks",
-           "Thread list",
--          "Workflows",
-         ],
-       },
-       {
-@@ -1676,29 +1583,17 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "Account Pooler [Experimental]",
-           "ACP providers",
-           "Automations",
--          "bb cloud AI",
--          "bb connect",
-           "Browser Automation",
-           "Claude Code provider",
-           "Codex provider",
-           "Concurrency limit",
--          "Docs",
--          "File Editor",
--          "GitHub",
--          "Inline visualizations",
-           "Keep Awake",
--          "Modal Sandbox [Experimental]",
-           "Project checkout",
-           "Provider retry",
-           "Provider usage",
-           "Push notifications",
-           "Secrets",
--          "Side chat",
--          "Storage & retention [Experimental]",
--          "Tasks",
--          "Theme Preview",
-           "Thread list",
--          "Workflows",
-           "Worktree",
-         ],
-       },
-@@ -1720,7 +1615,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "ReadonlyJsonValue",
-           "BbPluginApi",
-         ],
--        firstParty: ["Push notifications", "Workflows"],
-+        firstParty: ["Push notifications"],
-       },
-       {
-         id: "desktop-browsers",
-@@ -1761,7 +1656,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "PluginAiServiceDeclaration",
-           "PluginAiServiceStatus",
-         ],
--        firstParty: ["bb cloud AI", "Codex provider"],
-+        firstParty: ["Codex provider"],
-         experimental: true,
-       },
-       {
-@@ -1829,15 +1724,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-         firstParty: [
-           "Account Pooler [Experimental]",
-           "Automations",
--          "bb account",
--          "bb connect",
--          "Docs",
--          "File Editor",
--          "GitHub",
--          "Inline visualizations",
-           "Provider usage",
--          "Side chat",
--          "Tasks",
-           "Thread list",
-         ],
-       },
-@@ -1874,26 +1761,15 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-         firstParty: [
-           "Account Pooler [Experimental]",
-           "ACP providers",
--          "Agent Annotations",
-           "Ask User Question",
-           "Automations",
--          "bb account",
--          "bb cloud AI",
--          "bb connect",
-           "BB guide",
-           "Browser Automation",
-           "Claude Code provider",
-           "Codex provider",
-           "Concurrency limit",
--          "Custom instructions",
--          "Docs",
-           "Drafts",
--          "File Editor",
--          "GitHub",
--          "Inline visualizations",
-           "Keep Awake",
--          "Memory",
--          "Modal Sandbox [Experimental]",
-           "PDF preview",
-           "Personal workspace",
-           "Pi provider",
-@@ -1903,11 +1779,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "Push notifications",
-           "Secrets",
-           "Send later",
--          "Side chat",
--          "Tasks",
--          "Theme Preview",
-           "Thread list",
--          "Workflows",
-           "Worktree",
-         ],
-       },
-diff --git a/apps/app/.ladle/ladle.css b/apps/app/.ladle/ladle.css
-index 098b00286f..0efcde83a7 100644
---- a/apps/app/.ladle/ladle.css
-+++ b/apps/app/.ladle/ladle.css
-@@ -6,7 +6,6 @@
-    silently rendered unstyled here while working in the real app, which builds
-    the plugin's CSS separately. */
- @source "../../../plugins/automations";
--@source "../../../plugins/workflows";
- @source "../../../plugins/provider-usage";
- @source "../../../plugins/secrets";
- @source "../../../plugins/provider-codex";
-diff --git a/packages/templates/src/templates/bb-guide-plugins.md b/packages/templates/src/templates/bb-guide-plugins.md
-index 0389267372..ce0ab60694 100644
---- a/packages/templates/src/templates/bb-guide-plugins.md
-+++ b/packages/templates/src/templates/bb-guide-plugins.md
-@@ -176,17 +176,9 @@ Each bundled plugin documents its commands and behavior in its own skill.
- - MCP server (builtin, disabled by default): `bb plugin enable bb--mcp` lets
-   ChatGPT, Claude, or another MCP client control this bb; an approved app can
-   run any `bb` command. `bb mcp status|clients|revoke`; see the `mcp` skill.
--- Storage & retention (builtin, disabled by default): enable with
--  `bb plugin enable bb--storage-retention`. Owns thread retention policies
--  and machine storage cleanup through its sidebar panel and `bb storage`
--  commands; see the `storage-retention` skill.
- - Automations (builtin): recurring or one-shot agent prompts and stored
-   server scripts. `bb automation create|list|show|update|pause|resume|run|runs|delete`;
-   see the `automations` skill.
--- Workflows (builtin, off by default): durable JavaScript orchestration of
--  worker threads. Run `bb plugin enable workflows`, then
--  `bb workflows validate|run|status|history|list|stop`; see the `workflows`
--  skill.
- - Memory (official, `bb plugin install memory`): durable cross-provider
-   agent memory. `bb memory catalog|search|get|add|update|forget|history`;
-   see the `memory` skill.
-diff --git a/apps/app/src/components/plugin/management/BrowsePluginsTab.tsx b/apps/app/src/components/plugin/management/BrowsePluginsTab.tsx
-index 8ab26ea6b9..7e8014469c 100644
---- a/apps/app/src/components/plugin/management/BrowsePluginsTab.tsx
-+++ b/apps/app/src/components/plugin/management/BrowsePluginsTab.tsx
-@@ -6,7 +6,6 @@ import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
- import { Icon } from "@bb/shared-ui/icon";
- import { appToast } from "@/components/ui/app-toast";
- import bbLogoUrl from "../../../../../../assets/bb-logo.svg";
--import { OpenPluginGuideButton } from "./OpenPluginGuideButton";
- import { cn } from "@bb/shared-ui/lib/utils";
- import {
-   ResourceCollectionViewport,
-@@ -246,7 +245,6 @@ export function BrowsePluginsTab({
-               </ResourceTabDescription>
-             ) : (
-               <div className="flex items-center justify-between gap-3">
--                <OpenPluginGuideButton />
-                 {createAction}
-               </div>
-             )}
-diff --git a/packages/templates/src/templates/bb-guide-machines.md b/packages/templates/src/templates/bb-guide-machines.md
-index 5e669b0ac0..fb50a6bbec 100644
---- a/packages/templates/src/templates/bb-guide-machines.md
-+++ b/packages/templates/src/templates/bb-guide-machines.md
-@@ -250,16 +250,6 @@ requests, including account-pool endpoints. A machine on bb connect access holds
- a getbb.app machine credential that `bb machine remove` revokes; if that
- revocation fails, revoke the machine in the getbb.app dashboard.
- 
--Remote access through getbb.app comes from the bundled bb account and Connect
--plugins: `bb account login|status|logout` signs this server in (bb-account
--skill), and `bb connect status|on|off|expose|unexpose|unexpose-all|shares`
--serves it at `<handle>.getbb.app` and shares HTTP ports from any enrolled host
--(share-server-links skill). `bb connect servers` lists every bb on the account.
--`bb connect machine-code` mints a one-time, 10-minute code that pairs the bb
--mobile app (also shown under Settings → Mobile → Add mobile device); `--json`
--prints `{code, serverUrl, apex, expiresAt}`. Without an installed bb, pair a
--dashboard code with `npx -p bb-app@latest bb connect --code <code>`.
--
- ## Move the server
- 
- Moving the server is experimental and off by default. Turn on the `serverMove`
-diff --git a/packages/templates/src/templates/bb-guide-threads.md b/packages/templates/src/templates/bb-guide-threads.md
-index 61d0ad6b4a..0d001ea66e 100644
---- a/packages/templates/src/templates/bb-guide-threads.md
-+++ b/packages/templates/src/templates/bb-guide-threads.md
-@@ -187,8 +187,7 @@ Editing a sent message:
-   replacement history. If the thread is running,
-   submission stops the current turn and waits for it to settle. Provider-owned
-   background commands, agents, and workflows are stopped before replacing the
--  session, and retained task cards keep their terminal status. Durable runs
--  managed by the Workflows plugin continue independently. It then
-+  session, and retained task cards keep their terminal status. It then
-   replaces the selected turn and every later turn while retaining workspace
-   changes. Unsent queued messages remain in the queue and dispatch after the
-   replacement turn when their waits clear. An already-sending queued message

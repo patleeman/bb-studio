@@ -1,3 +1,4 @@
+import { studioCoreCardEntries } from "./threadContextCardCore.fork";
 import { parentRowIcon, parentRowLabel } from "@/components/promptbox/banner/parentRelationship.fork";
 import { useNavigate } from "react-router-dom";
 import {
@@ -7,8 +8,8 @@ import {
 } from "@get-bb/plugin-sdk";
 import { Icon } from "@bb/shared-ui/icon";
 import { InfoRowTime } from "@bb/shared-ui/info-list-row";
-import type { ThreadResponse } from "@bb/server-contract";
 import { ThreadContextCardRow } from "@/components/plugin/ThreadContextCardRow";
+import { SurfaceInfoSection } from "@/components/plugin/ThreadContextCardSection";
 import type {
   CoreThreadContextCardRow,
   CoreThreadContextCardSection,
@@ -16,19 +17,14 @@ import type {
 import { InfoList } from "@/components/secondary-panel/info/info-list";
 import { ThreadListEntryStatusGlyph } from "@/components/thread/ThreadListEntryStatusGlyph";
 import { ThreadTitle } from "@/components/thread/ThreadTitleMentions";
-import { useChildThreads, useThread } from "@/hooks/queries/thread-queries";
-import { getThreadRoutePath } from "@/lib/route-paths";
+import { useChildThreads } from "@/hooks/queries/thread-queries";
+import { getThreadLocationPath } from "@/lib/route-paths";
 import { getThreadDisplayTitle } from "@/lib/thread-title";
 import { useParentThreadSection } from "./useParentThreadSection";
 
 function ParentRow({ threadId }: ExperimentalThreadContextCardProps) {
-  const { data: thread } = useThread(threadId);
-  return thread === undefined ? null : <ParentThreadRow thread={thread} />;
-}
-
-function ParentThreadRow({ thread }: { thread: ThreadResponse }) {
   const navigate = useNavigate();
-  const parent = useParentThreadSection(thread, true);
+  const parent = useParentThreadSection(threadId);
   if (parent === null) return null;
   return (
     <ThreadContextCardRow
@@ -51,57 +47,58 @@ function ChildThreadsSection({ threadId }: ExperimentalThreadContextCardProps) {
   );
   if (children.length === 0) return null;
   return (
-    <InfoList
-      items={children}
-      getKey={(child) => child.id}
-      limit={4}
-      renderItem={(child) => {
-        const title = getThreadDisplayTitle(child);
-        return (
-          <li className="list-none">
-            <ThreadContextCardRow
-              leading={
-                <ThreadListEntryStatusGlyph
-                  thread={child}
-                  idle={<Icon name="ChildThread" aria-hidden />}
-                />
-              }
-              label={<ThreadTitle title={title} />}
-              title={title}
-              trailing={<InfoRowTime timestamp={child.updatedAt} />}
-              onClick={() =>
-                void navigate(
-                  getThreadRoutePath({
-                    projectId: child.projectId,
-                    threadId: child.id,
-                  }),
-                )
-              }
-            />
-          </li>
-        );
-      }}
-    />
+    <SurfaceInfoSection label="Child threads" count={children.length}>
+      <InfoList
+        items={children}
+        getKey={(child) => child.id}
+        limit={4}
+        renderItem={(child) => {
+          const title = getThreadDisplayTitle(child);
+          return (
+            <li className="list-none">
+              <ThreadContextCardRow
+                leading={
+                  <ThreadListEntryStatusGlyph
+                    thread={child}
+                    idle={<Icon name="ChildThread" aria-hidden />}
+                  />
+                }
+                label={<ThreadTitle title={title} />}
+                title={title}
+                trailing={<InfoRowTime timestamp={child.updatedAt} />}
+                onClick={() =>
+                  void navigate(
+                    getThreadLocationPath({
+                      projectId: child.projectId,
+                      threadId: child.id,
+                    }),
+                  )
+                }
+              />
+            </li>
+          );
+        }}
+      />
+    </SurfaceInfoSection>
   );
 }
 
 export const CORE_THREAD_CONTEXT_CARD_ROWS: readonly CoreThreadContextCardRow[] =
-  [
+  studioCoreCardEntries([
     {
       id: "parent",
       group: experimental_THREAD_INFO_ROW_GROUPS.thread,
       order: 10,
       component: ParentRow,
     },
-  ];
+  ]);
 
 export const CORE_THREAD_CONTEXT_CARD_SECTIONS: readonly CoreThreadContextCardSection[] =
-  [
+  studioCoreCardEntries([
     {
       id: "childThreads",
-      title: "Child threads",
       group: experimental_THREAD_INFO_SECTION_GROUPS.related,
       order: 10,
       component: ChildThreadsSection,
     },
-  ];
+  ]);

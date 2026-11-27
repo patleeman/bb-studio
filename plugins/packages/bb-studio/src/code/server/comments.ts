@@ -212,7 +212,7 @@ export function reviewMessage(input: {
   return [
     `Code review from VS Code ("${input.workspace}"): ${count} ${count === 1 ? "comment" : "comments"}.`,
     ...parts,
-    "Work through each one. Answer in its thread with code_comment_reply (the comment thread id above), saying what you changed or why not, and resolve it there when it's done. code_comments lists the open ones.",
+    "Work through each one. Answer in its thread with code_comments (op: reply) (the comment thread id above), saying what you changed or why not, and resolve it there when it's done. code_comments lists the open ones.",
   ].join("\n\n");
 }
 

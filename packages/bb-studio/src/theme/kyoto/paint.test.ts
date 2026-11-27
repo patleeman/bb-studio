@@ -13,34 +13,54 @@ const uniformsAt = (iso: string, snow = 0): KyotoUniforms => {
 
 interface Recorded { fills: { tile: string; style: string }[]; clips: Tile[]; cleared: number; bad: number; operations: string[] }
 
+const TILE_ENTRIES = Object.entries(TILES);
+
 function recorder(): { context: GardenContext; seen: Recorded } {
   const seen: Recorded = { fills: [], clips: [], cleared: 0, bad: 0, operations: [] };
   const stack: string[] = [];
   let tile = "";
   let pending: Tile | null = null;
-  const state: Record<string, unknown> = { fillStyle: "", strokeStyle: "", lineWidth: 1, lineCap: "butt", lineJoin: "miter", globalCompositeOperation: "source-over" };
-  const check = (args: unknown[]) => { for (const each of args) if (typeof each === "number" && !Number.isFinite(each)) seen.bad += 1; };
-  const gradient = { addColorStop: (offset: number) => check([offset]) };
-  const methods: Record<string, (...args: number[]) => unknown> = {
-    save: () => { stack.push(tile); },
-    restore: () => { tile = stack.pop() ?? ""; },
-    rect: (x, y, width, height) => { pending = { x, y, width, height }; },
-    clip: () => {
+  let composite = "source-over";
+  const num = (v: number) => { if (!Number.isFinite(v)) seen.bad += 1; };
+  const gradient = { addColorStop: (offset: number) => num(offset) } as unknown as CanvasGradient;
+  const ctx = {
+    fillStyle: "" as string | CanvasGradient | CanvasPattern,
+    strokeStyle: "" as string | CanvasGradient | CanvasPattern,
+    lineWidth: 1,
+    lineCap: "butt" as CanvasLineCap,
+    lineJoin: "miter" as CanvasLineJoin,
+    get globalCompositeOperation(): GlobalCompositeOperation { return composite as GlobalCompositeOperation; },
+    set globalCompositeOperation(value: GlobalCompositeOperation) { composite = String(value); seen.operations.push(composite); },
+    save() { stack.push(tile); },
+    restore() { tile = stack.pop() ?? ""; },
+    translate(x: number, y: number) { num(x); num(y); },
+    scale(x: number, y: number) { num(x); num(y); },
+    beginPath() {},
+    closePath() {},
+    rect(x: number, y: number, width: number, height: number) { num(x); num(y); num(width); num(height); pending = { x, y, width, height }; },
+    clip() {
       if (!pending) return;
       seen.clips.push(pending);
-      tile = Object.entries(TILES).find(([, each]) => each.x === pending!.x && each.y === pending!.y)?.[0] ?? "?";
+      tile = TILE_ENTRIES.find(([, each]) => each.x === pending!.x && each.y === pending!.y)?.[0] ?? "?";
     },
-    fill: () => { seen.fills.push({ tile, style: String(state.fillStyle) }); },
-    fillRect: () => { seen.fills.push({ tile, style: String(state.fillStyle) }); },
-    clearRect: (_x, _y, width, height) => { seen.cleared = width * height; },
-    createLinearGradient: () => gradient,
-    createRadialGradient: () => gradient,
+    moveTo(x: number, y: number) { num(x); num(y); },
+    lineTo(x: number, y: number) { num(x); num(y); },
+    quadraticCurveTo(cpx: number, cpy: number, x: number, y: number) { num(cpx); num(cpy); num(x); num(y); },
+    ellipse(x: number, y: number, rx: number, ry: number, rot: number, start: number, end: number) {
+      num(x); num(y); num(rx); num(ry); num(rot); num(start); num(end);
+    },
+    arc(x: number, y: number, r: number, start: number, end: number) { num(x); num(y); num(r); num(start); num(end); },
+    fill() { seen.fills.push({ tile, style: String(ctx.fillStyle) }); },
+    stroke() {},
+    fillRect(x: number, y: number, w: number, h: number) { num(x); num(y); num(w); num(h); seen.fills.push({ tile, style: String(ctx.fillStyle) }); },
+    clearRect(x: number, y: number, width: number, height: number) { num(x); num(y); num(width); num(height); seen.cleared = width * height; },
+    createLinearGradient(x0: number, y0: number, x1: number, y1: number) { num(x0); num(y0); num(x1); num(y1); return gradient; },
+    createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number) {
+      num(x0); num(y0); num(r0); num(x1); num(y1); num(r1);
+      return gradient;
+    },
   };
-  const context = new Proxy(state, {
-    get: (target, key: string) => (key in target ? target[key] : (...args: number[]) => { check(args); return methods[key]?.(...args); }),
-    set: (target, key: string, value) => { if (key === "globalCompositeOperation") seen.operations.push(String(value)); target[key] = value; return true; },
-  }) as unknown as GardenContext;
-  return { context, seen };
+  return { context: ctx as unknown as GardenContext, seen };
 }
 
 function paintOf(spec: GardenSpec): Recorded {
@@ -92,7 +112,10 @@ describe("the Kyoto Garden atlas", () => {
     expect(count(first, "maple")).toBeGreaterThan(8000);
     expect(count(first, "ground")).toBeGreaterThan(8000);
     expect(first.fills.at(-1)).toEqual({ tile: "", style: "#fff" });
-    expect(paintOf(AUTUMN).fills).toEqual(first.fills);
+    const second = paintOf(AUTUMN);
+    const same = second.fills.length === first.fills.length && second.fills.every((f, i) => f.tile === first.fills[i]!.tile && f.style === first.fills[i]!.style);
+    if (!same) expect(second.fills).toEqual(first.fills);
+    expect(same).toBe(true);
   });
 
   it("keeps the pond's water and the canopy's shade in separate channels of the mask, and cuts the water out of the bank", () => {

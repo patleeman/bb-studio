@@ -3,7 +3,6 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CODE_TAB } from "./kit/code-contract";
 import { dragItemRef, linkDragItem, refDragItem } from "./kit/app/item-drag";
-import { LOOPS_PANE } from "./loops/ui/hooks";
 import {
   AGENT_TYPES, auditTable, itemKindOfId, kindsNamedBy, NEW_TAB_ACTIONS, newTabFields, newTabTitle, pathFor, refOfPath, refOfTab, SURFACES,
   TAB_IDS, TAB_KIND_REGISTRY, tabKindEntry, tabOpenFor, type TabKindId, type TabRef,
@@ -26,11 +25,9 @@ const SAMPLE: Record<TabKindId, TabRef> = {
   skills: { kind: "skills", id: "bot_main" },
   library: { kind: "library", id: null },
   automations: { kind: "automations", id: null },
-  todos: { kind: "todos", id: "bot_main" },
   archive: { kind: "archive", id: "bot_main" },
   automation: { kind: "automation", id: "bot_main:aut_0123456789abcdef" },
   todo: { kind: "todo", id: "loop_0123abcd" },
-  record: { kind: "record", id: "mem_0123456789abcdef" },
   vscode: { kind: "vscode", id: null },
   file: { kind: "file", id: "src/a.ts" },
   diff: { kind: "diff", id: "src/a.ts" },
@@ -59,7 +56,7 @@ describe("the registry", () => {
 
   it("covers the kinds the owner listed, and bb's own", () => {
     const names = TAB_KIND_REGISTRY.map((entry) => entry.name);
-    for (const name of ["Conversation", "Worker", "Page", "Whiteboard", "Design", "Visual Chat board", "Artifact", "App", "Memory", "Library", "Scheduled", "Strands", "Conversations", "VS Code", "File", "Diff", "Browser", "Workflow run"]) expect(names).toContain(name);
+    for (const name of ["Conversation", "Worker", "Page", "Whiteboard", "Design", "Visual Chat board", "Artifact", "App", "Memory", "Library", "Scheduled", "Conversations", "VS Code", "File", "Diff", "Browser", "Workflow run"]) expect(names).toContain(name);
     expect(TAB_KIND_REGISTRY.filter((entry) => entry.owner === "bb").map((entry) => entry.open)).toEqual([
       { via: "bb", spec: "file" }, { via: "bb", spec: "diff" }, { via: "bb", spec: "url" }, { via: "bb", spec: "terminal" },
       // The Workflows plugin lets other plugins open its run tab.
@@ -68,7 +65,7 @@ describe("the registry", () => {
   });
 
   it("uses the tab ids the tabs register with", () => {
-    expect([TAB_IDS.studio, TAB_IDS.code, TAB_IDS.todos]).toEqual([STUDIO_TAB, CODE_TAB, LOOPS_PANE]);
+    expect([TAB_IDS.studio, TAB_IDS.code]).toEqual([STUDIO_TAB, CODE_TAB]);
   });
 });
 
@@ -94,7 +91,7 @@ describe("every kind reaches every surface it claims", () => {
     }
   });
 
-  it("workbench_open: a type, and for Studio's kinds the tab that shows it", () => {
+  it("workbench (op: open): a type, and for Studio's kinds the tab that shows it", () => {
     for (const entry of TAB_KIND_REGISTRY.filter((each) => reaches(each.surfaces.workbenchOpen))) {
       expect(AGENT_TYPES, entry.id).toContain(entry.agentType);
       if (entry.owner !== "bb" || entry.open.via === "plugin") expect(tabOpenFor(SAMPLE[entry.id]), entry.id).not.toBeNull();
@@ -145,7 +142,7 @@ describe("naming", () => {
   it("lists the New Tab Actions under New and Open, titled New <kind>, Open <kind> or the page's name", () => {
     expect(NEW_TAB_ACTIONS.map((action) => `${action.group}: ${action.title}`)).toEqual([
       "New: New conversation", "New: New page", "New: New whiteboard", "New: New design", "New: New app",
-      "Open: Open conversation", "Open: Open page", "Open: Memory", "Open: Skills", "Open: Library", "Open: Strands", "Open: Conversations", "Open: VS Code",
+      "Open: Open conversation", "Open: Open page", "Open: Memory", "Open: Skills", "Open: Library", "Open: Conversations", "Open: VS Code",
     ]);
     // bb's action search lists matches under one heading: no two titles are the same.
     expect(new Set(NEW_TAB_ACTIONS.map((action) => action.title)).size).toBe(NEW_TAB_ACTIONS.length);
@@ -165,9 +162,9 @@ describe("naming", () => {
 
   it("finds a kind by its name or plural in a search", () => {
     expect(kindsNamedBy("whiteboards")).toEqual(["whiteboard"]);
-    expect(kindsNamedBy("Task")).toEqual(["todos", "todo"]);
-    expect(kindsNamedBy("todos")).toEqual(["todos", "todo"]);
-    expect(kindsNamedBy("memory records")).toEqual(["memory", "record"]);
+    expect(kindsNamedBy("Task")).toEqual(["todo"]);
+    expect(kindsNamedBy("todos")).toEqual(["todo"]);
+    expect(kindsNamedBy("memory")).toEqual(["memory"]);
     expect(kindsNamedBy("pa")).toEqual([]);
   });
 });

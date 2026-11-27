@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // VS Code as a page in the main view (its nav panel):
 // its bar names it, there is no sharing banner, and the page is never blank.
 import { act } from "react";

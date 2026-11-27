@@ -44,7 +44,7 @@ function Outcome({ result }: { result: RestoreResult }) {
   );
 }
 
-export function BackupView({ api }: { api: BackupApi }) {
+export function BackupView({ api, cliName }: { api: BackupApi; cliName: "bbs" | "bb" }) {
   const input = useRef<HTMLInputElement>(null);
   const { state } = api;
   const busy = ["backing-up", "uploading", "checking", "restoring"].includes(state.step);
@@ -112,11 +112,11 @@ export function BackupView({ api }: { api: BackupApi }) {
         </div>
       ) : null}
       {state.step === "error" ? <p className="text-xs text-destructive">{state.message}</p> : null}
-      <CommandLine command="bb studio backup --out ~/Desktop" />
+      <CommandLine command={`${cliName} studio backup --out ~/Desktop`} />
     </section>
   );
 }
 
-export function BackupSection() {
-  return <BackupView api={useBackup()} />;
+export function BackupSection({ cliName }: { cliName: "bbs" | "bb" }) {
+  return <BackupView api={useBackup()} cliName={cliName} />;
 }

@@ -44,9 +44,6 @@ export const ITEM_FAMILIES: readonly { id: ItemFamily; label: string; plural: st
   { id: "app", label: "App", plural: "Apps", segment: "apps", types: ITEM_TYPES.filter((each) => each.family === "app").map((each) => each.type) },
 ];
 
-export const isItemFamily = (value: unknown): value is ItemFamily => value === "page" || value === "app";
-export const isItemType = (value: unknown): value is ItemType => ITEM_TYPES.some((each) => each.type === value);
-
 export function itemType(type: string): ItemTypeInfo | null {
   return ITEM_TYPES.find((each) => each.type === type) ?? null;
 }

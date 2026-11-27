@@ -13,6 +13,13 @@
 // only records what already needs the user, so an update never floods the
 // phone.
 //
+// A strand that needs the user only because a reply asks them something
+// isn't pushed here: that reply's own push covers it (Main's in
+// src/main-push.ts, BB's checked by Studio Mobile; a reply that needs the user
+// pushes even in a turn another thread started), unless the user read it or
+// muted the thread. It doesn't count as pushed, so a real ask on the same
+// strand later still pushes, and its body never repeats a reply's ask.
+//
 // The push-flood rules still hold:
 // - no push for an ask BB pushes itself: a question or approval in a thread
 //   BB shows (Main and workers' threads aside, BB pushes those); a Tool
@@ -65,9 +72,15 @@ export interface StrandPushDeps {
   delayMs?: number;
 }
 
+/** A strand that needs the user only for replies that ask them something (no BB ask, no worker waiting on them). */
+export function onlyReplies(strand: Pick<StrandView, "asks" | "workers">): boolean {
+  return strand.asks.length > 0 && strand.asks.every((ask) => ask.kind === "reply") && !strand.workers.some((worker) => worker.status === "needs-you");
+}
+
 /** What to push for a strand that turned "needs you", or null when the phone hears of it otherwise or not at all. */
 export async function pushFor(strand: StrandView, conversation: Pick<OverviewConversation, "threadId" | "title">, deps: Pick<StrandPushDeps, "bbPushesAsks" | "startedByAnotherThread">): Promise<{ body: string; threadId: string } | null> {
-  const ask: StrandAsk | undefined = strand.asks[0];
+  // A reply's ask pushed with the reply itself: the strand's push tells the rest.
+  const ask: StrandAsk | undefined = strand.asks.find((each) => each.kind !== "reply");
   if (ask && (ask.kind === "question" || ask.kind === "approval")) {
     if (await deps.bbPushesAsks(ask.threadId)) return null;
     if (ask.threadId === conversation.threadId && await deps.startedByAnotherThread(conversation.threadId)) return null;
@@ -95,25 +108,31 @@ export class StrandPushes {
   async check(): Promise<void> {
     if (this.disposed) return;
     if (this.running) { this.again = true; return this.running; }
-    this.running = this.run().catch((error: unknown) => this.deps.log?.(`Strands push: ${error instanceof Error ? error.message : String(error)}`)).finally(() => { this.running = null; });
+    this.running = this.run().catch((error: unknown) => {
+      if (!this.disposed) this.deps.log?.(`Strands push: ${error instanceof Error ? error.message : String(error)}`);
+    }).finally(() => { this.running = null; });
     await this.running;
     if (this.again && !this.disposed) { this.again = false; await this.check(); }
   }
 
   private async run(): Promise<void> {
+    if (this.disposed) return;
     const before = await this.deps.load();
+    if (this.disposed) return;
     const seen = new Set(before ?? []);
     const now = new Set<string>();
     const sends: { botId: string; strand: StrandView; conversation: OverviewConversation }[] = [];
     const checked = new Set<string>();
     let knowsChecked = true;
     for (const bot of this.deps.bots()) {
+      if (this.disposed) return;
       const { conversations, checked: read } = await this.deps.overview(bot.id);
+      if (this.disposed) return;
       if (!read) knowsChecked = false;
       for (const threadId of read ?? []) checked.add(threadId);
       for (const conversation of conversations) {
         for (const strand of conversation.strands) {
-          if (strand.state !== "needs-you") continue;
+          if (strand.state !== "needs-you" || onlyReplies(strand)) continue;
           now.add(strand.id);
           if (!seen.has(strand.id)) sends.push({ botId: bot.id, strand, conversation });
         }
@@ -127,17 +146,21 @@ export class StrandPushes {
         if (thread && !checked.has(thread)) now.add(id);
       }
     }
+    if (this.disposed) return;
     await this.deps.save([...now]);
+    // Once saved, finish sending every claimed push even if dispose() lands mid-flight
+    // (a reloaded instance reads the saved list and would otherwise skip them).
     // The first check only learns what already needs the user.
     if (before === null) return;
     for (const { botId, strand, conversation } of sends) {
       const push = await pushFor(strand, conversation, this.deps);
       if (!push) continue;
       try {
+        const projectId = (await this.deps.projectOf(conversation.threadId).catch(() => null)) || this.deps.defaultProjectId;
         await this.deps.notify({
           title: `${strand.title} · ${conversation.title}`.slice(0, 120), body: push.body, kind: "needs-you",
           threadId: push.threadId, conversationId: conversation.threadId, botId,
-          projectId: (await this.deps.projectOf(conversation.threadId).catch(() => null)) || this.deps.defaultProjectId,
+          projectId,
         });
         this.deps.pushed?.(botId);
       } catch (error) {

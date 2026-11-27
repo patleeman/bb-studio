@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { defineRpcContract } from "@get-bb/plugin-sdk";
 
 export const AREA_OUTCOMES = ["ok", "flagged", "broken"] as const;
 export const AREA_STATUSES = ["ok", "flagged", "broken", "unknown"] as const;
@@ -120,8 +119,3 @@ export const areaUpdateInput = z.object({
   archive: z.boolean().optional().describe("True to take the area off the list"),
 });
 export type AreaUpdateInput = z.infer<typeof areaUpdateInput>;
-
-export const areasContract = defineRpcContract({
-  "areas.list": { input: z.object({}), output: z.object({ areas: z.array(areaView) }) },
-  "areas.get": { input: z.object({ id: z.string().min(1) }), output: z.object({ area: areaView }) },
-});

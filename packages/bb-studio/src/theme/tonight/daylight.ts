@@ -20,27 +20,18 @@ export function skyPhase(sunAltitude: number): SkyPhase {
 export const DARK_BELOW = -4.5;
 export const LIGHT_ABOVE = -3.5;
 
-export function skyVariant(sunAltitude: number, previous: Mode | null): Mode {
-  if (previous === "light") return sunAltitude < DARK_BELOW ? "dark" : "light";
-  if (previous === "dark") return sunAltitude > LIGHT_ABOVE ? "light" : "dark";
-  return sunAltitude >= (DARK_BELOW + LIGHT_ABOVE) / 2 ? "light" : "dark";
+/** Tonight's Sky always stays in dark mode regardless of the Sun's altitude. */
+export function skyVariant(_sunAltitude: number, _previous: Mode | null): Mode {
+  return "dark";
 }
 
-const smooth = (edge0: number, edge1: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-};
 const round = (value: number) => Math.round(value * 1000) / 1000;
 
 export interface SkyLight { day: number; glow: number; lit: number; daylight: number }
 
-export function skyLight(sunAltitude: number): SkyLight {
-  return {
-    day: round(smooth(-7, 9, sunAltitude)),
-    glow: round(smooth(-14, -5, sunAltitude) * (1 - 0.88 * smooth(1, 16, sunAltitude))),
-    lit: round(smooth(-16, -5, sunAltitude)),
-    daylight: round(smooth(-9, 1, sunAltitude)),
-  };
+/** Tonight's Sky always keeps the night sky look (no daytime brightening or twilight wash). */
+export function skyLight(_sunAltitude: number): SkyLight {
+  return { day: 0, glow: 0, lit: 0, daylight: 0 };
 }
 
 export interface SkyInk { line: number; lineWidth: number; star: number; glow: number; label: number; faintest: number; white: number }

@@ -70,6 +70,7 @@ final class PagesStore: ObservableObject {
     }
 
     private var loadGeneration = 0
+    private static let cacheQueue = DispatchQueue(label: "nyc.plee.bbgo.pages-cache", qos: .utility)
 
     func load(_ client: BBClient) async {
         guard client.baseURL == serverURL else { return }
@@ -83,7 +84,14 @@ final class PagesStore: ObservableObject {
             for project in names { projectNames[project.id] = project.name }
             self.pages = pages
             error = nil
-            DiskCache.save(PagesSnapshot(pages: pages, projectNames: projectNames), as: PagesSnapshot.cacheKey, serverURL: serverURL)
+            let snapshot = PagesSnapshot(pages: pages, projectNames: projectNames)
+            let url = serverURL
+            await withCheckedContinuation { continuation in
+                Self.cacheQueue.async {
+                    DiskCache.save(snapshot, as: PagesSnapshot.cacheKey, serverURL: url)
+                    continuation.resume()
+                }
+            }
         } catch where BBClient.isCancellation(error) {
         } catch {
             guard generation == loadGeneration else { return }
@@ -287,6 +295,7 @@ struct PageRow: View {
 
 /// Says why pages couldn't load, with a retry. The cached tree stays on screen.
 struct PagesErrorRow: View {
+    @Environment(\.look) private var look
     let message: String
     let retry: () async -> Void
     @State private var retrying = false
@@ -294,7 +303,7 @@ struct PagesErrorRow: View {
     var body: some View {
         HStack {
             Label(message, systemImage: "wifi.exclamationmark")
-                .foregroundStyle(.orange)
+                .foregroundStyle(.secondary)
                 .font(.footnote.weight(.medium))
             Spacer()
             Button {

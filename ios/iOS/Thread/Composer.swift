@@ -51,9 +51,13 @@ struct ComposerField: UIViewRepresentable {
             view.textContainerInset.right = trailingInset
             view.invalidateIntrinsicContentSize()
         }
-        if view.text != text {
+        let stale = context.coordinator.isStale(text)
+        if view.text != text, !stale {
+            let typing = view.isFirstResponder
             view.text = text
             view.placeholder.isHidden = !text.isEmpty
+            // Replaced while typing (a restored draft, dictation): keep typing at its end.
+            if typing { view.selectedRange = NSRange(location: (text as NSString).length, length: 0) }
         }
         if focused != view.isFirstResponder, focused ? view.window != nil : true {
             context.coordinator.applyFocus(to: view)
@@ -128,7 +132,26 @@ struct ComposerField: UIViewRepresentable {
             }
         }
 
+        /// What the field last sent its binding, until the binding gives it
+        /// back. The composer is hosted apart from the thread view, and can
+        /// render with the text from before a keystroke first: that stale
+        /// value overwrote the keystroke, or put the caret before it, so the
+        /// first letter typed after opening a thread was lost or moved to the end.
+        private var sent: (text: String, at: TimeInterval)?
+
+        /// A value from before the field's own latest edit, which the binding
+        /// hasn't caught up with yet (for at most a second).
+        func isStale(_ incoming: String) -> Bool {
+            guard let sent else { return false }
+            if incoming == sent.text || ProcessInfo.processInfo.systemUptime - sent.at > 1 {
+                self.sent = nil
+                return false
+            }
+            return true
+        }
+
         func textViewDidChange(_ view: UITextView) {
+            sent = (view.text, ProcessInfo.processInfo.systemUptime)
             parent.text = view.text
             (view as? PastingTextView)?.placeholder.isHidden = !view.text.isEmpty
             parent.dictation?.handle(.edited)
@@ -175,6 +198,12 @@ struct ComposerBar<Settings: View, Send: View>: View {
     var prominentMic = false
     var micTint: Color?
     var attaches = true
+    /// While a reply runs: Stop, just before the mic and Send (a Bot conversation).
+    var stop: (() -> Void)? = nil
+    /// "Talk hands-free", first in the "+" menu (a Bot conversation).
+    var handsFree: (() -> Void)? = nil
+    /// A row pinned at the composer's top: a Bot conversation's lasting states (`ComposerChipsRow`).
+    var top: AnyView? = nil
     @ViewBuilder let settings: () -> Settings
     @ViewBuilder let send: () -> Send
 
@@ -183,13 +212,14 @@ struct ComposerBar<Settings: View, Send: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if let top { top.padding(.top, 2) }
             AttachmentStrip(items: $attachments)
                 .padding([.horizontal, .top], 10)
             if compact {
                 // One field in the same place either way: rebuilt in another
                 // branch, its text view lost the keyboard it had just taken.
                 HStack(alignment: .bottom, spacing: 2) {
-                    if oneRow && attaches { AttachmentMenu(items: $attachments, symbol: "plus", tint: micTint) }
+                    if oneRow && attaches { AttachmentMenu(items: $attachments, symbol: "plus", tint: micTint, handsFree: handsFree) }
                     field(top: oneRow ? 0 : 4)
                         .padding(.bottom, oneRow ? ComposerRow.lift : 0)
                         .padding(.top, oneRow ? ComposerRow.headroom : 0)
@@ -203,7 +233,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
             }
             if !oneRow {
                 HStack(spacing: 2) {
-                    if attaches { AttachmentMenu(items: $attachments, symbol: "plus", tint: micTint) }
+                    if attaches { AttachmentMenu(items: $attachments, symbol: "plus", tint: micTint, handsFree: handsFree) }
                     settings()
                     Spacer(minLength: 4)
                     if let toPage {
@@ -255,6 +285,18 @@ struct ComposerBar<Settings: View, Send: View>: View {
     }
 
     @ViewBuilder private var micAndSend: some View {
+        if let stop {
+            Button(action: stop) {
+                Image(systemName: "stop.fill").font(.footnote.weight(.bold))
+                    .frame(width: 34, height: 34)
+                    .background(.fill.secondary, in: .circle)
+                    .frame(width: ComposerRow.button, height: ComposerRow.button)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Stop")
+            .accessibilityIdentifier("composerStop")
+        }
         if let talk {
             HoldToTalkMic(talk: talk, prominent: prominentMic && empty && micTint == nil, themeTint: micTint)
         } else {

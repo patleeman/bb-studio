@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { expect, it } from "vitest";
 import { leavesFullSize } from "./whiteboard-expand";
 

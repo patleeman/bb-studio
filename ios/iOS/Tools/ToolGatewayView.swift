@@ -11,6 +11,7 @@ extension BBClient {
 /// requests waiting for approval. Adding, approving and changing happen on the
 /// desktop: those methods only answer the app window.
 struct ToolGatewayView: View {
+    @Environment(\.look) private var look
     @EnvironmentObject private var app: AppModel
     @State private var overview: Studio.ToolGatewayOverviewOutput?
     @State private var error: String?
@@ -40,7 +41,7 @@ struct ToolGatewayView: View {
                 if let servers = overview?.servers, !servers.isEmpty {
                     ForEach(servers, id: \.id) { server in
                         HStack(spacing: 10) {
-                            Circle().fill(Self.color(server.status, enabled: server.enabled ?? true)).frame(width: 8, height: 8)
+                            Circle().fill(Self.color(server.status, enabled: server.enabled ?? true, needsYou: look.needsYou)).frame(width: 8, height: 8)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(server.label ?? server.id ?? "Server")
                                 Text(Self.status(server)).font(.footnote).foregroundStyle(.secondary)
@@ -88,11 +89,11 @@ struct ToolGatewayView: View {
         }
     }
 
-    static func color(_ status: Studio.ToolGatewayOverviewOutputServersItemStatus?, enabled: Bool) -> Color {
+    static func color(_ status: Studio.ToolGatewayOverviewOutputServersItemStatus?, enabled: Bool, needsYou: Color) -> Color {
         guard enabled else { return .gray }
         switch status {
         case .running: return .green
-        case .needs_approval, .needs_sign_in, .starting: return .orange
+        case .needs_approval, .needs_sign_in, .starting: return needsYou
         case .error: return .red
         default: return .gray
         }

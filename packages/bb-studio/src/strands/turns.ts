@@ -19,6 +19,8 @@ export interface Turn {
   text: string;
   /** The reply's text so far (agent messages, in order). */
   reply: string;
+  /** The reply's last agent message: what the turn ends on, tagged needs-you or status. */
+  finalReply?: string;
   /** The seq of the reply's last agent message. */
   replySeq: number | null;
   /** The last seq that belongs to it. */
@@ -36,15 +38,16 @@ const QUIET_REPLY = /^\s*(?:\[PASS\]|PASS|\[SILENT\])?\s*$/i;
 /** A turn worth a strand: the user wrote it, or a report the reply says something about. */
 export function sortable(turn: Turn): boolean {
   if (turn.kind === "user") return true;
-  return !!turn.text.trim() && !QUIET_REPLY.test(turn.reply);
+  // A turn with no message but a reply the user reads (a background task finished, and the assistant reports on it) is sorted by its reply.
+  return !QUIET_REPLY.test(turn.reply);
+}
+
+/** A report the reply passes over quietly, but with something in it (a worker's plan, a relayed note): it still belongs somewhere in the tree. */
+export function quietReport(turn: Turn): boolean {
+  return turn.kind === "report" && !!turn.text.trim() && QUIET_REPLY.test(turn.reply);
 }
 
 interface Open { request: { seq: number; at: number; kind: "user" | "report" | "hidden"; text: string }; turn: Turn | null }
-
-/** The turns among `rows` (see turnsOf). */
-export function readTurns(rows: readonly EventRow[]): Turn[] {
-  return turnsOf(rows).turns;
-}
 
 /**
  * The turns among `rows` (in seq order). A request with no turn yet waits
@@ -112,6 +115,7 @@ export function turnsOf(rows: readonly EventRow[], options: { settled?: boolean;
       const message = messageText(row);
       if (message?.kind === "assistant") {
         turn.reply = [turn.reply, message.text].filter(Boolean).join("\n\n");
+        turn.finalReply = message.text;
         turn.replySeq = seq;
       }
     } else if (row.type === "turn/completed") {

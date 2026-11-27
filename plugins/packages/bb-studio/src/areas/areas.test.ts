@@ -3,11 +3,11 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MIGRATIONS } from "../migrations";
+import { migratedSqlDb } from "../test/migrated-db";
 import { AutomationTasks, parentIdOf, readSources, type AutomationBotInfo } from "../tasks/automations";
 import { TaskStore } from "../tasks/store";
 import { Areas, fileStat, leadsFrom, ownNameWords, readText, runnersFrom, type AreaCaller, type AreaDeps, type AreaLead } from "./areas";
-import { area as areaSchema, KEEP_AREA_RUNS, type Area } from "./contract";
+import { area as areaSchema, KEEP_AREA_RUNS } from "./contract";
 import { addressesUser, areaFolder, coversFromAreaMd, deriveStatus, nameWords, readStatusFile, readStatusNotes, runOutcome, sinceAt, sortAreas } from "./derive";
 import { registerAreas } from "./register";
 import { AreaStore } from "./store";
@@ -22,8 +22,7 @@ let dir: string;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
-  db = new Database(":memory:");
-  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
+  db = migratedSqlDb();
   dir = mkdtempSync(join(tmpdir(), "areas-"));
 });
 afterEach(() => {
@@ -318,15 +317,14 @@ describe("seed", () => {
 });
 
 describe("rpc and tools", () => {
-  it("registers areas.list, areas.get and the agent tools", async () => {
+  it("registers the agent tools and no RPCs (the Areas grid that read them is gone)", async () => {
     runner("run_sys", "Systems", "thr_sys", "Watch the server.");
     const { areas } = setup({ thr_sys: { kind: "runner", runnerId: "run_sys" } });
     areas.sync();
     const handlers: Record<string, (input: any) => Promise<any>> = {};
     const tools: Record<string, { execute(input: unknown, ctx: unknown): Promise<string> }> = {};
     registerAreas({ rpc: { register: (_c: unknown, map: typeof handlers) => Object.assign(handlers, map) }, agents: { registerTool: (tool: { name: string; execute(input: unknown, ctx: unknown): Promise<string> }) => { tools[tool.name] = tool; } } } as never, areas);
-    expect((await handlers["areas.list"]!({})).areas.map((a: Area) => a.name)).toEqual(["Systems"]);
-    expect((await handlers["areas.get"]!({ id: "Systems" })).area.ownerName).toBe("Systems runner");
+    expect(Object.keys(handlers)).toEqual([]);
     expect(JSON.parse(await tools.area_update!.execute({ status: "flagged", now: "Backup stuck." }, { threadId: "thr_sys" })).area).toMatchObject({ status: "flagged", now: "Backup stuck." });
     expect(await tools.area_get!.execute({ id: "nope" }, {})).toMatch(/^Error: No area/);
     expect(Object.keys(tools).sort()).toEqual(["area_get", "area_list", "area_update"]);
@@ -465,8 +463,8 @@ describe("the user's name in STATUS.md", () => {
 
 describe("an area's item that needs the user", () => {
   it("makes no task: there is no areas.itemTask, and the item stays on the card (the strand that holds the report shows it as needs you)", async () => {
-    const { areasContract } = await import("./contract");
-    expect(Object.keys(areasContract)).not.toContain("areas.itemTask");
+    const { rpcContract } = await import("../public-contract");
+    expect(Object.keys(rpcContract)).not.toContain("areas.itemTask");
     expect("itemTask" in Areas.prototype).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 public struct BBError: LocalizedError, Sendable {
     public var status: Int
@@ -89,6 +90,10 @@ public final class BBClient: @unchecked Sendable {
     fileprivate let session: URLSession
     fileprivate let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
+    /// Short-lived per-client cache of `/api/v1/system/execution-options` (static
+    /// provider/model catalog), keyed by providerId, so opening or swiping between
+    /// threads doesn't re-fetch it on every switch.
+    private let executionOptionsCache = OSAllocatedUnfairLock<[String: (at: ContinuousClock.Instant, value: ExecutionOptions)]>(initialState: [:])
 
     public init(baseURL: URL = BBClient.storedServerURL) {
         self.baseURL = baseURL
@@ -150,27 +155,55 @@ public final class BBClient: @unchecked Sendable {
 
     private struct RPCStatus: Decodable { var ok: Bool }
 
-    private struct RPCEnvelope<T: Decodable>: Decodable {
-        var result: T
-        private enum CodingKeys: String, CodingKey { case result }
+    private struct RPCResponse<T: Decodable>: Decodable {
+        var ok: Bool
+        var result: T?
+        private enum CodingKeys: String, CodingKey { case ok, result }
         init(from decoder: Decoder) throws {
-            // Even optional results require a result key. Only explicit null means no data.
-            result = try decoder.container(keyedBy: CodingKeys.self).decode(T.self, forKey: .result)
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            ok = try container.decode(Bool.self, forKey: .ok)
+            if ok {
+                // Even optional results require a result key. Only explicit null means no data.
+                result = try container.decode(T.self, forKey: .result)
+            } else {
+                result = nil
+            }
         }
     }
 
-    /// Shared status boundary for Codable and ordered RPC results.
+    private struct RPCOptionalResponse<T: Decodable>: Decodable {
+        var ok: Bool
+        var result: T?
+        private enum CodingKeys: String, CodingKey { case ok, result }
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            ok = try container.decode(Bool.self, forKey: .ok)
+            if ok {
+                result = try container.decode(T?.self, forKey: .result)
+            } else {
+                result = nil
+            }
+        }
+    }
+
+    /// Raw RPC call returning HTTP-checked response bytes.
+    private func rawRPC(_ pluginId: String, _ method: String, body data: Data) async throws -> (Int, Data) {
+        let (status, responseData) = try await raw(
+            method: "POST", path: "/api/v1/plugins/\(pluginId)/rpc/\(method)", body: data)
+        guard (200..<300).contains(status) else {
+            throw BBError(status: status, message: Self.errorMessage(responseData) ?? "\(pluginId).\(method) failed (HTTP \(status))")
+        }
+        return (status, responseData)
+    }
+
+    /// Shared status boundary for ordered RPC results.
     func rpcData(_ pluginId: String, _ method: String, _ input: JSONValue) async throws -> Data {
         try await rpcData(pluginId, method, body: try encoder.encode(input))
     }
 
     /// The same, for an input already encoded as JSON.
     func rpcData(_ pluginId: String, _ method: String, body data: Data) async throws -> Data {
-        let (status, responseData) = try await raw(
-            method: "POST", path: "/api/v1/plugins/\(pluginId)/rpc/\(method)", body: data)
-        guard (200..<300).contains(status) else {
-            throw BBError(status: status, message: Self.errorMessage(responseData) ?? "\(pluginId).\(method) failed (HTTP \(status))")
-        }
+        let (status, responseData) = try await rawRPC(pluginId, method, body: data)
         let envelope = try decoder.decode(RPCStatus.self, from: responseData)
         guard envelope.ok else {
             throw BBError(status: status, message: Self.errorMessage(responseData) ?? "\(pluginId).\(method) failed (HTTP \(status))")
@@ -179,15 +212,24 @@ public final class BBClient: @unchecked Sendable {
     }
 
     /// Calls a plugin's `bb.rpc` method: `POST /api/v1/plugins/<id>/rpc/<method>` with the raw input as the body.
+    /// Decodes `ok` and `result` in a single pass.
     public func rpc<T: Decodable>(_ pluginId: String, _ method: String, _ input: JSONValue = .null) async throws -> T {
-        let data = try await rpcData(pluginId, method, input)
-        return try decoder.decode(RPCEnvelope<T>.self, from: data).result
+        let (status, data) = try await rawRPC(pluginId, method, body: try encoder.encode(input))
+        let envelope = try decoder.decode(RPCResponse<T>.self, from: data)
+        guard envelope.ok, let result = envelope.result else {
+            throw BBError(status: status, message: Self.errorMessage(data) ?? "\(pluginId).\(method) failed (HTTP \(status))")
+        }
+        return result
     }
 
     /// For methods whose result can be `null`.
     public func rpcIfPresent<T: Decodable>(_ pluginId: String, _ method: String, _ input: JSONValue = .null) async throws -> T? {
-        let data = try await rpcData(pluginId, method, input)
-        return try decoder.decode(RPCEnvelope<T?>.self, from: data).result
+        let (status, data) = try await rawRPC(pluginId, method, body: try encoder.encode(input))
+        let envelope = try decoder.decode(RPCOptionalResponse<T>.self, from: data)
+        guard envelope.ok else {
+            throw BBError(status: status, message: Self.errorMessage(data) ?? "\(pluginId).\(method) failed (HTTP \(status))")
+        }
+        return envelope.result
     }
 
     static func errorMessage(_ data: Data) -> String? {
@@ -208,6 +250,10 @@ public final class BBClient: @unchecked Sendable {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
         components.scheme = components.scheme == "https" ? "wss" : "ws"
         components.path = "/ws"
+        // The thread list's "events appended" (several a second per running
+        // agent) only for threads this phone subscribes to; BB Studio's
+        // server honours it (`list-quiet.fork.ts`), others ignore it.
+        components.queryItems = [URLQueryItem(name: "listEvents", value: "status")]
         return components.url!
     }
 }
@@ -465,8 +511,20 @@ extension BBClient {
 
     // MARK: New-thread options
 
-    public func executionOptions(providerId: String? = nil) async throws -> ExecutionOptions {
-        try await get("/api/v1/system/execution-options" + (providerId.map { "?providerId=\($0)" } ?? ""))
+    /// Fetches `/api/v1/system/execution-options`. Pickers omit `cachedFor` so
+    /// permission ceiling, sign-in state, and custom models are always fresh;
+    /// display-only labels (e.g. `ThreadView`'s model chip) opt into a TTL cache.
+    public func executionOptions(providerId: String? = nil, cachedFor maxAge: Duration? = nil) async throws -> ExecutionOptions {
+        let key = providerId ?? ""
+        if let maxAge {
+            let now = ContinuousClock.now
+            if let hit = executionOptionsCache.withLock({ $0[key] }), now - hit.at < maxAge {
+                return hit.value
+            }
+        }
+        let fetched: ExecutionOptions = try await get("/api/v1/system/execution-options" + (providerId.map { "?providerId=\($0)" } ?? ""))
+        executionOptionsCache.withLock { $0[key] = (ContinuousClock.now, fetched) }
+        return fetched
     }
 
     public func projectDefaults(_ projectId: String) async throws -> ExecutionChoice? {

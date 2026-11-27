@@ -21,6 +21,9 @@ const composer = makeInstalledPlugin({
       sdkVersion: "0.4.27",
       compatible: true,
       runtimeSlots: ["zod"],
+      staticChunkUrls: [],
+      lazyChunkUrls: [],
+      lazyRuntimeSlots: [],
     },
   },
 });
@@ -56,9 +59,10 @@ describe("seedPluginListFromAppShell", () => {
 
     await expect(
       fetchFrontendCandidates(queryClient, "reuse-cached"),
-    ).resolves.toEqual([
-      { pluginId: "bb--composer", bundle: composer.app.bundle },
-    ]);
+    ).resolves.toEqual({
+      candidates: [{ pluginId: "bb--composer", bundle: composer.app.bundle }],
+      startingPluginIds: [],
+    });
     expect(networkFetch).toHaveBeenCalledTimes(1);
     expect(doc.getElementById(APP_SHELL_PLUGIN_LIST_ELEMENT_ID)).toBeNull();
   });

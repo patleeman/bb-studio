@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { expect, it, vi } from "vitest";
 import { NEW_TAB_ACTIONS, tabKindEntry } from "../tab-kinds";
 import { noteOpenedTab, openedTabs } from "./opened-tabs";
@@ -12,14 +11,12 @@ it("registers the Bot pages and the New … actions beside a conversation, named
     ["bot-skills", "Skills", "thread", "undefined"],
     ["library", "Library", "thread", "undefined"],
     ["bot-automations", "Scheduled", "thread", "undefined"],
-    ["loops", "Strands", "thread", "undefined"],
     ["archive", "Conversations", "thread", "undefined"],
     ["automation", "Automation", "thread", "undefined"],
     ["todo", "To-do", "thread", "undefined"],
-    ["memory-record", "Memory record", "thread", "undefined"],
     ...NEW_TAB_ACTIONS.filter((action) => action.create).map((action) => [action.tabId, action.title, "thread", "function"]),
   ]);
-  expect(tabs.filter((tab) => "experimental_showInNewTab" in tab).map((tab) => tab.id)).toEqual(["bot-automations", "automation", "todo", "memory-record"]);
+  expect(tabs.filter((tab) => "experimental_showInNewTab" in tab).map((tab) => tab.id)).toEqual(["bot-automations", "automation", "todo"]);
 });
 
 it("opens what a New … action made as a tab beside the conversation, else in the main view", () => {

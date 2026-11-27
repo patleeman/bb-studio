@@ -35,7 +35,7 @@ describe("reading turns from events", () => {
 
 const strand = (over: Partial<Strand> = {}): Strand => ({
   id: "s1", threadId: "t", title: "Model router", summary: null, named: true, nameTries: 0, summaryAt: null, firstSeq: 1, lastSeq: 1, lastAt: NOW - HOUR,
-  pinned: false, mergedInto: null, origin: "jev", taskId: null, waitingOn: null, waitingAt: null, doneAt: null, openedAt: null, createdAt: NOW - HOUR, ...over,
+  pinned: false, mergedInto: null, origin: "jev", taskId: null, waitingOn: null, waitingAt: null, doneAt: null, openedAt: null, createdAt: NOW - HOUR, parentId: null, trunk: false, ...over,
 });
 const signals = (over: Partial<Signals> = {}): Signals => ({ now: NOW, runningStrandId: null, workers: [], asks: [], tasks: [], ...over });
 
@@ -172,8 +172,8 @@ describe("strands.list", () => {
     asks.thr_worker = [{ id: "int_2", status: "pending", payload: { kind: "user_question", questions: [{ prompt: "Which fallback model?" }] } as never }];
     const list = await x.svc.list(x.thread.id);
     expect(list.strands.map((each) => [each.title, each.state])).toEqual([["Book the dentist", "needs-you"], ["Look at the router", "needs-you"]]);
-    expect(list.strands[0]!.asks).toEqual([{ id: "int_1", kind: "approval", threadId: "thr_main", label: "Approve: npm publish", details: ["Command: npm publish"], decisions: ["deny", "allow_once"], turnId: expect.any(String) }]);
-    expect(list.strands[1]!.asks).toEqual([{ id: "int_2", kind: "question", threadId: "thr_worker", label: "Router fix: Which fallback model?", details: [], decisions: [], turnId: null }]);
+    expect(list.strands[0]!.asks).toEqual([{ id: "int_1", kind: "approval", threadId: "thr_main", label: "Approve: npm publish", details: ["Command: npm publish"], decisions: ["deny", "allow_once"], turnId: expect.any(String), seq: null }]);
+    expect(list.strands[1]!.asks).toEqual([{ id: "int_2", kind: "question", threadId: "thr_worker", label: "Router fix: Which fallback model?", details: [], decisions: [], turnId: null, seq: null }]);
   });
 
   it("puts a worker's completion notice into the worker's strand, without asking Jev", async () => {
@@ -210,7 +210,13 @@ describe("strands.list", () => {
     const b = x.thread.turn("thanks", "Sure.");
     await x.svc.idle(x.thread.id);
     const { tags, strands } = x.svc.tags(x.thread.id);
-    expect(tags).toEqual([{ turnId: a.turnId, seq: a.seq, strandId: strands[0]!.id }, { turnId: b.turnId, seq: b.seq, strandId: null }]);
+    expect(tags).toMatchObject([{ turnId: a.turnId, seq: a.seq, strandId: strands[0]!.id, kind: "user", line: "Look at the router", also: [] }, { turnId: b.turnId, seq: b.seq, strandId: null, kind: "user", line: "thanks", also: [] }]);
+    expect(typeof tags[0]!.at).toBe("number");
+    expect(strands[0]).toEqual({ id: strands[0]!.id, title: strands[0]!.title, done: false, parentId: null, trunk: false });
+    // The opening message, with its turn's reply (a filter never shows the opening message; a jump lands on the reply).
+    const opening = x.svc.tags(x.thread.id).opening;
+    expect(opening?.seq).toBe(a.seq);
+    expect(opening?.replySeq).toBeGreaterThan(a.seq);
   });
 });
 
@@ -232,5 +238,58 @@ describe("bb studio strands", () => {
     expect(json.items).toHaveLength(2);
     expect((await runStrandsCli(["--items", "lots"], deps)).exitCode).toBe(1);
     expect((await runStrandsCli(["--bogus"], deps)).exitCode).toBe(1);
+  });
+});
+
+describe("strands.overview and list concurrency", () => {
+  it("calls busy() once per list() and reads multiple conversations concurrently while preserving order", async () => {
+    const db = database();
+    const busyCalls: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const threads = ["thr_1", "thr_2", "thr_3"];
+    const svc = new StrandService({
+      db,
+      conversation: (id) => (threads.includes(id) ? { botId: "bot", lastActiveAt: NOW } : null),
+      conversationsOf: async () => [
+        { threadId: "thr_1", title: "One", isMain: false, lastActiveAt: NOW - 1_000 },
+        { threadId: "thr_2", title: "Two", isMain: false, lastActiveAt: NOW - 2_000 },
+        { threadId: "thr_3", title: "Three", isMain: false, lastActiveAt: NOW - 3_000 },
+      ],
+      events: async () => [],
+      jev: fakeJev(),
+      model: fakeModel(),
+      changed: () => {},
+      log: () => {},
+      now: () => NOW,
+      setTimer: () => null,
+      clearTimer: () => {},
+      workers: async () => [],
+      interactions: async () => [],
+      busy: async (threadId) => {
+        busyCalls.push(threadId);
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((r) => setTimeout(r, 20));
+        inFlight -= 1;
+        return false;
+      },
+    });
+    for (const id of threads) {
+      svc.store.saveRead(id, { backfill: JSON.stringify({ at: NOW }) });
+      svc.store.create({ threadId: id, title: `Strand ${id}`, origin: "user", seq: 1, at: NOW - 1_000 });
+    }
+
+    // Single list() must call busy() only once (not twice).
+    await svc.list("thr_1");
+    expect(busyCalls).toEqual(["thr_1"]);
+
+    // overview() must read the 3 conversations concurrently and preserve order.
+    busyCalls.length = 0;
+    maxInFlight = 0;
+    const ov = await svc.overview("bot");
+    expect(maxInFlight).toBeGreaterThanOrEqual(2);
+    expect(busyCalls.sort()).toEqual(["thr_1", "thr_2", "thr_3"]);
+    expect(ov.conversations.map((c) => c.threadId)).toEqual(["thr_1", "thr_2", "thr_3"]);
   });
 });

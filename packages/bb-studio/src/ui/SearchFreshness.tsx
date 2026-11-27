@@ -1,4 +1,5 @@
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
+import { visiblePoll } from "../kit/app/visible-poll";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import type { rpcContract, SearchStatus } from "../contract";
@@ -26,8 +27,8 @@ export function useSearchFreshness(enabled = true) {
     };
     void refresh();
     // Also catch missed realtime events, including recovery while this view is open.
-    const timer = setInterval(() => { void refresh(); }, 3_000);
-    return () => { live = false; clearInterval(timer); };
+    const stop = visiblePoll(() => { void refresh(); }, 3_000);
+    return () => { live = false; stop(); };
   }, [rpc, enabled, signal]);
   const retry = async () => {
     if (retrying) return;

@@ -1,5 +1,11 @@
-import { BlockNoteSchema, defaultBlockSpecs, defaultInlineContentSpecs } from "@blocknote/core";
-import { createReactBlockSpec, createReactInlineContentSpec } from "@blocknote/react";
+import { BlockNoteSchema, createImageBlockConfig, defaultBlockSpecs, defaultInlineContentSpecs, imageParse } from "@blocknote/core";
+import {
+  createReactBlockSpec,
+  createReactInlineContentSpec,
+  ImagePreview,
+  ImageToExternalHTML,
+  ResizableFileBlockWrapper,
+} from "@blocknote/react";
 import { useEffect, useState, type ReactNode } from "react";
 import { PRIMARY_BUTTON, studioItemProps, studioThreadProps, wantsAlternate } from "../../kit/app/index";
 import { Icon } from "../../kit/ui/index";
@@ -12,6 +18,7 @@ import { pagePath } from "../constants";
 import { codeBlockSpec } from "./code";
 import { usePagesUi } from "./context";
 import { HtmlBlock } from "./html";
+import { PAGE_IMAGE_OPEN_EVENT } from "./image-lightbox";
 import { MermaidBlock } from "./mermaid";
 import { StudioEmbed, StudioPicker, useStudioItem } from "./studio-embeds";
 
@@ -429,6 +436,40 @@ function MentionChip({ kind, target, label }: { kind: keyof typeof MENTION_ICONS
   );
 }
 
+/**
+ * BlockNote's image block with an expand button that opens the image in the
+ * lightbox (image-lightbox.tsx). A click still selects the image for resizing
+ * and its caption; a double-click on it also opens the lightbox (PageEditor).
+ * Same type and props as BlockNote's, so saved pages are unchanged.
+ */
+const PageImageBlock = createReactBlockSpec(createImageBlockConfig, (config) => ({
+  meta: { fileBlockAccept: ["image/*"] },
+  render: (props) => (
+    <ResizableFileBlockWrapper {...(props as unknown as Parameters<typeof ResizableFileBlockWrapper>[0])} buttonIcon={<Icon name="studio/artifact-image" className="size-6" />}>
+      <ImagePreview {...(props as unknown as Parameters<typeof ImagePreview>[0])} />
+      <button
+        type="button"
+        aria-label="Expand image"
+        title="Expand (or double-click the image)"
+        className="pages-image-expand"
+        contentEditable={false}
+        // Not a click on the image: the editor neither selects nor drags it.
+        onMouseDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          event.currentTarget.dispatchEvent(new CustomEvent(PAGE_IMAGE_OPEN_EVENT, { bubbles: true }));
+        }}
+      >
+        <Icon name="Maximize2" className="size-3.5" />
+      </button>
+    </ResizableFileBlockWrapper>
+  ),
+  parse: imageParse(config),
+  toExternalHTML: ImageToExternalHTML as never,
+  runsBefore: ["file"],
+}));
+
 const Mention = createReactInlineContentSpec(mentionConfig, {
   render: ({ inlineContent }) => (
     <MentionChip kind={inlineContent.props.kind} target={inlineContent.props.target} label={inlineContent.props.label} />
@@ -438,6 +479,7 @@ const Mention = createReactInlineContentSpec(mentionConfig, {
 export const pageSchema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
+    image: PageImageBlock(),
     codeBlock: codeBlockSpec,
     mermaid: MermaidBlock(),
     html: HtmlBlock(),

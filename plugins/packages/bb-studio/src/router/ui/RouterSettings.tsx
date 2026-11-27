@@ -3,6 +3,7 @@
 import { experimental_ProviderModelPicker as ProviderModelPicker, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Textarea } from "../../kit/ui/index";
+import { errorMessage as errorText } from "../../kit/format";
 import { toReasoningLevelOrNull } from "../../kit/reasoning";
 import { Card, Row, SubHeading, Switch } from "../../settings/ui/controls";
 import type { rpcContract as decisionsContract } from "../../decisions/contract";
@@ -12,10 +13,6 @@ import { AUTO_ID, MAX_RULES, type Decision, type Policy, type Rule, type Target,
 function unlabeled<T extends { label?: string }>(target: T): Omit<T, "label"> {
   const { label: _label, ...rest } = target;
   return rest;
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function newRuleId(rules: readonly Rule[]): string {
@@ -31,7 +28,58 @@ function moved<T>(list: readonly T[], from: number, to: number): T[] {
   return next;
 }
 
-type Problems = ReadonlyMap<string, string>;
+/** What Settings says beside a chain's model: why Auto skips it, or (readiness unknown) that it comes after the ready ones. */
+/**
+ * A chain entry after the picker reports a value, or null when nothing changed.
+ * The picker reports what it shows when it opens (a null reasoning level shows
+ * as "medium"), which must not rewrite the saved entry. The same model keeps
+ * its label.
+ */
+export function pickerChange(target: Target, next: { providerId: string; model: string; reasoningLevel: string }): Target | null {
+  const sameModel = next.providerId === target.providerId && next.model === target.model;
+  if (sameModel && next.reasoningLevel === (target.reasoningLevel ?? "medium")) return null;
+  const reasoningLevel = toReasoningLevelOrNull(next.reasoningLevel);
+  return { providerId: next.providerId, model: next.model, reasoningLevel, ...(sameModel && target.label ? { label: target.label } : {}) };
+}
+
+/**
+ * One chain entry's picker. The picker also reports values on its own when it
+ * opens: its default reasoning level, or another provider or model when the
+ * saved one isn't offered (an agent that isn't installed, a retired model).
+ * Those must not rewrite the saved entry, so reports count only once the
+ * person has pressed or typed in this picker.
+ */
+/** How soon after a press or key in a chain entry's picker its report counts as the person's pick. */
+export const PICK_WINDOW_MS = 2_000;
+
+export function TargetPicker({ target, disabled, onChange, onAuto, now = Date.now }: { target: Target; disabled: boolean; onChange(next: Target): void; onAuto(): void; now?: () => number }) {
+  // When the person last pressed or typed in this picker (the open menu's events reach here through React's portal), or null.
+  // A pick reports right after that press; the mark is cleared by the pick, by Escape, and by time, so a menu closed without a
+  // pick leaves nothing for a later fallback report (provider states refreshing) to ride on.
+  const touched = useRef<number | null>(null);
+  const touch = (event: { nativeEvent: Event }) => {
+    touched.current = (event.nativeEvent as KeyboardEvent).key === "Escape" ? null : now();
+  };
+  return (
+    <span className="contents" onPointerDownCapture={touch} onKeyDownCapture={touch} data-testid="router-target-picker">
+      <ProviderModelPicker
+        disabled={disabled}
+        align="start"
+        value={{ providerId: target.providerId, model: target.model, reasoningLevel: target.reasoningLevel ?? "medium" }}
+        onChange={(next) => {
+          const at = touched.current;
+          if (at === null || now() - at > PICK_WINDOW_MS) return;
+          touched.current = null;
+          if (next.providerId === AUTO_ID) return onAuto();
+          const update = pickerChange(target, next);
+          if (update) onChange(update);
+        }}
+      />
+    </span>
+  );
+}
+
+type Problems = ReadonlyMap<string, { problem: string | null; note?: string }>;
 const problemKey = (target: Pick<Target, "providerId" | "model">) => `${target.providerId}\0${target.model}`;
 
 function Chain({ chain, disabled, onChange, starter, problems }: { chain: readonly Target[]; disabled: boolean; onChange(next: Target[]): void; starter(): Promise<Target | null>; problems: Problems }) {
@@ -48,21 +96,22 @@ function Chain({ chain, disabled, onChange, starter, problems }: { chain: readon
         {chain.map((target, index) => (
           <li key={`${index}:${target.providerId}:${target.model}`} className="flex flex-wrap items-center gap-2" data-testid="router-chain-target">
             <span className="w-5 text-right text-xs text-muted-foreground">{index + 1}.</span>
-            <ProviderModelPicker
+            <TargetPicker
+              target={target}
               disabled={disabled}
-              align="start"
-              value={{ providerId: target.providerId, model: target.model, reasoningLevel: target.reasoningLevel ?? "medium" }}
-              onChange={(next) => {
-                if (next.providerId === AUTO_ID) return setError("A chain names real models, not Auto.");
+              onAuto={() => setError("A chain names real models, not Auto.")}
+              onChange={(update) => {
                 setError(null);
-                onChange(chain.map((each, at) => at === index ? { providerId: next.providerId, model: next.model, reasoningLevel: toReasoningLevelOrNull(next.reasoningLevel) } : each));
+                onChange(chain.map((each, at) => at === index ? update : each));
               }}
             />
             <Button type="button" size="sm" variant="ghost" disabled={disabled || index === 0} aria-label="Move up" onClick={() => onChange(moved(chain, index, index - 1))}>↑</Button>
             <Button type="button" size="sm" variant="ghost" disabled={disabled || index === chain.length - 1} aria-label="Move down" onClick={() => onChange(moved(chain, index, index + 1))}>↓</Button>
             <Button type="button" size="sm" variant="ghost" disabled={disabled} aria-label="Remove model" onClick={() => onChange(chain.filter((_, at) => at !== index))}>Remove</Button>
-            {problems.get(problemKey(target)) ? (
-              <span className="text-xs text-warning" data-testid="router-target-problem">Skipped: {problems.get(problemKey(target))}</span>
+            {problems.get(problemKey(target))?.problem ? (
+              <span className="text-xs text-warning" data-testid="router-target-problem">Skipped: {problems.get(problemKey(target))?.problem}</span>
+            ) : problems.get(problemKey(target))?.note ? (
+              <span className="text-xs text-muted-foreground" data-testid="router-target-note">{problems.get(problemKey(target))?.note}</span>
             ) : null}
           </li>
         ))}
@@ -97,7 +146,9 @@ function describe(decision: Decision): string {
   const confidence = decision.confidence === null ? "" : ` ${Math.round(decision.confidence * 100)}%`;
   const target = decision.target ? (decision.target.label ?? decision.target.model) : "BB's default";
   const skipped = decision.skipped.length ? ` · skipped ${decision.skipped.map((each) => `${each.target.label ?? each.target.model} (${each.why})`).join(", ")}` : "";
-  return `${rule} (${via}${confidence}, ${decision.ms} ms) → ${target}${skipped}`;
+  const lean = decision.lean ? " · Lean tools" : "";
+  const note = decision.note ? ` · ${decision.note}` : "";
+  return `${rule} (${via}${confidence}, ${decision.ms} ms) → ${target}${lean}${skipped}${note}`;
 }
 
 function TryIt() {
@@ -133,7 +184,7 @@ export function RouterSettingsSection() {
 
   const check = useCallback(() => {
     void rpc.call("router.targets.check", null).then(
-      (checks: TargetCheck[]) => setProblems(new Map(checks.filter((each) => each.problem).map((each) => [problemKey(each), each.problem as string]))),
+      (checks: TargetCheck[]) => setProblems(new Map(checks.filter((each) => each.problem || each.note).map((each) => [problemKey(each), { problem: each.problem, note: each.note }]))),
       () => setProblems(new Map()),
     );
   }, [rpc]);

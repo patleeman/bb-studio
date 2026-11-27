@@ -1,7 +1,7 @@
 // Strands in Studio's server: BB's thread events drive the detector, the
 // backfill runs once per conversation a little after start, and the
 // strands.* RPCs and `bb studio strands` read it.
-import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { experimental_PluginRpcRefusal, type BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { primaryHostId } from "../kit/server/project";
@@ -11,6 +11,7 @@ import { EVENT_TYPES, type EventRow } from "./turns";
 import { JEV_TIMEOUT_MS, STRANDS_CALLER } from "./detector";
 import { StrandService, type WorkerFact } from "./service";
 import { StrandStore } from "./store";
+import { isAppWindow } from "../tool-gateway/server/caller";
 import type { Interaction } from "../worker-approvals";
 
 type Failure = { ok: false; unavailable: boolean; error: string };
@@ -34,6 +35,8 @@ export interface StrandsRegisterDeps {
   extraAsks?(threadId: string): { id: string; kind: "area" | "flag"; label: string; at: number }[];
   /** Secret values to keep out of what strands send and keep: Studio's API keys, Tool Gateway's secrets. */
   secrets(): Promise<readonly string[]>;
+  /** The Studio setting strands_richSorting. */
+  richSorting?(): boolean;
   log(message: string): void;
 }
 
@@ -58,24 +61,25 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
     db,
     conversation: deps.conversation,
     conversationsOf: deps.conversationsOf,
-    events: async ({ threadId, afterSeq, beforeSeq, order, limit }) => await bb.sdk.threads.events.list({
-      threadId, order, limit: String(limit), types: [...EVENT_TYPES],
+    events: async ({ threadId, afterSeq, beforeSeq, order, limit, types }) => await bb.sdk.threads.events.list({
+      threadId, order, limit: String(limit), types: [...(types ?? EVENT_TYPES)],
       ...(afterSeq !== undefined ? { afterSeq: String(afterSeq) } : {}), ...(beforeSeq !== undefined ? { beforeSeq: String(beforeSeq) } : {}),
     } as never) as unknown as EventRow[],
     jev: (input) => deps.decisions.systemOne({ ...input, questions: input.questions as never }, AbortSignal.timeout(JEV_TIMEOUT_MS)),
     secrets: deps.secrets,
+    richSorting: deps.richSorting,
     ...(completeText ? {
-      completeText: async ({ prompt }: { prompt: string }) => {
-        const result = await completeText({ prompt, timeoutMs: 8_000 });
+      completeText: async ({ prompt, signal }: { prompt: string; signal?: AbortSignal }) => {
+        const result = await completeText({ prompt, timeoutMs: 8_000, ...(signal ? { signal } : {}) });
         return result.ok ? { ok: true as const, text: result.text } : { ok: false as const, error: result.message ?? result.reason ?? "no answer" };
       },
     } : {}),
-    model: async ({ threadId, requestId, prompt }) => {
+    model: async ({ threadId, requestId, prompt, signal }) => {
       const hostId = await primaryHostId(bb).catch(() => null);
       if (!hostId) return { ok: false, unavailable: true, error: "BB has no primary host to run the model on." };
       // In Decisions' "thread" mode the model follows the conversation's provider.
       const providerId = (await threadOf(threadId))?.providerId ?? null;
-      return deps.decisions.model({ caller: STRANDS_CALLER, requestId, hostId, prompt, providerId });
+      return deps.decisions.model({ caller: STRANDS_CALLER, requestId, hostId, prompt, providerId }, signal);
     },
     workers: deps.workers,
     interactions: async (threadId) => {
@@ -102,6 +106,12 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
     "strands.items": ({ threadId, limit }) => ({ items: service.items(threadId, limit ?? 200) }),
     "strands.tags": ({ threadId }) => service.tags(threadId),
     "strands.opened": ({ strandId }) => ({ ok: service.opened(strandId) }),
+    // Done is the user's own, from Studio's app window: not an agent's, the CLI's or another plugin's.
+    "strands.resolveReply": ({ threadId, seq }, context?: unknown) => {
+      if (!isAppWindow(context)) throw new experimental_PluginRpcRefusal({ code: "forbidden", message: "Mark it done in the BB Studio app on this Mac." });
+      return { ok: service.resolveReply(threadId, seq) };
+    },
+    "strands.replyPush": ({ threadId, waitMs, requestSeq }) => service.replyPush(threadId, waitMs ?? 20_000, requestSeq ?? null),
     "strands.overview": ({ botId }) => service.overview(botId),
     "strands.move": ({ threadId, seq, strandId }) => ({ ok: service.move(threadId, seq, strandId) }),
     "strands.split": ({ threadId, seq }) => { const strandId = service.split(threadId, seq); return { ok: !!strandId, strandId }; },

@@ -46,6 +46,11 @@ This index lists every command path that the core CLI registers, including alias
 - `bb project source add`
 - `bb project source update`
 - `bb project source delete`
+- `bb project folder`
+- `bb project folder list`
+- `bb project folder add`
+- `bb project folder update`
+- `bb project folder remove`
 - `bb project attachment`
 - `bb project attachment upload`
 - `bb project attachment download`
@@ -105,6 +110,11 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 ## server
 
 - `bb server`
+- `bb server access`
+- `bb server access list`
+- `bb server access add`
+- `bb server access remove`
+- `bb server access order`
 - `bb server mirror`
 - `bb server mirror status`
 - `bb server mirror sync`
@@ -120,6 +130,8 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb server unlock`
 - `bb server allow-connect`
 - `bb server delete-old-copy`
+- `bb server sweeps`
+- `bb server sweeps retry`
 - `bb server install-machine-service`
 
 ## updates
@@ -198,6 +210,8 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb thread archive`
 - `bb thread unarchive`
 - `bb thread restore-environment`
+- `bb thread export`
+- `bb thread import`
 - `bb thread pin`
 - `bb thread unpin`
 - `bb thread regenerate-title`
@@ -215,9 +229,14 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb thread clear`
 - `bb thread cancel-plan`
 - `bb thread clear-goal`
+- `bb thread background-tasks`
+- `bb thread background-tasks list`
+- `bb thread background-tasks stop`
 - `bb thread interactions`
 - `bb thread interactions list`
 - `bb thread interactions show`
+- `bb thread move-provider`
+- `bb thread move-provider status`
 - `bb thread interactions approve`
 - `bb thread interactions grant`
 - `bb thread interactions answer`
@@ -228,10 +247,12 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 
 - `bb environment`
 - `bb environment providers`
+- `bb environment create`
 - `bb environment list`
 - `bb environment delete`
 - `bb environment cleanup`
 - `bb environment show`
+- `bb environment repos`
 - `bb environment get`
 - `bb environment paths`
 - `bb environment update`
@@ -277,6 +298,7 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb plugin types`
 - `bb plugin migrate`
 - `bb plugin build`
+- `bb plugin publish`
 - `bb plugin dev`
 - `bb plugin reload`
 - `bb plugin rpc`
@@ -298,6 +320,8 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 
 - `bb marketplace`
 - `bb marketplace add`
+- `bb marketplace disable`
+- `bb marketplace enable`
 - `bb marketplace list`
 - `bb marketplace refresh`
 - `bb marketplace remove`

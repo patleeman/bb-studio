@@ -270,6 +270,47 @@ group row while the context is on (`useTimelineFilterExpandsRow`);
 `useQuietReply` (`lib/fork-reply-classifiers.ts`) and `useRelayedFold`
 (`relayedFold.fork.tsx`) read the same context.
 
+**Folded runs.** A registration may also give `folds(threadId)`: runs to
+fold, each `{ id, turnIds, label }` (Studio's runs of status replies), and
+`expandFold(threadId, id)`, called when the user opens one. While no filter
+is on, `useRelayedFold` (`relayedFold.fork.tsx`) applies them after its own
+folds (`turnRunFold.fork.tsx`): the rows of a fold's turns, and rows of no
+turn between two of them, give way to one line (`TurnRunMarkerLine`) in place
+of the run's first message that isn't a quiet reply. It never hides another
+turn's rows, or what the relayed fold keeps (errors, alerts, warnings, rows
+still running); a message the user typed ends the run there. A fold holding
+the message a link or search points at (`#msg=`, search state) stays open,
+and `expandFold` is called for it, so a jump never lands on a hidden row (the
+target's rows come from the core's own `collectSearchedMessageAncestorRowIds`,
+only for a link into the list's own thread; a relayed group holding the target
+stays unfolded too). When bb folds fewer turns than a fold lists, the line is
+the fold's optional `labelFor(turnIds folded)`, else its `label`. The
+first registration that returns folds wins; folds that throw or are malformed
+count as none and are logged once (each returned array is checked once). No core file changed: the
+fold runs inside the relayed fold's existing hook and row wrapper.
+
+**Semantic zoom.** A registration may also give `zoom: { level(threadId),
+View }`. While `level` returns more than 0, `withTimelineFilter`
+(`timelineFilter.fork.tsx`) draws only the error rows of the turns since the
+user's last message (a turn failing while zoomed out still says so): `View`
+leads the timeline surface (mounted as the plugin's slot), and the surface's
+own status stays under it (host disconnected, load error, working or
+thinking, Stop requested, catch-up). `View` gets `{ threadId, level, anchorSeq, latestUserSeq }`:
+`anchorSeq` is the message that was at the middle of the scroll viewport when
+the thread left level 0 (read through a ref on the wrapper when the level
+changes, before the redraw); `latestUserSeq` is the newest message the user
+typed, so a plugin can go back to the messages when the user sends. A `View`
+that crashes gives the thread its timeline back until the next zoom-out;
+a `level` that throws counts as 0 and is logged once. Zooming back in is the
+plugin's: level 0 and the message's `#msg=` link, which scrolls there and
+opens any fold holding it. The first registration with `zoom` wins.
+`experimental_timelineFilter` answers `{ folds: true, zoom: true }`
+(`ExperimentalTimelineFilterHost`), so a plugin can tell this bb from one that
+takes the registration and drops `zoom` (that one answers nothing). No core
+file changed. Plugin commands that zoom should avoid Option with punctuation:
+on a Mac it turns "-" into "–", which bb's shortcut matcher can't map back
+(`fork-zoom-shortcuts.test.ts` pins ⌃⌘− / ⌃⌘=).
+
 **Why not upstream's own API.** No add-in point can hide timeline rows or
 open collapsed ones; the timeline windows only the rows it has and pages
 them in one run.
@@ -677,19 +718,23 @@ chat on Main.
 ## A thread header's title and a node after it (`slots.experimental_threadHeader`)
 
 A plugin's `useDecoration({ threadId })` hook runs in every thread header
-(main view and split panes). It returns null or `{ title?, after? }`:
+(main view and split panes). It returns null or `{ title?, after?, end? }`:
 `title` replaces the title text bb shows, `after` is drawn right after the
-title in the same row. The first plugin by id, then registration id, that
+title in the same row, and `end` is drawn at the header's right end, first
+among bb's own header actions. Both `after` and `end` sit in spans carved out
+of the desktop window's drag strip (`MACOS_WINDOW_NO_DRAG_CLASS`), so their
+controls take clicks instead of dragging the window. The first plugin by id, then registration id, that
 returns a decoration wins. Renaming (double click, the ··· menu, the
 shortcut) edits and saves the thread's real title; the decoration only
 changes what is shown. Each hook runs in its own error boundary; one that
 throws is dropped and bb's title stays. Studio is the caller: "Main · with
-<Bot>" for a Bot's chat thread, and a worker's status pill and repo tag in
-the row.
+<Bot>" for a Bot's chat thread, a worker's status pill and repo tag in
+the row, and the semantic-zoom controls at the end.
 
 **Core callers.** `components/fork/ForkThreadHeader.tsx`
 (`useForkThreadHeader`), called from `ThreadDetailHeader.tsx`, which draws
-the returned title and `after` node.
+the returned title, the `after` node after it and the `end` node first in
+its workflow actions.
 
 **Audit before stabilizing.**
 
@@ -823,6 +868,20 @@ a session is constructed.
 2. The 500 ms wait adds latency to every turn start while any provider is
    registered; decide on a per-plugin budget or a cached value.
 3. Decide whether steers and queued drains should get it too.
+4. **Provider move.** While a thread's newest `thread/provider-move`
+   operation (`thread-provider-move.fork.ts`) has no `turn/started` after
+   it, providers get `providerMove: { operationId, from, to, historyTokens,
+   at }` only for plugins registered with `{ providerMove: true }`, a 5 s
+   wait and one budget of about `historyTokens` × 4 characters shared by
+   them (ceiling 1.2M, `BB_PROVIDER_MOVE_CONTEXT_MAX_CHARS`), placed before
+   the user's message; the move stays pending until a real turn completes. Decide
+   whether a move should be a first-class event type instead of a
+   `system/operation`, and whether core should build the history itself.
+5. `experimental_moveThreadProvider(threadId, request)` on
+   `bb.experimental_hooks` runs the move in process for a plugin (Studio's
+   bulk move) and returns a result union, not typed errors. Decide whether
+   it belongs on `bb.sdk.threads` instead, and whether plugins should be
+   allowed an explicit `full`.
 
 ## Auto router (`bb.experimental_hooks.experimental_autoRouter`)
 
@@ -1681,3 +1740,23 @@ escalation), the SDK's `sendJson`.
 message API too, whether `source` should be an enum, and whether
 `experimental_features` should become a general capability list.
 
+
+## Deferred tool loading (`experimental_features.deferredAgentTools`, `x-bb-defer-loading`)
+
+A plugin's `configure()` can mark a tool it offers for deferred loading: the
+tool's `{ name, parameters }` entry carries the JSON Schema vendor key
+`x-bb-defer-loading` at the top of `parameters`: `true`, or a namespace name
+(Studio uses `"studio"`). BB passes the override through as the tool's
+inputSchema; provider-codex removes the key and puts the tool, with
+`deferLoading: true`, in a Codex namespace of that name (`bb` for `true`),
+since Codex takes deferred tools only inside a namespace. Codex lists the
+namespace and loads a tool's schema through tool_search when the model needs
+it; its call names the bare tool. Only on Codex 0.171.0 and up (the version its
+app-server reports at initialize); on an older or unknown Codex the key is
+removed and the tool goes eagerly.
+`bb.experimental_hooks.experimental_features.deferredAgentTools` (true) says
+the host supports it. Studio uses it for its on-demand tools in Codex
+sessions (plugins/packages/bb-studio/src/tool-scope.ts). Before promoting:
+decide whether this should be a first-class `defer` field on configure()'s
+tool entries (it would touch the SDK normalizer, the plugin service and
+`dynamicToolSchema`) rather than a schema key.

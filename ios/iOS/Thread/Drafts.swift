@@ -15,10 +15,12 @@ enum Drafts {
     }
 
     static func save(_ threadId: String, text: String, mentions: [Mention], serverURL: URL) {
+        let key = ServerScope.key("draft.\(threadId)", serverURL: serverURL)
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            defaults.removeObject(forKey: ServerScope.key("draft.\(threadId)", serverURL: serverURL))
-        } else if let data = try? JSONEncoder().encode(Draft(text: text, mentions: mentions)) {
-            defaults.set(data, forKey: ServerScope.key("draft.\(threadId)", serverURL: serverURL))
+            if defaults.object(forKey: key) != nil { defaults.removeObject(forKey: key) }
+        } else if let data = try? JSONEncoder().encode(Draft(text: text, mentions: mentions)),
+                  defaults.data(forKey: key) != data {
+            defaults.set(data, forKey: key)
         }
     }
 

@@ -1,7 +1,8 @@
-// Memory's RPC contract (README "Memory" has the request and response
-// shapes). Every method takes an optional `botId`; without one it acts on
-// the primary Bot. External Bots (Studio Agents) keep their own memory, so
-// every method refuses them.
+// Memory's RPC contract, kept for the phone app (./register.ts). Memory
+// records are retired: list and get find none, add, update and archive
+// refuse, and the "profile" is the Bot's always-on skills. Every method takes
+// an optional `botId`; without one it acts on the primary Bot. External Bots
+// (Studio Agents) keep their own memory, so every method refuses them.
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { MEMORY_SOURCE_KINDS } from "./shared";

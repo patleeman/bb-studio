@@ -44,7 +44,7 @@ struct TranscriptChrome: Equatable {
 
 /// The "jump to latest" pill: shown while the reader is up in the history,
 /// with how many rows came in meanwhile.
-struct TranscriptPillState: Equatable {
+struct TranscriptPillState: Equatable, Hashable {
     var shown = false
     var unseen = 0
     /// The app's word for something waiting at the end (a question), shown
@@ -150,6 +150,17 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private var hasTop = false
     private var appearedAt: TimeInterval?
     private var accessibilityTurnedOnBeforeAppearing = false
+
+    /// Which conversation this is, for its reading spot: a transcript rebuilt
+    /// in place (the Duo folding or unfolding, the window resizing) opens
+    /// where the one it replaces was, not at the end. Nil: always the end.
+    var spotKey: String?
+    /// The spot to open at, once its row is laid out.
+    private var pendingSpot: TranscriptReadingSpots.Spot?
+    /// The restored spot, held while the rows above it measure themselves
+    /// (their heights at this width aren't known yet), until a touch or this time.
+    private var spotHold: (spot: TranscriptReadingSpots.Spot, until: TimeInterval)?
+    static let spotHoldTime: TimeInterval = 1.5
 
     /// Our own animated scroll ("↓") is running.
     private var animating = false
@@ -293,10 +304,29 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         dataSource.applySnapshotUsingReloadData(snapshot)
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        guard let spotKey else { return }
+        if let spot = TranscriptReadingSpots.rebuilt(spotKey) {
+            pendingSpot = spot
+            log?("v2 spot: a rebuild, opens at \(spot.row.map(describe) ?? "the end")")
+            view.setNeedsLayout()
+        }
+        TranscriptReadingSpots.appeared(spotKey)
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        saveSpot()
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         appearedAt = ProcessInfo.processInfo.systemUptime
-        if accessibilityTurnedOnBeforeAppearing || (AccessibilityTurnOn.last ?? -.infinity) >= createdAt {
+        // Accessibility on at any point before this (even before this
+        // transcript existed, as on a relaunch under XCUITest): its hosts'
+        // subtrees can stay empty although drawn, so ask them once.
+        if accessibilityTurnedOnBeforeAppearing || AccessibilityTurnOn.last != nil {
             accessibilityTurnedOnBeforeAppearing = false
             wakeHostedAccessibility()
         }
@@ -305,6 +335,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         appearedAt = nil
+        if let spotKey { TranscriptReadingSpots.disappeared(spotKey) }
     }
 
     @objc private nonisolated func accessibilityDidTurnOn() {
@@ -313,8 +344,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     }
 
     private func accessibilityTurnedOn(at uptime: TimeInterval) {
-        if let appearedAt {
-            if uptime < appearedAt { wakeHostedAccessibility() }
+        if appearedAt != nil {
+            // On while it shows, or just before: either way accessibility is
+            // on now, so waking can't cause the scroll jump waking early did.
+            wakeHostedAccessibility()
         } else {
             accessibilityTurnedOnBeforeAppearing = true
         }
@@ -396,6 +429,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     /// Above the transcript's top (a find bar, a header); rows scroll under it.
     func setTop(_ top: AnyView?) {
+        guard top != nil || hasTop else { return }
         if hasTop != (top != nil) { view.setNeedsLayout() }
         hasTop = top != nil
         topHost.rootView = top.map(resizing) ?? AnyView(EmptyView())
@@ -414,6 +448,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         }
         applyRowMetrics()
         updateInsets()
+        restoreSpot()
         keepInRange("layout")
         logGeometry()
         if let probe, let rect = rowsFrameInWindow, rect != lastProbe {
@@ -483,16 +518,19 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     /// Reconfigures the cells on screen for these rows; off-screen rows
     /// pick up their content when they show.
     func reconfigure(_ changed: [AnyHashable]) {
+        var updated: [TranscriptCell] = []
         for id in changed {
             guard let indexPath = dataSource.indexPath(for: TranscriptRowID(id)),
                   let cell = collectionView.cellForItem(at: indexPath) as? TranscriptCell else { continue }
             configure(cell, id)
-            measure([cell])
+            updated.append(cell)
         }
+        guard !updated.isEmpty else { return }
+        measure(updated)
         // A reconfigured row measured before SwiftUI applied it keeps its old
         // height, and nothing else lays out while the reader is still: a
         // photo arriving on a shown message stood over the rows below it.
-        if !changed.isEmpty { remeasureNextTurn() }
+        remeasureNextTurn()
     }
 
     /// "Row A is now row B": it keeps its measured height, so the swap that
@@ -543,10 +581,13 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     func jumpToLatest(animated: Bool = true) {
         loadViewIfNeeded()
         pendingScroll = nil
+        pendingSpot = nil
+        spotHold = nil
         atEnd = true
         unseen = 0
         layout.readerRow = nil
         log?("v2 jumpToLatest animated=\(animated)")
+        if let spotKey { TranscriptReadingSpots.save(nil, for: spotKey) }
         let height = collectionView.bounds.height
         if !animated || collectionView.window == nil {
             write(maxOffset, "jump")
@@ -572,6 +613,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             return
         }
         pendingScroll = nil
+        pendingSpot = nil
+        spotHold = nil
         stopAnimation()
         atEnd = false
         let visible = collectionView.bounds.height - collectionView.contentInset.top - collectionView.contentInset.bottom
@@ -580,6 +623,46 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         log?("v2 scrollTo \(describe(id)) \(position)")
         if animated { collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: target), animated: true) } else { write(target, "scrollTo") }
         layout.readerRow = id
+        updatePill()
+        saveSpot()
+    }
+
+    // MARK: The reading spot
+
+    /// The row at the top of what the reader sees and how far below the top
+    /// it starts, or the end.
+    private func saveSpot() {
+        guard let spotKey, isViewLoaded, pendingSpot == nil else { return }
+        // Still settling into a restored spot: that spot stands.
+        if let hold = spotHold, ProcessInfo.processInfo.systemUptime < hold.until { return TranscriptReadingSpots.save(hold.spot, for: spotKey) }
+        guard !atEnd, let row = topRow() else { return TranscriptReadingSpots.save(nil, for: spotKey) }
+        TranscriptReadingSpots.save(.init(row: row.id, distance: row.distance, unseen: unseen), for: spotKey)
+    }
+
+    /// Opens at the spot the transcript this one replaces was at, once its
+    /// row is in, and keeps that row there while the rows settle.
+    private func restoreSpot() {
+        if let hold = spotHold {
+            guard !touching, ProcessInfo.processInfo.systemUptime < hold.until, let row = hold.spot.row,
+                  let frame = layout.frame(of: row) else { spotHold = nil; return }
+            let target = clamp(frame.minY - collectionView.contentInset.top - hold.spot.distance)
+            if abs(target - collectionView.contentOffset.y) > 0.5 { write(target, "spot hold") }
+            return
+        }
+        guard let spot = pendingSpot else { return }
+        guard let row = spot.row else { pendingSpot = nil; return }
+        guard let frame = layout.frame(of: row) else {
+            // Gone from the rows (or none yet): only the first rows can bring it.
+            if !ids.isEmpty { pendingSpot = nil; log?("v2 spot: its row is gone") }
+            return
+        }
+        pendingSpot = nil
+        stopAnimation()
+        atEnd = false
+        unseen = spot.unseen
+        layout.readerRow = row
+        write(clamp(frame.minY - collectionView.contentInset.top - spot.distance), "spot")
+        spotHold = (spot, ProcessInfo.processInfo.systemUptime + Self.spotHoldTime)
         updatePill()
     }
 
@@ -800,6 +883,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     /// A touch that moves the view: no longer at the end, at once, before
     /// anything lays out.
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        spotHold = nil
         stopAnimation()
         readerMoved = true
         if atEnd { atEnd = false; log?("v2 touch: reading") }
@@ -829,6 +913,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         if atEnd { unseen = 0; layout.readerRow = nil }
         log?(String(format: "v2 reader rested (%@) distance=%.1f atEnd=%@", why, distanceToEnd, "\(atEnd)"))
         updatePill()
+        saveSpot()
         logGeometry()
     }
 
@@ -1117,5 +1202,42 @@ enum TranscriptPaging {
     static func begins(velocity: CGPoint, start: CGPoint, width: CGFloat) -> Bool {
         guard start.x > edge, start.x < width - 8 else { return false }
         return abs(velocity.x) > 2 * abs(velocity.y) && abs(velocity.x) > 80
+    }
+}
+
+/// Each conversation's reading spot, and whether its transcript is on
+/// screen, so a transcript made while another for the same conversation
+/// still shows, or just went, opens where that one was. Opening a
+/// conversation afresh still lands at its end.
+@MainActor
+enum TranscriptReadingSpots {
+    struct Spot: Equatable {
+        /// Nil: at the end.
+        var row: AnyHashable?
+        var distance: CGFloat = 0
+        var unseen = 0
+    }
+
+    /// How soon after the last one went a new transcript counts as its rebuild.
+    static let rebuildWindow: TimeInterval = 1.5
+    private static var spots: [String: Spot] = [:]
+    private static var shown: [String: Int] = [:]
+    private static var wentAt: [String: TimeInterval] = [:]
+
+    static func save(_ spot: Spot?, for key: String) { spots[key] = spot ?? Spot() }
+
+    /// The spot to open at when this appearance rebuilds one that's showing or just went.
+    static func rebuilt(_ key: String, now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> Spot? {
+        let showing = shown[key, default: 0] > 0
+        let recent = wentAt[key].map { now - $0 < rebuildWindow } ?? false
+        guard showing || recent, let spot = spots[key], spot.row != nil else { return nil }
+        return spot
+    }
+
+    static func appeared(_ key: String) { shown[key, default: 0] += 1 }
+
+    static func disappeared(_ key: String, now: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        shown[key] = max(0, shown[key, default: 0] - 1)
+        wentAt[key] = now
     }
 }

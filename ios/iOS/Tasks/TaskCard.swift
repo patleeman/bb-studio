@@ -9,15 +9,10 @@ struct TaskCard: View {
     @State private var model = TasksModel.shared
     @State private var showsHistory = false
     @EnvironmentObject private var app: AppModel
-    @Environment(\.openTaskThread) private var openThread
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        if model.supported == false {
-            TaskNotice(text: "Update BB Studio on your Mac to see this card.", symbol: "arrow.down.circle")
-        } else {
-            card
-        }
+        card
     }
 
     private var card: some View {
@@ -49,7 +44,7 @@ struct TaskCard: View {
     }
 
     private func open(_ threadId: String) {
-        if let openThread { openThread(threadId) } else { app.openTaskThread(threadId) }
+        app.open(.conversation(threadId))
     }
 
     private func follow(_ output: TaskItem.Output) {

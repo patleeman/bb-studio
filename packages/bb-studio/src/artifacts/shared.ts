@@ -5,8 +5,6 @@
  * from: items stay `artifacts:<id>` in Studio's tables, mentions and links.
  */
 export const PLUGIN_ID = "artifacts";
-/** The "Artifacts" workbench tab's action id; reply cards open it with `{ artifactId }`. */
-export const ARTIFACTS_TAB = "save-to-studio";
 /** Studio's panel sub-path: /plugins/studio/studio/artifacts/<id> shows one artifact. */
 export const ROUTE_SEGMENT = "artifacts";
 export const ARTIFACT_ICON = "studio/artifact";

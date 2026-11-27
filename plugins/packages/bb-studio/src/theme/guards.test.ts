@@ -11,9 +11,10 @@ describe("when a scene runs", () => {
     expect(sceneMode(FRONT_ENVIRONMENT, true)).toBe("still");
   });
 
-  it("renders at the screen's pixel ratio on power, at half on battery, lower when it's nearly empty", () => {
-    expect(renderScale({ onBattery: false, batteryLevel: 1, pixelRatio: 2 })).toBe(2);
-    expect(renderScale({ onBattery: false, batteryLevel: 1, pixelRatio: 3 })).toBe(2);
+  it("caps the scene scale on power for Retina screens, halves on battery, and lowers when it's nearly empty", () => {
+    expect(renderScale({ onBattery: false, batteryLevel: 1, pixelRatio: 1 })).toBe(1);
+    expect(renderScale({ onBattery: false, batteryLevel: 1, pixelRatio: 2 })).toBe(1.25);
+    expect(renderScale({ onBattery: false, batteryLevel: 1, pixelRatio: 3 })).toBe(1.25);
     expect(renderScale({ onBattery: true, batteryLevel: 0.8, pixelRatio: 2 })).toBe(1);
     expect(renderScale({ onBattery: true, batteryLevel: 0.1, pixelRatio: 2 })).toBe(0.7);
     expect(renderScale({ onBattery: true, batteryLevel: 0.1, pixelRatio: 1 })).toBe(0.35);

@@ -1,6 +1,6 @@
 import XCTest
 
-/// The Bot's controls (slice 3), offline (`-qaConversationHome -qaSpacesDemo
+/// The Bot's controls (slice 3), offline (`-qaSpacesDemo
 /// list -qaBotDemo chat`; `BotSpacesDemo.State` answers `bot_pause`,
 /// `bot_resume`, `bot_stop`, `bot_make_main` and `bot_spaces`' state): Pause
 /// from the list's header, the paused line above the composer with Resume,
@@ -10,7 +10,7 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launch() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaConversationHome",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
                                "-qaRoomConversation", "thr_botdemo01"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")
@@ -35,11 +35,14 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
         shot("2-paused-list")
         app.closeRoomSheet()
         XCTAssertTrue(any("RoomSheet-conversations").waitForNonExistence(timeout: 10), "the list closes")
-        let banner = any("botPausedBanner")
-        XCTAssertTrue(banner.waitForExistence(timeout: 15), "the conversation says the Bot is paused")
-        shot("3-paused-banner")
-        app.buttons["botPausedResume"].tap()
-        XCTAssertTrue(banner.waitForNonExistence(timeout: 15), "Resume brings it back")
+        // Round 5: a lasting state is a chip in the composer's top row, not a banner.
+        let chip = app.buttons["chip-paused"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 15), "the composer says the Bot is paused")
+        XCTAssertTrue(chip.label.contains("Resume"), chip.label)
+        XCTAssertFalse(any("botPausedBanner").exists, "no banner above the composer")
+        shot("3-paused-chip")
+        chip.tap()
+        XCTAssertTrue(chip.waitForNonExistence(timeout: 15), "Resume brings it back")
     }
 
     func testMakeThisTheMainFromAConversation() {
@@ -48,9 +51,8 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
         let launchPrep = app.buttons["roomConversation-thr_demo_interview"]
         XCTAssertTrue(launchPrep.waitForExistence(timeout: 10))
         launchPrep.tap()
-        let more = app.buttons["More"].firstMatch
-        XCTAssertTrue(more.waitForExistence(timeout: 10))
-        more.tap()
+        // The conversation's menu is its title (round 5).
+        app.openConversationMenu()
         let make = app.buttons["makeMain"]
         XCTAssertTrue(make.waitForExistence(timeout: 5), "Make this the Main in the conversation's menu")
         shot("4-make-main")

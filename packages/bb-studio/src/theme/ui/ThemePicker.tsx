@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "../../kit/ui/button";
+import { errorMessage } from "../../kit/format";
 import { Slider } from "../../kit/ui/slider";
 import { Switch } from "../../kit/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "../../kit/ui/toggle-group";
@@ -191,7 +192,7 @@ function ThemeOptionRows({ themeId, options, client }: { themeId: string; option
     setError(null);
     client.save(themeId, option.id, value).then(
       (saved) => { setState({ themeId, values: saved }); themeOptionsChanged(themeId); },
-      (cause: unknown) => { setState(before ? { themeId, values: before } : null); setError(`Couldn't save ${option.label}: ${cause instanceof Error ? cause.message : String(cause)}`); },
+      (cause: unknown) => { setState(before ? { themeId, values: before } : null); setError(`Couldn't save ${option.label}: ${errorMessage(cause)}`); },
     );
   };
   return (

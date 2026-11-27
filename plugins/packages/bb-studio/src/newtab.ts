@@ -36,7 +36,7 @@ export interface ItemRow { id: string; title: string; updatedAt: number; emoji?:
 export interface BotThreadRow { threadId: string; kind: "conversation" | "worker"; title: string; updatedAt: number; isMain?: boolean }
 export interface BoardRow { threadId: string; title: string; updatedAt: number }
 export interface BotRow { id: string; name: string; updatedAt: number }
-export interface EntryRow { kind: "automation" | "todo" | "record"; id: string; title: string; updatedAt: number }
+export interface EntryRow { kind: "automation" | "todo"; id: string; title: string; updatedAt: number }
 
 /** The Bot's own chat, as its sidebar names it. */
 const MAIN_TITLE = "Main";
@@ -114,7 +114,7 @@ export interface NewTabSearchSources {
   botThreads(query: string, limit: number): Promise<readonly Scored<BotThreadRow>[]>;
   boards(): Promise<readonly BoardRow[]>;
   bots(): readonly BotRow[];
-  /** Automations, open todos and the memory records matching the query. */
+  /** Automations and open todos matching the query. */
   entries(query: string, limit: number): Promise<readonly EntryRow[]>;
 }
 
@@ -145,7 +145,7 @@ export async function newTabSearch(sources: NewTabSearchSources, options: { quer
     ...threads.map(({ row, score }) => ({ row: threadEntry(row), score })),
     ...byTitle(boards, (board) => board.title, "board").map(({ row, score }) => ({ row: boardEntry(row), score })),
     ...byTitle(sources.bots(), (bot) => bot.name, "bot").map(({ row, score }) => ({ row: botEntry(row), score })),
-    ...(["automation", "todo", "record"] as const).flatMap((kind) => byTitle(entries.filter((row) => row.kind === kind), (row) => row.title, kind)).map(({ row, score }) => ({ row: entryFor({ kind: row.kind, id: row.id }, row.title, row.updatedAt), score })),
+    ...(["automation", "todo"] as const).flatMap((kind) => byTitle(entries.filter((row) => row.kind === kind), (row) => row.title, kind)).map(({ row, score }) => ({ row: entryFor({ kind: row.kind, id: row.id }, row.title, row.updatedAt), score })),
   ];
   const best = new Map<string, Scored<NewTabEntry>>();
   for (const each of scored) {

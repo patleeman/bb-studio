@@ -14,6 +14,10 @@
       "https://getbb.app/marketplace/v2/screenshots/automations/automations-sidebar.png"
     ]
   },
+  "tailscale": {
+    "category": "cloud-and-remote",
+    "screenshots": []
+  },
   "pdf-preview": {
     "category": "file-viewers-and-editors",
     "screenshots": []
@@ -36,6 +40,10 @@
   },
   "keep-awake": {
     "category": "utilities",
+    "screenshots": []
+  },
+  "server-switcher": {
+    "category": "cloud-and-remote",
     "screenshots": []
   },
   "provider-retry": {

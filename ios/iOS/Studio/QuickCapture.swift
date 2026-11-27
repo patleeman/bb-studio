@@ -96,7 +96,7 @@ struct QuickWriteView: View {
     private func savePage() async {
         await attempt {
             let page = try await client.createPage(title: PageTitle.from(trimmed), markdown: trimmed)
-            operation.complete(on: app) { app.openPage(page.id) }
+            operation.complete(on: app) { app.open(.studio(kind: nil, .page(id: page.id))) }
         }
     }
 

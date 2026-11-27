@@ -92,18 +92,25 @@ describe("push levels", () => {
 });
 
 describe("Main's pushes", () => {
-  type Setup = { request?: unknown; read?: boolean; allowed?: boolean; needs?: Record<string, boolean>; taskPushAt?: number };
+  type Tag = { decision: "push" | "quiet" | "unknown"; ask: string | null };
+  type Setup = { request?: unknown; read?: boolean; allowed?: boolean; needs?: Record<string, boolean>; taskPushAt?: number; tags?: Tag[]; requestSeq?: number; readDuringWait?: boolean };
   function main(options: Setup = {}) {
     vi.useFakeTimers();
     const sent: MainPushInput[] = [];
+    const asked: (number | null)[] = [];
+    let waited = false;
     const pushes = new MainPushes({
       mainOf: (id) => (id === "thr_main" ? { botId: "bot_dot", name: "Dot" } : null),
-      thread: async (id) => ({ id, visibility: "hidden", projectId: "proj_personal", lastReadAt: options.read ? 10 : 1, latestAttentionAt: 5 }),
+      thread: async (id) => ({ id, visibility: "hidden", projectId: "proj_personal", lastReadAt: options.read || (options.readDuringWait && waited) ? 10 : 1, latestAttentionAt: 5 }),
       lastRequest: async () => options.request ?? { initiator: "user", input: [{ type: "text", text: "Is CI green?" }] },
       allowed: async () => options.allowed ?? true,
       notify: async (input) => { sent.push(input); },
       ...(options.needs ? { needsUser: (card: { id: string }) => options.needs![card.id] ?? true } : {}),
       ...(options.taskPushAt !== undefined ? { pushedTaskSince: (_botId: string, since: number) => options.taskPushAt! >= since } : {}),
+      ...(options.tags ? {
+        lastRequestSeq: async () => options.requestSeq ?? null,
+        replyTag: async (_threadId: string, requestSeq: number | null) => { asked.push(requestSeq); waited = true; return options.tags!.shift() ?? { decision: "unknown" as const, ask: null }; },
+      } : {}),
       defaultProjectId: "proj_personal",
     });
     dispose.push(async () => pushes.dispose());
@@ -111,13 +118,48 @@ describe("Main's pushes", () => {
       pushes.idle({ thread: { id: extra.threadId ?? "thr_main", visibility: extra.visibility ?? "hidden" }, lastAssistantText: text, ...(extra.quiet ? { experimental_quiet: true } : {}) });
       await vi.advanceTimersByTimeAsync(2_000);
     };
-    return { sent, idle };
+    return { sent, idle, asked, pushes };
   }
 
   it("pushes a real message as the Bot, on Main's conversation", async () => {
     const { sent, idle } = main();
     await idle("The new iOS build is on TestFlight: **20261114.0604**.");
     expect(sent).toEqual([{ title: "Dot", body: "The new iOS build is on TestFlight: 20261114.0604.", kind: "turn-finished", threadId: "thr_main", projectId: "proj_personal", botId: "bot_dot", conversationId: "thr_main" }]);
+  });
+
+  it("pushes only a reply that needs the user, with its ask line; a status reply stays off the phone; untagged pushes as before", async () => {
+    const { sent, idle } = main({ tags: [
+      { decision: "quiet", ask: null },
+      { decision: "push", ask: "Please sign in to the Ace portal so I can book Saturday." },
+      { decision: "unknown", ask: null },
+    ] });
+    await idle("Cleared DerivedData: 7.8 GB back.");
+    await idle("Ace has Saturday 9 AM open; their page needs your account. Please sign in to the Ace portal so I can book Saturday.");
+    await idle("Shipped as v1.2.");
+    expect(sent.map((input) => input.body)).toEqual(["Please sign in to the Ace portal so I can book Saturday.", "Shipped as v1.2."]);
+  });
+
+  it("pushes a reply that needs the user even when a worker's notice started the turn or a task push just went out; a status or untagged one there doesn't", async () => {
+    const worker = { initiator: "system", systemMessageKind: "child-completed", input: [{ type: "text", text: "[bb system] @thread:thr_w completed" }] };
+    const asks = main({ request: worker, taskPushAt: Date.now(), tags: [{ decision: "push", ask: "Want me to merge it?" }, { decision: "quiet", ask: null }, { decision: "unknown", ask: null }] });
+    await asks.idle("The worker finished and the tests pass. Want me to merge it?");
+    await asks.idle("The worker finished.");
+    await asks.idle("The worker finished.");
+    expect(asks.sent.map((input) => input.body)).toEqual(["Want me to merge it?"]);
+  });
+
+  it("checks whether the user read the reply after waiting for its tag, and asks about its own turn", async () => {
+    const read = main({ requestSeq: 41, readDuringWait: true, tags: [{ decision: "push", ask: "Want me to merge it?" }] });
+    await read.idle("Tests pass. Want me to merge it?");
+    expect(read.sent).toEqual([]);
+    expect(read.asked).toEqual([41]);
+  });
+
+  it("pushes one turn once, however many idles it gets", async () => {
+    const twice = main({ requestSeq: 41, tags: [{ decision: "push", ask: "Want me to merge it?" }, { decision: "push", ask: "Want me to merge it?" }] });
+    await twice.pushes.send("thr_main", { botId: "bot_dot", name: "Dot" }, "Want me to merge it?");
+    await twice.pushes.send("thr_main", { botId: "bot_dot", name: "Dot" }, "Want me to merge it?");
+    expect(twice.sent).toHaveLength(1);
   });
 
   it("pushes the morning card, and a reply that is only a loop or a work card", async () => {

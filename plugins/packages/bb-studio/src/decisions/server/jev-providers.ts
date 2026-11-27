@@ -8,6 +8,18 @@ import { z } from "zod";
  * the same model.
  */
 export const jevPresets = {
+  /**
+   * OpenCode Go's inference route bills a Go subscription (billing_source
+   * "go"). OpenCode Zen (`/zen/v1/systemone`) and the plain inference route
+   * bill the account's cash balance instead, so Studio no longer offers them.
+   */
+  "opencode-go": {
+    name: "OpenCode Go",
+    endpoint: "https://opencode.ai/inference/go/v1/systemone",
+    model: "jev-1.14",
+    keySetting: "zenApiKey",
+    keyEnv: "OPENCODE_API_KEY",
+  },
   typesafe: {
     name: "TypeSafe",
     endpoint: "https://api.typesafe.ai/v1/systemone",
@@ -29,19 +41,18 @@ export const jevPresets = {
     keySetting: "openRouterApiKey",
     keyEnv: "OPENROUTER_API_KEY",
   },
-  "opencode-zen": {
-    name: "OpenCode Zen",
-    endpoint: "https://opencode.ai/zen/v1/systemone",
-    model: "jev-1.13",
-    keySetting: "zenApiKey",
-    keyEnv: "OPENCODE_API_KEY",
-  },
 } as const;
 export type JevPresetId = keyof typeof jevPresets;
 export type JevProviderId = JevPresetId | "custom";
-/** `auto` tries every configured provider in this order. */
-export const jevProviderOrder: JevProviderId[] = ["typesafe", "vercel", "openrouter", "opencode-zen", "custom"];
+/**
+ * `auto` tries every configured provider in this order. OpenCode Go comes
+ * first: its calls are covered by the Go plan, so with an OpenCode key set
+ * the others are only fallbacks.
+ */
+export const jevProviderOrder: JevProviderId[] = ["opencode-go", "typesafe", "vercel", "openrouter", "custom"];
 export const jevProviderChoices = ["auto", ...jevProviderOrder] as const;
+/** Choices that were renamed or retired, and the choice they now mean. */
+export const renamedJevProviders: Record<string, JevProviderId> = { "opencode-zen": "opencode-go" };
 
 export type JevProviderSettings = {
   jevProvider?: string;
@@ -127,7 +138,7 @@ export function jevRoutes(
   settings: JevProviderSettings,
   env: NodeJS.ProcessEnv = process.env,
 ): { routes: JevRoute[]; problems: string[] } {
-  const mode = z.enum(jevProviderChoices).catch("auto").parse(settings.jevProvider || "auto");
+  const mode = z.enum(jevProviderChoices).catch("auto").parse(renamedJevProviders[settings.jevProvider ?? ""] ?? (settings.jevProvider || "auto"));
   const wanted = mode === "auto" ? jevProviderOrder : [mode];
   const routes: JevRoute[] = [];
   const problems: string[] = [];
@@ -173,6 +184,35 @@ export function jevRoutes(
     routes.push({ id, name: preset.name, endpoint: preset.endpoint, model, apiKey });
   }
   return { routes, problems };
+}
+
+export type JevProviderInfo = {
+  id: JevProviderId;
+  name: string;
+  endpoint: string | null;
+  model: string | null;
+  configured: boolean;
+  /** Where the key comes from; never the key itself. */
+  keyFrom: "setting" | "environment" | "command" | null;
+};
+
+/**
+ * Every provider in `auto` order, whether it has what it needs, and where its
+ * key would come from. Reports presence only: no key value or part of one.
+ */
+export function jevProviders(settings: JevProviderSettings, env: NodeJS.ProcessEnv = process.env): JevProviderInfo[] {
+  return jevProviderOrder.map((id): JevProviderInfo => {
+    if (id === "custom") {
+      const endpoint = text(settings.customJevEndpoint) || null;
+      const model = text(settings.customJevModel) || null;
+      const keyFrom = text(settings.customJevApiKeyCommand) ? "command" : text(settings.customJevApiKey) ? "setting" : null;
+      return { id, name: "Your own endpoint", endpoint, model, configured: !!endpoint && !!model, keyFrom };
+    }
+    const preset = jevPresets[id];
+    const keyFrom = text(settings[preset.keySetting]) ? "setting" : text(env[preset.keyEnv]) ? "environment" : null;
+    const model = id === "typesafe" ? text(settings.typesafeModel) || preset.model : preset.model;
+    return { id, name: preset.name, endpoint: preset.endpoint, model, configured: keyFrom !== null, keyFrom };
+  });
 }
 
 export function describeHttpFailure(route: JevRoute, status: number, detail: string | null = null) {

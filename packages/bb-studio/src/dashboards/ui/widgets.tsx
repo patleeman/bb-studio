@@ -4,6 +4,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNod
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Icon, cn } from "../../kit/ui/index";
 import { studioItemProps, studioThreadProps, wantsAlternate } from "../../kit/app/index";
+import { useNow } from "../../kit/app/visible-poll";
 import { useStudioOpen } from "../../ui/studio-open";
 import { ThreadTitle, useRpc } from "@get-bb/plugin-sdk/app";
 import { resolveChart, SERIES_COLORS } from "../../pages/chart-spec";
@@ -12,6 +13,7 @@ import type { WidgetView, WidgetTypeView } from "../shared";
 import { CustomFrame, type WidgetTheme } from "./custom-frame";
 import { Markdown } from "./markdown";
 import { isMiniId } from "../../minis/shared";
+import "./dashboards.css";
 
 // A mini app tile is the app itself; its host loads when a dashboard first shows one.
 const MiniTile = lazy(() => import("../../minis/ui/mini-view").then((module) => ({ default: module.MiniTile })));
@@ -410,15 +412,6 @@ function EmbedWidget({ widget }: WidgetProps) {
   }
   if (url) return <iframe title={widget.title ?? "Embedded page"} src={url} sandbox={embedSandbox(url)} referrerPolicy="no-referrer" loading="lazy" className="block h-full w-full border-0 bg-background" data-widget-body="embed" />;
   return <Empty icon="Layers" title="Nothing to embed" />;
-}
-
-function useNow(ms: number): number {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(timer);
-  }, [ms]);
-  return now;
 }
 
 export function countdown(target: number, now: number): string {

@@ -6,7 +6,8 @@
 // filter), BB's timeline shows only the strand's turns, expanded, and pages
 // back to its first message. On a BB without it, the tags dim the other
 // strands' messages instead.
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type ComponentType } from "react";
+import { foldOfSeq, statusRunFolds, type StatusRunFold, type Tags } from "./model";
 
 export interface Selection {
   strandId: string;
@@ -23,7 +24,7 @@ export interface TimelineFilter { turnIds: readonly string[]; firstSeq: number |
 const selected = new Map<string, Selection>();
 const filters = new Map<string, TimelineFilter>();
 const listeners = new Set<() => void>();
-const DIM_STYLE_ID = "studio-strand-dim-style";
+const DIM_STYLE_ID = "studio-strand-dim-style-3";
 let hostFilters = false;
 
 const notify = () => { for (const listener of listeners) listener(); };
@@ -112,32 +113,182 @@ export function useSelection(threadId: string): Selection | null {
   return useSyncExternalStore(subscribeSelection, () => selected.get(threadId) ?? null, () => null);
 }
 
+/** What a zoomed-out conversation draws in the timeline's place (BB's `zoom.View`). */
+export type ZoomViewComponent = ComponentType<{ threadId: string; level: number; anchorSeq: number | null }>;
+
 interface TimelineFilterSlots {
-  experimental_timelineFilter?: (registration: { id: string; get(threadId: string): TimelineFilter | null; subscribe(listener: () => void): () => void }) => void;
+  experimental_timelineFilter?: (registration: {
+    id: string; get(threadId: string): TimelineFilter | null; subscribe(listener: () => void): () => void;
+    folds?(threadId: string): readonly StatusRunFold[] | null; expandFold?(threadId: string, id: string): void;
+    zoom?: { level(threadId: string): number; View: ZoomViewComponent };
+  }) => { zoom?: boolean } | void;
 }
 
 /** Hands the filter to BB's timeline (`slots.experimental_timelineFilter`). False on a BB without it, where the tags dim instead. */
-export function registerTimelineFilter(slots: object): boolean {
+export function registerTimelineFilter(slots: object, zoomView?: ZoomViewComponent): boolean {
   const target = slots as TimelineFilterSlots;
   if (typeof target.experimental_timelineFilter !== "function") return false;
-  target.experimental_timelineFilter({ id: "strands", get: timelineFilterOf, subscribe: subscribeSelection });
+  // A BB whose timeline folds runs (the fork's seam) asks foldsOf; an older one ignores it and folds nothing.
+  // One that zooms (the fork's zoom seam) draws zoomView while a conversation is zoomed out; an older one never zooms.
+  const host = target.experimental_timelineFilter({
+    id: "strands", get: timelineFilterOf, subscribe: subscribeSelection, folds: foldsOf, expandFold: openFold,
+    ...(zoomView ? { zoom: { level: shownZoomOf, View: zoomView } } : {}),
+  });
   hostFilters = true;
+  // Only a BB that says it draws `zoom` zooms; one that takes the registration and drops `zoom` answers nothing.
+  hostZooms = !!zoomView && !!host && typeof host === "object" && host.zoom === true;
   return true;
+}
+
+// ---- semantic zoom: 0 messages (BB's timeline), 1 strands, 2 the tree ----
+
+/** The furthest out a conversation zooms (2: the tree). */
+export const ZOOM_MAX = 2;
+const zoomLevels = new Map<string, number>();
+let hostZooms = false;
+
+/** Whether BB draws a zoomed-out conversation (the fork's zoom seam). */
+export const zoomInHost = () => hostZooms;
+
+/** Conversations whose strands run (a header's switch is up, counted per header): only they zoom. */
+const zoomable = new Map<string, number>();
+
+/** A conversation's zoom level: 0 shows its messages. */
+export function zoomOf(threadId: string): number {
+  return zoomLevels.get(threadId) ?? 0;
+}
+
+/** The level BB draws: 0 unless the conversation's strands run, so turning them off gives the messages back. */
+export function shownZoomOf(threadId: string): number {
+  return zoomable.has(threadId) ? zoomOf(threadId) : 0;
+}
+
+/** A header shows the conversation's switch (its strands run): it can zoom until every such header lets go. */
+export function holdZoomable(threadId: string): () => void {
+  const count = zoomable.get(threadId) ?? 0;
+  zoomable.set(threadId, count + 1);
+  if (count === 0) notify();
+  let held = true;
+  return () => {
+    if (!held) return;
+    held = false;
+    const left = (zoomable.get(threadId) ?? 1) - 1;
+    if (left > 0) { zoomable.set(threadId, left); return; }
+    zoomable.delete(threadId);
+    notify();
+  };
+}
+
+/** Sets a conversation's zoom level (0…ZOOM_MAX). */
+export function setZoom(threadId: string, level: number): void {
+  const next = Math.max(0, Math.min(ZOOM_MAX, Math.round(level)));
+  if (zoomOf(threadId) === next) return;
+  if (next === 0) zoomLevels.delete(threadId); else zoomLevels.set(threadId, next);
+  // Keyboard mode lives on the tree only.
+  if (next < ZOOM_MAX) keyboardModes.delete(threadId);
+  notify();
+}
+
+/**
+ * The owner sent a message in this conversation: show its messages, unfiltered
+ * and zoomed in, so the new message is drawn at once. A strand filter shows
+ * only turns strands already tagged, and the new turn is tagged later. The
+ * scroll position from before filtering is dropped: BB scrolls to the new message.
+ */
+export function showSent(threadId: string): void {
+  const filtered = selected.has(threadId);
+  const zoomed = zoomLevels.has(threadId) || keyboardModes.has(threadId);
+  if (!filtered && !zoomed) return;
+  marks.delete(threadId);
+  selected.delete(threadId);
+  filters.delete(threadId);
+  zoomLevels.delete(threadId);
+  keyboardModes.delete(threadId);
+  notify();
+}
+
+/** Keyboard mode (Esc Esc): the tree with a search, ↑↓ ←→ and Enter. */
+const keyboardModes = new Set<string>();
+
+export function keyboardModeOf(threadId: string): boolean {
+  return keyboardModes.has(threadId);
+}
+
+/** Turns keyboard mode on (at the tree) or off (staying where it is). */
+export function setKeyboardMode(threadId: string, on: boolean): void {
+  if (keyboardModes.has(threadId) === on) return;
+  if (on) { keyboardModes.add(threadId); zoomLevels.set(threadId, ZOOM_MAX); } else keyboardModes.delete(threadId);
+  notify();
+}
+
+export function useKeyboardMode(threadId: string): boolean {
+  return useSyncExternalStore(subscribeSelection, () => keyboardModes.has(threadId), () => false);
+}
+
+export function useZoom(threadId: string): number {
+  return useSyncExternalStore(subscribeSelection, () => shownZoomOf(threadId), () => 0);
 }
 
 /** Whether BB's timeline hides the other strands' messages itself. */
 export const timelineFiltersInHost = () => hostFilters;
 
 /** Test hook: a fresh app (no host filter, nothing picked). */
-export function resetSelectionForTests(): void { hostFilters = false; selected.clear(); filters.clear(); marks.clear(); }
+export function resetSelectionForTests(): void { hostFilters = false; hostZooms = false; zoomLevels.clear(); zoomable.clear(); keyboardModes.clear(); selected.clear(); filters.clear(); marks.clear(); foldTags.clear(); openFolds.clear(); foldCache.clear(); }
+
+// ---- runs of status replies, folded in BB's timeline ----
+
+const foldTags = new Map<string, Tags>();
+/** The turns of the runs the user opened, per conversation. */
+const openFolds = new Map<string, Set<string>>();
+const foldCache = new Map<string, { tags: Tags; open: number; folds: readonly StatusRunFold[] }>();
+let openVersion = 0;
+
+/** A conversation's tags, as its messages' tags read them: the folds follow. */
+export function setFoldTags(threadId: string, tags: Tags | null | undefined): void {
+  if (!tags || foldTags.get(threadId) === tags) return;
+  foldTags.set(threadId, tags);
+  notify();
+}
+
+/** The runs BB folds in a conversation's timeline: the same array while nothing changed. */
+export function foldsOf(threadId: string): readonly StatusRunFold[] | null {
+  const tags = foldTags.get(threadId);
+  if (!tags) return null;
+  const cached = foldCache.get(threadId);
+  if (cached && cached.tags === tags && cached.open === openVersion) return cached.folds;
+  const folds = statusRunFolds(tags, openFolds.get(threadId));
+  foldCache.set(threadId, { tags, open: openVersion, folds });
+  return folds;
+}
+
+/** The user opened a fold: it stays open (by its turns, so a late tag that moves the run's start keeps it open). */
+export function openFold(threadId: string, id: string): void {
+  const fold = foldsOf(threadId)?.find((each) => each.id === id);
+  if (fold) openTurns(threadId, fold.turnIds);
+}
+
+/** Opens the fold that holds message `seq`, before a jump to it. */
+export function openFoldOf(threadId: string, seq: number): void {
+  const fold = foldOfSeq(foldTags.get(threadId), foldsOf(threadId) ?? [], seq);
+  if (fold) openTurns(threadId, fold.turnIds);
+}
+
+function openTurns(threadId: string, turnIds: readonly string[]): void {
+  const open = openFolds.get(threadId) ?? new Set<string>();
+  const before = open.size;
+  for (const turnId of turnIds) open.add(turnId);
+  if (open.size === before) return;
+  openFolds.set(threadId, open);
+  openVersion++;
+  notify();
+}
 
 /** The rule that dims the other strands' messages (where BB can't hide them), once per document. */
 export function ensureDimStyle(doc: Document = document): void {
   if (doc.getElementById(DIM_STYLE_ID)) return;
   const style = doc.createElement("style");
   style.id = DIM_STYLE_ID;
-  // Dimmed rows; and a tag's "Move to…" shows while its message is hovered or the menu is open.
-  style.textContent = "[data-studio-strand-dim]{opacity:.3;transition:opacity .2s}@media (prefers-reduced-motion:reduce){[data-studio-strand-dim]{transition:none}}"
-    + "[data-strand-move]{opacity:0}[data-timeline-row-id]:hover [data-strand-move],[data-strand-move]:focus-visible,[data-strand-move][data-state=open]{opacity:1}";
+  // Dimmed rows. (A tag's "Move to…" sits in BB's message footer, which shows on hover or focus.)
+  style.textContent = "[data-studio-strand-dim]{opacity:.3;transition:opacity .2s}@media (prefers-reduced-motion:reduce){[data-studio-strand-dim]{transition:none}}";
   doc.head.appendChild(style);
 }

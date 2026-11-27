@@ -1,6 +1,6 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
-import { MIGRATIONS } from "../migrations";
+import { migratedPluginDb } from "../test/migrated-db";
 import { testScheduler } from "../test/scheduler-fixture";
 import { isScheduleId, scheduleId, scheduleKey, type RunTarget } from "./scheduler";
 
@@ -31,8 +31,10 @@ async function setup() {
     hosts: { get: (async ({ hostId }: { hostId: string }) => hosts.get(hostId)) as never },
   } });
   dispose.push(() => harness.lifecycle.dispose());
-  const db = bb.storage.database();
-  bb.storage.migrate(db, MIGRATIONS);
+  const mem = migratedPluginDb();
+  const db = mem as unknown as ReturnType<typeof bb.storage.database>;
+  bb.storage.database = () => db;
+  dispose.push(async () => { mem.close(); });
   const clock = { now: START };
   const { engine, scheduler, warnings } = testScheduler(db, bb.sdk, clock);
   const target: { current: RunTarget | null } = { current: { threadId: "thr", prompt: "Check the inbox." } };

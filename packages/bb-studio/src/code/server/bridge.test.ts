@@ -130,7 +130,7 @@ describe("what the agent is told", () => {
     expect(text).toContain("line 14: Cannot find name 'delay'.");
     expect(text).toMatch(/unsaved[^\n]*src\/queue\.ts/i);
     expect(text).toMatch(/don't edit/i);
-    expect(text).toContain("code_show");
+    expect(text).toContain("code (op: show)");
   });
 
   it("says nothing when no editor is connected", () => {
@@ -231,6 +231,39 @@ describe("broadcast", () => {
       expect(await second).toEqual({ type: "comments" });
     } finally {
       await bridges.close("ws_cast");
+    }
+  });
+});
+
+describe("heartbeat dead-stream cleanup", () => {
+  it("drops the window, finishes its waiters, and clears its state when a stream throws on ping", async () => {
+    const bridges = new Bridges();
+    const socket = await bridges.open("ws_dead", dir);
+    const clientReq = request({ socketPath: socket, path: "/events?window=w1", headers: auth(socket) });
+    clientReq.on("error", () => {});
+    try {
+      const connected = new Promise<void>((resolve) => {
+        clientReq.once("response", (res) => { res.once("data", () => resolve()); });
+        clientReq.end();
+      });
+      await connected;
+      expect((await call(socket, "POST", "/state?window=w1", state)).status).toBe(204);
+      expect(bridges.state("ws_dead")?.unsavedFiles).toEqual(["/repo/src/queue.ts"]);
+
+      // Queue a command so a waiter is pending on this window, then make its stream fail on heartbeat write.
+      const pending = bridges.request("ws_dead", { type: "show", path: "a.ts", startLine: 1, endLine: 1 }, 5_000);
+      const bridge = (bridges as unknown as { bridges: Map<string, { windows: Map<string, { stream: { write(): void } | null }> }> }).bridges.get("ws_dead")!;
+      const stream = bridge.windows.get("w1")!.stream!;
+      stream.write = () => { throw new Error("write EPIPE"); };
+
+      bridges.ping("ws_dead");
+
+      expect(await pending).toEqual({ ok: false, detail: "The editor closed before answering the request; a partial edit may remain." });
+      expect(bridges.connected("ws_dead")).toBe(false);
+      expect(bridges.state("ws_dead")).toBeNull();
+    } finally {
+      clientReq?.destroy();
+      await bridges.close("ws_dead");
     }
   });
 });

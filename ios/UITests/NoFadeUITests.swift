@@ -1,8 +1,8 @@
 import XCTest
 
-/// No fade over the transcript above the composer and the jump button
-/// (docs/ios/no-fade): up in the history, rows stay at full brightness right
-/// up to the controls, on the old and the new transcript. Dark mode, so a
+/// No fade over the transcript above the bottom stack (the composer's opaque
+/// band) and the jump button (docs/ios/no-fade): up in the history, rows
+/// stay at full brightness right up to the controls. Dark mode, so a
 /// fade to the page's black dims the white text.
 ///
 /// `TEST_RUNNER_NOFADE_LAYOUT`: `phone` (default, an iPhone) or `split` (the
@@ -17,14 +17,10 @@ final class NoFadeUITests: ServerIsolatedUITestCase {
         app.buttons.matching(NSPredicate(format: "identifier == 'jumpToLatest' OR label BEGINSWITH 'Jump to latest'")).firstMatch
     }
 
-    func testOldTranscript() throws { try check(v2: false) }
-    func testNewTranscript() throws { try check(v2: true) }
-
-    private func check(v2: Bool) throws {
-        let name = "\(layout)-\(v2 ? "new" : "old")"
+    func testTranscript() throws {
+        let name = layout
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", layout == "split" ? "duo" : "chat",
             "-qaDark", "-openURL", "bbstudio://bot"]
-            + [v2 ? "-qaTranscriptV2" : "-qaTranscriptV1"]
             + (layout == "split" ? ["-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles"] : [])
         app.launchOffline()
         XCTAssertTrue(composer.waitForExistence(timeout: 30), "\(name): composer")
@@ -33,6 +29,9 @@ final class NoFadeUITests: ServerIsolatedUITestCase {
             let until = Date().addingTimeInterval(15)
             while !(0..<200).contains(composer.frame.minX), Date() < until { Thread.sleep(forTimeInterval: 0.25) }
         }
+        // A draft left by an earlier test (a photo, text) makes the composer taller.
+        command("draft?0")
+        for _ in 0..<3 where app.buttons["Remove attachment"].firstMatch.exists { app.buttons["Remove attachment"].firstMatch.tap() }
         Thread.sleep(forTimeInterval: 1)
         command("mid")
         _ = jump.waitForExistence(timeout: 5)
@@ -55,12 +54,13 @@ final class NoFadeUITests: ServerIsolatedUITestCase {
         var brightest = 0
         for step in 0..<6 {
             let count = brightPixels()
-            print("NO FADE \(name) step=\(step) bright=\(count) jump=\(jump.frame) composer=\(composer.frame)")
+            print("NO FADE \(name) step=\(step) bright=\(count) jump=\(jump.frame) composer=\(composer.frame) stackTop=\(stackTop().map { "\($0)" } ?? "none")")
             brightest = max(brightest, count)
             if count >= 20 || !jump.exists { break }
+            // From plain text well above the controls (a card there can keep the drag).
             let start = app.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: composer.frame.midX, dy: composer.frame.minY - 200))
-            start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 17)),
+                .withOffset(CGVector(dx: composer.frame.midX, dy: max(160, composer.frame.minY - 420)))
+            start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 29)),
                         withVelocity: .slow, thenHoldForDuration: 0.3)
             Thread.sleep(forTimeInterval: 0.6)
         }
@@ -74,7 +74,9 @@ final class NoFadeUITests: ServerIsolatedUITestCase {
         guard let image = screenshot.image.cgImage else { return 0 }
         let scale = CGFloat(image.width) / screenshot.image.size.width
         let button = jump.frame.insetBy(dx: -6, dy: -6)
-        let bottom = composer.frame.minY
+        // The room's bottom stack is one opaque band (RoomBottomStackUITests):
+        // the strip is above it, where a fade would dim the rows.
+        let bottom = stackTop() ?? composer.frame.minY
         let top = (layout == "split" ? jump.frame.minY : bottom) - 16
         let strip = CGRect(x: 0, y: top, width: screenshot.image.size.width - 10, height: bottom - top)
         guard strip.height > 0,
@@ -89,6 +91,19 @@ final class NoFadeUITests: ServerIsolatedUITestCase {
             }
         }
         return count
+    }
+
+    /// The top of the opaque band under the transcript (`qa-duo/layout`'s transcript stack).
+    private func stackTop() -> CGFloat? {
+        command("layout")
+        guard let value = app.windows.firstMatch.value as? String,
+              let layout = try? JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
+              let transcripts = layout["transcripts"] as? [[String: Any]] else { return nil }
+        let tops = transcripts.compactMap { ($0["stack"] as? [String: Any]).flatMap { box -> CGFloat? in
+            guard let y = box["y"] as? Double, let width = box["width"] as? Double, width > 0 else { return nil }
+            return CGFloat(y)
+        } }
+        return tops.first
     }
 
     private func shot(_ name: String) {

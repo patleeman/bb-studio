@@ -1,6 +1,6 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
-import { MIGRATIONS } from "./migrations";
+import { migratedPluginDb } from "./test/migrated-db";
 import { fromHeartbeat, localZone, type Weekday } from "./schedule";
 import { nextRun } from "./triggers/next-run";
 import { testScheduler } from "./test/scheduler-fixture";
@@ -51,8 +51,10 @@ async function setup(off: Off | null = null, extra: Partial<AutomationDeps> = {}
     plugins: { callRpc: callRpc as never, list: async () => ({ plugins: [{ id: "automations", enabled: !off }] }), experimental_discoverRpc: async () => [] },
   } });
   dispose.push(() => harness.lifecycle.dispose());
-  const db = bb.storage.database();
-  bb.storage.migrate(db, MIGRATIONS);
+  const mem = migratedPluginDb();
+  const db = mem as unknown as ReturnType<typeof bb.storage.database>;
+  bb.storage.database = () => db;
+  dispose.push(async () => { mem.close(); });
   const bot = { id: "bot_main", name: "Dot", threadId: "bot1" as string | null, state: "active", primary: true, kind: "studio" };
   let heartbeat: HeartbeatRun | null = { enabled: true, cadence: "weekdays", time: "08:00" };
   const setHeartbeat = vi.fn(async (_botId: string, run: HeartbeatRun) => { heartbeat = run; });
@@ -878,4 +880,60 @@ it("FM (review F5): setting up again a watcher deleted in bb tells the user once
   expect(notify.mock.calls[0]![1]).toContain("delete it in Studio");
   await x.auto.tick();
   expect(notify).toHaveBeenCalledTimes(1);
+});
+
+it("logs and skips rows with corrupted DB JSON instead of crashing list() or scheduled()", async () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const x = await setup();
+    const good = await x.auto.create({ kind: "checkin", name: "Good brief", instruction: "Say hi", schedule: { type: "cron", cron: "0 9 * * *" } });
+    const badSchedule = await x.auto.create({ kind: "checkin", name: "Broken schedule", instruction: "Never lists", schedule: { type: "cron", cron: "0 10 * * *" } });
+    const badMeta = await x.auto.create({ ...watcher, name: "Broken env", schedule: { type: "cron", cron: "0 11 * * *" } });
+
+    x.db.prepare("UPDATE bot_automations SET schedule_json = '{not-json' WHERE id = ?").run(badSchedule.id);
+    x.db.prepare("UPDATE bot_automations SET resources = '{bad', env_json = '{bad', seen_ids = '{bad' WHERE id = ?").run(badMeta.id);
+
+    const listed = await x.auto.list();
+    expect(listed.map((each) => each.id)).toContain(good.id);
+    expect(listed.map((each) => each.id)).not.toContain(badSchedule.id);
+    expect(listed.find((each) => each.id === badMeta.id)?.script?.envKeys).toEqual([]);
+
+    const sched = x.auto.scheduled("bot_main");
+    expect(sched.map((each) => each.name)).toContain("Dot · Good brief");
+    expect(sched.map((each) => each.name)).not.toContain("Dot · Broken schedule");
+    expect(warn.mock.calls.some(([msg]) => typeof msg === "string" && msg.includes(badSchedule.id))).toBe(true);
+    expect(warn.mock.calls.some(([msg]) => typeof msg === "string" && msg.includes(badMeta.id))).toBe(true);
+
+    // Repeated reads do not re-warn for the same row and column.
+    const warnCount = warn.mock.calls.length;
+    await x.auto.list();
+    x.auto.scheduled("bot_main");
+    expect(warn.mock.calls.length).toBe(warnCount);
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+it("skips a watcher for the tick when seen_ids is malformed instead of re-notifying, and warns only once", async () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const x = await setup();
+    const made = await x.auto.create({ ...watcher, name: "Broken seen_ids", schedule: { type: "cron", cron: "0 11 * * *" } });
+    const bbId = String(x.automations[0]!.id);
+    x.runs.set(bbId, [{ id: "run_1", status: "completed", finishedAt: Date.now() + 1000, output: "Alert!" }]);
+    x.db.prepare("UPDATE bot_automations SET seen_ids = '{bad' WHERE id = ?").run(made.id);
+
+    await x.auto.tick();
+    expect(x.send).not.toHaveBeenCalled();
+    const seenWarns = warn.mock.calls.filter(([msg]) => typeof msg === "string" && msg.includes(made.id) && msg.includes("seen_ids") && msg.includes("skipping watcher"));
+    expect(seenWarns).toHaveLength(1);
+
+    // A second tick still skips without re-warning.
+    await x.auto.tick();
+    expect(x.send).not.toHaveBeenCalled();
+    const seenWarnsAfter = warn.mock.calls.filter(([msg]) => typeof msg === "string" && msg.includes(made.id) && msg.includes("seen_ids"));
+    expect(seenWarnsAfter).toHaveLength(1);
+  } finally {
+    warn.mockRestore();
+  }
 });

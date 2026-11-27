@@ -17,6 +17,9 @@ final class EnergyGate: ObservableObject {
     /// How much longer a poll waits while idle, and the longest wait.
     nonisolated static let idleBackoff = 3
     nonisolated static let longestPoll: Duration = .seconds(180)
+    /// After this long without a touch, every poll waits `restingPoll`.
+    nonisolated static let restingAfter: TimeInterval = 300
+    nonisolated static let restingPoll: Duration = .seconds(300)
 
     @Published private(set) var idle = false
     @Published private(set) var typing = false
@@ -26,7 +29,7 @@ final class EnergyGate: ObservableObject {
     private var watched: Set<ObjectIdentifier> = []
     /// In the background: polls hold until the app is back.
     private(set) var background = false
-    private var waitingForForeground: [CheckedContinuation<Void, Never>] = []
+    private var waitingForForeground: [UUID: CheckedContinuation<Void, Never>] = [:]
 
     init(watchKeyboard: Bool = true) {
         guard watchKeyboard else { return }
@@ -52,20 +55,61 @@ final class EnergyGate: ObservableObject {
         now.timeIntervalSince(lastActivity) >= after
     }
 
-    /// A poll's wait: as given while in use, `idleBackoff` times longer (at most `longestPoll`) while idle.
-    nonisolated static func pollDelay(_ base: Duration, idle: Bool) -> Duration {
-        guard idle else { return base }
+    /// A poll's wait: as given while in use, `idleBackoff` times longer (at
+    /// most `longestPoll`) while idle or saving energy (Low Power Mode, a
+    /// warm phone), and `restingPoll` once nobody has touched the phone for
+    /// `restingAfter`.
+    nonisolated static func pollDelay(_ base: Duration, idle: Bool, idleFor: TimeInterval = 0, saving: Bool = false) -> Duration {
+        if idle, idleFor >= restingAfter { return max(base, restingPoll) }
+        guard idle || saving else { return base }
         return min(max(base, longestPoll), base * idleBackoff)
     }
 
-    func pollDelay(_ base: Duration) -> Duration { Self.pollDelay(base, idle: idle) }
+    func pollDelay(_ base: Duration) -> Duration {
+        Self.pollDelay(base, idle: idle, idleFor: Date().timeIntervalSince(lastActivity), saving: Self.saving)
+    }
+
+    /// The least time between two refreshes that BB's change signals ask for:
+    /// `inUse` while in use (the caller's own pace), at least 30 s while idle,
+    /// and `restingPoll` once untouched for `restingAfter`. A caller waiting
+    /// on it looks again now and then, so a touch brings a held refresh back
+    /// within seconds. In use it never waits longer, warm phone or not: what
+    /// shows stays current.
+    nonisolated static func changeGap(_ inUse: Duration, idle: Bool, idleFor: TimeInterval = 0) -> Duration {
+        guard idle else { return inUse }
+        if idleFor >= restingAfter { return max(inUse, restingPoll) }
+        return max(inUse * idleBackoff, .seconds(30))
+    }
+
+    func changeGap(_ inUse: Duration) -> Duration {
+        Self.changeGap(inUse, idle: idle, idleFor: Date().timeIntervalSince(lastActivity))
+    }
+
+    /// Low Power Mode or a warm phone (thermal state fair or worse): polls wait longer even in use.
+    nonisolated static var saving: Bool {
+        let info = ProcessInfo.processInfo
+        return info.isLowPowerModeEnabled || info.thermalState.rawValue >= ProcessInfo.ThermalState.fair.rawValue
+    }
 
     /// A poll loop's wait between rounds: `pollDelay(base)` (just `base` when it
     /// mustn't back off), then, while the app is in the background, until it comes back.
     func pollWait(_ base: Duration, backsOff: Bool = true) async {
         try? await Task.sleep(for: backsOff ? pollDelay(base) : base)
         while background, !Task.isCancelled {
-            await withCheckedContinuation { waitingForForeground.append($0) }
+            let token = UUID()
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    if !background || Task.isCancelled {
+                        continuation.resume()
+                    } else {
+                        waitingForForeground[token] = continuation
+                    }
+                }
+            } onCancel: {
+                Task { @MainActor [weak self] in
+                    self?.waitingForForeground.removeValue(forKey: token)?.resume()
+                }
+            }
         }
     }
 
@@ -73,8 +117,8 @@ final class EnergyGate: ObservableObject {
         background = now
         guard !now else { return }
         let waiting = waitingForForeground
-        waitingForForeground = []
-        waiting.forEach { $0.resume() }
+        waitingForForeground = [:]
+        waiting.values.forEach { $0.resume() }
     }
 
     /// A touch or keystroke: wake now, and look again when it would turn idle.

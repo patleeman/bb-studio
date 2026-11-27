@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { expect, it } from "vitest";
 import { FORK_HOOKS, forkOnly, isForkSdk, onForkHost } from "./kit/app/host-sdk";
 import { forkHooks } from "./onboarding-register";

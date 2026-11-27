@@ -16,7 +16,10 @@ final class ScrollLogUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(toggle.waitForExistence(timeout: 10))
         // Left over from an earlier run: start off and empty.
         if (toggle.value as? String) == "1" { toggle.switches.firstMatch.tap() }
+        // Clear sits under Share log, below the fold until scrolled to.
+        for _ in 0..<3 where app.buttons["Share log"].exists && !app.buttons["Clear"].isHittable { app.swipeUp() }
         if app.buttons["Clear"].exists { app.buttons["Clear"].tap() }
+        _ = app.buttons["Share log"].waitForNonExistence(timeout: 3)
         XCTAssertFalse(app.buttons["Share log"].exists, "Nothing to share before the log is on")
         if (toggle.value as? String) != "1" { toggle.switches.firstMatch.tap() }
         XCTAssertEqual(toggle.value as? String, "1")
@@ -32,8 +35,17 @@ final class ScrollLogUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(timeout: 10)
             || app.navigationBars["UIActivityContentView"].waitForExistence(timeout: 5), "The system share sheet opens")
         let close = app.buttons["Close"].firstMatch
-        // Above the half-height sheet, which closes it.
-        if close.exists { close.tap() } else { app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap() }
+        // Dragged down from inside it (a popover on iOS 27): a tap outside
+        // could close Settings, a sheet too, with it.
+        if close.exists {
+            close.tap()
+        } else {
+            let window = app.windows.firstMatch
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.62))
+                .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.99)))
+        }
+        XCTAssertTrue(share.waitForExistence(timeout: 5), "Settings stays open")
+        for _ in 0..<3 where !app.buttons["Clear"].isHittable { app.swipeUp() }
         XCTAssertTrue(app.buttons["Clear"].waitForExistence(timeout: 5))
 
         app.buttons["Clear"].tap()

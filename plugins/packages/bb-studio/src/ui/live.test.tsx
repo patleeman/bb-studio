@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, expectTypeOf, it, vi } from "vitest";
@@ -132,4 +132,19 @@ it("a signal whose refetch returns the same data does not render the readers aga
     expect(renders).toBe(settled + 1);
     expect(api.data?.runners).toEqual(runners);
   } finally { act(() => root.unmount()); vi.useRealTimers(); }
+});
+
+it("keeps one polling timer without recreating it as readers with the same pollMs join and leave", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.useFakeTimers();
+  const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+  rpc.call.mockReset().mockResolvedValue({ botId: "steady" });
+  function Reader() { useLive("bot_thread_owner", { threadId: "steady-poll" }, { pollMs: 5000 }); return null; }
+  const root = createRoot(document.createElement("div"));
+  try {
+    await act(async () => root.render(<><Reader /><Reader /><Reader /></>));
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+    await act(async () => root.render(<Reader />));
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+  } finally { act(() => root.unmount()); setIntervalSpy.mockRestore(); vi.useRealTimers(); }
 });

@@ -15,6 +15,8 @@ import type { ExpoMessage } from "./apns.js";
 export const DESK_FRESH_MS = 2 * 60_000;
 /** A held push is sent only if the user goes away within this long. */
 export const HOLD_MAX_MS = 10 * 60_000;
+/** Max wait per seen() check before treating the thread as unseen so one hung check can't stall releases. */
+export const SEEN_TIMEOUT_MS = 10_000;
 /** Clients forgotten after this long without a beat. */
 const CLIENT_TTL_MS = 60 * 60_000;
 const MAX_CLIENTS = 50;
@@ -90,6 +92,7 @@ export type DeskHoldDeps = {
   /** Sends the pushes that go out when the user leaves. */
   send(messages: ExpoMessage[]): Promise<void>;
   log?(message: string): void;
+  seenTimeoutMs?: number;
 };
 
 export type DeskStatus = { atDesk: boolean | null; held: number; clients: number; lastBeatAt: number | null };
@@ -101,6 +104,7 @@ export class DeskHold {
   private wasAtDesk = false;
   private releasing: Promise<void> = Promise.resolve();
   private releaseAll = false;
+  private disposed = false;
   private readonly now: () => number;
 
   constructor(private readonly deps: DeskHoldDeps) {
@@ -121,6 +125,7 @@ export class DeskHold {
 
   beat(beat: DeskBeat): DeskStatus {
     const now = this.now();
+    if (this.disposed) return this.status(now);
     for (const [id, client] of this.clients) if (now - client.at > CLIENT_TTL_MS) this.clients.delete(id);
     this.clients.delete(beat.clientId);
     this.clients.set(beat.clientId, { ...beat, at: now });
@@ -131,6 +136,7 @@ export class DeskHold {
 
   /** Holds the pushes when the user is at the desk; false when they should go out now. */
   hold(messages: ExpoMessage[]): boolean {
+    if (this.disposed) return false;
     const now = this.now();
     if (messages.length === 0 || !this.atDesk(now)) return false;
     this.wasAtDesk = true;
@@ -141,12 +147,14 @@ export class DeskHold {
 
   /** Sends what is held now (the switch was turned off). */
   releaseNow(): Promise<void> {
+    if (this.disposed) return Promise.resolve();
     this.releaseAll = true;
     return this.release();
   }
 
   /** Re-evaluates: drops old pushes and releases the rest once the user is away. */
   check(): void {
+    if (this.disposed) return;
     const now = this.now();
     this.held = this.held.filter((push) => now - push.heldAt <= HOLD_MAX_MS);
     const here = this.atDesk(now);
@@ -158,7 +166,7 @@ export class DeskHold {
   private schedule(): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
-    if (this.held.length === 0) return;
+    if (this.disposed || this.held.length === 0) return;
     const now = this.now();
     // The next moment something changes: the oldest push expires, or the last fresh "active" beat goes stale.
     const expires = Math.min(...this.held.map((push) => push.heldAt + HOLD_MAX_MS + 1));
@@ -171,6 +179,7 @@ export class DeskHold {
 
   private release(): Promise<void> {
     const task = this.releasing.then(async () => {
+      if (this.disposed) return;
       const now = this.now();
       // Pushes held after the user came back stay held for the next time they leave.
       const pushes = this.held.filter((push) => now - push.heldAt <= HOLD_MAX_MS);
@@ -180,23 +189,39 @@ export class DeskHold {
       if (this.timer) clearTimeout(this.timer);
       this.timer = null;
       if (pushes.length === 0) return;
-      const keys = new Map<string, Promise<boolean | undefined>>();
-      const unseen: HeldPush[] = [];
-      for (const push of pushes) {
+      const unique = new Map<string, { key: { threadId: string; workerId?: string }; seen: boolean | undefined }>();
+      const ids = pushes.map((push) => {
         const key = seenKey(push.message);
         const id = `${key.threadId}\u0000${key.workerId ?? ""}`;
-        if (!keys.has(id)) keys.set(id, this.deps.seen(key).catch(() => undefined));
-        if ((await keys.get(id)) !== true) unseen.push(push);
-      }
+        if (!unique.has(id)) unique.set(id, { key, seen: undefined });
+        return id;
+      });
+      const seenTimeoutMs = this.deps.seenTimeoutMs ?? SEEN_TIMEOUT_MS;
+      await Promise.all([...unique.values()].map(async (entry) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const late = new Promise<undefined>((resolve) => {
+          timer = setTimeout(() => resolve(undefined), seenTimeoutMs);
+          timer.unref?.();
+        });
+        entry.seen = await Promise.race([
+          this.deps.seen(entry.key).catch(() => undefined),
+          late,
+        ]).finally(() => { if (timer) clearTimeout(timer); });
+      }));
+      const unseen = pushes.filter((_, index) => unique.get(ids[index]!)?.seen !== true);
       const messages = awayMessages(unseen);
       if (messages.length > 0) await this.deps.send(messages);
+      if (this.disposed) return;
       this.deps.log?.(`desk: away; ${pushes.length} held, ${unseen.length} unseen, sent ${messages.length}${messages.length ? `: ${messages.map((message) => JSON.stringify(message.title ?? "")).join(", ")}` : ""}`);
-    }).catch((error: unknown) => this.deps.log?.(`desk: release failed: ${error instanceof Error ? error.message : String(error)}`));
+    }).catch((error: unknown) => {
+      if (!this.disposed) this.deps.log?.(`desk: release failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
     this.releasing = task;
     return task;
   }
 
   dispose(): void {
+    this.disposed = true;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     this.held = [];

@@ -47,6 +47,7 @@ function fillConcurrency(): { asked: number } {
     ],
     invokeHook: (_pluginId, _label, run) => invokePluginInline(run),
     decisionTimeoutMs: 10_000,
+    isLoadingPlugins: () => false,
   });
   return calls;
 }

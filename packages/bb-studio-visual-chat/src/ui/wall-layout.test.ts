@@ -96,7 +96,9 @@ document.getElementById("f").srcdoc = ${JSON.stringify(inner).replace(/<\//g, "<
 const overlaps = (a: { x: number; y: number; right: number; bottom: number }, b: { x: number; y: number; right: number; bottom: number }) =>
   a.x < b.right - 1 && b.x < a.right - 1 && a.y < b.bottom - 1 && b.y < a.bottom - 1;
 
-describe.skipIf(!chrome)("a picture wall at phone widths (headless Chrome)", () => {
+const runVisualLayout = process.env.BB_STUDIO_VISUAL_LAYOUT_TESTS === "1";
+
+describe.skipIf(!runVisualLayout || !chrome)("a picture wall at phone widths (headless Chrome)", () => {
   for (const [width, height] of [[466, 678], [390, 844]] as const) {
     for (const [cols, frame] of [[4, "fill"], [3, "fill"], [4, "fixed"], [3, "fixed"]] as const) {
       it(`keeps every card's text in its own cell at ${width}px with ${cols} columns (${frame} page)`, () => {

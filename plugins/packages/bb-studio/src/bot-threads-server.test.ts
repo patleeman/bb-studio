@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { ThreadFacts } from "./bot-threads";
 import { libraryItems, libraryKind, recordingFiles, registerBotThreads } from "./bot-threads-server";
 import type { IndexedItem } from "./item-index";
-import { MIGRATIONS } from "./migrations";
+import { migratedPluginDb } from "./test/migrated-db";
 
 const dispose: (() => Promise<void>)[] = [];
 /** While set, BB's thread reads wait on it (a reload while Studio still waits on BB). */
@@ -63,8 +63,10 @@ async function setup() {
     },
   } });
   dispose.push(() => harness.lifecycle.dispose());
-  const db = bb.storage.database();
-  bb.storage.migrate(db, MIGRATIONS);
+  const mem = migratedPluginDb();
+  const db = mem as unknown as ReturnType<typeof bb.storage.database>;
+  bb.storage.database = () => db;
+  dispose.push(async () => { mem.close(); });
   const changed = vi.fn();
   const server = registerBotThreads(bb, db, {
     bots: () => [{ id: "dot", name: "Dot", avatar: "🤖", primary: true, threadId: "thr_main", state: "active" }, { id: "home", name: "Home", avatar: "🏠", threadId: "thr_home", state: "paused", theme: { colors: ["#22c55e"], mode: "light", grain: 0 } } as never],

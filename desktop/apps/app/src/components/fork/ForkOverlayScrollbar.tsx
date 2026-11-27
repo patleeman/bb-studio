@@ -26,12 +26,16 @@ const CARD = '[data-fork-card="main"]';
 const PSEUDO_CARD_HOSTS =
   ".box-border.h-full.w-full, .relative.h-full.overflow-hidden";
 
-export function forkScrollCardRight(scroller: HTMLElement): number {
-  const edge = scroller.getBoundingClientRect().right;
+export function forkScrollCardRight(
+  scroller: HTMLElement,
+  edge?: number,
+): number {
+  const scrollerRight = edge ?? scroller.getBoundingClientRect().right;
   const card = scroller.querySelector(CARD) ?? scroller.closest(CARD);
-  if (card !== null) return Math.min(edge, card.getBoundingClientRect().right);
+  if (card !== null)
+    return Math.min(scrollerRight, card.getBoundingClientRect().right);
   const view = scroller.ownerDocument.defaultView;
-  if (view === null) return edge;
+  if (view === null) return scrollerRight;
   for (const host of [
     scroller.firstElementChild,
     scroller.closest(PSEUDO_CARD_HOSTS),
@@ -42,9 +46,9 @@ export function forkScrollCardRight(scroller: HTMLElement): number {
     const width = Number.parseFloat(backing.width);
     if (!Number.isFinite(width) || width <= 0) continue;
     const box = host.getBoundingClientRect();
-    return Math.min(edge, box.left + (box.width + width) / 2);
+    return Math.min(scrollerRight, box.left + (box.width + width) / 2);
   }
-  return edge;
+  return scrollerRight;
 }
 
 export function forkScrollThumbBox(
@@ -54,10 +58,11 @@ export function forkScrollThumbBox(
   >,
   thumbWidth: number,
   right?: number,
+  scrollerRect?: Pick<DOMRect, "top" | "right" | "height">,
 ): ForkScrollThumbBox | null {
   const range = scroller.scrollHeight - scroller.clientHeight;
   if (range <= 1 || scroller.clientHeight <= 0) return null;
-  const rect = scroller.getBoundingClientRect();
+  const rect = scrollerRect ?? scroller.getBoundingClientRect();
   const track = rect.height - 2 * EDGE_INSET;
   if (track <= MIN_THUMB) return null;
   const height = Math.max(
@@ -90,13 +95,28 @@ export function mountForkOverlayScrollbar(doc: Document): () => void {
   doc.body.appendChild(thumb);
   let current: HTMLElement | null = null;
   let hovered: HTMLElement | null = null;
+  let lastPointerTarget: EventTarget | null = null;
+  let cachedScrollerRect: Pick<DOMRect, "top" | "right" | "height"> | null = null;
+  let cachedCardRight: number | null = null;
+  let cachedThumbWidth: number | null = null;
+  let lastTop = "";
+  let lastLeft = "";
+  let lastHeight = "";
+  let visible = false;
   let timer: number | null = null;
   let drag: { y: number; scrollTop: number; scale: number } | null = null;
+
+  const invalidateLayout = () => {
+    cachedScrollerRect = null;
+    cachedCardRight = null;
+    cachedThumbWidth = null;
+  };
 
   const resized =
     typeof view.ResizeObserver === "function"
       ? new view.ResizeObserver(() => {
           if (current === null) return;
+          invalidateLayout();
           if (current.isConnected) show(current);
           else hide();
         })
@@ -105,10 +125,14 @@ export function mountForkOverlayScrollbar(doc: Document): () => void {
     if (scroller === current) return;
     resized?.disconnect();
     current = scroller;
+    invalidateLayout();
     if (scroller !== null) resized?.observe(scroller);
   };
   const hide = () => {
-    thumb.removeAttribute("data-visible");
+    if (visible) {
+      visible = false;
+      thumb.removeAttribute("data-visible");
+    }
     follow(null);
   };
   const idle = () => {
@@ -120,27 +144,59 @@ export function mountForkOverlayScrollbar(doc: Document): () => void {
   };
   const show = (scroller: HTMLElement) => {
     if (!doc.documentElement.hasAttribute(FORK_CARDS_ATTRIBUTE)) return hide();
+    if (scroller !== current) follow(scroller);
+    if (cachedScrollerRect === null) {
+      const rect = scroller.getBoundingClientRect();
+      cachedScrollerRect = {
+        top: rect.top,
+        right: rect.right,
+        height: rect.height,
+      };
+    }
+    if (cachedThumbWidth === null) cachedThumbWidth = thumb.offsetWidth || 6;
+    if (cachedCardRight === null)
+      cachedCardRight = forkScrollCardRight(scroller, cachedScrollerRect.right);
     const box = forkScrollThumbBox(
       scroller,
-      thumb.offsetWidth || 6,
-      forkScrollCardRight(scroller),
+      cachedThumbWidth,
+      cachedCardRight,
+      cachedScrollerRect,
     );
     if (box === null) {
       if (current === scroller) hide();
       return;
     }
-    follow(scroller);
-    thumb.style.top = `${box.top}px`;
-    thumb.style.left = `${box.left}px`;
-    thumb.style.height = `${box.height}px`;
-    thumb.setAttribute("data-visible", "");
+    const top = `${box.top}px`;
+    const left = `${box.left}px`;
+    const height = `${box.height}px`;
+    if (top !== lastTop) {
+      lastTop = top;
+      thumb.style.top = top;
+    }
+    if (left !== lastLeft) {
+      lastLeft = left;
+      thumb.style.left = left;
+    }
+    if (height !== lastHeight) {
+      lastHeight = height;
+      thumb.style.height = height;
+    }
+    if (!visible) {
+      visible = true;
+      thumb.setAttribute("data-visible", "");
+    }
     idle();
   };
   const onScroll = (event: Event) => {
     if (event.target instanceof HTMLElement) {
-      if (event.target.matches(FORK_OVERLAY_SCROLLERS)) show(event.target);
-      else if (current !== null && event.target.contains(current))
+      if (event.target === current) {
+        show(event.target);
+      } else if (event.target.matches(FORK_OVERLAY_SCROLLERS)) {
+        show(event.target);
+      } else if (current !== null && event.target.contains(current)) {
+        invalidateLayout();
         show(current);
+      }
     }
   };
   const onPointerMove = (event: PointerEvent) => {
@@ -149,7 +205,8 @@ export function mountForkOverlayScrollbar(doc: Document): () => void {
         drag.scrollTop + (event.clientY - drag.y) * drag.scale;
       return;
     }
-    if (event.target === thumb) return;
+    if (event.target === thumb || event.target === lastPointerTarget) return;
+    lastPointerTarget = event.target;
     const scroller = overlayScroller(event.target);
     if (scroller === hovered) return;
     hovered = scroller;
@@ -157,12 +214,13 @@ export function mountForkOverlayScrollbar(doc: Document): () => void {
     else idle();
   };
   const onPointerLeave = () => {
+    lastPointerTarget = null;
     hovered = null;
     idle();
   };
   const onThumbDown = (event: PointerEvent) => {
     if (current === null || event.button !== 0) return;
-    const box = forkScrollThumbBox(current, thumb.offsetWidth || 6);
+    const box = forkScrollThumbBox(current, cachedThumbWidth ?? (thumb.offsetWidth || 6));
     if (box === null || box.travel <= 0) return;
     event.preventDefault();
     thumb.setPointerCapture(event.pointerId);
@@ -179,6 +237,7 @@ export function mountForkOverlayScrollbar(doc: Document): () => void {
     idle();
   };
   const onResize = () => {
+    invalidateLayout();
     if (current !== null) show(current);
   };
 

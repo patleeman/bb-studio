@@ -102,11 +102,17 @@ enum Links {
         "bot-thread": .conversation, "board": .board,
     ]
 
+    nonisolated(unsafe) private static let directiveRegex = /^::([a-zA-Z-]+)\{([^}]*)\}$/
+    nonisolated(unsafe) private static let attrRegex = /([\w-]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s"']+)))?/
+    nonisolated(unsafe) private static let shortLinkRegex = /^(page|thread):([^\s\/?#]+)$/
+    nonisolated(unsafe) private static let threadPathRegex = /^\/(?:projects\/[^\/?#]+\/)?threads\/([^\/?#]+)(?:\/|$)/
+    nonisolated(unsafe) private static let boardPathRegex = /^\/plugins\/studio-visual-chat\/canvas\/([^\/]+)$/
+
     private static func directive(_ text: String) -> LinkRef?? {
-        guard let match = text.firstMatch(of: /^::([a-zA-Z-]+)\{([^}]*)\}$/) else { return .none }
+        guard text.hasPrefix("::"), let match = text.firstMatch(of: Self.directiveRegex) else { return .none }
         guard let kind = directiveKinds[String(match.1).lowercased()] else { return .some(nil) }
         var attributes: [String: String] = [:]
-        for each in String(match.2).matches(of: /([\w-]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s"']+)))?/) {
+        for each in String(match.2).matches(of: Self.attrRegex) {
             attributes[String(each.1)] = (each.2 ?? each.3 ?? each.4).map(String.init) ?? ""
         }
         let id = [attributes["id"], attributes["threadId"]].compactMap { $0 }.first { !$0.isEmpty }
@@ -133,7 +139,7 @@ enum Links {
         let link = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !link.isEmpty else { return nil }
         if let parsed = directive(link) { return parsed.map(LinkTarget.entity) }
-        if let match = link.firstMatch(of: /^(page|thread):([^\s\/?#]+)$/) {
+        if (link.hasPrefix("page:") || link.hasPrefix("thread:")), let match = link.firstMatch(of: Self.shortLinkRegex) {
             return ref(match.1 == "page" ? .page : .conversation, String(match.2).removingPercentEncoding).map(LinkTarget.entity)
         }
         let lower = link.lowercased()
@@ -159,10 +165,10 @@ enum Links {
         var path = String(pathname.split(whereSeparator: { $0 == "?" || $0 == "#" }).first ?? "")
         while path.hasSuffix("/") { path.removeLast() }
         func decode(_ part: Substring) -> String? { String(part).removingPercentEncoding.flatMap { $0.isEmpty ? nil : $0 } }
-        if let thread = path.firstMatch(of: /^\/(?:projects\/[^\/?#]+\/)?threads\/([^\/?#]+)(?:\/|$)/) {
+        if path.contains("/threads/"), let thread = path.firstMatch(of: Self.threadPathRegex) {
             return decode(thread.1).map { LinkRef(kind: .conversation, id: $0) }
         }
-        if let board = path.firstMatch(of: /^\/plugins\/studio-visual-chat\/canvas\/([^\/]+)$/) {
+        if path.hasPrefix("/plugins/studio-visual-chat/canvas/"), let board = path.firstMatch(of: Self.boardPathRegex) {
             guard let id = decode(board.1), id != "new" else { return nil }
             return LinkRef(kind: .board, id: id)
         }
@@ -195,6 +201,8 @@ enum Links {
 
     static func needsResolution(_ ref: LinkRef) -> Bool {
         guard ref.kind.ref != .none, ref.kind != .browser else { return false }
+        // Memory records are retired: an old record link just opens Memory, with nothing to look up.
+        if ref.kind == .record { return false }
         return ref.id != nil
     }
 
@@ -211,7 +219,7 @@ enum Links {
         case .archive: return .botPage(.archive, botId: id)
         case .automation: return id.map(LinkDestination.automation) ?? .botPage(.automations, botId: nil)
         case .todo: return id.map(LinkDestination.todo) ?? .botPage(.strands, botId: nil)
-        case .record: return id.map(LinkDestination.record) ?? .botPage(.memory, botId: nil)
+        case .record: return .botPage(.memory, botId: nil)
         case .page: return id.map { .route(.page(id: $0)) } ?? .elsewhere("That link names no page.")
         case .whiteboard: return id.map { .route(.drawing(id: $0)) } ?? .elsewhere("That link names no whiteboard.")
         case .design: return id.map { .route(.design(id: $0)) } ?? .elsewhere("That link names no design.")

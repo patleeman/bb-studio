@@ -104,7 +104,7 @@ export function AutomationsSection({ botId, botName, onOpen, disabled, external 
           {(["week", "list"] as const).map((each) => (
             <button key={each} type="button" role="tab" aria-selected={view === each} onClick={() => setView(each)}
               className="flex h-6 items-center gap-1 rounded px-2 text-xs text-muted-foreground hover:text-foreground aria-selected:bg-state-active aria-selected:text-foreground">
-              <Icon name={each === "week" ? "Calendar" : "List"} className="size-3.5" />{each === "week" ? "Week" : "List"}
+              <Icon name={each === "week" ? "Calendar" : "ListView"} className="size-3.5" />{each === "week" ? "Week" : "List"}
             </button>
           ))}
         </div>
@@ -136,7 +136,7 @@ export function AutomationsSection({ botId, botName, onOpen, disabled, external 
       ) : !list.length ? (
         <p className="pt-1 text-xs text-muted-foreground">{data.loading ? "Loading…" : "No automations"}</p>
       ) : null}
-      {view === "list" && list.some((a) => a.state === "done" || a.state === "ended") ? <button className={GHOST_BUTTON} onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>Done</button> : null}
+      {view === "list" && list.some((a) => a.state === "done" || a.state === "ended") ? <button type="button" className={GHOST_BUTTON} onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>Done</button> : null}
       {editor.dialogs}
     </section>
   );

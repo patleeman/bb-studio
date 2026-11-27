@@ -1,6 +1,7 @@
 import { untitled } from "../kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { callText, counted, nextLine, pageByKey, pageItems, staleCursor } from "../paging";
 import { createThread, listThreads, reply, setResolved, type ThreadView } from "./comments";
 import { readMarkdown, type EditOp } from "./doc";
 import { shortId } from "./markdown";
@@ -11,6 +12,41 @@ import type { PageMeta } from "./store";
 import { opNeeds } from "../op-errors";
 
 const MAX_READ_CHARS = 60_000;
+/** pages_read's default part of a long page (characters); `limit` asks for more, up to MAX_READ_CHARS. */
+const SEARCH_CAP = 200;
+export const READ_PART_CHARS = 12_000;
+
+/**
+ * One part of a page's Markdown, from block `from` (an id or its prefix) on, whole blocks only, at most
+ * `limit` characters; `next` is the first block left out. A single block larger than `limit` is cut at
+ * `limit` characters (`cut`). A `from` that matches no block gives `missing`: the block was deleted.
+ */
+export function readPart(markdown: string, from: string | undefined, limit: number): { text: string; next: string | null; shown: number; total: number; cut?: { block: string; size: number }; missing?: true } {
+  const marker = /^<!-- \^([A-Za-z0-9_-]+) -->/gm;
+  const starts: { at: number; id: string }[] = [];
+  for (const match of markdown.matchAll(marker)) starts.push({ at: match.index!, id: match[1]! });
+  if (!starts.length) return { text: markdown.slice(0, limit), next: null, shown: Math.min(markdown.length, limit), total: markdown.length };
+  const blocks = starts.map((start, index) => ({ id: start.id, text: markdown.slice(start.at, starts[index + 1]?.at ?? markdown.length) }));
+  const lead = markdown.slice(0, starts[0]!.at);
+  const first = from ? blocks.findIndex((block) => block.id.startsWith(from)) : 0;
+  if (first < 0) return { text: "", next: null, shown: 0, total: markdown.length, missing: true };
+  const out: string[] = first === 0 && lead ? [lead] : [];
+  let size = out.join("").length;
+  let index = first;
+  while (index < blocks.length && size + blocks[index]!.text.length <= limit) {
+    out.push(blocks[index]!.text);
+    size += blocks[index]!.text.length;
+    index++;
+  }
+  if (index === first) {
+    // One block larger than the whole part: its first `limit` characters, and say so.
+    const block = blocks[first]!;
+    const room = Math.max(0, limit - size);
+    out.push(block.text.slice(0, room));
+    return { text: out.join(""), next: blocks[first + 1]?.id ?? null, shown: size + room, total: markdown.length, cut: { block: block.id, size: block.text.length } };
+  }
+  return { text: out.join(""), next: blocks[index]?.id ?? null, shown: size, total: markdown.length };
+}
 
 export const TOOL_NAMES = [
   "pages_list",
@@ -27,7 +63,7 @@ export const AGENT_INSTRUCTIONS = [
   'Chart JSON: {"type":"bar|line|area|pie","title":"…","x":"label","series":["Revenue"],"unit":"$","data":[{"label":"Q1","Revenue":10}]}. Stats JSON: [{"label":"ARR","value":"$1.2M","delta":"+8%","trend":"up"}] (1–6 items). Embed JSON: {"kind":"bookmark|thread|page|drawing|artifact|recording|mini|table|item","target":"https://… or an id","title":"…"}; item targets are plugin:id from studio_list_items; a table target may be <table id>/view/<view id>; a drawing (whiteboard) embed may set "height" in pixels (160–1200).',
   "An ```html block renders its HTML in a sandboxed iframe: scripts run, but with no same-origin access (no cookies, storage or BB APIs), and don't assume network access. Keep it self-contained with inline <style> and <script>, follow light and dark with prefers-color-scheme, and keep it under 200,000 characters (longer ones show as code). Use ```html only for something to render; show HTML source as code with ```html source (or another language such as ```xml).",
   "Images: prefer an artifact embed (save the image as an artifact, then ```embed {\"kind\":\"artifact\",\"target\":\"art_…\"}). Local image paths (`![](/…/chart.png)`) are imported into the page when supported: PNG, JPEG, GIF or WebP up to 10 MB from your thread's workspace or thread storage. The tool result names any image it couldn't import.",
-  "Manage page comments with pages_comments (op: list, create, reply, resolve): answer in the same thread with op \"reply\"; start new threads with op \"create\" on the block/quote you are discussing.",
+  "Manage page comments with pages_read (comments) (op: list, create, reply, resolve): answer in the same thread with op \"reply\"; start new threads with op \"create\" on the block/quote you are discussing.",
   'When you create or change a page, put its card on its own line in your reply, `::page{id="pg_…"}`, so the user can open it beside the chat.',
 ].join("\n");
 
@@ -72,11 +108,23 @@ export function registerTools(
   bb.agents.registerTool({
     name: "pages_list",
     description: "List BB Pages (collaborative documents) in this project and global pages, as a tree. Optionally search titles and content.",
-    parameters: z.object({ query: z.string().max(200).optional() }),
-    execute({ query }, ctx) {
+    parameters: z.object({ query: z.string().max(200).optional(), after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
+    execute({ query, after }, ctx) {
+      // In parts (src/paging.ts): the next part starts after the last page shown.
+      const parted = (rows: { id: string; line: string }[], heading: string) => {
+        const part = pageItems(rows, (row) => row.id, (row) => row.line.length, { after });
+        if (part.missing) return staleCursor(`Page ${after}`, callText("pages_list", { ...(query?.trim() ? { query } : {}) }));
+        const next = nextLine(part, (last) => callText("pages_list", { ...(query?.trim() ? { query } : {}), after: last }), "pages");
+        return [heading, ...(next ? [next] : []), ...part.items.map((row) => row.line)].join("\n");
+      };
       if (query?.trim()) {
-        const hits = store.search(query, ctx.projectId);
-        return hits.length ? hits.map((page) => pageLine(page)).join("\n") : `No pages match "${query}".`;
+        // Search hits by keyset on creation: a page edited between parts doesn't move.
+        const hits = store.search(query, ctx.projectId, SEARCH_CAP, "created");
+        if (!hits.length) return `No pages match "${query}".`;
+        const part = pageByKey(hits, (page) => [page.created_at, page.id], (page) => pageLine(page).length, { after, descending: [true, true] });
+        if (part.missing) return staleCursor("That cursor", callText("pages_list", { query }));
+        const next = nextLine(part, (last) => callText("pages_list", { query, after: last }), "pages");
+        return [`${counted(hits.length, SEARCH_CAP)} page${hits.length === 1 ? "" : "s"} match, newest first.`, ...(next ? [next] : []), ...part.items.map((page) => pageLine(page))].join("\n");
       }
       const pages = store.list({ projectId: ctx.projectId });
       if (!pages.length) return "No pages yet. Create one with pages_create.";
@@ -85,34 +133,51 @@ export function registerTools(
         const parent = page.parent_id && pages.some((p) => p.id === page.parent_id) ? page.parent_id : null;
         children.set(parent, [...(children.get(parent) ?? []), page]);
       }
-      const lines: string[] = [];
+      const lines: { id: string; line: string }[] = [];
       const walk = (parent: string | null, depth: number) => {
         for (const page of children.get(parent) ?? []) {
-          lines.push(pageLine(page, depth));
+          lines.push({ id: page.id, line: pageLine(page, depth) });
           walk(page.id, depth + 1);
         }
       };
       walk(null, 0);
-      return lines.join("\n");
+      return parted(lines, `${lines.length} page${lines.length === 1 ? "" : "s"}.`);
     },
   });
 
   bb.agents.registerTool({
     name: "pages_read",
-    description: "Read a BB Page as Markdown with `<!-- ^id -->` block ids and open comments. Read right before pages_edit.",
-    parameters: z.object({ page: ref }),
-    execute({ page }, ctx) {
+    description: `Read a BB Page as Markdown with \`<!-- ^id -->\` block ids and open comments. Read right before pages_edit. A long page comes in parts of about ${READ_PART_CHARS.toLocaleString("en-US")} characters: the next part with from (the block id it names), or more at once with limit.`,
+    parameters: z.object({
+      page: ref,
+      from: z.string().trim().min(1).max(64).optional().describe("Block id (or prefix) to start from: the next part of a long page"),
+      limit: z.number().int().min(1_000).max(MAX_READ_CHARS).optional().describe(`Characters to read (default ${READ_PART_CHARS})`),
+    }),
+    execute({ page, from, limit }, ctx) {
       const meta = service.requirePage(page, ctx.projectId);
       const live = service.hub.open(meta.id);
-      const markdown = readMarkdown(live.doc, { ids: true });
+      const markdown = readMarkdown(live.doc, { ids: true }).trim();
+      const header = [
+        `# ${meta.icon ? `${meta.icon} ` : ""}${untitled(meta.title)}`,
+        `Page id ${meta.id} · ${meta.project_id ? "project page" : "global page"} · ${pageUrl(meta.id)}`,
+      ];
+      // The header and the Next line stay inside MAX_READ_CHARS whatever limit asks for.
+      const budget = Math.min(limit ?? READ_PART_CHARS, MAX_READ_CHARS - header.join("\n").length - 600);
+      const part = readPart(markdown, from, budget);
+      if (part.missing) return `Block ${from} is no longer on page ${meta.id}. Start again: ${callText("pages_read", { page: meta.id })}.`;
       const threads = listThreads(live.doc);
+      const last = part.next === null;
+      const notes = [
+        ...(part.cut ? [`(Block ${part.cut.block} is ${part.cut.size.toLocaleString("en-US")} characters, more than one part holds: it is cut after the first ${part.shown.toLocaleString("en-US")}.)`] : []),
+        ...(last ? [] : [`(Part: ${part.shown.toLocaleString("en-US")} of ${part.total.toLocaleString("en-US")} characters. Next: pages_read { page: "${meta.id}", from: "${part.next}" }.)`]),
+      ];
       return truncate(
         [
-          `# ${meta.icon ? `${meta.icon} ` : ""}${untitled(meta.title)}`,
-          `Page id ${meta.id} · ${meta.project_id ? "project page" : "global page"} · ${pageUrl(meta.id)}`,
+          ...header,
+          ...notes,
           "",
-          markdown.trim() || "(empty page)",
-          ...(threads.length ? ["", "## Open comments", ...threads.map(threadSummary)] : []),
+          part.text.trim() || "(empty page)",
+          ...(last && threads.length ? ["", "## Open comments", ...threads.map(threadSummary)] : []),
         ].join("\n"),
         MAX_READ_CHARS,
       );

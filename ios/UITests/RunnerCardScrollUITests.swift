@@ -1,10 +1,10 @@
 import XCTest
 
-/// The Bot's threads list (Running, Waiting to start, Runners, Recurring…):
-/// in the Activity sheet on a phone and in the Duo's sidebar, it scrolls in
-/// one scroll view with one indicator at its edge. No scroll view nests inside
-/// it, so no second indicator is drawn over a runner's "next 12:05 PM" or its
-/// summary. Offline, on the local Bot demo. See docs/ios/runner-card-scroll.
+/// The room's list of conversations with their workers and runners: the
+/// conversation list on a phone, the left page on the Duo's inner screen. It
+/// scrolls in one scroll view with one indicator at its edge. No scroll view
+/// nests inside it, so no second indicator is drawn over a row. Offline, on
+/// the local Bot demo. See docs/ios/runner-card-scroll.
 ///
 /// `TEST_RUNNER_RUNNERS_LAYOUT`: `phone` (default, an iPhone) or `split`
 /// (the iPhone Duo inner screen, two pages). `TEST_RUNNER_RUNNERS_SHOTS=<dir>`
@@ -20,14 +20,10 @@ final class RunnerCardScrollUITests: ServerIsolatedUITestCase {
             + (layout == "split" ? ["-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles"] : [])
         app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
-        // The phone's sheet, from the bell; the Duo's sidebar is already showing.
-        if layout != "split" {
-            let bell = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Activity'")).firstMatch
-            XCTAssertTrue(bell.waitForExistence(timeout: 10), "the Activity button")
-            bell.tap()
-        }
-        let runner = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'PR watcher'")).firstMatch
-        XCTAssertTrue(runner.waitForExistence(timeout: 15), "the Runners group shows")
+        // The phone's list over the conversation; the Duo's left page is already showing.
+        if layout != "split" { app.openRoomPlace("conversations") }
+        let runner = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomWorker-' OR identifier BEGINSWITH 'contextWorker-'")).firstMatch
+        XCTAssertTrue(runner.waitForExistence(timeout: 15), "a worker's row shows")
         Thread.sleep(forTimeInterval: 1)
         let list = try XCTUnwrap(listScroll(containing: runner.frame), "the list's scroll view")
         print("RUNNERS \(layout) list=\(list.frame) runner=\(runner.frame)")
@@ -57,22 +53,6 @@ final class RunnerCardScrollUITests: ServerIsolatedUITestCase {
         print("RUNNERS \(layout) indicator=\(indicator) listMaxX=\(list.frame.maxX) rowsMaxX=\(trailing)")
         XCTAssertGreaterThanOrEqual(indicator.minX, trailing - 1,
                                     "\(layout): the list's indicator is drawn over the rows, \(list.frame.maxX - indicator.maxX) points in from its edge")
-
-        // The other sidebar lists beside two pages share the same margins.
-        guard layout == "split" else { return }
-        for tab in ["threads", "studio"] {
-            command("tab?\(tab)")
-            Thread.sleep(forTimeInterval: 2)
-            guard let sidebar = try layoutGeometry().scrolls.first(where: {
-                abs($0.x - list.frame.minX) < 2 && $0.height > 400 && $0.indicator && $0.contentHeight > $0.height
-            }) else { print("RUNNERS \(tab): the sidebar doesn't scroll"); continue }
-            let point = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: sidebar.frame.midX, dy: sidebar.frame.midY))
-            point.press(forDuration: 0.1, thenDragTo: point.withOffset(CGVector(dx: 0, dy: -60)), withVelocity: .slow, thenHoldForDuration: 0.2)
-            let after = try XCTUnwrap(layoutGeometry().scrolls.first { $0.frame == sidebar.frame }, "\(tab): the sidebar after scrolling")
-            let bar = try XCTUnwrap(after.indicators.map(\.frame).first { $0.height > $0.width }, "\(tab): the sidebar's vertical indicator")
-            print("RUNNERS \(tab) sidebar=\(sidebar.frame) indicator=\(bar)")
-            XCTAssertGreaterThanOrEqual(bar.minX, sidebar.frame.maxX - 8, "\(tab): the sidebar's indicator is \(sidebar.frame.maxX - bar.maxX) points in from its edge")
-        }
     }
 
     /// The scroll view that holds the runner rows: the smallest one around them.

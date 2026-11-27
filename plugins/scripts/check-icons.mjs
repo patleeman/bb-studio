@@ -41,12 +41,16 @@ const registered = new Set();
 for (const file of files) for (const [, name] of readFileSync(file, "utf8").matchAll(/\{\s*name:\s*"([A-Za-z0-9]+)",\s*component:/g)) registered.add(name);
 
 const ICON = /\b(?:name|icon|kindIcon|fallback)(?:=|:\s*)"([A-Za-z][\w/-]*)"/g;
+const TERNARY_ICON = /\b(?:name|icon|kindIcon|fallback)(?:=\{\s*|:\s*)[^?\n;{}]+\?\s*"([A-Za-z][\w/-]*)"\s*:\s*"([A-Za-z][\w/-]*)"/g;
 for (const file of files) {
   const text = readFileSync(file, "utf8");
   if (!/Icon|icon/.test(text)) continue;
   text.split("\n").forEach((line, index) => {
     if (!/Icon|icon/i.test(line)) return;
-    for (const [, name] of line.matchAll(ICON)) {
+    const names = [];
+    for (const [, name] of line.matchAll(ICON)) names.push(name);
+    for (const [, a, b] of line.matchAll(TERNARY_ICON)) names.push(a, b);
+    for (const name of names) {
       // Only names that look like icons: capitalised, or plugin/name.
       if (!/^[A-Z]/.test(name) && !name.includes("/")) continue;
       // An icon's `name` sits on an Icon element or an icon field; skip other `name:` strings.

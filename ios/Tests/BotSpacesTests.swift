@@ -379,10 +379,10 @@ final class BotSpacesTests: XCTestCase {
         store.coalesceDelay = .milliseconds(10)
         store.retryDelays = [.seconds(60)]
         store.attach(client: client(spaces: { up.value ? (200, Self.spacesJSON) : (503, #"{"ok":false,"error":{"message":"studio is not running"}}"#) }, calls: calls), realtime: nil)
-        XCTAssertFalse(store.skipsLoading)
+        XCTAssertFalse(store.answeredWithError)
         await store.refresh()
         XCTAssertEqual(store.support, .unknown)
-        XCTAssertTrue(BotSpacesStore(serverURL: server).skipsLoading, "the next launch goes classic at once")
+        XCTAssertTrue(BotSpacesStore(serverURL: server).answeredWithError, "the next launch says Studio is unreachable at once")
         up.value = true
         store.askIfUnknown()
         await waitUntil { store.support == .available }
@@ -399,7 +399,7 @@ final class BotSpacesTests: XCTestCase {
         store.askIfUnknown()
         await waitUntil { calls.count("offline") == 1 }
         await settle()
-        XCTAssertFalse(BotSpacesStore(serverURL: server).skipsLoading)
+        XCTAssertFalse(BotSpacesStore(serverURL: server).answeredWithError)
     }
 
     @MainActor

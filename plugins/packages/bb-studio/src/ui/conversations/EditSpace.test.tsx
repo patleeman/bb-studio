@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // Edit space: the name, presence, appearance and default model of a Bot's space
 // in one view, built from bb's own controls, saved together.
 import { act } from "react";

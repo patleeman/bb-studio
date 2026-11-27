@@ -7,13 +7,14 @@ import {
   readFile,
   readlink,
   realpath,
+  rename,
   rm,
   stat,
   symlink,
 } from "node:fs/promises";
 import { dirname, join, resolve, win32 } from "node:path";
 import { CLI_LAUNCHER_MARKER } from "@bb/config/cli-command";
-import { pointsAtOwnLauncher } from "./cli-command.fork.js";
+import { linkStudioCliAliases, pointsAtOwnLauncher, removeStudioCliAliases, STUDIO_CLI_NAME } from "./cli-command.fork.js";
 import type {
   SystemCliCommandShadow,
   SystemCliCommandStatus,
@@ -24,7 +25,7 @@ import { ApiError } from "../../errors.js";
 export const MACHINE_CLI_SHIM_MARKER =
   "No installed bb machine CLI is available.";
 const CLI_LAUNCHER_MAX_BYTES = 16_384;
-const CLI_COMMAND_NAME = "bb";
+const CLI_COMMAND_NAME = STUDIO_CLI_NAME;
 const WINDOWS_USER_PATH_SCRIPT = `
 $ErrorActionPreference = 'Stop'
 if ($env:BB_CLI_COMMAND_SET -eq '1') {
@@ -264,19 +265,6 @@ async function readUnixStatus(
   };
 }
 
-function describeShadow(
-  context: CliCommandContext,
-  shadow: SystemCliCommandShadow,
-): string {
-  if (shadow.source === "npm") {
-    return `bb is already on your PATH at ${shadow.path}, installed by npm.`;
-  }
-  if (shadow.source === "machine") {
-    return `bb is already on your PATH at ${shadow.path}, installed with the bb machine on this computer.`;
-  }
-  return `Another bb at ${shadow.path} comes first on your PATH. Remove it, or run bb's command directly at ${context.launcherPath}.`;
-}
-
 async function installWindows(context: CliCommandContext): Promise<void> {
   const binDirectory = win32.dirname(context.launcherPath);
   const entries = await readWindowsPathEntries(context);
@@ -290,10 +278,29 @@ async function installWindows(context: CliCommandContext): Promise<void> {
   }
 }
 
+async function replaceMachineShim(
+  context: CliCommandContext,
+  shimPath: string,
+): Promise<void> {
+  const stagingPath = join(
+    dirname(shimPath),
+    `.${CLI_COMMAND_NAME}.${String(process.pid)}.tmp`,
+  );
+  try {
+    await rm(stagingPath, { force: true });
+    await symlink(context.launcherPath, stagingPath);
+    await rename(stagingPath, shimPath);
+  } catch {
+    await rm(stagingPath, { force: true }).catch(() => undefined);
+    throw blocked(`Could not replace ${shimPath}.`);
+  }
+}
+
 async function installUnix(context: CliCommandContext): Promise<void> {
   const existing = await findInstalledLink(context);
   if (existing !== null) {
     if ((await readLinkTarget(existing)) === context.launcherPath) {
+      await linkStudioCliAliases(dirname(existing), context.launcherPath);
       return;
     }
     try {
@@ -303,8 +310,19 @@ async function installUnix(context: CliCommandContext): Promise<void> {
     }
   }
   const shadow = await shadowingCommand(context);
+  if (shadow?.source === "machine") {
+    await replaceMachineShim(context, shadow.path);
+    return;
+  }
+  if (shadow?.source === "npm") {
+    throw blocked(
+      `bbs is already on your PATH at ${shadow.path}, installed by npm.`,
+    );
+  }
   if (shadow !== null) {
-    throw blocked(describeShadow(context, shadow));
+    throw blocked(
+      `Another bbs at ${shadow.path} comes first on your PATH. Remove it, or run BB Studio's command directly at ${context.launcherPath}.`,
+    );
   }
   const onPath = newTerminalPathEntries(context.env);
   const candidates = unixLinkDirectories(context.homeDir, context.platform);
@@ -329,11 +347,12 @@ async function installUnix(context: CliCommandContext): Promise<void> {
       () => false,
     );
     if (linked) {
+      await linkStudioCliAliases(directory, context.launcherPath);
       return;
     }
   }
   throw blocked(
-    `Another bb command is already installed, or no folder on your PATH is writable. Run bb's command directly at ${context.launcherPath}.`,
+    `Another bbs command is already installed, or no folder on your PATH is writable. Run BB Studio's command directly at ${context.launcherPath}.`,
   );
 }
 
@@ -357,6 +376,7 @@ async function removeUnix(context: CliCommandContext): Promise<void> {
     context.platform,
   )) {
     const link = join(directory, CLI_COMMAND_NAME);
+    await removeStudioCliAliases(directory, context.launcherPath);
     if ((await isBbLauncherLink(link)) && (await pointsAtOwnLauncher(link, context.launcherPath))) {
       try {
         await rm(link);
@@ -427,7 +447,6 @@ function runWindowsUserPathScript(
       {
         env: { ...env, ...extraEnv },
         stdio: ["ignore", "pipe", "ignore"],
-        windowsHide: true,
       },
     );
     let stdout = "";

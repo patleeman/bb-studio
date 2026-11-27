@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import type { PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { act, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";

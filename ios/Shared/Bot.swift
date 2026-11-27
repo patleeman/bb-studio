@@ -539,11 +539,15 @@ public struct BotLearning: Decodable, Hashable, Sendable {
     public var reviewing: Bool
     public var lastReview: Result?
 
+    private static let relativeLock = NSLock()
+    nonisolated(unsafe) private static let relativeFormatter = RelativeDateTimeFormatter()
+
     /// "Saved 1 skill · 2h ago", "Reviewing now…" or nil before the first review.
     public func status(now: Date = Date()) -> String? {
         if reviewing { return "Reviewing now…" }
         guard let lastReview else { return nil }
-        let ago = RelativeDateTimeFormatter().localizedString(for: Date(timeIntervalSince1970: lastReview.at / 1000), relativeTo: now)
+        let date = Date(timeIntervalSince1970: lastReview.at / 1000)
+        let ago = Self.relativeLock.withLock { Self.relativeFormatter.localizedString(for: date, relativeTo: now) }
         return "\(lastReview.result) · \(ago)"
     }
 }
@@ -673,31 +677,6 @@ public struct BotCacheState: Decodable, Hashable, Sendable {
             return left > 0 ? "Warm · \(max(1, Int((left / 60).rounded(.up))))m" : "Cold"
         }
         return label
-    }
-}
-
-/// The action row under a reply in the Bot's chat, as on the desktop: quiet
-/// icons (Copy, Reply in thread) and, when the reply has side threads, the
-/// compact "2 replies · 5m" link in the same row. Reply in thread and the link
-/// open the reply's newest side thread; the icon starts one when it has none
-/// (Studio's bot_side_thread_open).
-public struct BotReplyActions: Equatable, Sendable {
-    public static let replyTitle = "Reply in thread"
-    public static let copyTitle = "Copy"
-    /// The reply's side threads, summed; nil before it has one.
-    public var thread: BotSideThread?
-
-    /// Nil where there's no row: your messages, a reply still on its way,
-    /// and replies that can't start a thread (an earlier chat's).
-    public init?(messageId: String, isUser: Bool, canThread: Bool, thread: BotSideThread?) {
-        guard !isUser, canThread, !messageId.hasPrefix("pending:") else { return nil }
-        self.thread = thread
-    }
-
-    /// The link's words after the icons, when the reply has side threads.
-    public func repliesLabel(now: Date = .now) -> String? {
-        guard let thread, !thread.isFork else { return nil }
-        return thread.compactLabel(now: now)
     }
 }
 

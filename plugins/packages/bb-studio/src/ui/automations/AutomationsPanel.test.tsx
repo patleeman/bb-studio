@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -10,8 +10,8 @@ vi.mock("../../kit/app/index", () => ({
   PageColumn: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   StudioBar: ({ children }: { children: ReactNode }) => <div data-testid="studio-bar">{children}</div>,
 }));
-vi.mock("../../strands/ui/StrandsPage", () => ({
-  StrandsPage: (props: { view: { bot: { id: string; name: string; state: string; kind?: string } }; focus?: string }) => <section data-testid="bot-automations" data-bot={props.view.bot.id} data-name={props.view.bot.name} data-disabled={String(props.view.bot.state !== "active")} data-external={String(props.view.bot.kind === "external")} data-focus={props.focus} />,
+vi.mock("./ScheduledPage", () => ({
+  ScheduledPage: (props: { view: { bot: { id: string; name: string; state: string; kind?: string } }; focus?: string }) => <section data-testid="bot-automations" data-bot={props.view.bot.id} data-name={props.view.bot.name} data-disabled={String(props.view.bot.state !== "active")} data-external={String(props.view.bot.kind === "external")} data-focus={props.focus} />,
 }));
 vi.mock("../../kit/ui/icon", () => ({ Icon: () => null }));
 vi.mock("../bot/BotAvatar", () => ({ BotAvatar: () => null, botProvider: () => null }));
@@ -35,7 +35,7 @@ it("shows the picked Bot, else the primary, else the first", () => {
   expect(shownBot([], null)).toBeNull();
 });
 
-it("with one Bot, is that Bot's Strands page opened at the top, full-page, with no switcher", async () => {
+it("with one Bot, is that Bot's Scheduled page opened at the top, full-page, with no switcher", async () => {
   state.bots = [{ id: "bot_main", name: "Chief of Staff", avatar: "🤖", state: "active", primary: true }];
   await act(async () => root.render(<AutomationsPanel />));
   expect(section()?.dataset).toMatchObject({ bot: "bot_main", disabled: "false", external: "false" });

@@ -18,7 +18,6 @@ final class CatchupUITests: ServerIsolatedUITestCase {
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     private func stand() {
-        app.standRoomChat()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 
@@ -56,25 +55,31 @@ final class CatchupUITests: ServerIsolatedUITestCase {
         let fold = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomFold-'")).firstMatch
         XCTAssertTrue(fold.exists, "finished workers fold into N done")
         shot("3-list")
+        for _ in 0..<3 where !fold.isHittable { app.swipeUp() }
         fold.tap()
-        XCTAssertTrue(app.buttons["roomWorker-thr_demo_r1"].waitForExistence(timeout: 5), "a runner's thread sits under Main")
+        let runner = app.buttons["roomWorker-thr_demo_r1"]
+        for _ in 0..<3 where !runner.exists { app.swipeUp() }
+        XCTAssertTrue(runner.waitForExistence(timeout: 5), "a runner's thread sits under Main")
         shot("4-list-open")
     }
 
     func testSwipingTheConversationPagesToTheNext() {
         launch()
         stand()
-        let dots = any("conversationPageDots")
+        // The dots under the name; the folded Duo, which has none, shows the name.
+        let dots = app.shownConversation
         XCTAssertTrue(dots.waitForExistence(timeout: 20), "dots under the name")
-        XCTAssertTrue(dots.label.hasPrefix("Conversation 1 of"), dots.label)
+        let first = dots.label
+        if !app.isFoldedDuo { XCTAssertTrue(first.hasPrefix("Conversation 1 of"), first) }
         let middle = app.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.45))
         middle.press(forDuration: 0.02, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.46)), withVelocity: .fast, thenHoldForDuration: 0)
-        let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label BEGINSWITH 'Conversation 2 of'"), object: any("conversationPageDots"))
+        let moved = XCTNSPredicateExpectation(predicate: app.isFoldedDuo ? NSPredicate(format: "label != %@", first)
+            : NSPredicate(format: "label BEGINSWITH 'Conversation 2 of'"), object: dots)
         XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 10), .completed, "it pages to the next conversation")
         shot("5-swiped")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.45))
             .press(forDuration: 0.02, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.46)), withVelocity: .fast, thenHoldForDuration: 0)
-        let back = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label BEGINSWITH 'Conversation 1 of'"), object: any("conversationPageDots"))
+        let back = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", first), object: dots)
         XCTAssertEqual(XCTWaiter.wait(for: [back], timeout: 10), .completed, "and back")
     }
 

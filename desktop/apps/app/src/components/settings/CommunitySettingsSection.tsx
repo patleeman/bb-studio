@@ -4,7 +4,7 @@ import { cn } from "@bb/shared-ui/lib/utils";
 import {
   SettingsSection,
   SettingsWithControl,
-} from "@/components/ui/settings-section.js";
+} from "@bb/shared-ui/settings-section";
 import { openUrlInExternalBrowser } from "@/lib/url-open-routing";
 
 const GITHUB_REPO_URL = "https://github.com/patleeman/bb-studio";

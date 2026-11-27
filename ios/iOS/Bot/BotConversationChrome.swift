@@ -131,174 +131,73 @@ struct ConversationReplyRow: View {
     }
 }
 
+/// A Bot conversation's title, the header's one control besides Home
+/// (round 5): its name, and under it the model and how many Workspace tabs
+/// are open, or "Writing" while a reply runs. Tapping it opens the
+/// Workspace (Info first): a sheet on the iPhone, the right screen on the
+/// unfolded Duo. The page dots are gone from view; VoiceOver still hears
+/// "Conversation 2 of 4".
 struct ConversationTitle: View {
     let title: String
     let model: String?
+    var writing = false
+    var tabs = 0
     var pages: RoomChatPages? = nil
-    /// Tapping the name opens the conversation list (the conversation is home).
-    var openList: (() -> Void)? = nil
-    let choose: () -> Void
+    let open: () -> Void
+
+    /// Model and tab count; the count goes before the model would truncate (large text).
+    private var subtitle: String {
+        let lead = writing ? "Writing" : (model ?? "")
+        guard tabs > 0 else { return lead }
+        let count = "\(tabs) \(tabs == 1 ? "tab" : "tabs")"
+        return lead.isEmpty ? count : "\(lead) · \(count)"
+    }
 
     var body: some View {
-        VStack(spacing: 1) {
-            Group {
-                if let openList {
-                    Button(action: openList) {
-                        HStack(spacing: 3) {
-                            Text(title).lineLimit(1)
-                            Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+        Button(action: open) {
+            VStack(spacing: 1) {
+                HStack(spacing: 3) {
+                    Text(title).lineLimit(1)
+                    Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                }
+                .font(.headline)
+                .id(title)
+                .transition(.push(from: .trailing).combined(with: .opacity))
+                if !subtitle.isEmpty {
+                    HStack(spacing: 4) {
+                        if writing { ProgressView().controlSize(.mini) }
+                        // Large text: the tab count goes before the model would truncate.
+                        ViewThatFits(in: .horizontal) {
+                            Text(subtitle).lineLimit(1)
+                            Text(writing ? "Writing" : (model ?? subtitle)).lineLimit(1)
                         }
-                        .font(.headline)
-                        .contentShape(.rect)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("\(title), conversations")
-                    .accessibilityIdentifier("conversationTitleList")
-                } else {
-                    Text(title).font(.headline).lineLimit(1)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
-            .id(title)
-            .transition(.push(from: .trailing).combined(with: .opacity))
-            HStack(spacing: 6) {
-                if let pages, pages.count > 1 {
-                    HStack(spacing: 4) {
-                        ForEach(0..<min(pages.count, 9), id: \.self) { at in
-                            Capsule().fill(.primary.opacity(at == pages.index ? 0.8 : 0.25))
-                                .frame(width: at == pages.index ? 10 : 4, height: 4)
-                        }
-                    }
-                    .animation(.snappy, value: pages.index)
-                    .accessibilityElement(children: .ignore)
+            .foregroundStyle(.primary)
+            .frame(minHeight: 44)
+            .contentShape(.rect)
+        }
+        // No style of its own: in the Duo's header, `DuoHeaderButtonStyle` routes the tap.
+        .tint(.primary)
+        .accessibilityLabel([title, subtitle].filter { !$0.isEmpty }.joined(separator: ", "))
+        .accessibilityHint("Opens the conversation's Workspace")
+        .accessibilityIdentifier("conversationMore")
+        .overlay(alignment: .bottom) {
+            if let pages, pages.count > 1 {
+                Color.clear.frame(width: 1, height: 1)
+                    .accessibilityElement()
                     .accessibilityLabel("Conversation \(pages.index + 1) of \(pages.count)")
                     .accessibilityIdentifier("conversationPageDots")
-                }
-                chip
             }
-        }
-    }
-
-    private var chip: some View {
-            Button(action: choose) {
-                HStack(spacing: 3) {
-                    Text(model ?? "Model").lineLimit(1)
-                    Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
-                }
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(.fill.tertiary, in: .capsule)
-                .contentShape(.capsule)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Model: \(model ?? "unknown")")
-            .accessibilityIdentifier("conversationModelChip")
-    }
-}
-
-struct WorkersLineView: View {
-    let line: WorkersLine
-    let open: (String) -> Void
-    @Environment(\.look) private var look
-
-    var body: some View {
-        Menu {
-            ForEach(line.workers) { worker in
-                Button { open(worker.threadId) } label: {
-                    Label(worker.title.isEmpty ? "Worker" : worker.title,
-                          systemImage: worker.status == .needsYou ? "exclamationmark.circle" : "arrow.triangle.2.circlepath")
-                }
-            }
-        } label: {
-            HStack(spacing: 8) {
-                HStack(spacing: 5) {
-                    if line.needsYou { Circle().fill(.orange).frame(width: 8, height: 8) }
-                    if line.running { ProgressView().controlSize(.mini).tint(.green) }
-                }
-                Text(line.label)
-                Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .padding(.leading, 12)
-            .padding(.trailing, 14)
-            .frame(height: 36)
-            .background(look.stackFill, in: .capsule)
-            .glassEffect(.regular, in: .capsule)
-            .contentShape(.capsule)
-        }
-        .tint(Color(uiColor: .secondaryLabel))
-        .accessibilityLabel(line.label)
-        .accessibilityIdentifier("conversationWorkers")
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-struct NewConversationSheet: View {
-    let botName: String
-    let start: (String) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var text = ""
-    @State private var starting = false
-    @State private var error: String?
-    @FocusState private var focused: Bool
-
-    private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 12) {
-                TextField("Message \(botName)", text: $text, axis: .vertical)
-                    .lineLimit(3...10)
-                    .focused($focused)
-                    .padding(12)
-                    .background(.fill.tertiary, in: .rect(cornerRadius: 18))
-                    .accessibilityIdentifier("newConversationField")
-                if let error {
-                    Text(error).font(.footnote).foregroundStyle(.red)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(16)
-            .navigationTitle("New conversation")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    if starting {
-                        ProgressView()
-                    } else {
-                        Button("Start") { run() }
-                            .disabled(trimmed.isEmpty)
-                            .keyboardShortcut(.return, modifiers: .command)
-                            .accessibilityIdentifier("newConversationStart")
-                    }
-                }
-            }
-            .onAppear { focused = true }
-        }
-        .presentationDetents([.medium, .large])
-    }
-
-    private func run() {
-        let message = trimmed
-        guard !message.isEmpty else { return }
-        starting = true
-        error = nil
-        Task {
-            do {
-                try await start(message)
-                dismiss()
-            } catch {
-                self.error = error.localizedDescription
-            }
-            starting = false
         }
     }
 }
 
 struct WorkerTitle: View {
+    @Environment(\.look) private var look
     let info: WorkerInfo
 
     var body: some View {
@@ -310,7 +209,7 @@ struct WorkerTitle: View {
                     Text(info.headerLabel(now: context.date)).lineLimit(1)
                 }
                 .font(.caption)
-                .foregroundStyle(info.status == .needsYou ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                .foregroundStyle(info.status == .needsYou ? AnyShapeStyle(look.needsYou) : AnyShapeStyle(.secondary))
             }
         }
         .accessibilityElement(children: .ignore)

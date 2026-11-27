@@ -5,10 +5,13 @@ import { defaultAppearance } from "./theme/appearance";
 import { NORD } from "./theme/builtin/classic";
 import { GRID } from "./theme/builtin/grid";
 import { testScheduler } from "./test/scheduler-fixture";
+import { migratedPluginDb } from "./test/migrated-db";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { botHeartbeat, botInstructions, BOT_ID, Bots, newMainNote, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, setupInput, spawnedBy, startedBy } from "./bot";
+import { botHeartbeat, botInstructions, BOT_ID, Bots, newMainNote, CHECKIN_PRESETS, classifyActivity, descendants, setupInput, spawnedBy, startedBy } from "./bot";
+import { SKILL_CHANGED } from "./bot-skills";
+import { CORE_TEMPLATE, DEFAULT_CHECKIN, sectionText } from "./core-skill";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -91,16 +94,23 @@ async function setup(migrations = MIGRATIONS) {
     projects: { defaultExecutionOptions: (async () => projectDefault.current) as never } as never,
   } });
   dispose.push(() => harness.lifecycle.dispose());
-  const db = bb.storage.database();
-  bb.storage.migrate(db, migrations);
+  let db: ReturnType<typeof bb.storage.database>;
+  if (migrations === MIGRATIONS) {
+    const mem = migratedPluginDb();
+    db = mem as unknown as ReturnType<typeof bb.storage.database>;
+    bb.storage.database = () => db;
+    dispose.push(async () => { mem.close(); });
+  } else {
+    db = bb.storage.database();
+    bb.storage.migrate(db, migrations);
+  }
   const bots = { current: null as Bots | null };
   const clock = { now: Date.now() };
   const { engine, scheduler } = testScheduler(db, bb.sdk, clock);
   const leads = new ProjectLeads({ db, sdk: bb.sdk, scheduler, changed: () => {}, personalPrompt: () => bots.current!.prompt(), botPrompt: (key) => bots.current!.promptFor(key) });
   const pages = new Map<string, { title: string; markdown: string }>();
-  let made = 0;
   const userSkillsDir = await mkdtemp(join(tmpdir(), "bot-skills-"));
-  const memory = { exists: (id: string) => pages.has(id), create: (page: { title: string; markdown: string }) => { const id = `pg${++made}`; pages.set(id, page); return id; } };
+  const memory = { exists: (id: string) => pages.has(id), markdown: (id: string) => pages.get(id)?.markdown ?? null };
   bots.current = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, presenceChanged: () => {}, memory, userSkillsDir });
   return { send, clock, engine, scheduler, bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending, replies, get, del, execution, providerDefaults, projectDefault, noModel, signedOut };
 }
@@ -208,8 +218,7 @@ it("makes a second Bot with its own thread, check-in, memory, skills and handoff
   expect((await x.bots.get()).run).toBeNull();
   expect(x.leads.list().map((lead) => lead.projectId)).toEqual([PERSONAL_PROJECT_ID]);
   expect((await x.bots.activity(id)).scheduled).toEqual([expect.objectContaining({ kind: "heartbeat", enabled: true })]);
-  // Memory and skills are its own.
-  expect(x.bots.memoryPage(id)).not.toBe(x.bots.memoryPage());
+  // Skills are its own.
   x.bots.writeSkill({ name: "release-watch", description: "d", body: "b" }, id);
   expect(x.bots.skills(id).map((s) => s.name)).toEqual(["release-watch"]);
   expect(x.bots.skills()).toEqual([]);
@@ -553,7 +562,7 @@ it("keeps a drawn avatar and a role it's told, with the emoji as a fallback", as
   expect(view.bot).toMatchObject({ avatar: "🤖", shape: "blob", color: "#5b8def", role: null });
   const set = await x.bots.set({ shape: "hexagon", color: "#e5484d", role: "  You are my chief of staff.  " });
   expect(set.bot).toMatchObject({ shape: "hexagon", color: "#e5484d", role: "You are my chief of staff." });
-  expect(x.bots.instructions(set.bot!)).toContain("Your role, in the user's words: You are my chief of staff.");
+  expect(x.bots.instructions(set.bot!)).toContain("Your role, in their words: You are my chief of staff.");
   expect((await x.bots.set({ role: "" })).bot?.role).toBeNull();
 });
 
@@ -752,18 +761,21 @@ it("keeps the Bot's side threads out of Activity, Studio's own forks included", 
   expect((await x.bots.activity()).inProgress.map((t) => t.id)).toEqual(["child"]);
 });
 
-it("applies check-in presets: one schedule and one Memory line each; Off turns check-ins off", async () => {
+it("applies check-in presets: one schedule and one line in the always-on skill's Check-in each; Off turns check-ins off", async () => {
   const x = await setup();
-  const lines: string[] = [];
-  (x.bots as unknown as { deps: { memory: { addCheckin(pageId: string, line: string): boolean } } }).deps.memory.addCheckin = (_pageId, line) => { lines.push(line); return true; };
   await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const checkin = () => sectionText(x.bots.skill("core-profile")!.body, "Check-in")!.split("\n").filter((line) => !DEFAULT_CHECKIN.includes(line)).map((line) => line.replace(/^- /, ""));
+  let lines: string[] = [];
   const morning = await x.bots.checkinPreset("morning");
   expect(morning.run).toMatchObject({ enabled: true, cadence: "weekdays", time: "08:00" });
   const working = await x.bots.checkinPreset("working");
   expect(working.run).toMatchObject({ enabled: true, cadence: "custom", cron: "0 9-17/2 * * 1-5" });
+  lines = checkin();
   expect(lines).toEqual([CHECKIN_PRESETS.morning.line, CHECKIN_PRESETS.working.line]);
+  // Once each: the same preset again adds nothing.
+  await x.bots.checkinPreset("morning");
   expect((await x.bots.checkinPreset("off")).run?.enabled).toBe(false);
-  expect(lines).toHaveLength(2);
+  expect(checkin()).toHaveLength(2);
 });
 
 it("pauses, resumes and stops", async () => {
@@ -895,29 +907,73 @@ it("knows its new thread by spawn metadata before it becomes the lead", async ()
   expect(x.bots.forThread("t9", { bot: BOT_ID })).toBeNull();
 });
 
-it("makes one Memory page on first need and points the Bot at it briefly", async () => {
+it("gives a new Bot an always-on core skill, not a page, and lists only on-demand skills in its instructions", async () => {
   const x = await setup();
   x.add({ id: "bot1" });
   await x.bots.setThread("bot1");
   const bot = x.bots.forThread("bot1")!;
+  x.bots.writeSkill({ name: "weekly-review", description: "Run the weekly review", body: "Steps." });
   const text = x.bots.instructions(bot);
-  expect(x.pages.size).toBe(1);
-  expect(x.pages.get("pg1")).toMatchObject({ title: "Bot's Memory", markdown: MEMORY_TEMPLATE, botName: "Bot" });
-  expect(MEMORY_TEMPLATE.startsWith("## Check-in")).toBe(true);
-  // Memory (the core profile and records) is told by src/memory, not here.
-  expect(text).not.toContain("pages_edit");
+  expect(x.pages.size).toBe(0);
+  expect(x.bots.memoryPage()).toBeNull();
+  const core = x.bots.alwaysOnSkills();
+  expect(core).toEqual([expect.objectContaining({ name: "core-profile", body: CORE_TEMPLATE })]);
+  expect(x.bots.skill("core-profile")).toMatchObject({ alwaysOn: true, pinned: true });
+  // Always-on skills come in full from src/memory, so the on-demand list leaves them out.
+  expect(text).toContain("- weekly-review: Run the weekly review");
+  expect(text).not.toContain("core-profile");
   expect(text.length).toBeLessThan(800);
-  x.bots.instructions(bot);
-  expect(x.pages.size).toBe(1);
-  expect((await x.bots.get()).bot?.memoryPageId).toBe("pg1");
-  // Deleted: a new one next time.
-  x.pages.delete("pg1");
-  expect(x.bots.memoryPage()).toBe("pg2");
-  expect(botHeartbeat("Dot")).toMatch(/Memory page/);
+  expect(botHeartbeat("Dot")).toMatch(/"## Check-in" section of your always-on skill/);
   expect(botHeartbeat("Dot")).toMatch(/reply exactly \[PASS\]: no "✓"/);
   expect(botInstructions({ name: "Dot", state: "active" })).toMatch(/finished fine.*no "✓"/);
   expect(botInstructions({ name: "Dot", state: "active" })).toMatch(/You triage: reports, alerts and your threads. questions come to you/);
-  expect(botInstructions({ name: "Dot", state: "paused", memoryPageId: "pg1" })).not.toContain("pg1");
+});
+
+it("moves a Bot's core profile page into its always-on skill once, whole, even over the budget", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const long = `## Who the user is\n\n${"- A rule that matters.\n".repeat(200)}\n## Check-in\n\n- Look at the inbox.`;
+  x.pages.set("pg_profile", { title: "Dot's core profile", markdown: long });
+  x.db.prepare("INSERT INTO memory_profiles (bot_id, profile_page_id, legacy_page_id, split_at, created_at) VALUES (?, 'pg_profile', NULL, NULL, 1)").run(BOT_ID);
+  const moved = x.bots.ensureCore();
+  expect(moved).toMatchObject({ state: "moved", skill: "core-profile", sourcePageId: "pg_profile", chars: long.trim().length });
+  const skill = x.bots.skill("core-profile")!;
+  // Not cut: the whole text, flagged over budget.
+  expect(skill.body.trim()).toBe(long.trim());
+  expect(x.bots.skillBudget()).toMatchObject({ over: true, cap: 2000 });
+  // Moved text is the user's: Maintenance leaves it until the user edits it in Studio.
+  expect(x.bots.coreSkill()).toMatchObject({ name: "core-profile", migrated: true });
+  x.bots.userEditedSkill("weekly-review");
+  expect(x.bots.coreSkill()).toMatchObject({ migrated: true });
+  x.bots.userEditedSkill("core-profile");
+  expect(x.bots.coreSkill()).toMatchObject({ migrated: false });
+  expect(x.bots.skillLint({ name: "core-profile", body: skill.body })).toEqual(expect.arrayContaining([expect.stringContaining("over the 2,000 budget")]));
+  // Once: a second run, or an edit to the page afterwards, changes nothing.
+  x.pages.set("pg_profile", { title: "Dot's core profile", markdown: "## Check-in\n\n- Something else." });
+  expect(x.bots.ensureCore()).toEqual({ state: "done" });
+  expect(x.bots.skill("core-profile")!.body.trim()).toBe(long.trim());
+  expect(x.pages.get("pg_profile")).toBeDefined();
+  // A name the user already took for an on-demand skill stays theirs.
+  const other = await x.bots.create({ name: "Scout", avatar: "🛰️" });
+  x.bots.writeSkill({ name: "core-profile", description: "Mine", body: "Not a profile." }, other.bot!.id);
+  expect(x.bots.ensureCore(other.bot!.id)).toMatchObject({ state: "created", skill: "core-profile-moved" });
+  expect(x.bots.skill("core-profile", other.bot!.id)).toMatchObject({ alwaysOn: false, description: "Mine" });
+});
+
+it("writes a skill as a compare-and-swap with ifBody: only over the text the client read, never over a newer edit", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  // null: only while there's no such skill (a new skill never replaces one the Bot just made).
+  x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "v1", ifBody: null });
+  expect(() => x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "mine", ifBody: null })).toThrow(SKILL_CHANGED);
+  // The Bot edits after the client read "v1": the client's write is refused and changes nothing.
+  x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "v2 by the Bot" });
+  expect(() => x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "mine", ifBody: "v1" })).toThrow(SKILL_CHANGED);
+  expect(x.bots.skillHistory(undefined, undefined, "inbox")[0]?.body).toBe("v2 by the Bot");
+  // Over the text it read, it writes; without ifBody it writes as before.
+  x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "mine", ifBody: "v2 by the Bot" });
+  expect(x.bots.skillHistory(undefined, undefined, "inbox")[0]?.body).toBe("mine");
 });
 
 it("keeps skills to the Bot until shared into BB's user skills, and deletes them", async () => {
@@ -1253,17 +1309,17 @@ it("searches only the calling Bot's skills, ranked by title, then description, t
   expect(x.bots.searchSkills("own").map((hit) => hit.name)).toEqual([]);
 });
 
-it("lists eight skills in the Bot's instructions, pinned and recent first, and points at bot_skill_list for the rest", async () => {
+it("lists eight skills in the Bot's instructions, pinned and recent first, and points at bot_skill (op: list) for the rest", async () => {
   const x = await setup();
   x.add({ id: "bot1" });
   await x.bots.setThread("bot1");
   for (let n = 0; n < 10; n += 1) x.bots.writeSkill({ name: `task-${n}`, description: `Task ${n}`, body: "b" });
   x.bots.pinSkill("task-0", true);
   const text = x.bots.instructions(x.bots.forThread("bot1")!);
-  expect(text).toContain("bot_skill_list");
+  expect(text).toContain("bot_skill (op: list)");
   expect(text).toContain("- task-0: Task 0");
   expect(text.match(/^- task-/gm)).toHaveLength(8);
-  expect(text).toContain("2 more: search with bot_skill_list.");
+  expect(text).toContain("2 more: bot_skill (op: list).");
 });
 
 it("keeps one skill's history apart, reverts to an old version and restores a deleted skill", async () => {
@@ -1471,20 +1527,6 @@ it("FM: Resume works when the Main is gone and a new one can't start yet", async
   await expect(x.bots.resume(scout.id)).resolves.toMatchObject({ bot: { state: "active" } });
 });
 
-it("FM: an archived Memory page comes back instead of a blank one taking its place", async () => {
-  const x = await setup();
-  await x.bots.create({ name: "Dot", avatar: "🟣" });
-  const first = x.bots.memoryPage()!;
-  const archived = new Set([first]);
-  const deps = (x.bots as unknown as { deps: { memory: { exists(id: string): boolean; unarchive?(id: string): boolean } } }).deps.memory;
-  const exists = deps.exists;
-  deps.exists = (id) => !archived.has(id) && exists(id);
-  deps.unarchive = (id) => archived.delete(id);
-  // Before: a new blank page, and the old memory dropped out of the Bot's instructions.
-  expect(x.bots.memoryPage()).toBe(first);
-  expect(x.pages.size).toBe(1);
-});
-
 it("FM: switching a worktree conversation to another provider keeps its workspace; a gone one is said plainly", async () => {
   const x = await setup();
   await x.bots.create({ name: "Dot", avatar: "🟣" });
@@ -1596,4 +1638,125 @@ it("FM (review F6): the automatic new Main skips a signed-out provider; with non
   expect(x.spawn.mock.calls.length).toBe(before);
   // The Main last ran on Claude, so that is the one to sign in to.
   expect((await bots.get()).bot).toMatchObject({ mainProblem: "Sign in to Claude or choose a model", mainNeedsModel: true });
+});
+
+it("logs and tolerates corrupted warnings JSON in bot_skill_versions without crashing skillHistory()", async () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const x = await setup();
+    await x.bots.create({ name: "Dot", avatar: "🟣" });
+    x.db.prepare("INSERT INTO bot_skill_versions(bot_id, name, description, body, old_body, warnings, at) VALUES (?, 'triage', 'Triage inbox', 'Step 1', '', '{broken', 1000)").run(BOT_ID);
+    const history = x.bots.skillHistory(BOT_ID);
+    expect(history).toHaveLength(1);
+    expect(history[0]?.warnings).toEqual([]);
+    const matching = () => warn.mock.calls.filter(([msg]) => typeof msg === "string" && msg.includes("bot_skill_versions"));
+    expect(matching()).toHaveLength(1);
+
+    // Repeated reads warn at most once per version row.
+    x.bots.skillHistory(BOT_ID);
+    expect(matching()).toHaveLength(1);
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+it("stop() does not mark stopped or pause later automations when an earlier pause fails", async () => {
+  const x = await setup();
+  const created = await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const threadId = created.bot!.threadId!;
+  for (let i = 1; i <= 8; i++) {
+    x.automations.push({ id: `auto_${i}`, name: `Auto ${i}`, enabled: true, trigger: { cron: "0 9 * * *" }, execution: { targetThreadId: threadId }, nextRunAt: 99 });
+  }
+  const pausedIds: string[] = [];
+  const real = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => {
+    if (args.method === "automations_pause") {
+      const id = String(args.input.automationId);
+      pausedIds.push(id);
+      if (id === "auto_1") throw new Error("pause-boom-1");
+      await new Promise((resolve) => setTimeout(resolve, 15));
+    }
+    return real(args);
+  });
+
+  await expect(x.bots.stop()).rejects.toThrow("pause-boom-1");
+  expect((await x.bots.get()).bot?.state).not.toBe("stopped");
+  // Concurrency is 6: auto_7 and auto_8 must not have been started after auto_1 failed.
+  expect(pausedIds).not.toContain("auto_7");
+  expect(pausedIds).not.toContain("auto_8");
+});
+
+it("restorePaused() restores surviving items, keeps failed ones, and throws the lowest-rowid failure", async () => {
+  const x = await setup();
+  const created = await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const threadId = created.bot!.threadId!;
+  for (const id of ["auto_1", "auto_2", "auto_3"]) {
+    x.automations.push({ id, name: id, enabled: true, trigger: { cron: "0 9 * * *" }, execution: { targetThreadId: threadId }, nextRunAt: 99 });
+  }
+  await x.bots.stop();
+  expect((await x.bots.get()).bot?.state).toBe("stopped");
+
+  const real = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => {
+    if (args.method === "automations_resume") {
+      const id = String(args.input.automationId);
+      if (id === "auto_2") {
+        // Fails slower than auto_3, but has lower rowid so its error must win.
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        throw new Error("resume-fail-2");
+      }
+      if (id === "auto_3") {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        throw new Error("resume-fail-3");
+      }
+    }
+    return real(args);
+  });
+
+  await expect(x.bots.resume()).rejects.toThrow("resume-fail-2");
+  expect((await x.bots.get()).bot?.state).toBe("stopped");
+  // auto_1 succeeded and was forgotten; auto_2 and auto_3 stay recorded for retry.
+  expect(x.automations.find((a) => a.id === "auto_1")?.enabled).toBe(true);
+  const remaining = (x.db.prepare("SELECT item_id FROM bot_stop_paused WHERE bot_id = ? ORDER BY rowid").all(BOT_ID) as { item_id: string }[]).map((r) => r.item_id);
+  expect(remaining).toEqual(["auto_2", "auto_3"]);
+});
+
+it("finds the core skill by its marker, never by name or order: check-ins and Memory follow it", async () => {
+  const x = await setup();
+  const scout = await x.bots.create({ name: "Scout", avatar: "🛰️" });
+  const id = scout.bot!.id;
+  // The user already had an on-demand "core-profile", so the core skill is made as core-profile-moved.
+  x.bots.writeSkill({ name: "core-profile", description: "Mine", body: "Not a profile." }, id);
+  expect(x.bots.ensureCore(id)).toMatchObject({ skill: "core-profile-moved" });
+  // Another always-on skill that sorts first by name.
+  x.bots.writeSkill({ name: "aaa-notes", description: "Also always on", body: "## Notes\n\n- One.\n", alwaysOn: true }, id);
+  expect(x.bots.alwaysOnSkills(id).map((skill) => [skill.name, skill.core])).toEqual([["core-profile-moved", true], ["aaa-notes", false]]);
+  expect(x.bots.coreSkill(id)).toMatchObject({ name: "core-profile-moved", migrated: false });
+  expect(x.bots.addCheckin(id, "Every Friday: the weekly review.")).toBe(true);
+  expect(x.bots.skill("core-profile-moved", id)!.body).toContain("- Every Friday: the weekly review.");
+  expect(x.bots.skill("aaa-notes", id)!.body).not.toContain("Friday");
+  expect(x.bots.skill("core-profile", id)!.body).toBe("Not a profile.");
+  // Without its core skill, a check-in line goes nowhere rather than into another skill.
+  x.bots.deleteSkill("core-profile-moved", id);
+  expect(x.bots.coreSkill(id)).toBeNull();
+  expect(x.bots.addCheckin(id, "Another line.")).toBe(false);
+  expect(x.bots.skill("aaa-notes", id)!.body).not.toContain("Another line.");
+});
+
+it("repairs the core marker when the core skill was renamed, never by guessing among several", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  x.bots.ensureCore();
+  const core = x.bots.skill("core-profile")!;
+  // Renamed: written anew under another name, the old one deleted.
+  x.bots.writeSkill({ name: "my-rules", description: core.description, body: core.body, alwaysOn: true });
+  x.bots.writeSkill({ name: "travel-rules", description: "Also always on", body: "- Aisle seats.\n", alwaysOn: true });
+  x.bots.deleteSkill("core-profile");
+  expect(x.bots.coreSkill()).toMatchObject({ name: "my-rules" });
+  expect(x.bots.addCheckin(x.bots.list()[0]!.id, "Fridays: the review.")).toBe(true);
+  expect(x.bots.skill("my-rules")!.body).toContain("Fridays: the review.");
+  // Deleted with no copy left, and more than one other: nothing is guessed.
+  x.bots.deleteSkill("my-rules");
+  x.bots.writeSkill({ name: "home-rules", description: "Always on", body: "- Quiet.\n", alwaysOn: true });
+  expect(x.bots.coreSkill()).toBeNull();
 });

@@ -1,9 +1,9 @@
 import Foundation
 
-public struct WorkerInfo: Equatable, Sendable {
-    public enum WaitingOn: Equatable, Sendable { case approval, question }
+public struct WorkerInfo: Equatable, Hashable, Sendable {
+    public enum WaitingOn: Equatable, Hashable, Sendable { case approval, question }
 
-    public struct Owner: Equatable, Sendable {
+    public struct Owner: Equatable, Hashable, Sendable {
         public var threadId: String
         public var title: String
     }

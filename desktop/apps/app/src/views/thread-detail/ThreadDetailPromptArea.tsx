@@ -44,7 +44,10 @@ import type {
   ThreadTimelineResponse,
   TimelineWorkflowWorkRow,
 } from "@bb/server-contract";
-import type { ExperimentalComposerSelection } from "@get-bb/plugin-sdk";
+import type {
+  ExperimentalComposerSelection,
+  PluginComposerScope,
+} from "@get-bb/plugin-sdk";
 import type { ComposerSubmitExtras } from "@get-bb/plugin-sdk/internal/composer-handle";
 import {
   readExecutionSelection,
@@ -66,7 +69,6 @@ import {
 import {
   ThreadChildThreadsBanner,
   ThreadPromptContextBanner,
-  type ThreadPromptParentThreadSection,
   type ThreadPromptChildThreadsSection,
 } from "@/components/promptbox/banner/ThreadPromptContextBanner";
 import { ThreadTodoCard } from "@/components/promptbox/banner/ThreadTodoCard";
@@ -99,6 +101,11 @@ import type { MachineProviderPresentation } from "@/components/plugin/MachinePro
 import type { WorkspaceCheckoutDisplay } from "@bb/shared-ui/lib/workspace-checkout-display";
 import { useComposerTextEffects } from "@/lib/composer-text-effects";
 import { useLatestRef } from "@/hooks/useLatestRef";
+import {
+  getPromptDraftAccessor,
+  sendPromptDraft,
+} from "@/hooks/usePromptDraftStorage";
+import { appToast } from "@/components/ui/app-toast";
 import { useThreadCreationOptions } from "@/hooks/useThreadCreationOptions";
 import { useProjectDisplayName } from "@/hooks/queries/sidebar-navigation-query";
 import {
@@ -114,6 +121,7 @@ import {
   useCreateThread,
   useCancelThreadPlan,
   useStopThread,
+  useStopThreadBackgroundTask,
 } from "@/hooks/mutations/thread-runtime-mutations";
 import {
   useRestoreThreadEnvironment,
@@ -131,7 +139,6 @@ import {
 } from "@/lib/mutation-errors";
 import { promptHistoryEntriesToDrafts } from "@/lib/prompt-history";
 import { usePromptHistoryEnabled } from "@/hooks/usePromptHistoryEnabled";
-import { getThreadRoutePath } from "@/lib/route-paths";
 import { getThreadDisplayTitle } from "@/lib/thread-title";
 import {
   buildThreadHandoffCreateRequest,
@@ -165,6 +172,7 @@ import {
   shouldQueueFollowUpMessage,
   type FollowUpExecutionSelection,
 } from "@bb/client-core";
+import { openThread } from "@/lib/split-layout/openThread";
 
 const ignoreReportedSubmitError = () => {};
 const ignorePermissionModeChange = () => {};
@@ -218,7 +226,6 @@ interface ThreadDetailPromptAreaProps {
   modelFallback: ThreadTimelineModelFallback | null;
   activeWorkflows: TimelineWorkflowWorkRow[];
   activeBackgroundCommands: TimelineWorkflowWorkRow[];
-  parentThreadSection: ThreadPromptParentThreadSection | null;
   childThreadsSection: ThreadPromptChildThreadsSection | null;
   contextEnvironmentId: string | null;
   sendMessage: SendMessageMutationLike;
@@ -510,7 +517,6 @@ export function ThreadDetailPromptArea({
   modelFallback,
   activeWorkflows,
   activeBackgroundCommands,
-  parentThreadSection,
   childThreadsSection: hostChildThreadsSection,
   contextEnvironmentId,
   sendMessage,
@@ -574,6 +580,7 @@ export function ThreadDetailPromptArea({
     commitInlineQueuedMessage,
     updateInlineQueuedMessage,
     dismissInlineQueuedMessageEditor,
+    abandonInlineQueuedMessageEdit,
     beginEditQueuedMessage,
     queuedMessageDraftSession,
   } = useInlineQueuedMessageEditing({
@@ -582,6 +589,16 @@ export function ThreadDetailPromptArea({
     onBeginEdit: () => {
       clearInlineAttachmentErrorRef.current();
       setEditFocusNonce((nonce) => nonce + 1);
+    },
+    onUnsavedEditLost: (draft) => {
+      getPromptDraftAccessor({
+        kind: "thread",
+        projectId,
+        threadId: thread.id,
+      }).restoreUnsent(draft);
+      appToast.warning("Your queued message edit is in the composer", {
+        description: "The message left the queue before the edit was saved.",
+      });
     },
   });
   const inlineDraftSession = queuedMessageDraftSession;
@@ -595,6 +612,7 @@ export function ThreadDetailPromptArea({
   );
   const stopThread = useStopThread();
   const cancelThreadPlan = useCancelThreadPlan();
+  const { mutate: stopBackgroundTask } = useStopThreadBackgroundTask();
   const unarchiveThread = useUnarchiveThread();
   const restoreThreadEnvironment = useRestoreThreadEnvironment();
   const createThread = useCreateThread();
@@ -846,7 +864,15 @@ export function ThreadDetailPromptArea({
   const handoffSeed = useMemo<ThreadHandoffCreateSeed>(
     () => ({
       environmentId: thread.environmentId,
+      parent:
+        thread.parentThreadId === null
+          ? null
+          : {
+              threadId: thread.parentThreadId,
+              notifications: thread.parentNotifications,
+            },
       projectId: thread.projectId,
+      sectionId: thread.sectionId,
       sourceThreadId: thread.id,
       sourceThreadTitle: sourceThreadDisplayTitle,
     }),
@@ -854,7 +880,10 @@ export function ThreadDetailPromptArea({
       sourceThreadDisplayTitle,
       thread.environmentId,
       thread.id,
+      thread.parentNotifications,
+      thread.parentThreadId,
       thread.projectId,
+      thread.sectionId,
     ],
   );
   const beginHandoff = useCallback(
@@ -1117,6 +1146,7 @@ export function ThreadDetailPromptArea({
     onSaveSuccess: () => setInlineAttachmentError(null),
     inlineEditingQueuedMessage,
     dismissInlineQueuedMessageEditor,
+    abandonInlineQueuedMessageEdit,
     activeComposerDraftInput: inlineComposerDraftInput,
   });
   const isQueueMutationPending =
@@ -1232,9 +1262,18 @@ export function ThreadDetailPromptArea({
     },
     [applySelection],
   );
+  const threadComposerScope = useMemo<PluginComposerScope>(
+    () => ({
+      kind: "thread",
+      threadId: thread.id,
+      projectId: thread.projectId,
+      environmentId: thread.environmentId,
+    }),
+    [thread.environmentId, thread.id, thread.projectId],
+  );
   const normalPluginComposerHost = useMemo<PluginComposerHost>(
     () => ({
-      scope: { kind: "thread", threadId: thread.id },
+      scope: threadComposerScope,
       textEffectKey: promptDraft.storageKey,
       getCurrent: promptDraft.getCurrent,
       subscribeDraft: promptDraft.subscribe,
@@ -1254,7 +1293,7 @@ export function ThreadDetailPromptArea({
       promptDraft.subscribe,
       setSelection,
       subscribeSelection,
-      thread.id,
+      threadComposerScope,
     ],
   );
 
@@ -1326,23 +1365,17 @@ export function ThreadDetailPromptArea({
       await runWhileCreatingHandoffThread(
         isCreatingHandoffThreadRef,
         async () => {
-          const clearedSubmittedDraft =
-            promptDraft.clearIfCurrentMatches(submittedDraft);
           setBottomAttachmentError(null);
-          try {
-            const created = await createThread.mutateAsync(request);
-            navigate(
-              getThreadRoutePath({
-                projectId: created.projectId,
-                threadId: created.id,
-              }),
-            );
-          } catch (error) {
-            if (clearedSubmittedDraft) {
-              promptDraft.restoreIfEmpty(submittedDraft);
-            }
-            throw error;
-          }
+          const created = await sendPromptDraft(
+            promptDraft,
+            submittedDraft,
+            () => createThread.mutateAsync(request),
+          );
+          openThread({
+            navigate,
+            projectId: created.projectId,
+            threadId: created.id,
+          });
         },
       );
       return true;
@@ -1407,7 +1440,6 @@ export function ThreadDetailPromptArea({
         throw new Error("This thread's model options are still loading.");
       }
 
-      promptDraft.clearIfCurrentMatches(submittedDraft);
       setBottomAttachmentError(null);
 
       const compactRequestFirst = compactFirst && sendAt === undefined;
@@ -1421,24 +1453,25 @@ export function ThreadDetailPromptArea({
         ? "queue_message"
         : "send_message";
       try {
-        const request = buildAutoFollowUpRequest({
-          compactFirst: compactRequestFirst,
-          threadId: thread.id,
-          input: submittedInput,
-          execution: followUpExecutionSelection,
-        });
-        if (request) {
-          await sendMessage.mutateAsync({
-            ...request,
-            ...sendAtFields,
-            ...pluginSubmissionFields,
+        await sendPromptDraft(promptDraft, submittedDraft, async () => {
+          const request = buildAutoFollowUpRequest({
+            compactFirst: compactRequestFirst,
+            threadId: thread.id,
+            input: submittedInput,
+            execution: followUpExecutionSelection,
           });
-          if (!isQueuingMessage) {
-            setFullHistoryThreadId(null);
+          if (request) {
+            await sendMessage.mutateAsync({
+              ...request,
+              ...sendAtFields,
+              ...pluginSubmissionFields,
+            });
+            if (!isQueuingMessage) {
+              setFullHistoryThreadId(null);
+            }
           }
-        }
+        });
       } catch (nextError) {
-        promptDraft.restoreIfEmpty(submittedDraft);
         throw reportMutationError({
           error: nextError,
           fallbackMessage: failureMessage,
@@ -1492,19 +1525,19 @@ export function ThreadDetailPromptArea({
         const pluginSubmissionFields =
           pluginSubmission === undefined ? {} : { pluginSubmission };
         await submitDraft(async () => {
-          promptDraft.clearIfCurrentMatches(submittedDraft);
           setBottomAttachmentError(null);
           await runWhileFollowUpShortcutSending(
             setIsFollowUpShortcutSending,
             async () => {
               try {
-                await sendMessage.mutateAsync({
-                  ...shortcutRequest.request,
-                  ...sendAtFields,
-                  ...pluginSubmissionFields,
-                });
+                await sendPromptDraft(promptDraft, submittedDraft, () =>
+                  sendMessage.mutateAsync({
+                    ...shortcutRequest.request,
+                    ...sendAtFields,
+                    ...pluginSubmissionFields,
+                  }),
+                );
               } catch (nextError) {
-                promptDraft.restoreIfEmpty(submittedDraft);
                 throw reportMutationError({
                   error: nextError,
                   fallbackMessage: "Failed to send message",
@@ -1969,6 +2002,8 @@ export function ThreadDetailPromptArea({
           kind: "queued-message",
           threadId: thread.id,
           queuedMessageId: inlineEditQueuedMessageId,
+          projectId: thread.projectId,
+          environmentId: thread.environmentId,
         },
         textEffectKey: `queued-message:${thread.id}:${inlineEditQueuedMessageId}:${inlineEditSessionId}`,
         getCurrent: () =>
@@ -2002,7 +2037,9 @@ export function ThreadDetailPromptArea({
       inlineEditingQueuedMessageRef,
       queuedMessageComposerSelection,
       subscribeInlineQueuedDraft,
+      thread.environmentId,
       thread.id,
+      thread.projectId,
     ]);
   const queuedMessageEditor = useMemo(() => {
     if (
@@ -2118,7 +2155,7 @@ export function ThreadDetailPromptArea({
       }
       const operationId = sentMessageEditOperationId;
       return {
-        scope: { kind: "thread", threadId: thread.id },
+        scope: threadComposerScope,
         textEffectKey: `sent-message:${thread.id}:${operationId}`,
         getCurrent: () =>
           readSentMessageEditDraft(
@@ -2142,6 +2179,7 @@ export function ThreadDetailPromptArea({
       sentMessageEditRef,
       subscribeSentMessageEditDraft,
       thread.id,
+      threadComposerScope,
     ]);
   const sentMessageEditorPortal = useMemo(() => {
     if (!sentMessageEdit?.hostElement || !sentMessagePluginComposerHost) {
@@ -2242,6 +2280,12 @@ export function ThreadDetailPromptArea({
           commands={activeBackgroundCommands}
           isExpanded={isBackgroundCommandsExpanded}
           onToggle={() => setIsBackgroundCommandsExpanded((value) => !value)}
+          onStop={(row) =>
+            stopBackgroundTask({
+              threadId: thread.id,
+              itemId: row.itemId,
+            })
+          }
         />
         {shouldHideComposer ? null : activePromptModeCard}
         <ThreadTodoCard
@@ -2300,9 +2344,6 @@ export function ThreadDetailPromptArea({
                 ? null
                 : { id: contextEnvironmentId },
           }}
-          core={{
-            parentThread: parentThreadSection,
-          }}
           expandedSegment={expandedBannerSegment}
           onToggleSegment={handleToggleBannerSegment}
         />
@@ -2347,6 +2388,7 @@ export function ThreadDetailPromptArea({
     [
       queueExpanded,
       setQueueExpanded,
+      stopBackgroundTask,
       childThreadsBannerKey,
       contextBannerKey,
       isChildThreadsExpanded,
@@ -2380,7 +2422,6 @@ export function ThreadDetailPromptArea({
       activeBackgroundCommands,
       isBackgroundCommandsExpanded,
       modelFallback,
-      parentThreadSection,
       childThreadsSection,
       pendingTodos,
       displayedProcessingQueuedMessage,

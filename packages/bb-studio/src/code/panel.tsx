@@ -227,7 +227,7 @@ export function WorkspaceView({ id, onWorkspace, onChoose: chooseFrom }: { id: s
   );
   const retry = (run: () => void) => (
     <button type="button" className={BAR_BUTTON} onClick={run}>
-      <Icon name="RotateCw" className="size-4" /> Retry
+      <Icon name="RotateCcw" className="size-4" /> Retry
     </button>
   );
   const centered = "flex h-full flex-col items-center justify-center gap-3 p-6 text-center";
@@ -359,7 +359,7 @@ export function EditorFrame({ id, url, password, label, onReload, onChoose }: { 
         // Shown over the top of the frame, not instead of it: whatever did load stays in view.
         <div role="alert" className="absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-background px-3 py-1.5 text-sm text-foreground">
           <span className="min-w-0 flex-1">VS Code hasn't loaded.</span>
-          <button type="button" className={BAR_BUTTON} onClick={onReload}><Icon name="RotateCw" className="size-4" /> Retry</button>
+          <button type="button" className={BAR_BUTTON} onClick={onReload}><Icon name="RotateCcw" className="size-4" /> Retry</button>
           <button type="button" className={BAR_BUTTON} onClick={onChoose}><Icon name="FolderOpen" className="size-4" /> Choose another workspace</button>
           <button type="button" aria-label="Dismiss" title="Dismiss" className={BAR_BUTTON} onClick={() => setDismissed(true)}><Icon name="X" className="size-4" /></button>
         </div>

@@ -320,9 +320,13 @@ export class ToolGatewayEngine {
     this.providers.delete(id);
   }
 
-  private async closeConnected(id: string, conn: Connected): Promise<void> {
+  private wakeDead(conn: Connected): void {
     conn.expectedClose = true;
     for (const wake of conn.waiting.splice(0)) wake();
+  }
+
+  private async closeConnected(id: string, conn: Connected): Promise<void> {
+    this.wakeDead(conn);
     if (conn.kind === "host") {
       const controller = new AbortController();
       await withTimeout(this.deps.stdioHost!.close(conn.hostKey!, controller.signal), CLOSE_TIMEOUT_MS, `stop ${id}`, () => controller.abort());
@@ -355,6 +359,7 @@ export class ToolGatewayEngine {
     for (const [id, conn] of [...this.conns]) {
       if (conn.kind !== "host") continue;
       this.conns.delete(id);
+      this.wakeDead(conn);
       this.fail(id, "The server process stopped; it starts again on the next call.");
       any = true;
     }
@@ -362,14 +367,17 @@ export class ToolGatewayEngine {
   }
 
   private hostConnectionChanged(key: string, status: "closed" | "error", error: string | null): void {
+    if (this.closed) return;
     const conn = this.conns.get(key);
     if (!conn || conn.kind !== "host") return;
     this.conns.delete(key);
+    this.wakeDead(conn);
     this.fail(key, error ?? `The server ${status === "closed" ? "stopped" : "failed"}.`);
     this.deps.changed();
   }
 
   private hostCatalogChanged(key: string, error: string | null): void {
+    if (this.closed) return;
     const conn = this.conns.get(key);
     if (!conn || conn.kind !== "host" || error) return;
     void this.deps.stdioHost!.refresh(conn.hostKey!).then((catalog) => {
@@ -423,7 +431,7 @@ export class ToolGatewayEngine {
     if (failure && !options.retryNow && Date.now() - failure.at < this.backoffMs(id)) throw new Error(failure.message);
     const controller = new AbortController();
     this.connectControllers.set(id, controller);
-    const connecting = this.connect(record, controller.signal);
+    const connecting = this.connect(record, controller);
     this.pending.set(id, connecting);
     this.deps.changed();
     try {
@@ -434,7 +442,8 @@ export class ToolGatewayEngine {
     }
   }
 
-  private async connect(record: ServerRecord, signal: AbortSignal): Promise<Connected> {
+  private async connect(record: ServerRecord, controller: AbortController): Promise<Connected> {
+    const { signal } = controller;
     const id = record.id;
     const epoch = this.epochs.get(id) ?? 0;
     const config = record.config;
@@ -443,6 +452,7 @@ export class ToolGatewayEngine {
     let transport: Connected["transport"];
     let provider: McpOAuthProvider | undefined;
     let conn: Connected | undefined;
+    let hostStarted = false;
     this.deps.log(id, "event", "starting");
     try {
       if (config.kind === "stdio") {
@@ -454,7 +464,8 @@ export class ToolGatewayEngine {
         }
         const stdio: StdioConfig = { key: id, command: config.command, args: config.args, cwd, env: serverEnvironment(this.deps.baseEnv, secrets, config.envNames) };
         if (this.deps.stdioHost) {
-          const catalog = await withTimeout(this.deps.stdioHost.start(stdio, signal), this.limits.connectMs, `Starting ${id}`, () => this.connectControllers.get(id)?.abort(new Error(`Starting ${id} timed out`)));
+          hostStarted = true;
+          const catalog = await withTimeout(this.deps.stdioHost.start(stdio, signal), this.limits.connectMs, `Starting ${id}`, () => controller.abort(new Error(`Starting ${id} timed out`)));
           conn = { kind: "host", hostKey: id, tools: catalog.tools, expectedClose: false, lastUsed: Date.now(), active: 0, waiting: [], configKey: this.configKey(record) };
         } else {
           // Tests and a BB without host workers: the same client, in this process.
@@ -482,6 +493,7 @@ export class ToolGatewayEngine {
         transport!.onclose = () => {
           if (local.expectedClose || this.closed || this.conns.get(id) !== local) return;
           this.conns.delete(id);
+          this.wakeDead(local);
           this.fail(id, "The connection closed.");
           this.deps.changed();
         };
@@ -502,10 +514,22 @@ export class ToolGatewayEngine {
       return conn;
     } catch (error) {
       const message = this.deps.redact(errorText(error));
+      const cleanupPartial = async () => {
+        if (conn) {
+          await this.closeConnected(id, conn).catch(() => {});
+        } else if (client) {
+          await withTimeout(client.close(), CLOSE_TIMEOUT_MS, `close ${id}`).catch(() => {});
+        } else if (hostStarted && this.deps.stdioHost) {
+          const ownAttempt = !this.conns.has(id) && (!this.connectControllers.has(id) || this.connectControllers.get(id)?.signal === signal);
+          if (ownAttempt) {
+            const controller = new AbortController();
+            await withTimeout(this.deps.stdioHost.close(id, controller.signal), CLOSE_TIMEOUT_MS, `stop ${id}`, () => controller.abort()).catch(() => {});
+          }
+        }
+      };
       const cancelled = this.closed || signal.aborted || (this.epochs.get(id) ?? 0) !== epoch;
       if (cancelled) {
-        if (conn) await this.closeConnected(id, conn).catch(() => {});
-        else if (client) await withTimeout(client.close(), CLOSE_TIMEOUT_MS, `close ${id}`).catch(() => {});
+        await cleanupPartial();
         throw new Error(this.closed ? "Tool Gateway is closing" : `Start of ${id} cancelled`);
       }
       const authorizationUrl = provider ? await provider.authorizationUrlValue() : undefined;
@@ -517,8 +541,7 @@ export class ToolGatewayEngine {
         this.deps.changed();
         throw new AuthenticationRequiredError(authorizationUrl);
       }
-      if (conn) await this.closeConnected(id, conn).catch(() => {});
-      else if (client) await withTimeout(client.close(), CLOSE_TIMEOUT_MS, `close ${id}`).catch(() => {});
+      await cleanupPartial();
       this.conns.delete(id);
       this.fail(id, message);
       this.deps.changed();
@@ -536,6 +559,7 @@ export class ToolGatewayEngine {
   }
 
   private localCatalogChanged(id: string, error: Error | null, items: unknown): void {
+    if (this.closed) return;
     const conn = this.conns.get(id);
     if (!conn || error || !Array.isArray(items)) return;
     conn.tools = items as Tool[];
@@ -665,6 +689,7 @@ export class ToolGatewayEngine {
         signal?.addEventListener("abort", wake, { once: true });
       });
     }
+    if (conn.expectedClose) throw new Error("The server stopped.");
     conn.active += 1;
   }
 

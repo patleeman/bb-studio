@@ -1,52 +1,11 @@
 import SwiftUI
 import UIKit
 
-/// Settings ▸ Diagnostics ▸ New chat transcript: the Bot chat and threads
-/// on the UIKit transcript (`apps/ios/iOS/Transcript`). On by default (a
-/// value someone set stays); turned off, the thread is the SwiftUI
-/// transcript, untouched.
-enum TranscriptV2 {
-    static let key = "newChatTranscript"
-
-    /// Debug: `-qaTranscriptV2` turns it on for a launch, `-qaTranscriptV1` off.
-    static var launchArgument: Bool? {
-        #if DEBUG
-        let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("-qaTranscriptV1") { return false }
-        if arguments.contains("-qaTranscriptV2") { return true }
-        #endif
-        return nil
-    }
-}
-
-/// The flag's switch: reads the setting live, so turning it on applies to
-/// a chat that's already open the next time it draws.
-struct TranscriptV2Switch<Legacy: View, Next: View>: View {
-    @AppStorage(TranscriptV2.key) private var on = true
-    @ViewBuilder var legacy: () -> Legacy
-    @ViewBuilder var next: () -> Next
-
-    var body: some View {
-        if TranscriptV2.launchArgument ?? on { next() } else { legacy() }
-    }
-}
-
-/// The setting, in Diagnostics.
-struct TranscriptV2Toggle: View {
-    @AppStorage(TranscriptV2.key) private var on = true
-
-    var body: some View {
-        Toggle("New chat transcript", isOn: $on)
-            .accessibilityIdentifier("settingsNewChatTranscript")
-    }
-}
-
 /// What a row in the new transcript needs from its thread to act: the
 /// same closures the SwiftUI transcript passes its rows.
 struct ThreadTranscriptActions {
     /// Shows only one strand (a divider tapped); nil where strands don't run.
     var onlyStrand: ((String) -> Void)? = nil
-    var bot: BotInfo?
     var projectId: String?
     var reactionItems: [String]
     var cached: Bool
@@ -65,6 +24,8 @@ struct ThreadTranscriptActions {
     var resolve: (PendingInteraction, JSONValue) async -> Bool
     var cancel: (PendingInteraction) async -> Void
     var openWeb: () -> Void
+    /// A one-shot notice's action (a Bot conversation's lines at the end).
+    var notice: (TranscriptNotice.Action) -> Void = { _ in }
     var threadTitle: (String) -> String? = { _ in nil }
 }
 
@@ -73,21 +34,16 @@ struct ThreadTranscriptActions {
 enum ThreadTranscriptRow: Identifiable, Equatable {
     /// The spinner above the rows while older ones load.
     case older
-    case hero(BotInfo, status: String, working: Bool)
-    case bot(BotChatEntry, BotState)
+    /// A card about a thread the Bot started (the room's conversations).
+    case child(BotChildEvent, id: String)
     case item(TimelineItem, ItemState)
     case pending(Outbox.Message)
     case interaction(PendingInteraction)
-    case working(BotInfo?, thinking: String?)
+    case working(thinking: String?)
     /// Strands in the timeline: a divider where the strand changes, or "N other messages" under a filter.
     case strand(StrandTimeline.Mark, key: String)
-
-    struct BotState: Equatable {
-        var editable = false
-        var sideThread: BotSideThread?
-        var canReply = false
-        var live: BotChildStatus?
-    }
+    /// Something that happened once, as a quiet line at the end (a Bot conversation).
+    case notice(TranscriptNotice)
 
     struct ItemState: Equatable {
         var unread = false
@@ -97,58 +53,35 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         var sameTurn = false
         var relayed: RelayedMessage?
         var quiet = false
+        /// A reply that needs the user: its asking sentence marked (its turn's newest message).
+        var ask: ReplyAskMark?
     }
 
     var id: String {
         switch self {
         case .older: "transcript:older"
-        case .hero: "transcript:hero"
-        case .bot(let entry, _): entry.id
+        case .child(_, let id): "child:\(id)"
         case .item(let item, _): item.id
         case .pending(let message): "pending-message:\(message.id)"
         case .interaction(let interaction): interaction.id
         case .working: "transcript:working"
         case .strand(_, let key): "strand:\(key)"
+        case .notice(let notice): "notice:\(notice.id)"
         }
     }
 
     static func == (a: Self, b: Self) -> Bool {
         switch (a, b) {
         case (.older, .older): true
-        case let (.hero(x, s, w), .hero(y, t, v)): x == y && s == t && w == v
-        case let (.bot(x, s), .bot(y, t)): x == y && s == t
+        case let (.child(x, i), .child(y, j)): x == y && i == j
         case let (.item(x, s), .item(y, t)): x.id == y.id && x.rows == y.rows && s == t
         case let (.pending(x), .pending(y)): x == y
         case let (.interaction(x), .interaction(y)): x == y
-        case let (.working(x, s), .working(y, t)): x == y && s == t
+        case let (.working(x), .working(y)): x == y
         case let (.strand(x, k), .strand(y, l)): x == y && k == l
+        case let (.notice(x), .notice(y)): x == y
         default: false
         }
-    }
-
-    /// The Bot's chat: the hero or the older-rows spinner, its entries, the
-    /// outbox, and its typing dots.
-    @MainActor
-    static func bot(_ chrome: BotChrome, rows: [TimelineRow], status: String, working: Bool, canLoadOlder: Bool,
-                    editableId: String?, threadRows: Set<String>, pending: [Outbox.Message], typing: Bool, thinking: String?) -> [Self] {
-        var result: [Self] = [canLoadOlder ? .older : .hero(chrome.bot, status: status, working: working)]
-        let live = Dictionary(chrome.started.map { ($0.id, $0.status) }, uniquingKeysWith: { first, _ in first })
-        for entry in BotChatEntry.memo.entries(rows, started: chrome.started, compactions: chrome.compactions) {
-            var state = BotState()
-            switch entry {
-            case .message(let row, _, _):
-                state.editable = row.id == editableId
-                state.sideThread = chrome.sideThreads[row.id]
-                state.canReply = !row.isUser && threadRows.contains(row.id)
-            case .child(let event, _):
-                state.live = event.threadId.flatMap { live[$0] }
-            default: break
-            }
-            result.append(.bot(entry, state))
-        }
-        result += pending.map(Self.pending)
-        if typing { result.append(.working(chrome.bot, thinking: thinking)) }
-        return result
     }
 
     /// A thread: its messages and activity, the outbox, questions, and the working line.
@@ -183,7 +116,7 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         }
         result += pending.map(Self.pending)
         result += interactions.map(Self.interaction)
-        if working { result.append(.working(nil, thinking: thinking)) }
+        if working { result.append(.working(thinking: thinking)) }
         return result
     }
 }
@@ -210,10 +143,10 @@ struct ThreadTranscriptRowView: View {
         switch row {
         case .older:
             ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
-        case .hero(let bot, let status, let working):
-            BotHero(bot: bot, status: status, working: working)
-        case .bot(let entry, let state):
-            bot(entry, state)
+        case .child(let event, _):
+            BotChildCard(event: event, live: nil) {
+                if let id = event.threadId { actions.openThread(id) }
+            }
         case .item(let item, let state):
             VStack(alignment: .leading, spacing: 14) {
                 if state.unread { UnreadDivider() }
@@ -229,7 +162,7 @@ struct ThreadTranscriptRowView: View {
                             saveFiles: actions.saveFiles, thread: state.sideThread, replier: actions.replier,
                             replyInThread: actions.messageThread.flatMap { open in ConversationReplies.canThread(row) ? { open(row) } : nil },
                             fork: actions.forkConversation.flatMap { fork in ConversationReplies.canFork(row) ? { fork(row) } : nil },
-                            openSideThread: actions.openSideThread)
+                            openSideThread: actions.openSideThread, ask: state.ask)
                     case .activity(let rows):
                         ActivityGroup(rows: rows)
                     }
@@ -246,36 +179,14 @@ struct ThreadTranscriptRowView: View {
                             resolve: { await actions.resolve(interaction, $0) },
                             cancel: { await actions.cancel(interaction) },
                             openWeb: actions.openWeb)
-        case .working(let bot, let thinking):
-            if let bot { BotTypingRow(bot: bot, thinking: thinking) } else { WorkingIndicator(thinking: thinking) }
+        case .working(let thinking):
+            WorkingIndicator(thinking: thinking)
         case .strand(.divider(let strandId, let title), _):
             StrandDividerRow(title: title, only: actions.onlyStrand.map { only in { only(strandId) } })
         case .strand(.gap(let count), _):
             StrandGapRow(count: count)
-        }
-    }
-
-    @ViewBuilder private func bot(_ entry: BotChatEntry, _ state: ThreadTranscriptRow.BotState) -> some View {
-        switch entry {
-        case .day(let date, _):
-            BotDaySeparator(date: date)
-        case .message(let row, let first, let last):
-            if let bot = actions.bot {
-                BotMessageRow(
-                    bot: bot, row: row, first: first, last: last, projectId: actions.projectId,
-                    react: actions.sendReply, quote: actions.quote, select: actions.select,
-                    edit: state.editable ? actions.edit : nil, sideThread: state.sideThread,
-                    replyInThread: state.canReply ? { actions.replyInThread(row.id) } : nil)
-                .modifier(ChatPerfRow(row: row, cached: actions.cached))
-            }
-        case .work(let rows):
-            BotWorkRow(rows: rows)
-        case .autoCompacted(let compaction, _):
-            BotAutoCompactedMarker(compaction: compaction)
-        case .child(let event, _):
-            BotChildCard(event: event, live: state.live, inset: actions.bot == nil ? 0 : 36) {
-                if let id = event.threadId { actions.openThread(id) }
-            }
+        case .notice(let notice):
+            TranscriptNoticeRow(notice: notice, act: actions.notice)
         }
     }
 }
@@ -284,12 +195,13 @@ extension ThreadTranscriptRow {
     /// Strands in a conversation's rows (`StrandTimeline.plan`): dividers where
     /// the strand changes, or, showing only one strand, its rows with the others
     /// folded into "N other messages". Rows that aren't from a turn stay.
-    static func strands(_ rows: [Self], tags: StrandTags?, only: String?) -> [Self] {
+    static func strands(_ rows: [Self], tags: StrandTags?, only: String?, flash: Double? = nil) -> [Self] {
         guard let tags, !tags.tags.isEmpty else { return rows }
         let seqs: [Double?] = rows.map { row in
             if case .item(let item, _) = row { return item.rows.compactMap(\.sourceSeqEnd).max() }
             return nil
         }
+        let rows = asks(rows, seqs: seqs, tags: tags, flash: flash)
         let messages: [Bool] = rows.map { row in
             if case .item(.message, _) = row { return true }
             return false
@@ -302,6 +214,24 @@ extension ThreadTranscriptRow {
             if plan.keep[index] { out.append(row) }
         }
         for (n, mark) in (plan.marks[rows.count] ?? []).enumerated() { out.append(.strand(mark, key: "end:\(n)")) }
+        return out
+    }
+
+    /// Replies that still need the user (`strands.tags` replies): each is marked
+    /// in its turn's newest reply message; `flash` is the reply Jump to reply flashes.
+    static func asks(_ rows: [Self], seqs: [Double?], tags: StrandTags, flash: Double?) -> [Self] {
+        guard tags.replies.contains(where: \.open) else { return rows }
+        var newest: [String: Int] = [:]
+        for (index, row) in rows.enumerated() {
+            guard case .item(.message(let message), _) = row, !message.isUser, let turn = tags.turn(atSeq: seqs[index]) else { continue }
+            newest[turn.turnId] = index
+        }
+        var out = rows
+        for (turnId, index) in newest {
+            guard let reply = tags.openReply(turnId: turnId), case .item(let item, var state) = out[index] else { continue }
+            state.ask = ReplyAskMark(ask: reply.ask, seq: reply.seq, flash: flash == reply.seq)
+            out[index] = .item(item, state)
+        }
         return out
     }
 }

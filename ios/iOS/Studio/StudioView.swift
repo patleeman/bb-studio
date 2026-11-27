@@ -11,12 +11,39 @@ final class StudioStore: ObservableObject {
     /// Archived ones too; the list shows them on request.
     @Published private(set) var items: [StudioItem] = []
     /// What each add-on says its kinds can do, from the Studio plugin.
-    @Published private(set) var kindInfo: [StudioKindInfo] = []
+    @Published private(set) var kindInfo: [StudioKindInfo] = [] {
+        didSet {
+            infoByKey = Dictionary(kindInfo.map { ("\($0.pluginId):\($0.id)", $0) }, uniquingKeysWith: { first, _ in first })
+        }
+    }
     /// Studio's tags, in name order.
-    @Published private(set) var tags: [StudioTag] = []
+    @Published private(set) var tags: [StudioTag] = [] {
+        didSet {
+            tagOrderById = Dictionary(tags.enumerated().map { ($1.id, ($0, $1)) }, uniquingKeysWith: { first, _ in first })
+        }
+    }
     @Published private(set) var supportsTags = false
     /// Starred items, newest-starred first.
-    @Published private(set) var starred: [StudioItem] = []
+    @Published private(set) var starred: [StudioItem] = [] {
+        didSet { starredIds = Set(starred.map(\.id)) }
+    }
+    private var infoByKey: [String: StudioKindInfo] = [:]
+    private var tagOrderById: [String: (rank: Int, tag: StudioTag)] = [:]
+    private var starredIds: Set<String> = []
+
+    /// Tags for an item, deduplicated and in `tags` name order.
+    func orderedTags(for ids: [String]?) -> [StudioTag] {
+        guard let ids, !ids.isEmpty else { return [] }
+        var seen = Set<String>()
+        var matches: [(rank: Int, tag: StudioTag)] = []
+        matches.reserveCapacity(ids.count)
+        for id in ids where seen.insert(id).inserted {
+            if let entry = tagOrderById[id] { matches.append(entry) }
+        }
+        matches.sort { $0.rank < $1.rank }
+        return matches.map(\.tag)
+    }
+    private static let cacheQueue = DispatchQueue(label: "nyc.plee.bbgo.studio-cache", qos: .utility)
     @Published private(set) var supportsStars = false
     @Published private(set) var projectNames: [String: String] = [:]
     @Published private(set) var plugins: Set<String> = []
@@ -32,6 +59,12 @@ final class StudioStore: ObservableObject {
     private var listener: UUID?
     private weak var realtime: BBRealtime?
     private var reloadTask: Task<Void, Never>?
+    /// Studio lists on screen. Signals reload only while one shows; off
+    /// screen they mark the list stale, and it reloads when Studio shows
+    /// again. (Attached once, the store heard every Studio signal for good:
+    /// each turn of any Bot reloaded all of Studio, about ten requests.)
+    private var showing = 0
+    private var stale = false
 
     func attach(_ app: AppModel) {
         guard app.serverURL == serverURL else { return }
@@ -42,14 +75,24 @@ final class StudioStore: ObservableObject {
         listener = app.realtime.listen { [weak self] event in
             guard let self else { return }
             switch event {
-            // Studio's open-tabs channel changes nothing listed here.
-            case .pluginSignal("studio", "studio-tabs", _): break
-            case .pluginSignal("studio", _, _): scheduleReload(client)
-            case .connected: scheduleReload(client)
+            // Studio's open-tabs channel and the Bots' turns change nothing listed here.
+            case .pluginSignal("studio", "studio-tabs", _), .pluginSignal("studio", Studio.Channel.bot_threads_changed, _): break
+            case .pluginSignal("studio", _, _), .connected:
+                if showing > 0 { scheduleReload(client) } else { stale = true }
             default: break
             }
         }
     }
+
+    /// A Studio list came on screen: reload if signals came while none showed.
+    func appeared(_ client: BBClient) {
+        showing += 1
+        guard stale else { return }
+        stale = false
+        scheduleReload(client)
+    }
+
+    func disappeared() { showing = max(0, showing - 1) }
 
     /// Pages signal on every save and Talk on every segment; coalesce them.
     private func scheduleReload(_ client: BBClient) {
@@ -91,8 +134,12 @@ final class StudioStore: ObservableObject {
         let generation = loadGeneration
         async let projects = try? client.projects()
         if let running = try? await client.runningPlugins(), generation == loadGeneration {
-            plugins = running
-            UserDefaults.standard.set(running.sorted().joined(separator: ","), forKey: ServerScope.key("runningPlugins", serverURL: serverURL))
+            if plugins != running { plugins = running }
+            let joined = running.sorted().joined(separator: ",")
+            let key = ServerScope.key("runningPlugins", serverURL: serverURL)
+            if UserDefaults.standard.string(forKey: key) != joined {
+                UserDefaults.standard.set(joined, forKey: key)
+            }
         }
         do {
             let listing = try await fetch(client)
@@ -106,11 +153,13 @@ final class StudioStore: ObservableObject {
             self.items = Self.shown(listing.items).sorted { $0.updatedAt > $1.updatedAt }
             Spotlight.indexStudio(self.items, serverURL: serverURL)
             error = nil
-            DiskCache.save(
-                StudioSnapshot(
-                    items: self.items, kinds: kindInfo, tags: supportsTags ? tags : nil,
-                    starred: supportsStars ? starred : nil),
-                as: StudioSnapshot.cacheKey, serverURL: serverURL)
+            let snapshot = StudioSnapshot(
+                items: self.items, kinds: kindInfo, tags: supportsTags ? tags : nil,
+                starred: supportsStars ? starred : nil)
+            let serverURL = self.serverURL
+            Self.cacheQueue.async {
+                DiskCache.save(snapshot, as: StudioSnapshot.cacheKey, serverURL: serverURL)
+            }
         } catch where BBClient.isCancellation(error) {
         } catch {
             guard generation == loadGeneration else { return }
@@ -193,7 +242,7 @@ final class StudioStore: ObservableObject {
     }
 
     func info(_ item: StudioItem) -> StudioKindInfo? {
-        kindInfo.first { $0.pluginId == item.pluginId && $0.id == item.kind }
+        infoByKey["\(item.pluginId):\(item.kind)"]
     }
 
     func archive(_ item: StudioItem, _ archived: Bool, client: BBClient) async throws {
@@ -228,7 +277,7 @@ final class StudioStore: ObservableObject {
         }
     }
 
-    func isStarred(_ item: StudioItem) -> Bool { starred.contains { $0.id == item.id } }
+    func isStarred(_ item: StudioItem) -> Bool { starredIds.contains(item.id) }
 
     /// The item a route opens, for its star.
     func item(for route: Route) -> StudioItem? {
@@ -374,7 +423,7 @@ struct StudioKind: Identifiable, Hashable {
     static let known = [
         StudioKind(id: "page", label: "Page", plural: "Pages", symbol: "doc.richtext", tint: .blue),
         StudioKind(id: "recording", label: "Recording", plural: "Recordings", symbol: "waveform", tint: .red),
-        StudioKind(id: "dictation", label: "Dictation", plural: "Dictations", symbol: "mic", tint: .orange),
+        StudioKind(id: "dictation", label: "Dictation", plural: "Dictations", symbol: "mic", tint: .pink),
         StudioKind(id: "drawing", label: "Whiteboard", plural: "Whiteboards", symbol: "scribble.variable", tint: .purple),
         StudioKind(id: "app", label: "App", plural: "Apps", symbol: "macwindow", tint: .teal),
         StudioKind(id: "design", label: "Design", plural: "Designs", symbol: "rectangle.on.rectangle.angled", tint: .pink),
@@ -397,6 +446,8 @@ struct StudioKind: Identifiable, Hashable {
 }
 
 struct StudioView: View {
+    @Environment(\.look) private var look
+    @ObservedObject private var router = Router.shared
     var selectsDetail = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var app: AppModel
@@ -437,6 +488,8 @@ struct StudioView: View {
             store.attach(app)
             await store.load(client)
         }
+        .onAppear { store.appeared(client) }
+        .onDisappear { store.disappeared() }
         .sheet(item: $recordingKind) { kind in
             DictationView(threadId: nil, autoStart: true, kind: kind)
                 .onDisappear { Task { await store.load(client) } }
@@ -620,7 +673,7 @@ struct StudioView: View {
         if selectsDetail {
             // Keep filters above the folder/item list, as in the phone pager,
             // without nesting its page controller inside the sidebar.
-            studioList(kind: app.studioKind, chips: false)
+            studioList(kind: router.studioKind, chips: false)
                 .safeAreaBar(edge: .top) {
                     if showsFilter {
                         kindFilter
@@ -630,7 +683,7 @@ struct StudioView: View {
                     }
                 }
         } else if query.isEmpty {
-            TabView(selection: Binding(get: { app.studioKind ?? "" }, set: { app.studioKind = $0.isEmpty ? nil : $0 })) {
+            TabView(selection: Binding(get: { router.studioKind ?? "" }, set: { router.studioKind = $0.isEmpty ? nil : $0 })) {
                 ForEach(kindPages, id: \.self) { kind in
                     studioList(kind: kind.isEmpty ? nil : kind, chips: false)
                         .background(YieldsRowSwipesToPager())
@@ -645,16 +698,16 @@ struct StudioView: View {
                         .padding(.vertical, 6)
                 }
             }
-            .sensoryFeedback(.selection, trigger: app.studioKind)
+            .sensoryFeedback(.selection, trigger: router.studioKind)
         } else {
-            studioList(kind: app.studioKind, chips: true)
+            studioList(kind: router.studioKind, chips: true)
         }
     }
 
     /// "" is All; a kind chosen elsewhere keeps its page even with nothing in it.
     private var kindPages: [String] {
         let kinds = store.kinds.map(\.id)
-        return [""] + kinds + (app.studioKind.map { kinds.contains($0) ? [] : [$0] } ?? [])
+        return [""] + kinds + (router.studioKind.map { kinds.contains($0) ? [] : [$0] } ?? [])
     }
 
     private var showsFilter: Bool {
@@ -701,8 +754,11 @@ struct StudioView: View {
                     .listRowBackground(Color.clear)
             }
             if selectsDetail, query.isEmpty {
+                let parentKeys: Set<String> = Set(store.items.compactMap { item in
+                    item.parentId.map { "\(item.pluginId):\($0)" }
+                })
                 let folders = store.items.filter { parent in
-                    !parent.archived && store.items.contains { $0.pluginId == parent.pluginId && $0.parentId == parent.itemId }
+                    !parent.archived && parentKeys.contains("\(parent.pluginId):\(parent.itemId)")
                 }
                 if !folders.isEmpty {
                     Section("Folders") {
@@ -756,14 +812,14 @@ struct StudioView: View {
         let count = store.hasTalk || dynamicTypeSize.isAccessibilitySize ? 2 : 1
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: count), spacing: 10) {
             if store.hasTalk {
-                tile("Dictate", "mic.fill", .orange) { recordingKind = "dictation" } menu: {
+                tile("Dictate", "mic.fill", .pink) { recordingKind = "dictation" } menu: {
                     if store.hasPages {
                         Button("Dictate a Page", systemImage: "doc.badge.plus") { dictatingPage = true }
                     }
                     Button("Record", systemImage: "record.circle") { recordingKind = "recording" }
                 }
             }
-            tile("Write", "square.and.pencil", .blue) { app.sheet = .write } menu: {
+            tile("Write", "square.and.pencil", .blue) { router.sheet = .write } menu: {
                 ForEach(store.creatable, id: \.id) { kind in
                     Button("New \(kind.label)", systemImage: StudioKind.of(kind.id).symbol) {
                         Task { await create(kind) }
@@ -776,7 +832,7 @@ struct StudioView: View {
 
     /// Visual Chat (its own plugin): its chats and New chat.
     private var visualChatCard: some View {
-        Button { app.studioPath.append(.visualChats) } label: {
+        Button { router.studioPath.append(.visualChats) } label: {
             HStack(spacing: 12) {
                 Image(systemName: "rectangle.3.group.bubble").font(.title2).foregroundStyle(.purple)
                 VStack(alignment: .leading, spacing: 2) {
@@ -819,12 +875,12 @@ struct StudioView: View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    chip("All", nil, selected: app.studioKind == nil) { withAnimation { app.studioKind = nil } }
+                    chip("All", nil, selected: router.studioKind == nil) { withAnimation { router.studioKind = nil } }
                         .id("")
                         .accessibilityIdentifier("studio-kind-all")
                     ForEach(store.kinds) { kind in
-                        chip(kind.plural, kind.symbol, selected: app.studioKind == kind.id) {
-                            withAnimation { app.studioKind = app.studioKind == kind.id ? nil : kind.id }
+                        chip(kind.plural, kind.symbol, selected: router.studioKind == kind.id) {
+                            withAnimation { router.studioKind = router.studioKind == kind.id ? nil : kind.id }
                         }
                         .id(kind.id)
                         .accessibilityIdentifier("studio-kind-" + kind.id)
@@ -849,7 +905,7 @@ struct StudioView: View {
             }
             .scrollClipDisabled()
             // A swipe to another kind brings its chip into view.
-            .onChange(of: app.studioKind) { withAnimation { proxy.scrollTo(app.studioKind ?? "", anchor: .center) } }
+            .onChange(of: router.studioKind) { withAnimation { proxy.scrollTo(router.studioKind ?? "", anchor: .center) } }
         }
     }
 
@@ -917,9 +973,10 @@ struct StudioView: View {
 
     @ViewBuilder
     private func row(_ item: StudioItem) -> some View {
+        let itemTags = store.orderedTags(for: item.tags)
         let content = StudioRow(
             item: item, project: project.isEmpty ? projectName(item) : nil,
-            tags: store.tags.filter { item.tags?.contains($0.id) == true },
+            tags: itemTags,
             snippet: query.isEmpty ? nil : contentMatches[item.id].flatMap { $0.isEmpty ? nil : $0 },
             highlight: query.trimmingCharacters(in: .whitespaces))
         opener(item, id: "studioItem") { content }
@@ -948,11 +1005,11 @@ struct StudioView: View {
     private func opener(_ item: StudioItem, id: String, @ViewBuilder content: () -> some View) -> some View {
         if !selecting, let route = item.route {
             if selectsDetail {
-                Button { app.studioPath = [route] } label: {
+                Button { router.studioPath = [route] } label: {
                     content().frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .listRowBackground(SidebarSelectionBackground(selected: app.studioPath.first == route))
+                .listRowBackground(SidebarSelectionBackground(selected: router.studioPath.first == route))
                 .accessibilityIdentifier(id)
             } else {
                 NavigationLink(value: route) { content() }
@@ -1003,7 +1060,7 @@ struct StudioView: View {
     private func menu(_ item: StudioItem) -> some View {
         if let href = item.href {
             Button {
-                operation.complete(on: app) { app.newThread(text: "[\(item.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(href)) ") }
+                operation.complete(on: app) { app.open(.compose("[\(item.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(href)) ")) }
             } label: { Label("New Thread with This", systemImage: "square.and.pencil") }
         }
         ForEach(store.info(item)?.actions ?? [], id: \.id) { action in
@@ -1062,7 +1119,7 @@ struct StudioView: View {
     }
 
     /// The items on the page shown.
-    private var visible: [StudioItem] { visible(kind: app.studioKind) }
+    private var visible: [StudioItem] { visible(kind: router.studioKind) }
 
     private func visible(kind: String?) -> [StudioItem] {
         store.items.filter { item in
@@ -1085,25 +1142,26 @@ struct StudioView: View {
 
     private struct DaySection {
         let title: String
-        let items: [StudioItem]
+        var items: [StudioItem]
     }
 
     /// Today, Yesterday, Previous 7 Days, then by month.
     private func sections(_ visible: [StudioItem]) -> [DaySection] {
         let calendar = Calendar.current
         let now = Date.now
+        let week = calendar.date(byAdding: .day, value: -7, to: now)
         func title(_ item: StudioItem) -> String {
             let date = Date(timeIntervalSince1970: item.updatedAt / 1000)
             if calendar.isDateInToday(date) { return "Today" }
             if calendar.isDateInYesterday(date) { return "Yesterday" }
-            if let week = calendar.date(byAdding: .day, value: -7, to: now), date > week { return "Previous 7 Days" }
+            if let week, date > week { return "Previous 7 Days" }
             return date.formatted(calendar.isDate(date, equalTo: now, toGranularity: .year) ? .dateTime.month(.wide) : .dateTime.month(.wide).year())
         }
         var result: [DaySection] = []
         for item in visible {
             let key = title(item)
             if result.last?.title == key {
-                result[result.count - 1] = DaySection(title: key, items: result[result.count - 1].items + [item])
+                result[result.count - 1].items.append(item)
             } else {
                 result.append(DaySection(title: key, items: [item]))
             }
@@ -1150,7 +1208,7 @@ struct StudioView: View {
     private func createPage(_ text: String) async {
         do {
             let page = try await client.createPage(title: PageTitle.from(text), markdown: text)
-            operation.complete(on: app) { app.studioPath.append(.page(id: page.id)) }
+            operation.complete(on: app) { router.studioPath.append(.page(id: page.id)) }
             await store.load(client)
         } catch {
             store.error = BBClient.describe(error, server: client.baseURL)
@@ -1161,7 +1219,7 @@ struct StudioView: View {
         let projectId = project.isEmpty || project == "none" ? nil : project
         do {
             let item = try await store.create(kind, projectId: projectId, client: client)
-            if let route = item.route { operation.complete(on: app) { app.studioPath.append(route) } }
+            if let route = item.route { operation.complete(on: app) { router.studioPath.append(route) } }
         } catch {
             flash(BBClient.describe(error, server: client.baseURL))
         }
@@ -1523,9 +1581,7 @@ struct StudioThumbnail: View {
             }
             .task(id: key) { await draw() }
         } else {
-            AsyncImage(url: URL(string: path, relativeTo: client.baseURL)) { image in
-                image.resizable().scaledToFill()
-            } placeholder: {
+            DownsampledRemoteImage(url: URL(string: path, relativeTo: client.baseURL), pixels: 180, contentMode: .fill) {
                 Image(systemName: kind.symbol).font(.body.weight(.medium)).foregroundStyle(kind.tint)
             }
         }

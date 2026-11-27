@@ -7,22 +7,11 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { composerFor } from "../../kit/composer";
 import { errorMessage } from "../../kit/format";
+import { useDarkMode } from "../../kit/ui/dark-mode";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { liveContract } from "../live/contract";
 import type { LiveEventPayload } from "../live/server";
 import { LIVE_CHANNEL, LIVE_MESSAGE, contentUrl, takeMentionId } from "../shared";
-
-function useDarkMode(): boolean {
-  const read = () => document.documentElement.classList.contains("dark") || document.body.classList.contains("dark");
-  const [dark, setDark] = useState(read);
-  useEffect(() => {
-    const observer = new MutationObserver(() => setDark(read()));
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
-  return dark;
-}
 
 /** How often an open copy that exposes actions says it's still open. */
 const HEARTBEAT = 20_000;

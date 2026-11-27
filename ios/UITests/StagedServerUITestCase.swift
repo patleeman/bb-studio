@@ -42,19 +42,8 @@ extension XCUIApplication {
             arguments.remove(at: index)
             if index < arguments.count { arguments.remove(at: index) }
         }
-        // The new chat transcript is the default. `TEST_RUNNER_TRANSCRIPT_V2=0`:
-        // any suite on the old one; `=1` (or anything else) on the new one.
-        if let v2 = ProcessInfo.processInfo.environment["TRANSCRIPT_V2"],
-           !arguments.contains("-qaTranscriptV2"), !arguments.contains("-qaTranscriptV1") {
-            arguments.append(v2 == "0" ? "-qaTranscriptV1" : "-qaTranscriptV2")
-        }
-        // The conversation is home now (`RoomHome`). The suites written for the
-        // presence screen keep it with `-qaPresenceHome`; `-qaConversationHome` opts out.
-        if arguments.contains("-qaConversationHome") {
-            arguments.removeAll { $0 == "-qaConversationHome" || $0 == "-qaPresenceHome" }
-        } else if !arguments.contains("-qaPresenceHome") {
-            arguments.append("-qaPresenceHome")
-        }
+        // Each launch opens on Main, not on a conversation an earlier suite left open.
+        if !arguments.contains("-qaRoomRemember"), !arguments.contains("-qaRoomForget") { arguments.append("-qaRoomForget") }
         launchArguments = arguments + ["-serverURL", server]
         launch()
     }

@@ -3,6 +3,7 @@ import SwiftUI
 /// Answers a pending approval, question, design brief, or secret request in place. Other
 /// plugin forms fall back to the web app.
 struct InteractionCard: View {
+    @Environment(\.look) private var look
     let interaction: PendingInteraction
     let resolve: (JSONValue) async -> Bool
     var cancel: () async -> Void = {}
@@ -19,7 +20,7 @@ struct InteractionCard: View {
         VStack(alignment: .leading, spacing: 10) {
             Label(header, systemImage: "hand.raised.fill")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(look.needsYou)
             switch interaction.payload.kind {
             case "approval": approval
             case "user_question": questions
@@ -42,7 +43,7 @@ struct InteractionCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.orange.opacity(0.12), in: .rect(cornerRadius: 14))
+        .background(look.needsYou.opacity(0.12), in: .rect(cornerRadius: 14))
         .disabled(working)
         .overlay { if working { ProgressView() } }
         .sheet(isPresented: $showingPlan) {

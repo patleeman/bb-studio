@@ -108,15 +108,6 @@ function Section({ id, label, closed, onToggle, children }: { id: string; label:
   );
 }
 
-/**
- * The Studio list as the Studio panel's own sidebar (a nav panel's
- * `experimental_sidebar`): BB shows it while the panel is on screen, with no
- * preference to switch.
- */
-export function StudioPanelSidebar() {
-  return <StudioItemsList onNavigate={() => {}} />;
-}
-
 function StudioItemsList({ onNavigate }: { onNavigate(): void }) {
   const { data, error, rpc, load } = useSidebarData();
   const context = useBbContext();

@@ -4,9 +4,9 @@ import { pushFor, StrandPushes, type StrandPushDeps, type StrandPushInput } from
 
 const strand = (id: string, state: StrandView["state"], asks: StrandAsk[] = [], over: Partial<StrandView> = {}): StrandView => ({
   id, title: `Strand ${id}`, summary: null, named: true, state, detail: state === "needs-you" && !asks.length ? "Release worker needs you" : null, asks, workers: [],
-  lastAt: 1, firstAt: 1, firstSeq: 1, latestSeq: 2, latestTurnId: "turn_1", messages: 2, unsure: 0, pinned: false, origin: "jev", taskId: null, ...over,
+  lastAt: 1, firstAt: 1, firstSeq: 1, latestSeq: 2, latestTurnId: "turn_1", messages: 2, unsure: 0, pinned: false, origin: "jev", taskId: null, parentId: null, trunk: false, ...over,
 });
-const ask = (threadId: string, kind: StrandAsk["kind"] = "question"): StrandAsk => ({ id: `ask_${threadId}`, kind, threadId, label: "Merge the PR?", details: [], turnId: "turn_1", decisions: [] });
+const ask = (threadId: string, kind: StrandAsk["kind"] = "question"): StrandAsk => ({ id: `ask_${threadId}`, kind, threadId, label: "Merge the PR?", details: [], turnId: "turn_1", decisions: [], seq: null });
 const conversation = (threadId: string, strands: StrandView[]): OverviewConversation => ({ threadId, title: threadId === "thr_main" ? "Main" : "BB Studio", isMain: threadId === "thr_main", lastActiveAt: 1, strands });
 
 function harness(over: Partial<StrandPushDeps> = {}) {
@@ -134,5 +134,80 @@ describe("the needs-you push", () => {
     rows = [conversation("thr_main", [strand("s1", "needs-you", [ask("thr_main")])]), conversation("thr_studio", [strand("s2", "active")])];
     await h.pushes.check();
     expect(h.kept()).toEqual(["s1"]);
+  });
+
+  it("stops run() without saving or notifying when disposed while overview() is in flight", async () => {
+    let releaseOverview!: () => void;
+    let calls = 0;
+    const overview = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) await new Promise<void>((resolve) => { releaseOverview = resolve; });
+      return { conversations: [conversation("thr_main", [strand("s1", "needs-you", [ask("thr_main")])])] };
+    });
+    const save = vi.fn(async () => {});
+    const notify = vi.fn(async () => {});
+    const pushed = vi.fn();
+    const h = harness({
+      bots: () => [{ id: "bot_1", name: "One" }, { id: "bot_2", name: "Two" }],
+      load: async () => [],
+      overview,
+      save,
+      notify,
+      pushed,
+    });
+
+    const checking = h.pushes.check();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(overview).toHaveBeenCalledTimes(1);
+
+    h.pushes.dispose();
+    releaseOverview();
+    await checking;
+
+    expect(overview).toHaveBeenCalledTimes(1);
+    expect(save).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    expect(pushed).not.toHaveBeenCalled();
+  });
+
+  it("finishes sending a saved push when disposed during pushFor() across a two-instance reload (exactly one notify)", async () => {
+    let releaseAsk!: () => void;
+    let kept: string[] | null = [];
+    const rows = [conversation("thr_main", [strand("s1", "needs-you", [ask("thr_main")])])];
+    const notify = vi.fn(async () => {});
+    const shared = {
+      bots: () => [{ id: "bot_main", name: "Chief of Staff" }],
+      overview: async () => ({ conversations: rows }),
+      startedByAnotherThread: async () => false,
+      projectOf: async () => "proj_1",
+      notify,
+      load: async () => kept,
+      save: async (ids: string[]) => { kept = ids; },
+      defaultProjectId: "proj_personal",
+      delayMs: 0,
+    };
+    const first = new StrandPushes({
+      ...shared,
+      bbPushesAsks: async () => {
+        await new Promise<void>((resolve) => { releaseAsk = resolve; });
+        return false;
+      },
+    });
+    const second = new StrandPushes({
+      ...shared,
+      bbPushesAsks: async () => false,
+    });
+
+    const firstCheck = first.check();
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Reload: first instance is disposed after save() already recorded s1, and the new instance runs.
+    first.dispose();
+    await second.check();
+    releaseAsk();
+    await firstCheck;
+
+    expect(kept).toEqual(["s1"]);
+    expect(notify).toHaveBeenCalledTimes(1);
   });
 });

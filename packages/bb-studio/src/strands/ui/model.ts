@@ -1,8 +1,78 @@
 // What the strands UI shows, as pure functions (design dsn_398fde78c3b1f6b8,
 // screen 4a): text only, neutral marks, amber only for "needs you".
-import type { StrandAsk, StrandList, StrandView } from "../contract";
+import type { ReplyTagView, StrandAsk, StrandList, StrandView } from "../contract";
 
-export type Tags = { tags: readonly { turnId: string; seq: number; strandId: string | null }[]; strands: readonly { id: string; title: string }[] };
+type TagReply = Omit<ReplyTagView, "line"> & { line?: string | null };
+export type Tags = { tags: readonly { turnId: string; seq: number; strandId: string | null; kind?: "user" | "report"; at?: number | null; line?: string | null }[]; strands: readonly { id: string; title: string; done?: boolean; parentId?: string | null }[]; replies?: readonly TagReply[]; opening?: { seq: number; replySeq: number | null } | null };
+
+/** A run of status replies shorter than this stays open. */
+export const RUN_MIN = 3;
+
+/** One run of status replies folded into one line (BB's timeline folds, slots.experimental_timelineFilter's `folds`). */
+export interface StatusRunFold {
+  id: string;
+  turnIds: string[];
+  label: string;
+  /** The line when BB folds only some of the run's turns (it cut the run short): their count and the last one's line. */
+  labelFor(turnIds: readonly string[]): string;
+}
+
+const runLabel = (count: number, last: string | null) => `${count} updates${last ? ` · last: ${last}` : ""}`;
+
+/**
+ * The conversation's runs of status replies to fold: consecutive turns whose
+ * replies Jev tagged status, with no message the user typed between them (a
+ * turn the user started may open a run: its message stays, its reply folds).
+ * A reply that needs the user, or one with no tag, ends a run; runs shorter
+ * than RUN_MIN stay open; the newest turn never folds, so the newest reply
+ * always shows. `openTurns`: the turns of the runs the user opened; a run
+ * holding any of them stays open, even when a late tag moves where it starts.
+ */
+export function statusRunFolds(tags: Tags | null | undefined, openTurns: ReadonlySet<string> = new Set()): StatusRunFold[] {
+  if (!tags?.replies?.length) return [];
+  const replies = new Map(tags.replies.map((reply) => [reply.turnId, reply]));
+  const runs: { turnId: string; line: string | null }[][] = [];
+  let run: { turnId: string; line: string | null }[] = [];
+  const close = () => { if (run.length >= RUN_MIN) runs.push(run); run = []; };
+  for (const turn of tags.tags.slice(0, -1)) {
+    if ((turn.kind ?? "user") === "user") close();
+    const reply = replies.get(turn.turnId);
+    if (reply?.tag === "status") run.push({ turnId: turn.turnId, line: reply.line ?? null });
+    else close();
+  }
+  close();
+  return runs
+    .map((each): StatusRunFold => {
+      const lines = new Map(each.map((turn) => [turn.turnId, turn.line]));
+      return {
+        id: `run:${each[0]!.turnId}`,
+        turnIds: each.map((turn) => turn.turnId),
+        label: runLabel(each.length, each.at(-1)!.line),
+        labelFor: (turnIds) => runLabel(turnIds.length, lines.get(turnIds.at(-1) ?? "") ?? null),
+      };
+    })
+    .filter((fold) => !fold.turnIds.some((turnId) => openTurns.has(turnId)));
+}
+
+/** The fold that holds message `seq` (a message's or a reply's seq: the turn it falls in), or null. */
+export function foldOfSeq(tags: Tags | null | undefined, folds: readonly StatusRunFold[], seq: number): StatusRunFold | null {
+  let turnId: string | null = null;
+  for (const turn of tags?.tags ?? []) { if (turn.seq <= seq) turnId = turn.turnId; else break; }
+  return turnId ? folds.find((fold) => fold.turnIds.includes(turnId!)) ?? null : null;
+}
+
+/** A turn's reply tag: needs-you (still open, or answered) or status; null when it has none. */
+export function replyOf(tags: Tags | null | undefined, turnId: string | null): TagReply | null {
+  if (!tags?.replies || !turnId) return null;
+  for (let index = tags.replies.length - 1; index >= 0; index--) if (tags.replies[index]!.turnId === turnId) return tags.replies[index]!;
+  return null;
+}
+
+/** A needs-you strand's reply ask, when that's what it waits on first: its message is where picking it goes. */
+export function replyAskOf(strand: Pick<StrandView, "state" | "asks">): (StrandAsk & { seq: number }) | null {
+  const ask = strand.state === "needs-you" ? strand.asks[0] : undefined;
+  return ask?.kind === "reply" && ask.seq !== null ? ask as StrandAsk & { seq: number } : null;
+}
 
 /** A message's tag: its turn's strand, and whether a divider goes above it (the strand changed since the last sorted turn). */
 export function tagOf(tags: Tags | null | undefined, turnId: string | null): { strandId: string; title: string; divider: boolean; seq: number } | null {

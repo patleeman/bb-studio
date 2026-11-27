@@ -185,7 +185,7 @@ if [ $DRY = 1 ]; then
 else
   node --no-warnings "$TRANSFER" --from "$LIVE_DIR" --to "$STUDIO_DIR" "${RW[@]}" --manifest "$B/manifest.json" | sed 's/^/  /'
   S="$STUDIO_DIR/plugins/studio/data.db"; L="$LIVE_DIR/plugins/studio/data.db"
-  for t in memory_records bot_skills bot_runners bot_automations bot_loops; do
+  for t in bot_skills bot_runners bot_automations bot_loops; do
     a=$(q "$L" "select count(*) from $t"); b=$(q "$S" "select count(*) from $t")
     [ "$a" = "$b" ] && ok "$t $b = live" || fail "$t $b, live $a"
   done
@@ -282,7 +282,7 @@ if [ $DRY = 0 ]; then
   [ "$(curl -s "$API/fork/import" | json 'o.paused')" = true ] && ok "mirror paused" || fail "mirror not paused"
   bot=$(rpc studio bot_get '{"botId":"bot_main"}' | json '(o.bot??o).state+" "+(o.bot??o).threadId')
   [ "$bot" = "paused $(cat "$STATE/new-main")" ] && ok "Bot paused, Main $(cat "$STATE/new-main")" || fail "Bot is '$bot'"
-  for m in bot_runners bot_automations bot_skills memory.list memory.profile; do rpc studio $m '{"botId":"bot_main"}' >/dev/null && ok "$m reads" || fail "$m"; done
+  for m in bot_runners bot_automations bot_skills bot_core memory.profile; do rpc studio $m '{"botId":"bot_main"}' >/dev/null && ok "$m reads" || fail "$m"; done
   [ "$(rpc studio bot_runners '{"botId":"bot_main"}' | json 'o.runners.filter(r=>r.state!=="paused").length')" = 0 ] && ok "runners all paused" || fail "a runner is not paused"
   echo "  visible threads now: $(q "$STUDIO_DIR/bb.db" "select count(*) from threads where archived_at is null and deleted_at is null and coalesce(visibility,'')!='hidden'")"
 fi

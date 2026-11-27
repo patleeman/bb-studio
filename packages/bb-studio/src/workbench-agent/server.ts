@@ -1,11 +1,13 @@
 // The workbench tools on the server: workbench_list, workbench_open,
 // workbench_tab (close, focus, pop_out) and workbench_arrange act on the calling
-// conversation's workbench. The workbench lives in the app, so each call is
-// published on WORKBENCH_CHANNEL; the window showing that conversation claims
-// it, runs it (exec.ts) and replies (contract.ts). No claim within CLAIM_MS
-// means the conversation isn't on screen. Studio keeps each conversation's
-// record (what the agent opened, what the user closed or changed) here, in
-// memory, and hands it to the window with each call.
+// conversation's workbench. Its tabs are the conversation's Workspace, kept
+// here (store.ts): list, open, close and focus read and write it with no
+// window needed, and every window showing the conversation follows
+// (ui/sync.ts). What only a desktop window can do (pop_out, arrange, an open
+// into a pane or a window of its own) is published on WORKBENCH_CHANNEL; the
+// window showing that conversation claims it, runs it (exec.ts) and replies
+// (contract.ts). No claim within CLAIM_MS means the conversation isn't on
+// screen.
 import { randomUUID } from "node:crypto";
 import { access } from "node:fs/promises";
 import { isAbsolute, normalize, relative, resolve } from "node:path";
@@ -14,11 +16,16 @@ import { z } from "zod";
 import { linksContract } from "../links/contract";
 import { parseLink } from "../links/router";
 import { linkHandlers } from "../links/server";
-import { AGENT_TYPES, itemKindOfId, kindOfAgentType, STUDIO_PLUGIN, tabOpenFor, TAB_KIND_REGISTRY, type TabKindEntry } from "../tab-kinds";
-import { workbenchContract } from "./contract";
+import type Database from "better-sqlite3";
+import { AGENT_TYPES, itemKindOfId, kindOfAgentType, STUDIO_PLUGIN, tabKindEntry, tabOpenFor, TAB_KIND_REGISTRY, type TabKindEntry } from "../tab-kinds";
+import { workbenchContract, workspaceRpcContract } from "./contract";
+import { WorkspaceStore } from "./store";
+import { refOfSpec, type WorkspaceTabRef } from "./workspace";
+import { WORKSPACE_CHANGED_CHANNEL } from "./workspace-contract";
+import { stateView, WorkspaceService } from "./workspace-server";
 import { PANE_LIMITS, WINDOW_KINDS } from "./exec";
 import {
-  CLAIM_MS, EMPTY_RECORD, itemOfSpec, MAX_WIDTH_PERCENT, MIN_PANE_PERCENT, MIN_WIDTH_PERCENT, RESULT_MS, WORKBENCH_CHANNEL,
+  CLAIM_MS, itemOfSpec, MAX_WIDTH_PERCENT, MIN_PANE_PERCENT, MIN_WIDTH_PERCENT, RESULT_MS, WORKBENCH_CHANNEL,
   type OpenSpec, type WorkbenchCommand, type WorkbenchLayout, type WorkbenchOp, type WorkbenchRecord,
 } from "./shared";
 
@@ -79,45 +86,35 @@ export class WorkbenchRouter {
   }
 }
 
-/** Each conversation's record, newest used last; the oldest are dropped past `cap`. */
-export class WorkbenchRecords {
-  private readonly records = new Map<string, WorkbenchRecord>();
-  constructor(private readonly cap = 500) {}
-  get(threadId: string): WorkbenchRecord {
-    return this.records.get(threadId) ?? EMPTY_RECORD;
-  }
-  set(threadId: string, record: WorkbenchRecord): void {
-    this.records.delete(threadId);
-    this.records.set(threadId, record);
-    while (this.records.size > this.cap) this.records.delete(this.records.keys().next().value!);
-  }
-}
-
 export const OFF_SCREEN = "This conversation isn't on screen in BB, so its workbench can't be reached. Nothing changed.";
-export const NO_ANSWER = "BB's window didn't answer in time. Call workbench_list to see what changed.";
+export const NO_ANSWER = "BB's window didn't answer in time. Call workbench (op: list) to see what changed.";
 export const STACKED = `Stacked isn't available. ${PANE_LIMITS} Nothing changed.`;
 
 type FileTarget = Extract<OpenSpec, { kind: "file" }>["target"];
 
-export interface WorkbenchToolDeps {
-  router: Pick<WorkbenchRouter, "call">;
-  records: Pick<WorkbenchRecords, "get" | "set">;
+/** What the tools look up to turn the agent's input into an op. */
+export interface WorkbenchLookups {
   /** A thread's title, or null when there is no such thread. */
   threadTitle(threadId: string): Promise<string | null>;
   /** A Studio item's title, or null when there is no such item. */
   itemTitle(id: string): string | null;
   /** A Bot's name, or null when there is no such Bot. */
   botName(id: string): string | null;
-  /** An automation's, a todo's or a memory record's title, or null when there is none with that id. */
-  entryTitle(kind: "automation" | "todo" | "record", id: string): Promise<string | null>;
+  /** An automation's or a todo's title, or null when there is none with that id. */
+  entryTitle(kind: "automation" | "todo", id: string): Promise<string | null>;
   /** Where a path (full, or relative to the conversation's working folder) is, for BB's file preview; null when BB can't show it. */
   fileTarget(threadId: string, path: string): Promise<FileTarget | null>;
   /** A path as the conversation's workspace names it, for the diff tab. */
   workspacePath(threadId: string, path: string): Promise<string>;
 }
 
+export interface WorkbenchToolDeps extends WorkbenchLookups {
+  router: Pick<WorkbenchRouter, "call">;
+  workspace: WorkspaceService;
+}
+
 const force = z.boolean().optional().describe("Override user choice when explicitly asked");
-const tabKey = z.string().trim().min(1).max(500).describe("Tab key from workbench_list");
+const tabKey = z.string().trim().min(1).max(500).describe("Tab key from workbench (op: list)");
 
 const studioKinds = TAB_KIND_REGISTRY.filter((entry) => entry.agentType && entry.owner !== "bb");
 const typesBy = (ref: TabKindEntry["ref"]) => studioKinds.filter((entry) => entry.ref === ref).map((entry) => entry.agentType).join(", ");
@@ -173,7 +170,7 @@ export function linkedInput(link: string): Pick<OpenInput, "type" | "id" | "path
 }
 
 /** The op for a workbench_open call, or the reason it can't be made. */
-export async function openOp(given: OpenInput, threadId: string, deps: WorkbenchToolDeps): Promise<WorkbenchOp | string> {
+export async function openOp(given: OpenInput, threadId: string, deps: WorkbenchLookups): Promise<WorkbenchOp | string> {
   const linked = given.link ? linkedInput(given.link) : null;
   if (typeof linked === "string") return linked;
   const input: OpenInput = linked ? { ...given, ...linked } : given;
@@ -207,11 +204,11 @@ export async function openOp(given: OpenInput, threadId: string, deps: Workbench
       const name = input.id ? deps.botName(input.id) : null;
       if (input.id && name === null) return `No Bot has id ${input.id}.`;
       if (kind.id === "bot" && !input.id) return "Give the Bot's id.";
-      return tab(kind.id === "todos" ? null : input.id ?? null, kind.id === "bot" ? name! : kind.name);
+      return tab(input.id ?? null, kind.id === "bot" ? name! : kind.name);
     }
     case "entry": {
       if (!input.id) return `Give the ${kind.name.toLowerCase()}'s id.`;
-      const title = kind.id === "automation" || kind.id === "todo" || kind.id === "record" ? await deps.entryTitle(kind.id, input.id) : null;
+      const title = kind.id === "automation" || kind.id === "todo" ? await deps.entryTitle(kind.id, input.id) : null;
       if (title === null) return `No ${kind.name.toLowerCase()} has id ${input.id}.`;
       return tab(input.id, title.trim() || kind.name);
     }
@@ -237,54 +234,134 @@ export async function openOp(given: OpenInput, threadId: string, deps: Workbench
   }
 }
 
-/** The five tools, for bb.agents.registerTool. */
+export type ToolName = (typeof WORKBENCH_TOOLS)[number];
+type TabInput = { action: "close" | "focus" | "pop_out"; key: string; force?: boolean };
+type ArrangeInput = z.infer<typeof arrangeInput>;
+
+/** The op a tool call makes, as the window would run it (exec.ts), or why it can't be made. */
+export async function toolOp(name: ToolName, input: object, threadId: string, deps: WorkbenchLookups): Promise<WorkbenchOp | string> {
+  switch (name) {
+    case "workbench_list": return { type: "list" };
+    case "workbench_open": return openOp(input as OpenInput, threadId, deps);
+    case "workbench_tab": {
+      const tab = input as TabInput;
+      return { type: tab.action === "pop_out" ? "popOut" : tab.action, key: tab.key, force: tab.force === true };
+    }
+    case "workbench_arrange": {
+      const given = input as ArrangeInput;
+      if (given.layout === "stacked") return STACKED;
+      if (!given.layout && given.widthPercent === undefined && given.panes === undefined && !given.paneWidths) return "Give a layout, a widthPercent, panes, paneWidths, or several.";
+      const layout: Partial<WorkbenchLayout> = {
+        ...(given.layout ? LAYOUTS[given.layout] : {}),
+        ...(given.widthPercent !== undefined ? { widthPercent: given.widthPercent } : {}),
+        ...(given.panes !== undefined ? { panes: given.panes } : {}),
+        ...(given.paneWidths ? { paneWidths: given.paneWidths } : {}),
+      };
+      return { type: "arrange", layout, force: given.force === true };
+    }
+  }
+}
+
+/** What a stored tab is, by the tab kinds registry's name ("Page", "Memory"), else whose tab it is. */
+function kindName(ref: WorkspaceTabRef): string {
+  if (ref.kind === "plugin") return ref.pluginId === STUDIO_PLUGIN ? `Studio ${ref.tabId} tab` : `${ref.pluginId} tab`;
+  return tabKindEntry(ref.kind).name;
+}
+
+const FORCE_NOTE = "Pass force: true only when the user asks for it.";
+const unknownTab = (key: string) => `No tab has key ${JSON.stringify(key)}. Call workbench (op: list) for the current keys.`;
+const LAYOUT_NAMES: Record<string, string> = { panel: "the panel open or closed", widthPercent: "the panel width", conversation: "the conversation shown or collapsed", panes: "the number of panes", paneWidths: "the pane widths" };
+
+/** workbench_list's answer, from the Workspace the server keeps. */
+export function listText(workspace: WorkspaceService, threadId: string): string {
+  const state = workspace.get(threadId);
+  const lines = [`${state.tabs.length ? `${state.tabs.length} tab${state.tabs.length === 1 ? "" : "s"}` : "No tabs open"}${state.panelOpen === null ? "" : `, panel ${state.panelOpen ? "open" : "closed"}`}.`];
+  for (const tab of state.tabs) {
+    const notes = [kindName(tab.ref), tab.tabId === state.activeTabId ? "selected" : null, tab.openedBy === "agent" ? "opened by you" : null].filter(Boolean);
+    lines.push(`- key ${JSON.stringify(tab.tabId)}: ${JSON.stringify(tab.title)} (${notes.join(", ")})`);
+  }
+  const closed = workspace.store.closedByUser(threadId).filter((each) => !state.tabs.some((tab) => tab.item === each.item));
+  if (closed.length) lines.push(`Closed by the user after you opened them (not reopened without force): ${closed.slice(0, 20).map((each) => JSON.stringify(each.title)).join(", ")}.`);
+  const { userLayout } = workspace.store.layout(threadId);
+  if (userLayout.length) lines.push(`Changed by the user after you set it (left as is without force): ${userLayout.map((field) => LAYOUT_NAMES[field] ?? field).join(", ")}.`);
+  return lines.join("\n");
+}
+
+/**
+ * The four tools, for bb.agents.registerTool. List, open, close and focus
+ * read and write the Workspace on the server, with no window needed; each
+ * desktop window showing the conversation follows it (ui/sync.ts). Only what
+ * just a desktop window can do goes to one: pop_out, arrange, and an open
+ * into a pane or a window of its own.
+ */
 export function workbenchTools(deps: WorkbenchToolDeps) {
-  const run = async (threadId: string, op: WorkbenchOp): Promise<string> => {
-    const outcome = await deps.router.call(threadId, op, deps.records.get(threadId));
-    if (outcome.status === "off-screen") return OFF_SCREEN;
+  const { workspace } = deps;
+  /** Runs an op in the window showing the conversation, with the layout record the server keeps. */
+  const inWindow = async (threadId: string, op: WorkbenchOp): Promise<string | null> => {
+    const outcome = await deps.router.call(threadId, op, { opened: [], dismissed: [], ...workspace.store.layout(threadId) });
+    if (outcome.status === "off-screen") return null;
     if (outcome.status === "timeout") return NO_ANSWER;
-    deps.records.set(threadId, outcome.record);
+    workspace.store.setLayout(threadId, { layoutSet: outcome.record.layoutSet, userLayout: outcome.record.userLayout });
     return outcome.message;
   };
+  const NOT_SHOWN = "No BB window or phone shows this conversation now: it appears when the conversation is shown.";
+  /** " (shown on the phone)" when only the phone shows the conversation, so the answer says where. */
+  const where = (threadId: string) => (workspace.shownOn(threadId) === "phone" ? " (shown on the phone)" : "");
+  const storeOpen = async (threadId: string, op: Extract<WorkbenchOp, { type: "open" }>): Promise<string> => {
+    const outcome = await workspace.mutate(threadId, { op: "open", tab: refOfSpec(op.spec), title: op.title, focus: op.focus, force: op.force, ...(op.index !== undefined ? { position: op.index } : {}) }, "agent");
+    const name = JSON.stringify(op.title);
+    const key = `key ${JSON.stringify(outcome.tabId)}`;
+    if (outcome.result === "refused" || outcome.result === "notFound" || outcome.result === "conflict") return outcome.message ?? `${name} didn't open.`;
+    if (!workspace.isShown(threadId)) {
+      const selected = op.focus ? " as the selected tab" : "";
+      return outcome.created ? `Saved ${name} to this conversation's Workspace (${key})${selected}. ${NOT_SHOWN}` : `${name} is already in this conversation's Workspace (${key})${op.focus ? "; it is the selected tab" : ""}. ${NOT_SHOWN}`;
+    }
+    const on = where(threadId);
+    if (!outcome.created) return op.focus ? `${name} was already open (${key}); selected it${on}.` : `${name} was already open (${key}); left it where it is${on}.`;
+    return `Opened ${name} (${key}) ${op.focus ? "and selected it" : "behind the selected tab"}${on}.`;
+  };
+  const run = async (name: ToolName, input: object, threadId: string): Promise<string> => {
+    const op = await toolOp(name, input, threadId, deps);
+    if (typeof op === "string") return op;
+    switch (op.type) {
+      case "list": return listText(workspace, threadId);
+      case "open": {
+        if (op.pane === undefined || op.pane === 1) return storeOpen(threadId, op);
+        // A pane or a window of its own is the desktop's: the window places it. Into a pane, the Workspace has it first, so the window's sync doesn't count it as the user's.
+        if (op.pane !== "window") {
+          const stored = await storeOpen(threadId, op);
+          if (!stored.startsWith("Opened") && !stored.includes("was already open")) return stored;
+          return (await inWindow(threadId, op)) ?? `${stored} It wasn't placed in pane ${op.pane === "new" ? 2 : op.pane}: no BB window shows this conversation now.`;
+        }
+        return (await inWindow(threadId, op)) ?? `${await storeOpen(threadId, { ...op, pane: undefined })} No window of its own: that needs the conversation on screen in BB.`;
+      }
+      case "close": case "focus": {
+        const tab = workspace.get(threadId).tabs.find((each) => each.tabId === op.key);
+        if (!tab) return unknownTab(op.key);
+        const outcome = await workspace.mutate(threadId, { op: op.type, tabId: op.key }, "agent");
+        if (outcome.result === "notFound") return unknownTab(op.key);
+        if (outcome.result !== "ok" && outcome.result !== "unchanged") return outcome.message ?? `${JSON.stringify(tab.title)} didn't change.`;
+        const title = JSON.stringify(tab.title);
+        if (!workspace.isShown(threadId)) return op.type === "close" ? `Closed ${title} in this conversation's Workspace. No BB window or phone shows this conversation now.` : `${title} is the selected tab in this conversation's Workspace. ${NOT_SHOWN}`;
+        return op.type === "close" ? `Closed ${title}${where(threadId)}.` : `Selected ${title}${where(threadId)}.`;
+      }
+      case "popOut": {
+        const tab = workspace.get(threadId).tabs.find((each) => each.tabId === op.key);
+        if (!tab) return unknownTab(op.key);
+        return (await inWindow(threadId, { ...op, item: tab.item })) ?? OFF_SCREEN;
+      }
+      case "arrange": return (await inWindow(threadId, op)) ?? OFF_SCREEN;
+    }
+  };
+  const tool = <I extends object>(name: ToolName, description: string, parameters: z.ZodType<I>) => ({
+    name, description, parameters,
+    execute: (input: I, ctx: { threadId: string }) => run(name, input, ctx.threadId),
+  });
   return [
-    {
-      name: "workbench_list",
-      description: "List tabs and layout of this conversation's workbench (while on screen in BB).",
-      parameters: z.object({}),
-      execute: async (_input: Record<string, never>, ctx: { threadId: string }) => run(ctx.threadId, { type: "list" }),
-    },
-    {
-      name: "workbench_open",
-      description: "Open a tab in this conversation's workbench (or pane \"window\" for its own window) by type+id/path/url or link. Selects if already open. Won't reopen what the user closed after you opened it, or take the screen while they type.",
-      parameters: openInput,
-      execute: async (input: OpenInput, ctx: { threadId: string }) => {
-        const op = await openOp(input, ctx.threadId, deps);
-        return typeof op === "string" ? op : run(ctx.threadId, op);
-      },
-    },
-    {
-      name: "workbench_tab",
-      description: 'Act on a workbench tab by key (from workbench_list): action "close", "focus", or "pop_out" (into its own window). focus and pop_out are refused while the user types in the panel.',
-      parameters: z.object({ action: z.enum(["close", "focus", "pop_out"]), key: tabKey, force }),
-      execute: async (input: { action: "close" | "focus" | "pop_out"; key: string; force?: boolean }, ctx: { threadId: string }) =>
-        run(ctx.threadId, { type: input.action === "pop_out" ? "popOut" : input.action, key: input.key, force: input.force === true }),
-    },
-    {
-      name: "workbench_arrange",
-      description: `Arrange the workbench: layout (side by side, panel only, conversation only), widthPercent (${MIN_WIDTH_PERCENT}–${MAX_WIDTH_PERCENT}), panes (1|2), paneWidths. A setting the user changed after you set it stays theirs.`,
-      parameters: arrangeInput,
-      execute: async (input: z.infer<typeof arrangeInput>, ctx: { threadId: string }) => {
-        if (input.layout === "stacked") return STACKED;
-        if (!input.layout && input.widthPercent === undefined && input.panes === undefined && !input.paneWidths) return "Give a layout, a widthPercent, panes, paneWidths, or several.";
-        const layout: Partial<WorkbenchLayout> = {
-          ...(input.layout ? LAYOUTS[input.layout] : {}),
-          ...(input.widthPercent !== undefined ? { widthPercent: input.widthPercent } : {}),
-          ...(input.panes !== undefined ? { panes: input.panes } : {}),
-          ...(input.paneWidths ? { paneWidths: input.paneWidths } : {}),
-        };
-        return run(ctx.threadId, { type: "arrange", layout, force: input.force === true });
-      },
-    },
+    tool("workbench_list", "List the tabs of this conversation's workbench (its Workspace), with their keys.", z.object({})),
+    tool("workbench_open", "Open a tab in this conversation's workbench (or pane \"window\" for its own window) by type+id/path/url or link. Selects if already open. Won't reopen what the user closed after you opened it.", openInput),
+    tool("workbench_tab", `Act on a workbench tab by key (from workbench (op: list)): action "close", "focus", or "pop_out" (into its own window; needs the conversation on screen in BB). ${FORCE_NOTE.replace("Pass", "pop_out takes force:")}`, z.object({ action: z.enum(["close", "focus", "pop_out"]), key: tabKey, force })),
+    tool("workbench_arrange", `Arrange the workbench on screen in BB: layout (side by side, panel only, conversation only), widthPercent (${MIN_WIDTH_PERCENT}–${MAX_WIDTH_PERCENT}), panes (1|2), paneWidths. A setting the user changed after you set it stays theirs.`, arrangeInput),
   ];
 }
 
@@ -315,15 +392,10 @@ export function workspacePathIn(place: ThreadPlace, path: string): string {
   return normalize(path).replace(/^\.\/+/u, "");
 }
 
-/** Registers the tools and the window's RPCs. */
-export function registerWorkbenchAgent(bb: BbPluginApi, deps: { itemTitle(id: string): string | null; botName(id: string): string | null; entryTitle(kind: "automation" | "todo" | "record", id: string): Promise<string | null> }): void {
+/** Registers the tools, the Workspace RPCs and the window's RPCs; answers the Workspace for the rest of Studio. */
+export function registerWorkbenchAgent(bb: BbPluginApi, db: Database.Database, deps: { itemTitle(id: string): string | null; botName(id: string): string | null; entryTitle(kind: "automation" | "todo", id: string): Promise<string | null> }): WorkspaceService {
   const router = new WorkbenchRouter((command) => { void bb.realtime.publish(WORKBENCH_CHANNEL, command as never); });
   bb.onDispose(() => router.dispose());
-  const records = new WorkbenchRecords();
-  bb.rpc.register(workbenchContract, {
-    "workbench.claim": ({ requestId }) => ({ go: router.claim(requestId) }),
-    "workbench.reply": ({ requestId, message, record }) => ({ ok: router.reply(requestId, message, record) }),
-  });
   const place = async (threadId: string): Promise<ThreadPlace> => {
     const thread = (await bb.sdk.threads.get({ threadId }).catch(() => null)) as { environmentId?: string | null } | null;
     const environmentId = thread?.environmentId ?? null;
@@ -332,6 +404,38 @@ export function registerWorkbenchAgent(bb: BbPluginApi, deps: { itemTitle(id: st
     return { environmentId, hostId: environment?.hostId ?? null, root: environment?.path ?? null };
   };
   const primaryHostId = async () => ((await bb.sdk.system.config().catch(() => null)) as { primaryHostId?: string } | null)?.primaryHostId ?? null;
+  // A desktop window reports a file by path alone: the server adds where it is, so the phone can show it.
+  const completeRef = async (threadId: string, ref: WorkspaceTabRef): Promise<WorkspaceTabRef> => {
+    if (ref.kind !== "file" || !ref.path || ref.environmentId || ref.hostId) return ref;
+    const target = fileTargetIn(await place(threadId), await primaryHostId(), ref.path);
+    if (!target) return ref;
+    return target.kind === "workspace" ? { kind: "file", path: target.path, environmentId: target.environmentId } : { kind: "file", path: target.path, hostId: target.hostId };
+  };
+  const exists = <T>(lookup: () => Promise<T>) => lookup().then((found) => !!found, () => false);
+  const workspace = new WorkspaceService(new WorkspaceStore(db), (event) => { void bb.realtime.publish(WORKSPACE_CHANGED_CHANNEL, event as never); }, completeRef, {
+    threadExists: (threadId) => exists(() => bb.sdk.threads.get({ threadId })),
+    placeProblem: async (ref) => {
+      if (ref.kind !== "file") return null;
+      if (ref.environmentId && !(await exists(() => bb.sdk.environments.get({ environmentId: ref.environmentId! })))) return `No worktree has id ${JSON.stringify(ref.environmentId)}.`;
+      if (ref.hostId && !(await exists(() => bb.sdk.hosts.get({ hostId: ref.hostId! })))) return `No machine has id ${JSON.stringify(ref.hostId)}.`;
+      return null;
+    },
+  });
+  // A deleted conversation's Workspace goes with it.
+  bb.events.on("thread.deleted", ({ thread }) => { try { workspace.forget(thread.id); } catch { /* nothing stored */ } });
+  bb.rpc.register(workbenchContract, {
+    "workbench.claim": ({ requestId }) => ({ go: router.claim(requestId) }),
+    "workbench.reply": ({ requestId, message, record }) => ({ ok: router.reply(requestId, message, record) }),
+    "workbench.import": async ({ threadId, tabs, activeIndex, panelOpen, origin }) => {
+      const result = await workspace.importOnce(threadId, tabs as { ref: WorkspaceTabRef; title: string }[], activeIndex, panelOpen, origin ?? null);
+      return { imported: result.imported, state: stateView(result.state) };
+    },
+  });
+  bb.rpc.register(workspaceRpcContract, {
+    threadWorkbenchGet: ({ threadId }) => stateView(workspace.get(threadId)),
+    threadWorkbenchMutate: (input) => workspace.rpcMutate(input),
+    threadWorkbenchShown: ({ threadIds, origin }) => { workspace.markShown(threadIds, origin); return { ok: true }; },
+  });
   const lookups = {
     itemTitle: deps.itemTitle,
     botName: deps.botName,
@@ -348,6 +452,7 @@ export function registerWorkbenchAgent(bb: BbPluginApi, deps: { itemTitle(id: st
     },
   };
   bb.rpc.register(linksContract, linkHandlers(lookups));
-  const tools = workbenchTools({ router, records, ...lookups });
+  const tools = workbenchTools({ router, workspace, ...lookups });
   for (const tool of tools) bb.agents.registerTool(tool as never);
+  return workspace;
 }

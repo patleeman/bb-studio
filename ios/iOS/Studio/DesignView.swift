@@ -5,6 +5,7 @@ import WebKit
 /// Tapping a screen plays it full screen; comments and edits stay with the
 /// design's thread and BB web, where elements can be picked.
 struct DesignView: View {
+    @Environment(\.look) private var look
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
@@ -131,7 +132,12 @@ struct DesignView: View {
                     ForEach(round.screens ?? [], id: \.id) { screen in
                         Button { playing = screen } label: { thumbnail(screen) }
                             .buttonStyle(.plain)
+                            // Pinching a screen opens it full screen, where pinch zooms and a drag pans.
+                            .simultaneousGesture(MagnifyGesture().onEnded { value in
+                                if value.magnification > 1.1 { playing = screen }
+                            })
                             .accessibilityLabel("Play screen \(screen.id ?? ""), \(screen.title ?? screen.caption ?? "")")
+                            .accessibilityIdentifier("designScreen-\(screen.id ?? "")")
                     }
                 }
                 .padding(.horizontal)
@@ -159,6 +165,8 @@ struct DesignView: View {
             }
             .frame(width: size.width * scale, alignment: .leading)
         }
+        // The page takes no touches, so without this only the caption was a target: the whole card plays the screen.
+        .contentShape(.rect)
     }
 
     @ViewBuilder
@@ -166,7 +174,7 @@ struct DesignView: View {
         let round = review.round.map { " round \(Int($0))" } ?? ""
         let (text, symbol, tint): (String, String, Color) = switch review.state {
         case .reviewing: ("Reviewing\(round)…", "eye", .blue)
-        case .needs_work: ("The reviewer sent\(round) back for fixes", "exclamationmark.triangle", .orange)
+        case .needs_work: ("The reviewer sent\(round) back for fixes", "exclamationmark.triangle", .secondary)
         case .failed: ("The review\(round) didn't finish", "xmark.octagon", .red)
         default: ("Reviewed\(round)", "checkmark.seal", .green)
         }
@@ -252,21 +260,32 @@ struct DesignView: View {
 
 extension DesignScreen: Identifiable {}
 
-/// One screen, live, played full screen: Fit shows it whole, Fill uses the
-/// phone's width and scrolls. A prototype's steps start it part-way through.
+/// One screen, full screen. It opens as a still of the screen, drawn at its
+/// own size and zoomed in one scroll view: fit to the width and centred on
+/// open, pinch to 6×, drag to pan, double-tap to zoom in and out, with only a
+/// light bounce at the edges. A tap (or Play) plays the live prototype, laid
+/// out at the screen's width; a prototype's steps start it part-way through.
 private struct DesignPlayer: View {
     private let operation = ServerOperation()
     let designId: String
     let screen: DesignScreen
-    @State private var fill = false
+    @State private var playing = false
     @State private var step = ""
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            // Pinch to zoom and pan over the screen in Fit and Fill; taps still play the prototype.
-            Zoomable { player }
-                .background(Color(.secondarySystemBackground))
+            Group {
+                if playing {
+                    DesignFrame(url: operation.client.designScreenURL(designId, screen, step: step), interactive: true,
+                                pageWidth: screen.size.width)
+                        .id(step)
+                } else {
+                    DesignStill(url: operation.client.designScreenURL(designId, screen),
+                                size: CGSize(width: screen.size.width, height: screen.size.height)) { playing = true }
+                }
+            }
+            .background(Color(.secondarySystemBackground))
             .navigationTitle([screen.id, screen.title?.isEmpty == false ? screen.title : screen.caption].compactMap { $0 }.joined(separator: " · "))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -274,63 +293,298 @@ private struct DesignPlayer: View {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if let steps = screen.steps, !steps.isEmpty {
                         Menu {
-                            Picker("Start at", selection: $step) {
+                            Picker("Start at", selection: Binding(get: { step }, set: { step = $0; playing = true })) {
                                 Text("Beginning").tag("")
                                 ForEach(steps, id: \.id) { Text($0.label ?? $0.id ?? "").tag($0.id ?? "") }
                             }
                         } label: { Image(systemName: "list.number") }
                         .accessibilityLabel("Steps")
                     }
-                    Button { fill.toggle() } label: {
-                        Image(systemName: fill ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    Button { playing.toggle() } label: {
+                        Image(systemName: playing ? "photo" : "play.fill")
                     }
-                    .accessibilityLabel(fill ? "Fit" : "Fill")
+                    .accessibilityLabel(playing ? "View" : "Play")
+                    .accessibilityIdentifier("designPlayToggle")
                 }
             }
         }
     }
+}
 
-    private var player: some View {
-        GeometryReader { proxy in
-            let size = screen.size
-            let scale = fill ? proxy.size.width / size.width : min(1, proxy.size.width / size.width, proxy.size.height / size.height)
-            DesignFrame(url: operation.client.designScreenURL(designId, screen, step: step), interactive: true)
-                .id(step)
-                .frame(width: size.width, height: fill ? proxy.size.height / scale : size.height)
-                .scaleEffect(scale, anchor: .topLeading)
-                .frame(width: size.width * scale, height: fill ? proxy.size.height : size.height * scale, alignment: .topLeading)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
+/// A screen's still in one scroll view (`DesignStillView`).
+private struct DesignStill: UIViewRepresentable {
+    let url: URL
+    let size: CGSize
+    var play: () -> Void
+
+    func makeUIView(context: Context) -> DesignStillView {
+        DesignStillView(url: url, size: size, play: play)
+    }
+
+    func updateUIView(_ view: DesignStillView, context: Context) {
+        view.play = play
     }
 }
 
-/// A design screen's page. Previews take no touches, so the row scrolls.
+/// Draws the screen once, under the scroll view at its own size, takes a picture of it,
+/// and shows the picture in a `UIScrollView`: the only scroll view, so a pan
+/// moves the picture and nothing inside it rubber-bands. The minimum zoom is
+/// fit-to-width, the picture is centred while it's smaller than the view, and
+/// the edges bounce lightly. `designStill`'s value is the zoom relative to fit.
+final class DesignStillView: UIView, UIScrollViewDelegate, WKNavigationDelegate {
+    var play: () -> Void
+    private let url: URL
+    private let size: CGSize
+    private let scroll = UIScrollView()
+    private let imageView = UIImageView()
+    private let spinner = UIActivityIndicatorView(style: .medium)
+    private let failure = UILabel()
+    private var renderer: WKWebView?
+    private var started = false
+    private var fit: CGFloat = 1
+    private var laidOutWidth: CGFloat = 0
+    /// The page's height at its own width (a screen can be taller than its frame).
+    private var pageHeight: CGFloat = 0
+
+    init(url: URL, size: CGSize, play: @escaping () -> Void) {
+        self.url = url
+        self.size = CGSize(width: max(1, size.width), height: max(1, size.height))
+        self.play = play
+        super.init(frame: .zero)
+        scroll.delegate = self
+        scroll.bounces = true
+        scroll.bouncesZoom = true
+        scroll.alwaysBounceVertical = false
+        scroll.alwaysBounceHorizontal = false
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.contentInsetAdjustmentBehavior = .never
+        scroll.decelerationRate = .normal
+        scroll.backgroundColor = .secondarySystemBackground
+        scroll.accessibilityIdentifier = "designStill"
+        scroll.accessibilityLabel = "Design screen"
+        scroll.isAccessibilityElement = true
+        imageView.contentMode = .scaleToFill
+        scroll.addSubview(imageView)
+        addSubview(scroll)
+        spinner.startAnimating()
+        addSubview(spinner)
+        failure.text = "This screen didn't draw. Play opens it live."
+        failure.font = .preferredFont(forTextStyle: .footnote)
+        failure.textColor = .secondaryLabel
+        failure.numberOfLines = 0
+        failure.textAlignment = .center
+        failure.isHidden = true
+        addSubview(failure)
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(doubleTapped(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        scroll.addGestureRecognizer(doubleTap)
+        let tap = UITapGestureRecognizer(target: self, action: #selector(tapped))
+        tap.require(toFail: doubleTap)
+        scroll.addGestureRecognizer(tap)
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        scroll.frame = bounds
+        spinner.center = CGPoint(x: bounds.midX, y: bounds.midY)
+        failure.frame = bounds.insetBy(dx: 32, dy: 0)
+        guard bounds.width > 0 else { return }
+        if !started, window != nil { render() }
+        if imageView.image != nil, bounds.width != laidOutWidth { fitToWidth(keepingZoom: laidOutWidth > 0) }
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        setNeedsLayout()
+    }
+
+    // MARK: Drawing the still
+
+    /// The page at its own width, offscreen (it must be in the window to draw), until its fonts and first frames are in.
+    private func render() {
+        started = true
+        let configuration = WKWebViewConfiguration()
+        configuration.suppressesIncrementalRendering = true
+        let page = WKWebView(frame: CGRect(origin: .zero, size: size), configuration: configuration)
+        // Opaque, under the scroll view's opaque background: a snapshot keeps the view's alpha, and a hidden view doesn't draw.
+        page.isUserInteractionEnabled = false
+        page.accessibilityElementsHidden = true
+        page.scrollView.contentInsetAdjustmentBehavior = .never
+        page.navigationDelegate = self
+        insertSubview(page, at: 0)
+        renderer = page
+        #if DEBUG
+        if let html = DesignDemo.html(for: url) {
+            page.loadHTMLString(html, baseURL: nil)
+            return
+        }
+        #endif
+        page.load(URLRequest(url: url))
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        let script = """
+            if (document.fonts) { await document.fonts.ready; }
+            await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+            return Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0);
+            """
+        webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { [weak self] result in
+            guard let self else { return }
+            let height = (try? result.get()) as? Double ?? Double(self.size.height)
+            self.pageHeight = min(8000, max(self.size.height, CGFloat(height)))
+            webView.frame.size.height = self.pageHeight
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { self.snapshot(webView) }
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { failed() }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { failed() }
+
+    private func snapshot(_ page: WKWebView) {
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = CGRect(x: 0, y: 0, width: size.width, height: pageHeight)
+        // Sharp to a few times fit, within a texture a phone handles (4096 px wide).
+        let scale = window?.screen.scale ?? 3
+        let width = min(size.width * 3, max(bounds.width * 6, size.width), 4096 / scale, 16384 / scale * size.width / pageHeight)
+        configuration.snapshotWidth = NSNumber(value: Double(width))
+        configuration.afterScreenUpdates = true
+        page.takeSnapshot(with: configuration) { [weak self] image, _ in
+            guard let self else { return }
+            page.removeFromSuperview()
+            self.renderer = nil
+            guard let image else { return self.failed() }
+            self.spinner.stopAnimating()
+            self.spinner.isHidden = true
+            self.imageView.image = image
+            self.imageView.frame = CGRect(x: 0, y: 0, width: self.size.width, height: self.pageHeight)
+            self.scroll.contentSize = self.imageView.frame.size
+            self.fitToWidth(keepingZoom: false)
+        }
+    }
+
+    private func failed() {
+        renderer?.removeFromSuperview()
+        renderer = nil
+        spinner.stopAnimating()
+        spinner.isHidden = true
+        failure.isHidden = false
+    }
+
+    // MARK: Zoom
+
+    /// Fit-to-width is the least zoom; a size change keeps the zoom relative to it.
+    private func fitToWidth(keepingZoom: Bool) {
+        guard bounds.width > 0, imageView.image != nil else { return }
+        let relative = keepingZoom && fit > 0 ? scroll.zoomScale / fit : 1
+        laidOutWidth = bounds.width
+        fit = bounds.width / size.width
+        scroll.minimumZoomScale = fit
+        scroll.maximumZoomScale = fit * 6
+        scroll.zoomScale = fit * min(6, max(1, relative))
+        if !keepingZoom { scroll.contentOffset = .zero }
+        center()
+        report()
+    }
+
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
+
+    func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        center()
+        report()
+    }
+
+    /// While the picture is smaller than the view (a wide screen's height), it sits in the middle.
+    private func center() {
+        let content = scroll.contentSize
+        scroll.contentInset = UIEdgeInsets(top: max(0, (bounds.height - content.height) / 2), left: max(0, (bounds.width - content.width) / 2),
+                                           bottom: 0, right: 0)
+    }
+
+    private func report() {
+        scroll.accessibilityValue = String(format: "%.4f", fit > 0 ? scroll.zoomScale / fit : 0)
+    }
+
+    @objc private func doubleTapped(_ gesture: UITapGestureRecognizer) {
+        guard imageView.image != nil else { return }
+        if scroll.zoomScale > fit * 1.05 {
+            scroll.setZoomScale(fit, animated: true)
+        } else {
+            let point = gesture.location(in: imageView)
+            let scale = fit * 2.5
+            let size = CGSize(width: bounds.width / scale, height: bounds.height / scale)
+            scroll.zoom(to: CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2, width: size.width, height: size.height), animated: true)
+        }
+    }
+
+    @objc private func tapped() { play() }
+}
+
+/// A design screen's live page. Previews take no touches, so the row scrolls.
+/// Played (`pageWidth`), the page is laid out at the screen's own width from
+/// its first layout (WebKit fits it to the view), and it zooms in its own
+/// scroll view with WebKit's own limits; nothing else zooms or scrolls it.
 private struct DesignFrame: UIViewRepresentable {
     let url: URL
     let interactive: Bool
+    var pageWidth: Double? = nil
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
+        if let pageWidth {
+            configuration.userContentController.addUserScript(Self.viewport(width: pageWidth))
+            configuration.ignoresViewportScaleLimits = true
+        }
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.isUserInteractionEnabled = interactive
         view.scrollView.contentInsetAdjustmentBehavior = .never
         view.isOpaque = false
-        view.load(URLRequest(url: url))
-        context.coordinator.loaded = url
+        if pageWidth != nil { view.accessibilityIdentifier = "designPlayerPage" }
+        context.coordinator.load(url, in: view)
         return view
     }
 
     func updateUIView(_ view: WKWebView, context: Context) {
         view.isUserInteractionEnabled = interactive
         guard context.coordinator.loaded != url else { return }
-        context.coordinator.loaded = url
-        view.load(URLRequest(url: url))
+        context.coordinator.load(url, in: view)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
+    /// The page's viewport at the screen's width before its first layout, and kept there if the page changes it.
+    static func viewport(width: Double) -> WKUserScript {
+        WKUserScript(source: """
+            (function () {
+              var content = 'width=\(Int(width)), maximum-scale=6, user-scalable=yes';
+              function apply() {
+                var metas = document.querySelectorAll('meta[name=viewport]');
+                if (!metas.length) {
+                  var meta = document.createElement('meta'); meta.name = 'viewport';
+                  (document.head || document.documentElement).appendChild(meta); metas = [meta];
+                }
+                metas.forEach(function (meta) { if (meta.content !== content) meta.content = content; });
+              }
+              apply();
+              new MutationObserver(apply).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['content'] });
+            })();
+            """, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+    }
+
     final class Coordinator {
         var loaded: URL?
+
+        func load(_ url: URL, in view: WKWebView) {
+            loaded = url
+            #if DEBUG
+            if let html = DesignDemo.html(for: url) {
+                view.loadHTMLString(html, baseURL: nil)
+                return
+            }
+            #endif
+            view.load(URLRequest(url: url))
+        }
     }
 }

@@ -57,10 +57,20 @@ export const decisionSchema = z.object({
   ms: z.number(),
   target: targetSchema.nullable(),
   skipped: z.array(z.object({ target: targetSchema, why: z.string() })),
+  /** Why the pick is not the plain first ready model: no ready model was left, so one whose readiness is unknown was taken. */
+  note: z.string().optional(),
+  /** The picked model runs with Lean tools (an ACP agent on a local model, by default; Settings › Agent context). */
+  lean: z.boolean().optional(),
 });
 export type Decision = z.infer<typeof decisionSchema>;
 
-export const targetCheckSchema = z.object({ providerId: z.string(), model: z.string(), problem: z.string().nullable() });
+export const targetCheckSchema = z.object({
+  providerId: z.string(),
+  model: z.string(),
+  problem: z.string().nullable(),
+  /** For a usable target whose readiness BB can't tell: it comes after the ready ones. */
+  note: z.string().optional(),
+});
 export type TargetCheck = z.infer<typeof targetCheckSchema>;
 
 export const noticeKindSchema = z.enum(["usage-limit", "sign-in"]);
@@ -75,6 +85,12 @@ export const noticeSchema = z.object({
   reason: z.string(),
   target: targetSchema.nullable(),
   targetName: z.string().nullable(),
+  /**
+   * The permission mode the hand-off thread runs with: the failed thread's,
+   * narrowed to one the target offers (never wider). Hand off sets it in the
+   * composer and checks it before sending; null when it isn't known.
+   */
+  permissionMode: z.string().nullable().optional(),
   text: z.string(),
   createdAt: z.number(),
 });

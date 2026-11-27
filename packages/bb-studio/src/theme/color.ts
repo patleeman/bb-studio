@@ -87,10 +87,6 @@ export function over(top: Rgb, alpha: number, bottom: Rgb): Rgb {
   return { r: top.r * a + bottom.r * (1 - a), g: top.g * a + bottom.g * (1 - a), b: top.b * a + bottom.b * (1 - a) };
 }
 
-export function mixRgb(a: Rgb, b: Rgb, shareOfA: number): Rgb {
-  return over(a, shareOfA, b);
-}
-
 export function worstContrast(color: Rgb, backgrounds: readonly Rgb[]): number {
   return Math.min(...backgrounds.map((background) => contrast(color, background)));
 }

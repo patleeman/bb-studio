@@ -10,35 +10,96 @@ import SwiftUI
 /// are left out; see `Directive`.
 struct MarkdownText: View {
     let source: String
+    /// A reply that needs the user: its asking sentence (or last paragraph) marked in place.
+    var mark: ReplyAskMark?
+    @Environment(\.look) private var look
 
-    init(_ source: String) {
+    init(_ source: String, mark: ReplyAskMark? = nil) {
         self.source = source
+        self.mark = mark
+    }
+
+    /// A block of text the ask can be in: a heading, a paragraph, or one list item.
+    struct TextKey: Hashable {
+        var block: Int
+        var item = -1
     }
 
     var body: some View {
         let blocks = MarkdownBlock.parse(source)
+        let marked = mark.map { Self.marked(blocks, $0) } ?? [:]
         VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
-                view(for: block)
+                view(for: block, at: index, marked: marked)
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if let mark, mark.flash, !marked.isEmpty {
+                // For VoiceOver and the UI tests: the reply asks something, here.
+                Color.clear.frame(width: 1, height: 1)
+                    .accessibilityElement()
+                    .accessibilityLabel("Needs you: " + (mark.ask ?? "the last paragraph"))
+                    .accessibilityValue(mark.flash ? "flash" : "marked")
+                    .accessibilityIdentifier("replyAsk")
             }
         }
     }
 
+    /// Where the mark goes: the ask sentence in the blocks' shown text (`ReplyAsk.find`), or, when Jev named
+    /// no sentence, the last paragraph or list item. Empty when the sentence isn't there.
+    static func marked(_ blocks: [MarkdownBlock], _ mark: ReplyAskMark) -> [TextKey: Range<Int>] {
+        var keys: [TextKey] = []
+        var texts: [String] = []
+        var prose: [Bool] = []
+        for (index, block) in blocks.enumerated() {
+            switch block {
+            case .heading(_, let text):
+                keys.append(TextKey(block: index)); texts.append(String(inline(text).characters)); prose.append(false)
+            case .paragraph(let text):
+                keys.append(TextKey(block: index)); texts.append(String(inline(text).characters)); prose.append(true)
+            case .list(let items):
+                for (n, item) in items.enumerated() {
+                    keys.append(TextKey(block: index, item: n)); texts.append(String(inline(item.text).characters)); prose.append(true)
+                }
+            default:
+                break
+            }
+        }
+        guard let ask = mark.ask else {
+            guard let last = texts.indices.last(where: { prose[$0] && !texts[$0].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+            else { return [:] }
+            return [keys[last]: 0..<texts[last].count]
+        }
+        guard let found = ReplyAsk.find(ask, in: texts) else { return [:] }
+        return Dictionary(uniqueKeysWithValues: found.map { (keys[$0.key], $0.value) })
+    }
+
+    /// The block's text with the mark's faint amber (brighter while it flashes) over `range`.
+    private func highlighted(_ text: AttributedString, _ range: Range<Int>?) -> AttributedString {
+        // No standing highlight: only Jump to reply's brief flash marks the asking sentence.
+        guard let range, let mark, mark.flash, range.upperBound <= text.characters.count else { return text }
+        var out = text
+        let start = out.characters.index(out.characters.startIndex, offsetBy: range.lowerBound)
+        let end = out.characters.index(start, offsetBy: range.count)
+        out[start..<end].backgroundColor = look.needsYou.opacity(0.5)
+        return out
+    }
+
     @ViewBuilder
-    private func view(for block: MarkdownBlock) -> some View {
+    private func view(for block: MarkdownBlock, at index: Int, marked: [TextKey: Range<Int>]) -> some View {
         switch block {
         case .heading(let level, let text):
-            Text(Self.inline(text))
+            Text(highlighted(Self.inline(text), marked[TextKey(block: index)]))
                 .font(level == 1 ? .title3.bold() : level == 2 ? .headline : .subheadline.bold())
                 .padding(.top, 4)
         case .paragraph(let text):
-            Text(Self.inline(text))
+            Text(highlighted(Self.inline(text), marked[TextKey(block: index)]))
         case .list(let items):
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                ForEach(Array(items.enumerated()), id: \.offset) { n, item in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         marker(item)
-                        Text(Self.inline(item.text))
+                        Text(highlighted(Self.inline(item.text), marked[TextKey(block: index, item: n)]))
                     }
                     .padding(.leading, CGFloat(item.level) * 18)
                 }
@@ -112,30 +173,57 @@ struct MarkdownText: View {
     }()
 
     private static func parseInline(_ text: String) -> AttributedString {
-        let linked = text.replacing(MarkdownRegex.threadMention) { match in
-            let id = String(match.1)
-            let title = ThreadTitles.titles[id].map { $0.replacingOccurrences(of: "]", with: "") } ?? id
-            return "[@\(title)](bbstudio://thread/\(id))"
-        }
+        guard hasInlineSyntax(text) else { return AttributedString(text) }
+        let linked = text.contains("@thread:")
+            ? text.replacing(MarkdownRegex.threadMention) { match in
+                let id = String(match.1)
+                let title = ThreadTitles.titles[id].map { $0.replacingOccurrences(of: "]", with: "") } ?? id
+                return "[@\(title)](bbstudio://thread/\(id))"
+            }
+            : text
         guard
             var attributed = try? AttributedString(
                 markdown: linked, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))
         else { return AttributedString(text) }
         for run in attributed.runs {
-            guard let url = run.link else { continue }
-            if url.scheme == "thread" {
-                attributed[run.range].link = URL(string: "bbstudio://thread/\(url.absoluteString.dropFirst("thread:".count))")
-            } else if url.scheme == nil || url.scheme == "file" {
-                let path = url.scheme == "file" ? url.path : url.relativeString.removingPercentEncoding ?? url.relativeString
-                attributed[run.range].link = FilePathLink.url(FilePathLink.stripLine(path))
-            }
-        }
-        for run in attributed.runs where run.link == nil && run.inlinePresentationIntent?.contains(.code) == true {
-            if let path = FilePathLink.path(inCode: String(attributed[run.range].characters)) {
+            if let url = run.link {
+                if url.scheme == "thread" {
+                    attributed[run.range].link = URL(string: "bbstudio://thread/\(url.absoluteString.dropFirst("thread:".count))")
+                } else if url.scheme == nil || url.scheme == "file" {
+                    let path = url.scheme == "file" ? url.path : url.relativeString.removingPercentEncoding ?? url.relativeString
+                    attributed[run.range].link = FilePathLink.url(FilePathLink.stripLine(path))
+                }
+            } else if run.inlinePresentationIntent?.contains(.code) == true,
+                      let path = FilePathLink.path(inCode: String(attributed[run.range].characters)) {
                 attributed[run.range].link = FilePathLink.url(path)
             }
         }
         return attributed
+    }
+
+    /// Plain strings without any CommonMark inline syntax characters, entities,
+    /// or autolink/mention prefixes skip `AttributedString(markdown:)` entirely.
+    static func hasInlineSyntax(_ text: String) -> Bool {
+        for byte in text.utf8 {
+            switch byte {
+            case 0x2A, // *
+                 0x5F, // _
+                 0x60, // `
+                 0x5B, // [
+                 0x5D, // ]
+                 0x21, // !
+                 0x7E, // ~
+                 0x5C, // \
+                 0x3C, // <
+                 0x3E, // >
+                 0x26, // &
+                 0x3A: // : (URLs, @thread:)
+                return true
+            default:
+                continue
+            }
+        }
+        return false
     }
 }
 
@@ -157,9 +245,23 @@ enum ThreadTitles {
 
     /// Looks up titles for mentioned threads not seen yet (archived ones, say).
     static func fetchUnknown(in texts: [String], client: BBClient) async {
-        for id in unknownMentions(in: texts).prefix(10) {
-            if let thread = try? await client.thread(id), client.baseURL == ServerScope.selectedURL { set(id, thread.displayTitle) }
+        let ids = Array(unknownMentions(in: texts).prefix(10))
+        guard !ids.isEmpty else { return }
+        let fetched: [(String, String)] = await withTaskGroup(of: (String, String)?.self) { group in
+            for id in ids {
+                group.addTask {
+                    guard let thread = try? await client.thread(id) else { return nil }
+                    return (id, thread.displayTitle)
+                }
+            }
+            var out: [(String, String)] = []
+            for await pair in group {
+                if let pair { out.append(pair) }
+            }
+            return out
         }
+        guard client.baseURL == ServerScope.selectedURL else { return }
+        for (id, title) in fetched { set(id, title) }
     }
 
     /// `@thread:thr_x` becomes `@Title` when the title is known.
@@ -208,7 +310,11 @@ enum MarkdownBlock {
     }
 
     /// Messages re-render on every timeline refresh; parse each text once.
-    nonisolated(unsafe) private static let cache = NSCache<NSString, Box>()
+    nonisolated(unsafe) private static let cache: NSCache<NSString, Box> = {
+        let cache = NSCache<NSString, Box>()
+        cache.countLimit = 500
+        return cache
+    }()
 
     static func parse(_ source: String) -> [MarkdownBlock] {
         if let hit = cache.object(forKey: source as NSString) { return hit.blocks }
@@ -276,10 +382,11 @@ enum MarkdownBlock {
                     flush()
                     blocks.append(.loop(loop))
                 }
-            } else if let heading = trimmed.firstMatch(of: MarkdownRegex.heading) {
+            } else if trimmed.first == "#", let heading = trimmed.firstMatch(of: MarkdownRegex.heading) {
                 flush()
                 blocks.append(.heading(heading.1.count, String(heading.2)))
-            } else if trimmed.wholeMatch(of: MarkdownRegex.rule) != nil {
+            } else if let first = trimmed.first, (first == "-" || first == "*" || first == "_"),
+                      trimmed.wholeMatch(of: MarkdownRegex.rule) != nil {
                 flush()
                 blocks.append(.rule)
             } else if trimmed.hasPrefix(">") {
@@ -295,7 +402,8 @@ enum MarkdownBlock {
                     index += 1
                 }
                 blocks.append(.table(header: header, rows: rows))
-            } else if let item = line.firstMatch(of: MarkdownRegex.listItem) {
+            } else if let first = trimmed.first, (first == "-" || first == "*" || first == "+" || (first.isASCII && first.isNumber)),
+                      let item = line.firstMatch(of: MarkdownRegex.listItem) {
                 if !paragraph.isEmpty || !quote.isEmpty { flush() }
                 let indent = item.1.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
                 if let last = indents.last, indent > last {
@@ -332,6 +440,7 @@ enum MarkdownBlock {
 
     /// A paragraph's text without its images, then the images.
     private static func withImages(_ text: String) -> [MarkdownBlock] {
+        guard text.contains("![") else { return [.paragraph(text)] }
         let images = text.matches(of: imagePattern).map {
             MarkdownBlock.image(alt: String($0.1), src: String($0.2 ?? $0.3 ?? ""))
         }
@@ -377,6 +486,7 @@ struct Directive {
 
     /// The directive on the reply's last non-empty line, outside code blocks.
     static func last(in text: String) -> Directive? {
+        guard text.contains("::") else { return nil }
         var inCode = false
         var last: String?
         for line in text.components(separatedBy: "\n") {
@@ -389,7 +499,11 @@ struct Directive {
 
     /// The last line can offer up to five short "emoji label" replies.
     static func reactions(in text: String) -> [String] {
-        guard let directive = last(in: text), directive.name == "reactions",
+        reactions(from: last(in: text))
+    }
+
+    static func reactions(from directive: Directive?) -> [String] {
+        guard let directive, directive.name == "reactions",
             let raw = directive.attributes["items"] else { return [] }
         return parseReactions(raw)
     }
@@ -414,7 +528,11 @@ struct Directive {
     }
 
     static func next(in text: String) -> Next {
-        guard let directive = last(in: text), directive.name == "next" else { return Next(reply: [], ask: []) }
+        next(from: last(in: text))
+    }
+
+    static func next(from directive: Directive?) -> Next {
+        guard let directive, directive.name == "next" else { return Next(reply: [], ask: []) }
         let notes = parseNotes(directive.attributes["btw"], max: 3)
         return Next(reply: parseNextItems(directive.attributes["reply"], max: 5),
             ask: parseNextItems(directive.attributes["do"], max: 3),
@@ -555,8 +673,10 @@ private struct CappedWidth: Layout {
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         guard let content = subviews.first else { return .zero }
-        var width = min(content.sizeThatFits(.unspecified).width.rounded(.up), max)
+        let ideal = content.sizeThatFits(.unspecified)
+        var width = min(ideal.width.rounded(.up), max)
         if let offered = proposal.width, offered.isFinite, offered > width { width = min(offered, max) }
+        if ideal.width <= width { return CGSize(width: width, height: ideal.height) }
         return CGSize(width: width, height: content.sizeThatFits(ProposedViewSize(width: width, height: nil)).height)
     }
 

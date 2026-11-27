@@ -221,6 +221,7 @@ export async function runModel(
   }
   // A chosen model the provider no longer offers runs on its default model instead.
   const chosen = fallback.mode === "model" ? await fallbackModel(bb, providerId, fallback.model) : null;
+  signal.throwIfAborted();
   const model = chosen?.model;
   const chosenLevel = fallback.mode === "model" && !chosen?.replaced ? fallback.reasoningLevel : null;
   const levels = (provider.reasoningLevels ?? []).map((level) => level.id);
@@ -250,6 +251,7 @@ export async function runModel(
     });
     threadId = thread.id;
     sessions.add(threadId);
+    signal.throwIfAborted();
     // Wait for the final event: an initial idle status can precede dispatch.
     await bb.sdk.threads.wait({ threadId, event: "turn/completed", timeoutMs: 30000, signal });
     signal.throwIfAborted();

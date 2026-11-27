@@ -208,6 +208,9 @@ export const pluginAppStateSchema = z.object({
       sdkVersion: z.string(),
       compatible: z.boolean(),
       runtimeSlots: z.array(z.string()),
+      staticChunkUrls: z.array(z.string()),
+      lazyChunkUrls: z.array(z.string()),
+      lazyRuntimeSlots: z.array(z.string()),
     })
     .nullable(),
 });
@@ -544,6 +547,16 @@ export type PluginCatalogCollection = z.infer<
   typeof pluginCatalogCollectionSchema
 >;
 
+export const pluginCatalogListingSchema = z.object({
+  marketplace: z.string(),
+  marketplaceDisplayName: z.string(),
+  publisherLabel: z.string(),
+  entryId: z.string(),
+  official: z.boolean(),
+  source: z.string(),
+});
+export type PluginCatalogListing = z.infer<typeof pluginCatalogListingSchema>;
+
 export const pluginCatalogSearchResultSchema = z.object({
   entryId: z.string(),
   pluginId: z.string(),
@@ -566,6 +579,7 @@ export const pluginCatalogSearchResultSchema = z.object({
   publisherKey: z.string(),
   publisherLabel: z.string(),
   official: z.boolean(),
+  listings: z.array(pluginCatalogListingSchema).default([]),
   author: pluginCatalogAuthorSchema.nullable(),
   installed: z.boolean(),
   installedByDefault: z.boolean().default(false),
@@ -662,6 +676,8 @@ export const pluginMarketplaceSchema = z.object({
   displayName: z.string(),
   description: z.string().nullable(),
   official: z.boolean(),
+  enabled: z.boolean(),
+  canDisable: z.boolean(),
   sourceKind: pluginMarketplaceSourceKindSchema,
   source: z.string(),
   subdirectory: z.string().nullable().default(null),
@@ -693,6 +709,12 @@ export const pluginMarketplaceRemoveResponseSchema = z.object({
   ok: z.literal(true),
   convertedPluginIds: z.array(z.string()),
 });
+
+export const pluginMarketplaceSetEnabledRequestSchema = z
+  .object({
+    enabled: z.boolean(),
+  })
+  .strict();
 
 export const pluginMarketplaceRefreshRequestSchema = z
   .object({

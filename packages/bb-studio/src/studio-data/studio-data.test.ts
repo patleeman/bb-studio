@@ -9,8 +9,6 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Automations } from "../automations";
 import { BOT_ID, Bots } from "../bot";
-import { MemoryService } from "../memory/service";
-import { MemoryStore } from "../memory/store";
 import { MIGRATIONS } from "../migrations";
 import { runOnboarding } from "../onboarding";
 import { PagesService } from "../pages/service";
@@ -256,9 +254,8 @@ async function freshStudio(dataDir: string) {
   const store = new PageStore(db);
   const pages = new PagesService(bb as never, store);
   dispose.push(() => pages.hub.disposeAll());
-  const memory = new MemoryService({ store: new MemoryStore(db), pages: { create: ({ title, markdown, icon }: { title: string; markdown: string; icon: string }) => pages.createPage({ projectId: PERSONAL_PROJECT_ID, parentId: null, title, icon, markdown, actor: "studio" }).id } } as never);
   const leads = new ProjectLeads({ db, sdk: bb.sdk, scheduler: testScheduler(db, bb.sdk).scheduler, changed: () => {}, personalPrompt: () => "", botPrompt: () => null });
-  const bots = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, presenceChanged: () => {}, memory: { exists: (id) => !!store.meta(id), create: ({ botId, botName }) => memory.newProfile(botId, botName) } });
+  const bots = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, presenceChanged: () => {}, memory: { exists: (id) => !!store.meta(id), markdown: (id) => (db.prepare("SELECT markdown FROM pages WHERE id = ?").get(id) as { markdown: string } | undefined)?.markdown ?? null } });
   const bbDb = new Database(join(dataDir, "bb.db"));
   bbDb.exec("CREATE TABLE threads (id TEXT PRIMARY KEY)");
   bbDb.close();
@@ -271,8 +268,9 @@ async function freshStudio(dataDir: string) {
   });
   const flag = await onboard();
   expect(flag).toMatchObject({ state: "done", reason: "ran" });
-  // The core profile page is made when the Bot's instructions are first built.
-  expect(bots.memoryPage(BOT_ID)).toMatch(/^pg/);
+  // A new Bot gets its always-on core skill (src/core-skill-migrate.ts), not a page.
+  expect(bots.ensureCore(BOT_ID)).toMatchObject({ state: "created", skill: "core-profile" });
+  expect(bots.memoryPage(BOT_ID)).toBeNull();
   return { db, bb, pages, bots };
 }
 
@@ -282,15 +280,16 @@ describe("whether this install has data of its own", () => {
     const fresh = await freshStudio(dataDir);
     expect(studioOwnData(fresh.db)).toEqual({ has: false });
     fresh.pages.createPage({ projectId: PERSONAL_PROJECT_ID, parentId: null, title: "Groceries", markdown: "Milk", actor: "user" });
-    expect(studioOwnData(fresh.db)).toEqual({ has: true, reason: "it has 2 pages" });
+    expect(studioOwnData(fresh.db)).toEqual({ has: true, reason: "it has 1 pages" });
     fresh.db.close();
   });
 
   it("counts a changed core profile, a second conversation, and tables it doesn't know", async () => {
     const dataDir = temp("studio-own2-");
     const fresh = await freshStudio(dataDir);
-    fresh.db.prepare("UPDATE pages SET markdown = markdown || '\nLikes tea.'").run();
-    expect(studioOwnData(fresh.db)).toEqual({ has: true, reason: "its Bot's core profile page was changed" });
+    fresh.bots.writeSkill({ name: "core-profile", description: "Always on.", body: "## Preferences\n\n- Likes tea.\n" }, BOT_ID);
+    expect(studioOwnData(fresh.db)).toMatchObject({ has: true, reason: expect.stringMatching(/always-on skill was changed|skills were edited/) });
+    fresh.bots.ensureCore(BOT_ID);
     const other = new Database(":memory:");
     host().bb.storage.migrate(other, MIGRATIONS);
     other.exec("CREATE TABLE later_feature (id TEXT); INSERT INTO later_feature VALUES ('x')");

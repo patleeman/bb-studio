@@ -52,9 +52,18 @@ export function signInGuide(output: string): SignInGuide {
   return { url, code: USER_CODE.exec(rest)?.[0] ?? null, acceptsCode: PASTE_PROMPT.test(rest) };
 }
 
-export function redact(text: string): string {
+/** The SECRETS entry that redacts any value of a pair named token/api_key/secret/password/authorization. */
+const NAMED_PAIR = SECRETS[4]!;
+
+/**
+ * Removes token-shaped secrets. `pairs: false` leaves named pairs to the
+ * caller (strands' scrubber judges pair names and values itself, so
+ * "password: string" in TypeScript stays).
+ */
+export function redact(text: string, options: { pairs?: boolean } = {}): string {
   let out = stripTerminal(text);
   for (const pattern of SECRETS) {
+    if (options.pairs === false && pattern === NAMED_PAIR) continue;
     out = out.replace(pattern, (match, name?: unknown, separator?: unknown) =>
       typeof name === "string" && typeof separator === "string" && match.startsWith(name) ? `${name}${separator}[redacted]` : "[redacted]");
   }

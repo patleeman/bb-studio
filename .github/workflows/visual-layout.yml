@@ -1,0 +1,25 @@
+name: Visual Layout Tests
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  visual-layout:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.10.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: plugins/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:visual

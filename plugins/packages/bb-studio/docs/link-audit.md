@@ -38,7 +38,7 @@ has a canonical link that parses back to itself and opens through the router.
 - A target that no longer exists (deleted, gone from the index, a thread or
   Bot that isn't there) opens a Not found tab (`link-not-found`, title
   "Not found") with the kind, the id and the link as typed. Existence is one
-  server call, `links.resolve`, that uses the lookups `workbench_open` opens
+  server call, `links.resolve`, that uses the lookups `workbench (op: open)` opens
   by (thread title, item title, Bot name, the file target); kinds with one per
   window (Library, VS Code), bot pages without a Bot id and browser URLs are
   not checked. A failed check still opens.
@@ -72,11 +72,9 @@ registry doesn't know (Settings) parses to nothing and stays bb's.
 | Skills | `bb://skills/bot_main` | `/plugins/studio/studio/skills/bot_main` |  |
 | Library | `bb://library` | `/plugins/studio/studio` |  |
 | Scheduled | `bb://automations` | `/plugins/studio/automations` |  |
-| Strands | `bb://todos/bot_main` | `/plugins/studio/studio/bot/bot_main/strands` |  |
 | Conversations | `bb://archive/bot_main` | `/plugins/studio/studio/conversations/bot_main` |  |
 | Automation | `bb://automation/bot_main%3Aaut_0123456789abcdef` | `/plugins/studio/studio/automation/bot_main%3Aaut_0123456789abcdef` |  |
 | To-do | `bb://todo/loop_0123abcd` | `/plugins/studio/studio/todo/loop_0123abcd` |  |
-| Memory record | `bb://record/mem_0123456789abcdef` | `/plugins/studio/studio/record/mem_0123456789abcdef` |  |
 | VS Code | `bb://vscode` | `/plugins/studio/vscode` |  |
 | File (bb) | `bb://file/%2FUsers%2Fp%2Fsrc%2Fa.ts` |  |  |
 | Diff (bb) | `bb://diff/src%2Fa.ts` |  |  |
@@ -89,7 +87,7 @@ registry doesn't know (Settings) parses to nothing and stays bb's.
 **routes** means the source hands the link to the router, which opens it by
 the rule above; **n/a** says why it can't.
 
-| Kind | Transcript link | Mod/Shift-click | Chat card | Link in a page | Link on a whiteboard | Link in a design | Mini app bb.open | Cmd+K | Launcher | workbench_open | Popped-out window | Bot page row |
+| Kind | Transcript link | Mod/Shift-click | Chat card | Link in a page | Link on a whiteboard | Link in a design | Mini app bb.open | Cmd+K | Launcher | workbench (op: open) | Popped-out window | Bot page row |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Conversation | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | Worker | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
@@ -105,11 +103,9 @@ the rule above; **n/a** says why it can't.
 | Skills | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Library | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Scheduled | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
-| Strands | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Conversations | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Automation | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | To-do | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
-| Memory record | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | VS Code | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | File (bb) | routes | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | n/a [3] |
 | Diff (bb) | n/a [6] | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | n/a [3] |
@@ -124,7 +120,16 @@ the rule above; **n/a** says why it can't.
 [5] Cmd+K lists no such rows; a typed bb:// link, app route or web address goes through the router.
 [6] Replies don't link a diff; bb's change cards open it.
 [7] A terminal has no id; nothing links one.
-[8] A terminal opens by starting one; workbench_tab action "focus" selects an open one.
+[8] A terminal opens by starting one; workbench (op: tab) action "focus" selects an open one.
+
+[1] A design's screens are sandboxed frames; a link in one opens as the frame's popup. The design's card and header go through the router.
+[2] No card names one.
+[3] No Bot page lists one.
+[4] Only by a bb:// link or file:// URL; marked items and in-app links are Studio's and threads.
+[5] Cmd+K lists no such rows; a typed bb:// link, app route or web address goes through the router.
+[6] Replies don't link a diff; bb's change cards open it.
+[7] A terminal has no id; nothing links one.
+[8] A terminal opens by starting one; workbench (op: tab) action "focus" selects an open one.
 
 ## Sources
 
@@ -139,7 +144,7 @@ the rule above; **n/a** says why it can't.
 | Mini app bb.open | src/minis/ui/mini-frame.tsx openTarget | src/ui/studio-open.wiring.test.tsx (mini apps' bb.open) |
 | Cmd+K | src/launcher/ui/CommandPalette.tsx run | src/launcher/ui/CommandPalette.test.tsx |
 | Launcher | src/launcher/ui/Launcher.tsx run | src/launcher/ui/Launcher.test.tsx |
-| workbench_open | src/workbench-agent/server.ts linkedInput | src/workbench-agent/workbench-agent.test.ts |
+| workbench (op: open) | src/workbench-agent/server.ts linkedInput | src/workbench-agent/workbench-agent.test.ts |
 | Popped-out window | src/links/open.ts inMainWindow, LinksBridge in each window | src/links/open.test.ts; src/links/router.test.ts (relay) |
 | Bot page row | src/ui/bot-page/open-row.ts useRowOpen (Automations, Todos, Library, Memory, Conversations) | src/ui/bot-page/open-row.test.tsx; each page's test |
 

@@ -63,6 +63,19 @@ final class LookTests: XCTestCase {
         }
     }
 
+    /// Tonight's Sky is night at every hour: dark even when its driver chose the
+    /// light variant by day. Kyoto Garden still follows its driver.
+    func testTonightsSkyStaysNight() {
+        let store = LookStore(defaults: UserDefaults(suiteName: "LookTests-\(UUID())")!)
+        let sky = LookCatalog.shared.theme("tonights-sky"), garden = LookCatalog.shared.theme("kyoto-garden")
+        store.sceneModes = [sky.id: .light, garden.id: .light]
+        XCTAssertEqual(LookRoot.fixedScheme(sky, store: store), .dark)
+        XCTAssertEqual(LookRoot.look(sky, store: store, scheme: .light).mode, .dark)
+        XCTAssertEqual(LookRoot.fixedScheme(garden, store: store), .light)
+        SceneStills.chose(.light, theme: sky.id, key: "LookTests-\(UUID())")
+        XCTAssertNotEqual(LookStore.shared.sceneModes[sky.id], .light, "its driver's day is ignored")
+    }
+
     func testLiveSceneNeedsOptInForegroundAndHeadroom() {
         let defaults = UserDefaults(suiteName: "LookTests-\(UUID())")!
         let store = LookStore(defaults: defaults)
@@ -105,6 +118,22 @@ final class LookTests: XCTestCase {
         XCTAssertEqual(EnergyGate.pollDelay(.seconds(60), idle: true), .seconds(180))
         XCTAssertEqual(EnergyGate.pollDelay(.seconds(120), idle: true), .seconds(180))
         XCTAssertEqual(EnergyGate.pollDelay(.seconds(300), idle: true), .seconds(300))
+        // Untouched for five minutes: every poll rests at 5 min.
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(30), idle: true, idleFor: 299), .seconds(90))
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(30), idle: true, idleFor: 300), .seconds(300))
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(600), idle: true, idleFor: 900), .seconds(600))
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(30), idle: false, idleFor: 900), .seconds(30), "in use: as given")
+        // Low Power Mode or a warm phone: as if idle, even in use.
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(30), idle: false, saving: true), .seconds(90))
+    }
+
+    func testChangeSignalsRefreshLessOftenWhileIdle() {
+        XCTAssertEqual(EnergyGate.changeGap(.seconds(3), idle: false), .seconds(3), "in use: the caller's own pace")
+        XCTAssertEqual(EnergyGate.changeGap(.zero, idle: false), .zero)
+        XCTAssertEqual(EnergyGate.changeGap(.seconds(3), idle: true), .seconds(30))
+        XCTAssertEqual(EnergyGate.changeGap(.zero, idle: false, idleFor: 900), .zero, "in use: no wait")
+        XCTAssertEqual(EnergyGate.changeGap(.seconds(20), idle: true), .seconds(60))
+        XCTAssertEqual(EnergyGate.changeGap(.seconds(3), idle: true, idleFor: 300), .seconds(300), "at rest")
     }
 
     func testPollsHoldInTheBackgroundAndRunWhenTheAppIsBack() async throws {

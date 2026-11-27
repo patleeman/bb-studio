@@ -63,7 +63,7 @@ describe("review comments", () => {
     expect(message).toContain("```ts\nfor (let i = 0; i < 2; i++) {\n  await send();\n```");
     expect(message).toContain("> User: Why twice?\n\n> You: It retries once on timeout.\n\nThen name it retryOnce.");
     expect(message).toContain(`### 2. README.md:3 (comment thread ${second})\n\n\`\`\`md\nInstall with npm\n\`\`\`\n\nSay pnpm.`);
-    expect(message).toContain("code_comment_reply");
+    expect(message).toContain("code_comments (op: reply)");
   });
 
   it("describes a thread for the agent without the user's unsent replies", () => {

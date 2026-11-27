@@ -59,10 +59,95 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
     var probe: ((CGRect) -> Void)?
     /// How the log writes a row id.
     var describeID: ((AnyHashable) -> String)?
+    /// The conversation, for its reading spot across rebuilds (`TranscriptReadingSpots`).
+    var spotKey: String?
+    /// Optional change keys for the hosted composer and top chrome. When set and
+    /// unchanged (along with `colorScheme`, `dynamicTypeSize`, and `legibilityWeight`),
+    /// their UIHostingController rootViews aren't replaced on pure streaming row updates.
+    var composerVersion: AnyHashable? = nil
+    var topVersion: AnyHashable? = nil
 
     final class Coordinator {
         var items: [Item] = []
+        var itemIDs: [AnyHashable] = []
         var byID: [AnyHashable: Item] = [:]
+        var composerMounted = false
+        var composerVersion: AnyHashable?
+        var topMounted = false
+        var topVersion: AnyHashable?
+        var hasTop = false
+        var colorScheme: ColorScheme?
+        var dynamicTypeSize: DynamicTypeSize?
+        var legibilityWeight: LegibilityWeight?
+
+        struct DiffResult {
+            var rowsChanged: Bool
+            var needsSetRows: Bool
+            var changed: [AnyHashable]
+        }
+
+        /// Diffs `next` against the coordinator's current rows and updates
+        /// `items`, `itemIDs`, and `byID` atomically.
+        func apply(_ next: [Item]) -> DiffResult {
+            let oldCount = items.count
+            if next.count >= oldCount, oldCount > 0 {
+                var samePrefix = true
+                var changed: [AnyHashable] = []
+                var pendingUpdates: [(id: AnyHashable, item: Item)] = []
+                for index in 0..<oldCount {
+                    let item = next[index]
+                    let old = items[index]
+                    if item.id != old.id {
+                        samePrefix = false
+                        break
+                    }
+                    if item != old {
+                        let id = itemIDs[index]
+                        changed.append(id)
+                        pendingUpdates.append((id, item))
+                    }
+                }
+                if samePrefix {
+                    // Commit buffered updates only after confirming the prefix holds,
+                    // so a fallback to the slow path never compares against mutated `byID`.
+                    for (id, item) in pendingUpdates { byID[id] = item }
+                    if next.count == oldCount {
+                        if changed.isEmpty {
+                            return DiffResult(rowsChanged: false, needsSetRows: false, changed: [])
+                        }
+                        items = next
+                        return DiffResult(rowsChanged: true, needsSetRows: false, changed: changed)
+                    }
+                    for index in oldCount..<next.count {
+                        let item = next[index]
+                        let id = AnyHashable(item.id)
+                        itemIDs.append(id)
+                        byID[id] = item
+                    }
+                    items = next
+                    return DiffResult(rowsChanged: true, needsSetRows: true, changed: changed)
+                }
+            }
+
+            guard next != items else {
+                return DiffResult(rowsChanged: false, needsSetRows: false, changed: [])
+            }
+            var changed: [AnyHashable] = []
+            var nextByID: [AnyHashable: Item] = [:]
+            var nextIDs: [AnyHashable] = []
+            nextByID.reserveCapacity(next.count)
+            nextIDs.reserveCapacity(next.count)
+            for item in next {
+                let id = AnyHashable(item.id)
+                if let old = byID[id], old != item { changed.append(id) }
+                nextByID[id] = item
+                nextIDs.append(id)
+            }
+            items = next
+            itemIDs = nextIDs
+            byID = nextByID
+            return DiffResult(rowsChanged: true, needsSetRows: true, changed: changed)
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -85,6 +170,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         controller.log = log
         if let dismissKeyboard { controller.dismissKeyboard = dismissKeyboard }
         controller.probe = probe
+        controller.spotKey = spotKey
         if let describeID { controller.describe = describeID }
         controller.chrome = chrome
         let row = row
@@ -94,22 +180,42 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         }
         let pill = pill
         controller.pillContent = { state, jump in AnyView(pill(state, jump).environment(\.self, environment)) }
-        controller.setComposer(AnyView(composer().environment(\.self, environment)))
-        controller.setTop(top.map { AnyView($0().environment(\.self, environment)) })
 
         defer { controller.pillNote = pillNote }
-        // Same rows (usually the very same storage): nothing to diff.
-        guard items != coordinator.items else { return }
-        var changed: [AnyHashable] = []
-        var byID: [AnyHashable: Item] = [:]
-        byID.reserveCapacity(items.count)
-        for item in items {
-            let id = AnyHashable(item.id)
-            if let old = coordinator.byID[id], old != item { changed.append(id) }
-            byID[id] = item
+        let diff = coordinator.apply(items)
+        if diff.rowsChanged {
+            if diff.needsSetRows {
+                controller.setRows(coordinator.itemIDs, changed: diff.changed)
+            } else {
+                controller.reconfigure(diff.changed)
+            }
         }
-        coordinator.items = items
-        coordinator.byID = byID
-        controller.setRows(items.map { AnyHashable($0.id) }, changed: changed)
+
+        // Skip re-assigning hosted chrome only on pure streaming row updates;
+        // refresh whenever rows didn't change (SwiftUI environment/AX update),
+        // the chrome token changed, or visual environment traits changed.
+        let envChanged = coordinator.colorScheme != environment.colorScheme
+            || coordinator.dynamicTypeSize != environment.dynamicTypeSize
+            || coordinator.legibilityWeight != environment.legibilityWeight
+        coordinator.colorScheme = environment.colorScheme
+        coordinator.dynamicTypeSize = environment.dynamicTypeSize
+        coordinator.legibilityWeight = environment.legibilityWeight
+
+        let skipComposer = diff.rowsChanged && !envChanged && coordinator.composerMounted
+            && composerVersion != nil && coordinator.composerVersion == composerVersion
+        if !skipComposer {
+            coordinator.composerMounted = true
+            coordinator.composerVersion = composerVersion
+            controller.setComposer(AnyView(composer().environment(\.self, environment)))
+        }
+        let nextHasTop = top != nil
+        let skipTop = diff.rowsChanged && !envChanged && coordinator.topMounted && coordinator.hasTop == nextHasTop
+            && (!nextHasTop || (topVersion != nil && coordinator.topVersion == topVersion))
+        if !skipTop {
+            coordinator.topMounted = true
+            coordinator.hasTop = nextHasTop
+            coordinator.topVersion = topVersion
+            controller.setTop(top.map { AnyView($0().environment(\.self, environment)) })
+        }
     }
 }

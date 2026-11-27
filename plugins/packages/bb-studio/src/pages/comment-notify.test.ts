@@ -66,8 +66,8 @@ it("tells the user's comment to the page's agent", () => {
   ]);
   expect(text).toContain('The user left a comment on the page "Plan" (id pg_a');
   expect(text).toContain('New thread t1 on "Friday":\n> Move it\n> please');
-  expect(text).toContain('pages_comments op "reply"');
-  expect(text).toContain('pages_comments op "resolve"');
+  expect(text).toContain('pages_read (comments) op "reply"');
+  expect(text).toContain('pages_read (comments) op "resolve"');
 });
 
 describe("comments on a page an agent made", () => {

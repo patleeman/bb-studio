@@ -1,9 +1,9 @@
 #if DEBUG
 import Foundation
 
-/// Debug builds: `-qaBotDemo chat|working|needs|onboarding|list` fills the Bot tab
-/// with a deterministic local Bot, chat and Activity, for screenshots without
-/// a server. `-qaBotSheet activity|profile` opens a sheet over it.
+/// Debug builds: `-qaBotDemo chat|working|needs|duo` fills the Main
+/// conversation with a deterministic local chat, for screenshots and UI
+/// tests without a server (with `-qaSpacesDemo` for the Bot around it).
 /// `-qaBotAttention`: the Bot asked you a question, a thread under Running
 /// waits for approval, and a runner reported something urgent.
 enum BotDemo {
@@ -377,42 +377,6 @@ enum BotDemo {
     }
 
     /// The Bots list: Juniper alone, or with two more for `-qaBotDemo list`.
-    static var bots: [BotInfo]? {
-        guard let fixture = current else { return nil }
-        guard let juniper = fixture.bot.map({ $0.with(id: "bot_juniper", primary: true, external: false) }) else { return [] }
-        guard variant == "list" else { return [juniper] }
-        let scout = BotInfo(name: "Scout", avatar: "🔭", state: .active, lead: ThreadLead(threadId: "thr_scout01"),
-                            shape: "star", color: "#e0803a", role: "Watches competitors and the news.")
-            .with(id: "bot_scout", primary: false, external: false)
-        let ledger = BotInfo(name: "Ledger", avatar: "🧾", state: .paused, lead: ThreadLead(threadId: "thr_ledger01"),
-                             shape: "hexagon", color: "#5b6ee1", role: "Keeps the books.")
-            .with(id: "bot_ledger", primary: false, external: true)
-        return [juniper, scout, ledger]
-    }
-
-    static var summaries: [String: BotSummary] {
-        [
-            "bot_juniper": BotSummary(preview: "Just one thing: the Lisbon offsite budget needs your sign-off by 3pm.", attention: .init(reason: "Asked you a question", count: 1), running: false, updatedAt: now - 600_000),
-            "bot_scout": BotSummary(preview: "Two competitors shipped pricing changes this week. Summary is on your Pages.", running: true, updatedAt: now - 120_000),
-            "bot_ledger": BotSummary(preview: "October invoices are reconciled. Three receipts are still missing.", running: false, updatedAt: now - 86_400_000 * 2),
-        ]
-    }
-
-    /// One runner in each row state: running, quiet, reported (one of them urgent), failed and paused.
-    static var runners: [BotRunner] {
-        let today = Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000
-        let laterToday = max(now + 600_000, today + 23 * 3_600_000)
-        return decode(#"""
-        [{"id":"run_inbox","providerId":"codex","threadId":"thr_runinbox","name":"Inbox sweep","state":"active","running":true,"runningSince":\#(now - 42_000),"schedule":{"cadence":"every2hours"},"nextRunAt":\#(now + 7_200_000),"lastRunAt":\#(now - 7_200_000),"lastRunStatus":"succeeded","lastLevel":"log","lastReport":"4 new threads, none urgent.","lastReportAt":\#(now - 7_200_000)},
-         {"id":"run_prs","providerId":"claude-code","threadId":"thr_runprs","name":"PR watcher","state":"active","schedule":{"cadence":"weekdays","time":"09:00"},"nextRunAt":\#(now + 86_400_000),"lastRunAt":\#(now - 7_200_000),"lastRunStatus":"succeeded","lastLevel":"urgent","lastReport":"Release PR is waiting on CI.","lastReportAt":\#(now - 7_200_000)},
-         {"id":"run_security","providerId":"claude-code","threadId":"thr_runsecurity","name":"Security","state":"active","schedule":{"cadence":"daily","time":"07:00"},"nextRunAt":\#(now + 86_400_000),"lastRunAt":\#(now - 240_000),"lastRunStatus":"succeeded","lastLevel":"urgent","lastReport":"SSH on homelab accepts passwords again.","lastReportAt":\#(now - 240_000)},
-         {"id":"run_deploy","providerId":"pi","threadId":"thr_rundeploy","name":"Deploy check","state":"active","schedule":{"cadence":"hourly"},"nextRunAt":\#(laterToday),"lastRunAt":\#(now - 3_000_000),"lastRunStatus":"succeeded","lastLevel":"log"},
-         {"id":"run_rivals","providerId":"acp-opencode","threadId":"thr_runrivals","name":"Competitor pricing watch","state":"active","schedule":{"cadence":"daily","time":"07:30"},"nextRunAt":\#(now + 2 * 86_400_000),"lastRunAt":\#(now - 36_000_000),"lastRunStatus":"succeeded","lastLevel":"tell","lastReport":"Acme cut its Pro price by 20%.","lastReportAt":\#(now - 36_000_000)},
-         {"id":"run_metrics","providerId":"claude-code","threadId":"thr_runmetrics","name":"Weekly metrics digest","state":"active","schedule":{"cadence":"daily","time":"18:00"},"nextRunAt":\#(now + 86_400_000 + 3_600_000),"lastRunAt":\#(now - 20_000_000),"lastRunStatus":"failed"},
-         {"id":"run_news","providerId":"codex","threadId":"thr_runnews","name":"Industry news","state":"paused","schedule":{"cadence":"daily","time":"07:30"},"lastReport":"Quiet day.","lastReportAt":\#(now - 86_400_000 * 3),"lastRunAt":\#(now - 86_400_000 * 3)}]
-        """#)
-    }
-
     /// `-qaLoopsDemo`: the morning card and loop cards at the end of the chat.
     private static func loopRows() -> [TimelineRow] {
         let start = now - 300_000

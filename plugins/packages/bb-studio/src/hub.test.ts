@@ -218,4 +218,101 @@ describe("StudioHub", () => {
     const hub = new StudioHub(fakeSdk({ plugins: [], rpc: {} }));
     await expect(hub.call("studio", "studio_list", null)).rejects.toThrow("Studio isn't a provider.");
   });
+
+  it("coalesces concurrent overview() and providers() fan-outs, then runs fresh after settlement", async () => {
+    let listCalls = 0;
+    let releaseList!: () => void;
+    const gate = new Promise<void>((resolve) => { releaseList = resolve; });
+    const sdk = fakeSdk({
+      plugins: [plugin("pages")],
+      rpc: {
+        "pages.studio_describe": () => ({ pluginId: "pages", version: 2, panel: "pages", kinds: [kind] }),
+        "pages.studio_list": async () => {
+          listCalls += 1;
+          await gate;
+          return { items: [item("pg_1")] };
+        },
+      },
+    });
+    const listPluginsSpy = vi.spyOn(sdk.plugins, "list");
+    const hub = new StudioHub(sdk);
+    const pending = Promise.all([hub.overview(), hub.overview(), hub.overview(), hub.overview()]);
+    releaseList();
+    const results = await pending;
+    expect(listCalls).toBe(1);
+    expect(results.every((r) => r.items.length === 1)).toBe(true);
+
+    // After settlement, a subsequent call runs a fresh fan-out.
+    await hub.overview();
+    expect(listCalls).toBe(2);
+
+    // Concurrent providers() calls coalesce on plugins.list / discovery (not just cached studio_describe).
+    listPluginsSpy.mockClear();
+    const providerLists = await Promise.all([hub.providers(), hub.providers(), hub.providers()]);
+    expect(providerLists).toHaveLength(3);
+    expect(listPluginsSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts a fresh fan-out when a write happens while overview() is in flight", async () => {
+    const stored = [item("pg_1")];
+    let listCalls = 0;
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const sdk = fakeSdk({
+      plugins: [plugin("pages")],
+      rpc: {
+        "pages.studio_describe": () => ({ pluginId: "pages", version: 2, panel: "pages", kinds: [kind] }),
+        "pages.studio_list": async () => {
+          const call = ++listCalls;
+          const snapshot = [...stored];
+          if (call === 1) await firstGate;
+          return { items: snapshot };
+        },
+        "pages.studio_create": async () => {
+          const created = item("pg_2");
+          stored.push(created);
+          return { item: created };
+        },
+      },
+    });
+    const hub = new StudioHub(sdk);
+    const first = hub.overview();
+    // Wait until the first studio_list has started and captured ["pg_1"].
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await hub.call("pages", "studio_create", { kind: "page", projectId: null });
+    const second = hub.overview();
+    releaseFirst();
+
+    const [r1, r2] = await Promise.all([first, second]);
+    expect(listCalls).toBe(2);
+    expect(r1.items.map((each) => each.id)).toEqual(["pg_1"]);
+    expect(r2.items.map((each) => each.id)).toEqual(["pg_1", "pg_2"]);
+  });
+
+  it("clears the in-flight slot on rejection and keeps overview(only) uncoalesced", async () => {
+    let fail = true;
+    const sdk = fakeSdk({
+      plugins: [plugin("pages")],
+      rpc: {
+        "pages.studio_describe": () => ({ pluginId: "pages", version: 2, panel: "pages", kinds: [kind] }),
+        "pages.studio_list": () => ({ items: [item("pg_1")] }),
+      },
+    });
+    const origList = sdk.plugins.list;
+    sdk.plugins.list = async () => {
+      if (fail) throw new Error("host down");
+      return origList();
+    };
+    const hub = new StudioHub(sdk);
+    await expect(Promise.all([hub.overview(), hub.overview()])).rejects.toThrow("host down");
+
+    fail = false;
+    const recovered = await hub.overview();
+    expect(recovered.items.map((each) => each.id)).toEqual(["pg_1"]);
+
+    // overview(only) does not join or populate the unfiltered coalescing slot.
+    const listBefore = sdk.calls.filter((c) => c === "pages.studio_list").length;
+    await Promise.all([hub.overview(new Set(["pages"])), hub.overview(new Set(["pages"]))]);
+    expect(sdk.calls.filter((c) => c === "pages.studio_list").length).toBe(listBefore + 2);
+  });
 });

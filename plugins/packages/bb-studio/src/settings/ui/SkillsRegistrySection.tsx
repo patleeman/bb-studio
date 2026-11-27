@@ -1,5 +1,6 @@
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
+import { visiblePoll } from "../../kit/app/visible-poll";
 import { errorMessage } from "../../kit/format";
 import type { skillsRegistryContract, SkillsRegistryState } from "../../skills-registry-contract";
 import { Card, Row, Switch } from "./controls";
@@ -22,8 +23,7 @@ export function SkillsRegistrySection() {
   useEffect(load, [load]);
   useEffect(() => {
     if (!state?.pending) return;
-    const timer = setInterval(load, 1500);
-    return () => clearInterval(timer);
+    return visiblePoll(load, 1500);
   }, [state?.pending, load]);
   const change = (enabled: boolean) => {
     void rpc.call("skillsRegistry.set", { enabled }).then((next) => { setState(next); setError(null); }, (cause: unknown) => setError(errorMessage(cause)));

@@ -12,15 +12,10 @@ final class WorkersUITests: ServerIsolatedUITestCase {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", variant]
         app.launchOffline()
         XCTAssertTrue(app.waitForRoom(), "the app opens on the room")
-        app.standRoomChat()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 
-    private func back() {
-        let bar = app.navigationBars.firstMatch
-        XCTAssertTrue(bar.waitForExistence(timeout: 20))
-        bar.buttons.element(boundBy: 0).tap()
-    }
+    private func back() { app.goBack() }
 
     private var askField: XCUIElement { app.textViews["Ask the Bot about this worker…"] }
 
@@ -36,7 +31,6 @@ final class WorkersUITests: ServerIsolatedUITestCase {
 
     func testOpenFromTheListAndAsk() {
         launch()
-        app.buttons["roomLayDown"].tap()
         app.openRoomPlace("conversations")
         // The failed worker sits under the conversation that started it, behind that row's toggle.
         let nest = app.buttons["roomNestToggle-thr_demo_interview"]
@@ -65,13 +59,12 @@ final class WorkersUITests: ServerIsolatedUITestCase {
         shot("asked")
     }
 
-    func testOpenFromTheWorkersLineAndAskGoesBack() {
+    /// From the conversation list (the "N workers from here" line went with In flight).
+    func testOpenFromTheListAndAskGoesBack() {
         launch()
-        let line = app.buttons["conversationWorkers"]
-        XCTAssertTrue(line.waitForExistence(timeout: 15))
-        line.tap()
-        let running = app.buttons["Theme stills renderer"]
-        XCTAssertTrue(running.waitForExistence(timeout: 5))
+        app.openRoomPlace("conversations")
+        let running = app.buttons["roomWorker-thr_demo_w2"]
+        XCTAssertTrue(running.waitForExistence(timeout: 15))
         running.tap()
         expectWorker("Theme stills renderer", status: "running")
         XCTAssertTrue(app.buttons["workerOwner"].label.contains("Main"))
@@ -81,16 +74,12 @@ final class WorkersUITests: ServerIsolatedUITestCase {
         askField.tap()
         askField.typeText("How far along is it?")
         app.buttons["workerAskSend"].tap()
-        let typingLine = app.buttons["in-flight-toggle"]
-        XCTAssertTrue(app.buttons["conversationWorkers"].waitForExistence(timeout: 15) || typingLine.label.contains("worker"),
-                      "back on Main, its workers in the chip or, while typing, in the one line")
-        XCTAssertTrue(app.textViews["Message"].exists)
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 15), "back on Main")
         XCTAssertFalse(askField.exists)
     }
 
     func testWaitingOnAnApprovalShowsItsStatusOnly() {
         launch()
-        app.buttons["roomLayDown"].tap()
         app.openRoomPlace("conversations")
         let waiting = app.buttons["roomWorker-thr_demo_w1"]
         XCTAssertTrue(waiting.waitForExistence(timeout: 15))

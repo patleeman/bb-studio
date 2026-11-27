@@ -24,6 +24,8 @@ public struct RelayedMessage: Hashable, Sendable {
     nonisolated(unsafe) private static let summaryMarkers = try! Regex(#"^\s*(?:>\s*|#{1,6}\s+|[-*+]\s+|\d+[.)]\s+)+"#)
     nonisolated(unsafe) private static let summaryLinks = try! Regex(#"!?\[([^\]\n]*)\]\([^)\s]*\)"#)
     nonisolated(unsafe) private static let sentenceEnd = try! Regex(#"[.!?](?=\s)"#)
+    nonisolated(unsafe) private static let whitespaceRun = try! Regex(#"\s+"#)
+    nonisolated(unsafe) private static let trailingPunct = try! Regex(#"[\s,;:.]+$"#)
 
     private struct StudioLine {
         var pattern: Regex<AnyRegexOutput>
@@ -57,13 +59,13 @@ public struct RelayedMessage: Hashable, Sendable {
         var plain = line.replacing(summaryMarkers, maxReplacements: 1) { _ in "" }
         plain = plain.replacing(summaryLinks) { capture($0, 1) }
         plain = plain.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "__", with: "").replacingOccurrences(of: "`", with: "")
-        plain = plain.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
+        plain = plain.replacing(whitespaceRun, with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         let sentence = plain.firstMatch(of: sentenceEnd).map { String(plain[..<$0.range.upperBound]) } ?? plain
         guard sentence.count > summaryLimit else { return sentence }
         let cut = String(sentence.prefix(summaryLimit - 1))
         var kept = cut
         if let space = cut.lastIndex(of: " "), cut.distance(from: cut.startIndex, to: space) > summaryLimit / 2 { kept = String(cut[..<space]) }
-        return kept.replacingOccurrences(of: #"[\s,;:.]+$"#, with: "", options: .regularExpression) + "…"
+        return kept.replacing(trailingPunct, with: "") + "…"
     }
 
     private init(kind: Kind, sender: String?, senderThreadId: String? = nil, urgent: Bool = false, body: Substring, summaryFrom: Substring) {
@@ -101,7 +103,7 @@ public struct RelayedMessage: Hashable, Sendable {
     }
 
     public static func parse(_ text: String, initiator: String?) -> RelayedMessage? {
-        guard !text.isEmpty else { return nil }
+        guard text.hasPrefix("[bb ") else { return nil }
         let all = text[...]
         if let automation = all.prefixMatch(of: automationHeader) {
             let rest = all[automation.range.upperBound...]

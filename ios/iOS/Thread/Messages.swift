@@ -18,6 +18,8 @@ struct MessageBubble: View {
     var fork: (() -> Void)? = nil
     /// Opens an existing side thread (a fork made at this message).
     var openSideThread: ((String) -> Void)? = nil
+    /// A reply that needs the user: its asking sentence marked in place.
+    var ask: ReplyAskMark? = nil
     @EnvironmentObject private var app: AppModel
 
     private var text: String { row.text ?? "" }
@@ -42,15 +44,16 @@ struct MessageBubble: View {
             QuietCheckMarker()
         } else {
             VStack(alignment: .leading, spacing: 10) {
-                MarkdownText(text)
+                MarkdownText(text, mark: ask)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(.contextMenuPreview, .rect(cornerRadius: 8))
                     .contextMenu { menu }
-                let reactions = Directive.reactions(in: text)
+                let lastDirective = Directive.last(in: text)
+                let reactions = Directive.reactions(from: lastDirective)
                 if !reactions.isEmpty {
                     ReactionChips(items: reactions, react: react)
                 }
-                let next = Directive.next(in: text)
+                let next = Directive.next(from: lastDirective)
                 if !next.isEmpty {
                     NextCard(next: next, react: react)
                 }
@@ -74,6 +77,14 @@ struct MessageBubble: View {
         if let createdAt = row.createdAt {
             Section {
                 Text(Self.sentLabel(createdAt))
+            }
+        }
+        if ask != nil {
+            // Done is the user's own, from BB Studio's app on the Mac; answering here clears it too.
+            Section {
+                Button {} label: { Label("Mark done in BB Studio on your Mac", systemImage: "checkmark.circle") }
+                    .disabled(true)
+                    .accessibilityIdentifier("replyAskDone")
             }
         }
         Button { UIPasteboard.general.string = plainText } label: { Label("Copy", systemImage: "doc.on.doc") }
@@ -145,6 +156,7 @@ struct MessageBubble: View {
 }
 
 struct RelayedRow: View {
+    @Environment(\.look) private var look
     let relayed: RelayedMessage
     var quiet = false
     var title: String?
@@ -174,7 +186,7 @@ struct RelayedRow: View {
                     Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
                         .rotationEffect(.degrees(expanded ? 90 : 0))
                 }
-                .foregroundStyle(relayed.urgent ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                .foregroundStyle(relayed.urgent ? AnyShapeStyle(look.needsYou) : AnyShapeStyle(.secondary))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
                 .contentShape(.rect)
@@ -207,7 +219,7 @@ struct QuietCheckMarker: View {
         }
         .labelStyle(.titleAndIcon)
         .font(.caption)
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(.secondary)
         .padding(.horizontal, 8)
         .padding(.vertical, 2)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -549,6 +561,7 @@ struct FlowLayout: Layout {
 /// A run of tool calls and reasoning, collapsed to one line. Expanded, each step
 /// shows what it did, and a tap on a step shows its output.
 struct ActivityGroup: View {
+    @Environment(\.look) private var look
     let rows: [TimelineRow]
     @State private var expanded = false
 
@@ -563,7 +576,7 @@ struct ActivityGroup: View {
                 if running {
                     ProgressView().controlSize(.mini)
                 } else if failed {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
                 }
                 Text(summary).lineLimit(1)
                 if !running, let stats = diffStats { DiffStats(stats: stats) }
@@ -574,31 +587,50 @@ struct ActivityGroup: View {
         .tint(.secondary)
     }
 
-    private var work: [TimelineRow] { rows.filter { $0.kind == "work" } }
-
     private var diffStats: TimelineRow.FileChange.Stats? {
-        let all = rows.compactMap { $0.change?.diffStats }
-        guard !all.isEmpty else { return nil }
-        return .init(added: all.map(\.added).reduce(0, +), removed: all.map(\.removed).reduce(0, +))
+        var added = 0
+        var removed = 0
+        var found = false
+        for row in rows {
+            if let stats = row.change?.diffStats {
+                added += stats.added
+                removed += stats.removed
+                found = true
+            }
+        }
+        return found ? .init(added: added, removed: removed) : nil
     }
     private var running: Bool { rows.contains { $0.status == "inProgress" || $0.status == "running" || $0.status == "pending" } }
     private var failed: Bool { rows.contains { $0.status == "failed" || $0.status == "error" } }
 
     private var summary: String {
-        if work.isEmpty { return rows.last?.title ?? "Thinking" }
-        if running, let current = rows.last(where: { $0.kind == "work" }) {
-            return ActivityStep.label(for: current)
+        var workCount = 0
+        var commands = 0
+        var reads = 0
+        var tools = 0
+        var editedPaths = Set<String>()
+        var lastWork: TimelineRow?
+        for row in rows where row.kind == "work" {
+            workCount += 1
+            lastWork = row
+            switch row.workKind {
+            case "command": commands += 1
+            case "file-read": reads += 1
+            case "file-change":
+                if let path = row.change?.path ?? row.path { editedPaths.insert(path) }
+            case "tool": tools += 1
+            default: break
+            }
         }
+        if workCount == 0 { return rows.last?.title ?? "Thinking" }
+        if running, let lastWork { return ActivityStep.label(for: lastWork) }
         var counts: [String] = []
-        let commands = work.filter { $0.workKind == "command" }.count
-        let reads = work.filter { $0.workKind == "file-read" }.count
-        let edits = Set(work.filter { $0.workKind == "file-change" }.compactMap { $0.change?.path ?? $0.path }).count
-        let tools = work.filter { $0.workKind == "tool" }.count
+        let edits = editedPaths.count
         if commands > 0 { counts.append("\(commands) command\(commands == 1 ? "" : "s")") }
         if reads > 0 { counts.append("read \(reads) file\(reads == 1 ? "" : "s")") }
         if edits > 0 { counts.append("edited \(edits) file\(edits == 1 ? "" : "s")") }
         if tools > 0 { counts.append("\(tools) tool call\(tools == 1 ? "" : "s")") }
-        return counts.isEmpty ? "\(work.count) step\(work.count == 1 ? "" : "s")" : counts.joined(separator: ", ").capitalizedFirst
+        return counts.isEmpty ? "\(workCount) step\(workCount == 1 ? "" : "s")" : counts.joined(separator: ", ").capitalizedFirst
     }
 }
 
@@ -671,7 +703,11 @@ struct ActivityStep: View {
         row.change?.path ?? (["file-change", "file-read"].contains(row.workKind ?? "") ? row.path : nil)
     }
 
-    private var hasDetail: Bool { detail != nil || row.change?.diff?.isEmpty == false }
+    private var hasDetail: Bool {
+        if row.change?.diff?.isEmpty == false { return true }
+        guard let text = row.output ?? row.detail else { return false }
+        return text.contains { !$0.isWhitespace && !$0.isNewline }
+    }
 
     private var icon: String {
         if row.status == "failed" || row.status == "error" { return "xmark.circle" }

@@ -57,7 +57,7 @@ struct DictateIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        AppModel.shared.startDictation()
+        AppModel.shared.open(.sheet(.dictation(threadId: nil, autoStart: true)))
         return .result()
     }
 }
@@ -71,7 +71,7 @@ struct OpenThreadIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        AppModel.shared.openThread(try thread.threadId(on: AppModel.shared.serverURL))
+        AppModel.shared.open(.conversation(try thread.threadId(on: AppModel.shared.serverURL)))
         return .result()
     }
 }
@@ -126,7 +126,7 @@ struct NewThreadIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        AppModel.shared.newThread()
+        AppModel.shared.open(.compose(""))
         return .result()
     }
 }
@@ -138,7 +138,7 @@ struct CaptureIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        AppModel.shared.sheet = .capture
+        Router.shared.sheet = .capture
         return .result()
     }
 }
@@ -195,7 +195,7 @@ struct WriteIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        AppModel.shared.sheet = .write
+        Router.shared.sheet = .write
         return .result()
     }
 }

@@ -66,7 +66,6 @@ export function providerForMode(mode: ListMode): string {
 }
 
 const MODES = new Set<string>(["bots", "studio"]);
-const listeners = new Set<() => void>();
 
 /** This window's mode, or null before it has one. */
 export function readListMode(): ListMode | null {
@@ -79,13 +78,6 @@ export function readListMode(): ListMode | null {
 function writeListMode(mode: ListMode): void {
   if (readListMode() === mode) return;
   try { sessionStorage.setItem(MODE_KEY, mode); } catch { /* private mode */ }
-  for (const listener of [...listeners]) listener();
-}
-
-/** Calls `listener` when this window's mode changes (useSyncExternalStore). */
-export function subscribeListMode(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => { listeners.delete(listener); };
 }
 
 // --- This window's last Bot thread -------------------------------------------
@@ -151,7 +143,6 @@ export const threadLocator = (sdk: { threads: { get(input: { threadId: string })
 /** Forgets this window's mode (tests: a fresh window). */
 export function forgetListMode(): void {
   try { sessionStorage.removeItem(MODE_KEY); } catch { /* private mode */ }
-  for (const listener of [...listeners]) listener();
 }
 
 export interface ListSwitch {

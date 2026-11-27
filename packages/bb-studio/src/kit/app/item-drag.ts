@@ -94,13 +94,50 @@ export function absoluteUrl(path: string, origin: string = typeof window === "un
   return `${origin}${path}`;
 }
 
-function watch(): void {
+// Window-global drag cleanup listeners: first bundle to load wins across
+// plugins, and a same-plugin reload replaces only its own listeners.
+const DRAG_WATCH_KEY = Symbol.for("bb-studio.item-drag");
+const DEFAULT_OWNER = "studio";
+type DragWatchEntry = { owner: string; dispose: () => void };
+type DragWatchWindow = Window & { [DRAG_WATCH_KEY]?: true | DragWatchEntry };
+
+function isDragWatchEntry(value: unknown): value is DragWatchEntry {
+  return !!value && typeof value === "object"
+    && typeof (value as { owner?: unknown }).owner === "string"
+    && typeof (value as { dispose?: unknown }).dispose === "function";
+}
+
+function watch(owner: string = DEFAULT_OWNER): void {
   if (watching || typeof window === "undefined") return;
+  const win = window as DragWatchWindow;
+  const existing = win[DRAG_WATCH_KEY];
+  if (existing) {
+    if (!isDragWatchEntry(existing) || existing.owner !== owner) return;
+    existing.dispose();
+  }
   watching = true;
+  const controller = new AbortController();
   // The drag is over when its source hears `dragend`, or this window takes the drop.
   const clear = () => { current = null; };
-  window.addEventListener("dragend", clear, true);
-  window.addEventListener("drop", () => { setTimeout(clear, 0); }, true);
+  const opts = { capture: true, signal: controller.signal } as const;
+  window.addEventListener("dragend", clear, opts);
+  window.addEventListener("drop", () => { setTimeout(clear, 0); }, opts);
+  const entry: DragWatchEntry = {
+    owner,
+    dispose: () => {
+      controller.abort();
+      watching = false;
+      if (win[DRAG_WATCH_KEY] === entry) delete win[DRAG_WATCH_KEY];
+    },
+  };
+  win[DRAG_WATCH_KEY] = entry;
+}
+
+/** Stops the window-level drag cleanup listeners (tests and teardown). */
+export function stopDragWatch(): void {
+  if (typeof window === "undefined") return;
+  const existing = (window as DragWatchWindow)[DRAG_WATCH_KEY];
+  if (isDragWatchEntry(existing)) existing.dispose();
 }
 
 /**

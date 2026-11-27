@@ -3,6 +3,7 @@
 // (the kit's studio_backup / studio_restore), adds its own data, and zips or
 // unzips the whole folder. Files never travel through RPC.
 import { randomBytes } from "node:crypto";
+import { studioCliName } from "../cli-name";
 import { mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { BACKUP_FORMAT, BACKUP_VERSION, STUDIO_BACKUP_METHOD, STUDIO_RESTORE_METHOD, studioBackupSchemas, type RestoreReport } from "../kit/backup";
@@ -343,7 +344,7 @@ export function formatRestore(summary: RestoreSummary): string {
     for (const note of report.notes) lines.push(`\t\t${note}`);
   }
   if (summary.projects.unmapped.length) {
-    lines.push("Projects not on this BB; their items are global items now (move them with bb studio move):");
+    lines.push(`Projects not on this BB; their items are global items now (move them with ${studioCliName()} studio move):`);
     for (const project of summary.projects.unmapped) lines.push(`  ${project.name}${project.path ? ` (${project.path})` : ""}`);
   }
   return `${lines.join("\n")}\n`;

@@ -34,7 +34,7 @@ struct UsageView: View {
         .task {
             while !Task.isCancelled {
                 await load()
-                try? await Task.sleep(for: .seconds(60))
+                await EnergyGate.shared.pollWait(.seconds(60))
             }
         }
     }
@@ -65,6 +65,7 @@ struct UsageView: View {
 }
 
 struct AccountUsage: View {
+    @Environment(\.look) private var look
     let account: PoolAccount
 
     var body: some View {
@@ -126,13 +127,13 @@ struct AccountUsage: View {
         guard account.enabled else { return .secondary }
         switch account.status {
         case "ready": return .green
-        case "held": return .orange
+        case "held": return .secondary
         case "exhausted", "error": return .red
         default: return .secondary
         }
     }
 
     static func color(_ used: Double) -> Color {
-        used >= 0.9 ? .red : used >= 0.7 ? .orange : .accentColor
+        used >= 0.9 ? .red : used >= 0.7 ? .yellow : .accentColor
     }
 }

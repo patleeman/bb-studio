@@ -13,6 +13,7 @@ import type { Presence } from "./presence/schema";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import { callText, clipLine, nextLine, pageSections, staleCursor } from "./paging";
 import type { ThreadSeeds } from "./thread-seeds";
 import { BotThreads, botOwnThread, forkUndecided, botActivity, botNeedsYou, conversationsPage, conversationTitle, conversationWorkers, latestLine, needsYouOf, olderView, repoTag, staleRaises, threadsView, workerStatus, type BotThreadRecord, type Signals, type ThreadFacts } from "./bot-threads";
 import { ConversationText, plainLine, queryWords, snippetOf, summaryBody, summaryPreview } from "./conversation-text";
@@ -26,7 +27,7 @@ import type { MirroredBatch, MirrorLive } from "./mirror-live";
 import { SideThreads } from "./bot-side-threads";
 import { MessageThreads, type MessageRef } from "./message-threads";
 import { MirrorCatchUp } from "./mirror-catch-up";
-import type { BotSpace, BotThreadInfo, LibraryItem, LibraryKind, NewConversationRequest } from "./bot-threads-contract";
+import type { BotSpace, BotThreadInfo, ConversationRow, LibraryItem, LibraryKind, NewConversationRequest } from "./bot-threads-contract";
 import type { ReasoningLevel } from "./kit/reasoning";
 import type { IndexedItem } from "./item-index";
 import { familyHref, itemType } from "./item-model";
@@ -61,6 +62,8 @@ export interface BotThreadsServerDeps {
   log(message: string): void;
   /** The Bot a thread acts for, for the tools (its own conversation, a runner's, a thread it started). */
   actingBot(threadId: string | undefined): Promise<string | null>;
+  /** Open Workspace tabs per conversation (src/workbench-agent/store.ts), for each row's tabCount. */
+  tabCounts?(threadIds: readonly string[]): ReadonlyMap<string, number>;
   /** Where BB forked a thread (`experimental_threadForkPoint`, the fork); absent on a BB without it. */
   forkPoint?(threadId: string): Promise<{ sourceThreadId: string; sourceTurnId: string | null } | null>;
   /** bb's live state of the threads BB Studio mirrors (src/mirror-live.ts); absent without an import. */
@@ -70,7 +73,7 @@ export interface BotThreadsServerDeps {
   seeds?: ThreadSeeds;
   /** A Bot's default model (src/bot.ts): what its new conversations start on; null when it has none. */
   defaultModel(botId: string): { providerId: string; model: string; reasoning: ReasoningLevel | null } | null;
-  /** The summaries a Bot saved of its conversations (memory records under "Conversations"), newest per conversation, by thread id. */
+  /** Older summaries of a Bot's conversations kept elsewhere, by thread id (none now: memory records are retired; a conversation keeps its own). */
   conversationSummaries?(botId: string): ReadonlyMap<string, string>;
 }
 
@@ -263,6 +266,12 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
   };
   const rechecked = new Set<string>();
 
+  /** Each conversation row with its Workspace's open tab count. */
+  const withTabCounts = <T extends { conversations: readonly ConversationRow[] }>(view: T): T => {
+    if (!deps.tabCounts || !view.conversations.length) return view;
+    const counts = deps.tabCounts(view.conversations.map((row) => row.threadId));
+    return { ...view, conversations: view.conversations.map((row) => ({ ...row, tabCount: counts.get(row.threadId) ?? 0 })) };
+  };
   /** One Bot's rows with BB's view of them, for the sidebar and its "N older" lists. */
   const botRows = async (id: string) => {
     await Promise.all([fillLatest(id).catch(() => {}), fillActivity(ACTIVITY_PER_VIEW).catch(() => 0)]);
@@ -295,7 +304,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     if (!id) return { botId: null, conversations: [], workers: [], hiddenWorkers: 0, hiddenToday: 0, olderConversations: 0 };
     const { records, threads } = await botRows(id);
     const { runnerBot } = deps.signals();
-    return threadsView(id, records, threads, Date.now(), (threadId, thread) => botOwnThread(threadId, thread, runnerBot));
+    return withTabCounts(threadsView(id, records, threads, Date.now(), (threadId, thread) => botOwnThread(threadId, thread, runnerBot)));
   };
   /** What the sidebar leaves out, and the finished conversations, newest first. */
   const older = async (botId: string | undefined) => {
@@ -311,7 +320,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     const bbTitles = new Map(archived.map((thread) => [thread.id, thread.title?.trim() || thread.titleFallback?.trim() || null]));
     const failed = new Set(archived.filter((thread) => thread.status === "error").map((thread) => thread.id));
     const finished = done.map((rec) => ({ threadId: rec.threadId, title: rec.title?.trim() || bbTitles.get(rec.threadId) || "Untitled conversation", finishedAt: rec.archivedAt!, summary: rec.finishedSummary!, failed: failed.has(rec.threadId) }));
-    return { ...rest, finished };
+    return { ...withTabCounts(rest), finished };
   };
 
   /** A conversation's whole summary: what finishing it wrote, else the record it saved under "Conversations". */
@@ -589,6 +598,16 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     bot_threads_view: ({ botId }: { botId?: string }) => view(botId),
     bot_threads_older: ({ botId }: { botId?: string }) => older(botId),
     bot_conversations_all: async ({ botId }: { botId?: string }) => (await conversationsAll(botId)).page,
+    bot_summaries: async ({ botId }: { botId?: string }) => {
+      const { page, summaries } = await conversationsAll(botId);
+      return {
+        botId: page.botId,
+        summaries: page.conversations.flatMap((row) => {
+          const summary = summaries.get(row.threadId);
+          return row.archivedAt !== null && summary ? [{ threadId: row.threadId, title: row.title, archivedAt: row.archivedAt, summary }] : [];
+        }).sort((a, b) => b.archivedAt - a.archivedAt),
+      };
+    },
     bot_conversations_search: (input: { botId?: string; query: string }) => conversationsSearch(input),
     bot_thread_info: async ({ threadId }: { threadId: string }) => ({ info: await info(threadId) }),
     bot_landing: async ({ botId, last }: { botId: string; last: string | null }) => {
@@ -624,23 +643,34 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
   };
 
   // The tools: a Bot's own view of its conversations and workers, and its way to raise something with the user.
-  const describe = async (botId: string) => {
+  const describe = async (botId: string, after?: string) => {
     const shown = await view(botId);
-    const lines = [
-      "Conversations (you and the user; Main gets reports and alerts):",
-      ...shown.conversations.map((each) => `- ${each.title} (/threads/${each.threadId})${each.isMain ? " [Main]" : ""}${each.forkedFrom ? `, forked from ${each.forkedFrom.title}` : ""}${each.running ? ", working" : ""}${each.needsYou ? `, needs the user: ${each.needsYou.reason}` : ""}${each.latest ? `. Latest: ${each.latest}` : ""}`),
-      "Workers (agents you started; each reports to the conversation that started it):",
-      ...(shown.workers.length ? shown.workers.map((each) => `- ${each.title} (/threads/${each.threadId}): ${each.status}${each.ownerTitle ? `, from ${each.ownerTitle}` : ""}${each.tag ? `, in ${each.tag}${each.branch ? ` (${each.branch})` : ""}` : ""}`) : ["- none"]),
-      ...(shown.olderConversations ? [`(${shown.olderConversations} older conversations not listed: not active in 14 days)`] : []),
-      ...(shown.hiddenWorkers ? [`(${shown.hiddenWorkers} older finished or failed workers not listed)`] : []),
+    // In parts (src/paging.ts): the next part starts after the last thread shown.
+    const conversations = "Conversations (you and the user; Main gets reports and alerts):";
+    const workersHead = "Workers (agents you started; each reports to the conversation that started it):";
+    const rows = [
+      ...shown.conversations.map((each) => ({ id: each.threadId, section: conversations, line: `- ${each.title} (/threads/${each.threadId})${each.isMain ? " [Main]" : ""}${each.forkedFrom ? `, forked from ${each.forkedFrom.title}` : ""}${each.running ? ", working" : ""}${each.needsYou ? `, needs the user: ${each.needsYou.reason}` : ""}${each.latest ? `. Latest: ${clipLine(each.latest, 160)}` : ""}` })),
+      ...shown.workers.map((each) => ({ id: each.threadId, section: workersHead, line: `- ${each.title} (/threads/${each.threadId}): ${each.status}${each.ownerTitle ? `, from ${each.ownerTitle}` : ""}${each.tag ? `, in ${each.tag}${each.branch ? ` (${each.branch})` : ""}` : ""}` })),
     ];
-    return lines.join("\n");
+    const part = pageSections(rows, { after });
+    if (!part) return staleCursor(`Thread ${after}`, callText("bot_conversations", {}));
+    const next = nextLine(part.page, (last) => callText("bot_conversations", { after: last }), "threads");
+    const last = part.page.next === null;
+    return [
+      ...(next ? [next] : []),
+      // The headings the old list always had: Conversations even when there are none, Workers "- none" at the end.
+      ...(!after && !shown.conversations.length ? [conversations, "- none"] : []),
+      ...part.lines,
+      ...(last && !shown.workers.length ? [workersHead, "- none"] : []),
+      ...(part.page.next === null && shown.olderConversations ? [`(${shown.olderConversations} older conversations not listed: not active in 14 days)`] : []),
+      ...(part.page.next === null && shown.hiddenWorkers ? [`(${shown.hiddenWorkers} older finished or failed workers not listed)`] : []),
+    ].join("\n");
   };
   const conversationsTool = (name: string, description: string) => bb.agents.registerTool({
-    name, description, parameters: z.object({}),
-    execute: async (_input, ctx) => {
+    name, description, parameters: z.object({ after: z.string().min(1).max(512).optional().describe("The cursor the last part's Next names") }),
+    execute: async ({ after }: { after?: string }, ctx) => {
       const botId = (ctx.threadId ? store.get(ctx.threadId)?.botId : null) ?? await deps.actingBot(ctx.threadId) ?? deps.bots()[0]?.id;
-      return botId ? describe(botId) : "The user has no Bot yet.";
+      return botId ? describe(botId, after) : "The user has no Bot yet.";
     },
   });
   conversationsTool("bot_conversations", "List your conversations with the user (Main first) and your workers (status, owner conversation, repo/branch).");

@@ -1,0 +1,82 @@
+[
+  {
+    "input": "http://127.0.0.1:38986/api/v1/plugins/mobile/http/push?token=bbpt_0123456789abcdefSECRETrelayTOKEN42",
+    "output": "http://127.0.0.1:38986/api/v1/plugins/mobile/http/push?token=[redacted …EN42]"
+  },
+  {
+    "input": "https://x.test/a?b=1&api_key=short&c=2",
+    "output": "https://x.test/a?b=1&api_key=[redacted]&c=2"
+  },
+  {
+    "input": "https://x.test/cb#access_token=ya29.a0AfH6SMBexampleexampleTOKENzz&expires_in=3599",
+    "output": "https://x.test/cb#access_token=[redacted …ENzz]&expires_in=3599"
+  },
+  {
+    "input": "https://me:hunter2@x.test/",
+    "output": "https://[redacted]@x.test/"
+  },
+  {
+    "input": "https://exp.host/--/api/v2/push/send",
+    "output": "https://exp.host/--/api/v2/push/send"
+  },
+  {
+    "input": "\"ExponentPushToken[deviceSecret0123456789XyZ]\" is not a registered push notification recipient",
+    "output": "\"ExponentPushToken[[redacted …9XyZ]]\" is not a registered push notification recipient"
+  },
+  {
+    "input": "apns:a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9d",
+    "output": "apns:[redacted …8f9d]"
+  },
+  {
+    "input": "token a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9d gone",
+    "output": "token [redacted …8f9d] gone"
+  },
+  {
+    "input": "Authorization: Bearer sk-live-0123456789abcdefWXYZ",
+    "output": "Authorization: [redacted …WXYZ]"
+  },
+  {
+    "input": "source: bb; x-api-key: abcd1234efgh5678ijkl; org-id: 2",
+    "output": "source: bb; x-api-key: [redacted …ijkl]; org-id: 2"
+  },
+  {
+    "input": "curl -H 'Authorization: Basic dXNlcjpwYXNzd29yZDEyMzQ='",
+    "output": "curl -H 'Authorization: [redacted …MzQ=]'"
+  },
+  {
+    "input": "Bearer token required. Basic authentication is off.",
+    "output": "Bearer token required. Basic authentication is off."
+  },
+  {
+    "input": "https://hooks.slack.com/services/T0000000/B0000000/XXXXXXXXXXXXXXXXXXXXXXXX",
+    "output": "https://hooks.slack.com/services/[redacted …XXXX]"
+  },
+  {
+    "input": "https://discord.com/api/webhooks/123456789012345678/abcDEF-ghiJKL_mnoPQR0123456789stuVWX",
+    "output": "https://discord.com/api/webhooks/123456789012345678/[redacted …uVWX]"
+  },
+  {
+    "input": "https://x.test/?token=[redacted0123456789abcdefSECRET]",
+    "output": "https://x.test/?token=[redacted]"
+  },
+  {
+    "input": "https://x.test/?token=[redacted …ab]extra",
+    "output": "https://x.test/?token=[redacted] …ab]extra"
+  },
+  {
+    "input": "https://x.test/?token=%5Bredacted%20%E2%80%A6EN42%5D",
+    "output": "https://x.test/?token=%5Bredacted%20%E2%80%A6EN42%5D"
+  },
+  {
+    "input": "http://homelab:8000",
+    "output": "http://homelab:8000"
+  },
+  {
+    "input": "commit 0123456789abcdef0123456789abcdef01234567 is short hex",
+    "output": "commit 0123456789abcdef0123456789abcdef01234567 is short hex"
+  },
+  {
+    "input": "Token required",
+    "output": "Token required"
+  }
+]

@@ -330,13 +330,17 @@ enum LibraryPage {
         return words.allSatisfy { text.contains($0) }
     }
 
+    nonisolated(unsafe) private static let extensionRegex = try! Regex(#"\.[a-z0-9]{2,4}$"#)
+    nonisolated(unsafe) private static let digitsRegex = try! Regex(#"\d+"#)
+    nonisolated(unsafe) private static let separatorRegex = try! Regex(#"[\s…·-]+"#)
+
     static func titleStem(_ title: String) -> String {
         let clean = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var head = clean
         if let colon = clean.firstIndex(of: ":"), clean.distance(from: clean.startIndex, to: colon) >= 12 { head = String(clean[..<colon]) }
-        head = head.replacingOccurrences(of: #"\.[a-z0-9]{2,4}$"#, with: "", options: .regularExpression)
-        head = head.replacingOccurrences(of: #"\d+"#, with: "#", options: .regularExpression)
-        head = head.replacingOccurrences(of: #"[\s…·-]+"#, with: " ", options: .regularExpression)
+        head = head.replacing(extensionRegex, with: "")
+        head = head.replacing(digitsRegex, with: "#")
+        head = head.replacing(separatorRegex, with: " ")
         return head.trimmingCharacters(in: .whitespaces)
     }
 
@@ -554,27 +558,6 @@ extension BBClient {
     func memoryProfile(botId: String?) async throws -> String? {
         let output: Studio.MemoryProfileOutput = try await rpc("studio", Studio.Method.memory_profile, Self.scoped(botId))
         return output.profile?.markdown
-    }
-
-    @discardableResult
-    func memoryAdd(botId: String?, topic: String, text: String) async throws -> MemoryRecord? {
-        let output: Studio.MemoryAddOutput = try await rpc("studio", Studio.Method.memory_add,
-                                                           Self.scoped(botId, ["topic": .string(topic), "text": .string(text)]))
-        return output.record.flatMap { MemoryRecord(converting: $0) }
-    }
-
-    @discardableResult
-    func memoryUpdate(botId: String?, id: String, text: String, topic: String?) async throws -> MemoryRecord? {
-        let output: Studio.MemoryUpdateOutput = try await rpc("studio", Studio.Method.memory_update,
-                                                              Self.scoped(botId, ["id": .string(id), "text": .string(text), "topic": topic.map(JSONValue.string)]))
-        return output.record.flatMap { MemoryRecord(converting: $0) }
-    }
-
-    @discardableResult
-    func memoryArchive(botId: String?, id: String, archived: Bool) async throws -> MemoryRecord? {
-        let output: Studio.MemoryArchiveOutput = try await rpc("studio", Studio.Method.memory_archive,
-                                                               Self.scoped(botId, ["id": .string(id), "archived": .bool(archived)]))
-        return output.record.flatMap { MemoryRecord(converting: $0) }
     }
 
     func botLibrary(botId: String?) async throws -> [BotLibraryItem] {

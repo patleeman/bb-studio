@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // The canvas opens a design at 100% on its first section and reopens it
 // where the user left it (zoom, position, or Fit).
 import { act } from "react";

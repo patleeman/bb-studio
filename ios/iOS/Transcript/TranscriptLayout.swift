@@ -76,9 +76,18 @@ final class TranscriptListLayout: UICollectionViewLayout {
     /// top edge, which each adjustment moves: a row shrinking across the
     /// top stopped counting as above it halfway (the replay's drag, 15 pt).
     private func growsUpward(_ index: Int) -> Bool {
-        if let readerRow, let reader = indices[readerRow] { return index < reader }
         guard let collectionView else { return false }
-        return frames[index].minY < collectionView.contentOffset.y + collectionView.contentInset.top - 0.5
+        let top = collectionView.contentOffset.y + collectionView.contentInset.top
+        // The reader's row while it's in view. One that has left it (a find
+        // match the history then moved, a row scrolled to and away from)
+        // would hold a row off screen still and move the rows in view
+        // instead: a row you can see changing height (your message's action
+        // row as the keyboard comes up) moved what you were reading by as much.
+        if let readerRow, let reader = indices[readerRow], frames.indices.contains(reader) {
+            let bottom = collectionView.contentOffset.y + collectionView.bounds.height - collectionView.contentInset.bottom
+            if frames[reader].maxY > top, frames[reader].minY < bottom { return index < reader }
+        }
+        return frames[index].minY < top - 0.5
     }
 
     /// Several rows' new heights at once, in one invalidation (one layout

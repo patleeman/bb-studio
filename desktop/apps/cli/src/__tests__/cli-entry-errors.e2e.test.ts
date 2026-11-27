@@ -94,6 +94,7 @@ describe.skipIf(process.platform === "win32")("bb entrypoint errors", () => {
               },
               maxPermissionMode: "full",
               lastSeenAt: 1,
+              route: null,
               lastRejectedProtocolVersion: null,
               createdAt: 1,
               updatedAt: 1,
@@ -208,6 +209,15 @@ describe.skipIf(process.platform === "win32")("bb entrypoint errors", () => {
     expect(result.stderr).toContain("Commands: list, enable, disable, models");
   }, 30_000);
 
+  it("suggests the core command for a top-level name no plugin owns", async () => {
+    const result = await runCli(["thraed", "list"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("error: unknown command 'thraed'");
+    expect(result.stderr).toContain("Did you mean: bb thread?");
+  }, 30_000);
+
   it("runs bb machine for bb host when no plugin owns that name", async () => {
     const result = await runCli(["host", "list", "--json"]);
 
@@ -248,7 +258,7 @@ describe.skipIf(process.platform === "win32")("bb entrypoint errors", () => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Usage: bb machine");
+    expect(result.stdout).toContain("Usage: bbs machine");
   }, 30_000);
 
   it("prints the JSON envelope when the server is down", async () => {

@@ -7,13 +7,13 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
     private var device: String { duo ? "duo" : "iphone" }
 
     private func launch() {
-        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo", "-qaRoomTheme", theme]
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaStrandsDemo", "-qaRoomTheme", theme]
         app.launchOffline()
-        if !app.buttons["roomMic"].waitForExistence(timeout: 30) {
+        if !app.waitForRoom(timeout: 30) {
             app.terminate()
             app.launchOffline()
         }
-        XCTAssertTrue(app.buttons["roomMic"].waitForExistence(timeout: 60), "the app opens on the room")
+        XCTAssertTrue(app.waitForRoom(timeout: 60), "the app opens on the room")
     }
 
     private func command(_ path: String, wait: TimeInterval = 2) {
@@ -63,7 +63,7 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
     }
 
     private func stackParts() -> [(String, CGRect)] {
-        [("In flight", any("in-flight")), ("the worker pill", any("conversationWorkers")), ("the composer", any("threadComposer"))]
+        [("the strands box", any("strands-box")), ("the worker pill", any("conversationWorkers")), ("the composer", any("threadComposer"))]
             .filter { $0.1.exists }.map { ($0.0, $0.1.frame) }
     }
 
@@ -102,13 +102,13 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
         }
     }
 
-    private func expandInFlight() {
-        let toggle = app.buttons["in-flight-toggle"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 20), "In flight sits above the composer")
+    private func expandStrands() {
+        let toggle = app.buttons["strands-toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 20), "the strands box sits above the composer")
         if toggle.value as? String == "Collapsed", !keyboard.exists { toggle.tap() }
     }
 
-    func testTheLastMessageStaysAboveInFlightAndTheComposer() throws {
+    func testTheLastMessageStaysAboveTheStrandsBoxAndTheComposer() throws {
         launch()
         Thread.sleep(forTimeInterval: 8)
         shot("presence")
@@ -117,13 +117,13 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
             capture("unfolded-presence")
             command("outer", wait: 4)
         }
-        app.buttons["roomInput"].tap()
+        app.textViews["Message"].tap()
         XCTAssertTrue(field.waitForExistence(timeout: 10), "the chat stands up")
         XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "the keyboard is up")
         let tip = app.buttons["Continue"]
         if tip.waitForExistence(timeout: 2) { tip.tap() }
         command("dismiss")
-        expandInFlight()
+        expandStrands()
         command("bottom")
         try assertClearOfTheStack("with the keyboard down", keyboardUp: false)
         shot("chat-keyboard-down")
@@ -142,10 +142,13 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
         command("mid")
         field.tap()
         XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "the keyboard is up while reading up")
-        try assertTheJumpSitsAboveTheStack("with the keyboard up")
-        shot("chat-keyboard-up-reading")
-        app.buttons["jumpToLatest"].firstMatch.tap()
-        try assertClearOfTheStack("after the ↓, with the keyboard up", keyboardUp: true)
+        // The folded Duo's ↓ is on its side column, which hides it while you type: no ↓ to tap here.
+        if !(duo || app.isFoldedDuo) {
+            try assertTheJumpSitsAboveTheStack("with the keyboard up")
+            shot("chat-keyboard-up-reading")
+            app.buttons["jumpToLatest"].firstMatch.tap()
+            try assertClearOfTheStack("after the ↓, with the keyboard up", keyboardUp: true)
+        }
 
         guard duo else { return }
         command("landscape", wait: 4)
@@ -181,7 +184,10 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
         }
         if reading {
             let jump = try XCTUnwrap(jumpFrame(transcript), "the ↓ shows while reading up \(when)", file: file, line: line)
-            XCTAssertGreaterThanOrEqual(jump.minY, band.minY - 0.5, "the ↓ (\(jump)) is on the band (from \(band.minY)), over no row \(when)", file: file, line: line)
+            // The folded Duo's ↓ is on its side column, not the band.
+            if !app.isFoldedDuo {
+                XCTAssertGreaterThanOrEqual(jump.minY, band.minY - 0.5, "the ↓ (\(jump)) is on the band (from \(band.minY)), over no row \(when)", file: file, line: line)
+            }
             for (name, frame) in stackParts() {
                 XCTAssertLessThanOrEqual(frame.intersection(jump).height, 0.5, "the ↓ (\(jump)) leaves \(name) (\(frame)) clear \(when)", file: file, line: line)
             }
@@ -193,9 +199,9 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
         }
     }
 
-    private func setInFlight(collapsed: Bool) {
-        let toggle = app.buttons["in-flight-toggle"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 20), "In flight")
+    private func setStrands(collapsed: Bool) {
+        let toggle = app.buttons["strands-toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 20), "the strands box")
         if (toggle.value as? String == "Collapsed") != collapsed { toggle.tap() }
         Thread.sleep(forTimeInterval: 1)
     }
@@ -211,35 +217,36 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
 
     func testTheBottomStackIsOneOpaqueBandWithTheJumpInItsOwnLane() throws {
         launch()
-        app.buttons["roomInput"].tap()
+        app.textViews["Message"].tap()
         XCTAssertTrue(field.waitForExistence(timeout: 10), "the chat stands up")
         let tip = app.buttons["Continue"]
         if tip.waitForExistence(timeout: 2) { tip.tap() }
         command("dismiss")
         for collapsed in [false, true] {
             let state = collapsed ? "collapsed" : "expanded"
-            setInFlight(collapsed: collapsed)
+            setStrands(collapsed: collapsed)
             command("bottom", wait: 2)
-            try assertOneOpaqueStack("In flight \(state), keyboard down, at the end", reading: false)
+            try assertOneOpaqueStack("strands \(state), keyboard down, at the end", reading: false)
             shot("stack-inflight-\(state)-end")
             readUp()
-            try assertOneOpaqueStack("In flight \(state), keyboard down, reading up", reading: true)
+            try assertOneOpaqueStack("strands \(state), keyboard down, reading up", reading: true)
             shot("stack-inflight-\(state)-reading")
             command("bottom", wait: 2)
             field.tap()
             XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "the keyboard is up")
-            try assertOneOpaqueStack("In flight \(state), keyboard up, at the end", reading: false)
+            try assertOneOpaqueStack("strands \(state), keyboard up, at the end", reading: false)
             shot("stack-inflight-\(state)-keyboard")
             readUp()
-            if keyboard.exists {
-                try assertOneOpaqueStack("In flight \(state), keyboard up, reading up", reading: true)
+            // Not on the folded Duo, whose ↓ hides while you type.
+            if keyboard.exists, !duo, !app.isFoldedDuo {
+                try assertOneOpaqueStack("strands \(state), keyboard up, reading up", reading: true)
             }
             command("dismiss")
         }
     }
 
-    func testAConversationWithoutWorkersOrInFlightHasTheSameStack() throws {
-        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo", "-qaRoomTheme", theme,
+    func testAConversationWithoutWorkersHasTheSameStack() throws {
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaStrandsDemo", "-qaRoomTheme", theme,
                                 "-qaRoomConversation", "thr_demo_interview", "-qaRoomMode", "read"]
         app.launchOffline()
         if !field.waitForExistence(timeout: 30) {
@@ -249,7 +256,7 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 60), "Launch prep stands up")
         XCTAssertFalse(any("conversationWorkers").exists, "no worker pill here")
         command("bottom", wait: 2)
-        try assertOneOpaqueStack("no pill, no In flight, at the end", reading: false)
+        try assertOneOpaqueStack("no pill, no strands, at the end", reading: false)
         shot("stack-plain-end")
     }
 }

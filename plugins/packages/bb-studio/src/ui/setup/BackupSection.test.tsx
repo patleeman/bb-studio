@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -41,7 +41,7 @@ const button = (label: string) => [...container.querySelectorAll("button")].find
 
 test("shows the dry run and restores only when confirmed", async () => {
   const planned = api({ step: "planned", fileName: "b.zip", uploadId: "up_1", plan });
-  act(() => root.render(<BackupView api={planned} />));
+  act(() => root.render(<BackupView api={planned} cliName="bbs" />));
   expect(container.textContent).toContain("Restoring b.zip");
   expect(container.textContent).toContain("3 new, 1 already here, 1 kept (newer here), 2 would become global");
   expect(container.textContent).toContain("Studio Talk isn't installed here.");
@@ -55,31 +55,39 @@ test("shows the dry run and restores only when confirmed", async () => {
 
 test("backs up with one click and offers the download again", async () => {
   const idle = api({ step: "idle" });
-  act(() => root.render(<BackupView api={idle} />));
+  act(() => root.render(<BackupView api={idle} cliName="bbs" />));
   await act(async () => button("Back up")!.click());
   expect(idle.backup).toHaveBeenCalled();
-  act(() => root.render(<BackupView api={api({ step: "backed-up", name: "bb-studio-backup-x.zip", bytes: 2048, text: "", href: "/dl" })} />));
+  act(() => root.render(<BackupView api={api({ step: "backed-up", name: "bb-studio-backup-x.zip", bytes: 2048, text: "", href: "/dl" })} cliName="bbs" />));
   expect(container.querySelector("a")?.getAttribute("href")).toBe("/dl");
-  expect(container.textContent).toContain("bb studio backup");
+  expect(container.textContent).toContain("bbs studio backup");
 });
 
 test("after a restore with failures it offers to run again, and drops the offer once done", async () => {
   const failed: RestoreResult = { ...plan, dryRun: false, failed: true };
   const view = api({ step: "restored", fileName: "b.zip", result: failed, uploadId: "up_1" });
-  act(() => root.render(<BackupView api={view} />));
+  act(() => root.render(<BackupView api={view} cliName="bbs" />));
   await act(async () => button("Restore again")!.click());
   expect(view.confirm).toHaveBeenCalled();
-  act(() => root.render(<BackupView api={api({ step: "restored", fileName: "b.zip", result: { ...failed, failed: false }, uploadId: null })} />));
+  act(() => root.render(<BackupView api={api({ step: "restored", fileName: "b.zip", result: { ...failed, failed: false }, uploadId: null })} cliName="bbs" />));
   expect(button("Restore again")).toBeUndefined();
 });
 
 test("keeps retry and cancel beside a confirm error", async () => {
   const view = api({ step: "planned", fileName: "b.zip", uploadId: "up_1", plan, error: "Restore is busy" });
-  act(() => root.render(<BackupView api={view} />));
+  act(() => root.render(<BackupView api={view} cliName="bbs" />));
   expect(container.querySelector('[role="alert"]')?.textContent).toBe("Restore is busy");
   expect(container.textContent).toContain("Plan for b.zip:");
   await act(async () => button("Restore")!.click());
   expect(view.confirm).toHaveBeenCalled();
   await act(async () => button("Cancel")!.click());
   expect(view.cancel).toHaveBeenCalled();
+});
+
+test("names the backup command after the CLI that is there: bb under stock bb", () => {
+  act(() => root.render(<BackupView api={api({ step: "idle" })} cliName="bb" />));
+  expect(container.textContent).toContain("bb studio backup --out ~/Desktop");
+  expect(container.textContent).not.toContain("bbs studio backup");
+  act(() => root.render(<BackupView api={api({ step: "idle" })} cliName="bbs" />));
+  expect(container.textContent).toContain("bbs studio backup --out ~/Desktop");
 });

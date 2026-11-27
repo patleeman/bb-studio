@@ -69,6 +69,9 @@ const ATTRIBUTES = [THEME_ATTRIBUTE, EFFECTS_ATTRIBUTE, STILL_ATTRIBUTE, CROSSFA
 const NEEDS_YOU_RATE = 2;
 export const CLEAR_MEASURE_MS = 250;
 const CLEAR_RATE = 5;
+/** Minimum interval between ambient WebGL draws (~30fps on both 60Hz and 120Hz displays). Crossfades still run at full frame rate. */
+export const SCENE_FRAME_MS = 30;
+const EASE_EPSILON = 0.05;
 const NO_CARD: ClearRect = [0, 0, 0, 0];
 
 export function effectList(appearance: Appearance): string {
@@ -115,6 +118,7 @@ export class ThemeEngine {
   private tokens: Record<string, string> = {};
   private env: SceneEnvironment = FRONT_ENVIRONMENT;
   private signals: SceneSignals = NO_SIGNALS;
+  private workerSlotMap = new Map<string, number>();
   private ripples: Ripple[] = [];
   private appeared = new Map<string, number>();
   private needsYouLevel = 0;
@@ -122,6 +126,8 @@ export class ThemeEngine {
   private frames = 0;
   private handle: number | null = null;
   private last: number | null = null;
+  private lastDrawAt: number | null = null;
+  private pendingDt = 0;
   private workers = emptyWorkers();
   private rippleData = emptyRipples();
   private clearShown: ClearRect | null = null;
@@ -129,6 +135,8 @@ export class ThemeEngine {
   private clearAt = Number.NEGATIVE_INFINITY;
   private openShown: ClearRect | null = null;
   private cardsShown: ClearRect[] = [];
+  private cardsData: Float32Array | null = null;
+  private openCache: { layout: SceneLayout; rect: ReturnType<typeof openRect>; boxes: ReturnType<typeof cardSlots> } | null = null;
   private layoutWatch = new LayoutWatch();
   private layoutListeners = new Set<() => void>();
   private stopLayout: (() => void) | null = null;
@@ -169,8 +177,10 @@ export class ThemeEngine {
     }
     this.target = look;
     for (const layer of this.layers) layer.drawnStill = false;
+    this.lastDrawAt = null;
     this.writeAttributes();
     if (!this.fade) this.applyTokens(look);
+    this.watchLayout();
     this.wake();
   }
 
@@ -201,12 +211,15 @@ export class ThemeEngine {
     this.env = env;
     if (reduced && this.shown) { this.show(this.shown, this.mode); return; }
     for (const layer of this.layers) layer.drawnStill = false;
+    this.lastDrawAt = null;
+    this.watchLayout();
     this.wake();
   }
 
   setSignals(next: SceneSignals): void {
     const events = sceneEvents(this.signals, next);
     this.signals = next;
+    this.workerSlotMap = workerSlots(next.workers);
     const appearance = this.shown?.appearance;
     const live = this.top()?.renderer;
     if (appearance && live && this.currentMode() === "run") {
@@ -218,6 +231,7 @@ export class ThemeEngine {
       this.ripples = this.ripples.slice(-MAX_RIPPLES);
     }
     for (const layer of this.layers) layer.drawnStill = false;
+    this.lastDrawAt = null;
     this.wake();
   }
 
@@ -257,7 +271,7 @@ export class ThemeEngine {
   }
 
   private watchLayout(): void {
-    const wanted = !this.disposed && this.layers.length > 0 && !!this.deps.layout && !!this.deps.every;
+    const wanted = !this.disposed && this.layers.length > 0 && this.currentMode() !== "paused" && !!this.deps.layout && !!this.deps.every;
     if (wanted && !this.stopLayout) this.stopLayout = this.deps.every!(LAYOUT_SETTLE_MS, () => this.sampleLayout());
     if (!wanted && this.stopLayout) { this.stopLayout(); this.stopLayout = null; }
   }
@@ -364,6 +378,8 @@ export class ThemeEngine {
     if (this.handle !== null) this.deps.cancelFrame(this.handle);
     this.handle = null;
     this.last = null;
+    this.lastDrawAt = null;
+    this.pendingDt = 0;
   }
 
   private tick(): void {
@@ -383,11 +399,13 @@ export class ThemeEngine {
     }
 
     const fadeMs = Math.max(1, this.target?.crossfadeMs ?? this.fade?.ms ?? 400);
+    let anyAnimating = false;
     for (const layer of this.layers) {
       if (layer.opacity === layer.target) continue;
       const step = dt > 0 ? (dt * 1000) / fadeMs : 0;
       layer.opacity = layer.target > layer.opacity ? Math.min(layer.target, layer.opacity + step) : Math.max(layer.target, layer.opacity - step);
       layer.element.style.opacity = String(layer.opacity);
+      anyAnimating = true;
       busy = true;
     }
     const gone = this.layers.filter((layer) => layer.target === 0 && layer.opacity === 0);
@@ -399,25 +417,54 @@ export class ThemeEngine {
     const look = this.displayed;
     if (look) {
       const target = this.shown?.appearance.effects.needsYou && needsYou(this.signals) ? 1 : 0;
+      const hasStale = this.layers.some((layer) => layer.stale);
+      const runDue = anyAnimating || hasStale || this.lastDrawAt === null || now - this.lastDrawAt >= SCENE_FRAME_MS;
+      const drawDt = mode === "run" ? (runDue ? Math.min(0.1, this.pendingDt + dt) : 0) : dt;
       if (mode === "run") {
-        this.sceneTime += dt * look.rate;
-        this.needsYouLevel = target > this.needsYouLevel ? Math.min(target, this.needsYouLevel + dt * NEEDS_YOU_RATE) : Math.max(target, this.needsYouLevel - dt * NEEDS_YOU_RATE);
-        if (this.needsYouLevel !== target) busy = true;
+        if (runDue) {
+          this.pendingDt = 0;
+          this.sceneTime += drawDt * look.rate;
+          this.needsYouLevel = target > this.needsYouLevel ? Math.min(target, this.needsYouLevel + drawDt * NEEDS_YOU_RATE) : Math.max(target, this.needsYouLevel - drawDt * NEEDS_YOU_RATE);
+          if (this.needsYouLevel !== target) busy = true;
+        } else {
+          this.pendingDt = Math.min(0.1, this.pendingDt + dt);
+          if (this.needsYouLevel !== target) busy = true;
+        }
       } else {
+        this.pendingDt = 0;
         this.needsYouLevel = target;
       }
-      this.ripples = this.ripples.filter((ripple) => this.sceneTime - ripple.start < RIPPLE_SECONDS);
+      if (this.ripples.length > 0) this.ripples = this.ripples.filter((ripple) => this.sceneTime - ripple.start < RIPPLE_SECONDS);
+      let drew = false;
       for (const layer of this.layers) {
         if (!layer.renderer || !layer.canvas) continue;
         const animating = layer.opacity !== layer.target;
         if (mode === "paused" && !animating && !layer.stale) continue;
         if (mode === "still" && layer.drawnStill && !animating) continue;
-        this.draw(layer, look, mode, dt);
+        if (mode === "run" && !runDue) { busy = true; continue; }
+        this.draw(layer, look, mode, drawDt);
+        drew = true;
         if (mode === "run") busy = true;
       }
+      if (drew) this.lastDrawAt = now;
     }
     if (busy) this.wake();
-    else this.last = null;
+    else { this.last = null; this.pendingDt = 0; }
+  }
+
+  private easeRect(from: ClearRect, target: ClearRect, step: number): ClearRect {
+    if (
+      Math.abs(target[0] - from[0]) <= EASE_EPSILON &&
+      Math.abs(target[1] - from[1]) <= EASE_EPSILON &&
+      Math.abs(target[2] - from[2]) <= EASE_EPSILON &&
+      Math.abs(target[3] - from[3]) <= EASE_EPSILON
+    ) return target;
+    return [
+      from[0] + (target[0] - from[0]) * step,
+      from[1] + (target[1] - from[1]) * step,
+      from[2] + (target[2] - from[2]) * step,
+      from[3] + (target[3] - from[3]) * step,
+    ];
   }
 
   private measureClear(size: { width: number; height: number }, canvas: { width: number; height: number }, mode: SceneMode, dt: number): ClearRect {
@@ -429,11 +476,7 @@ export class ThemeEngine {
     const target = this.clearTarget;
     const from = this.clearShown;
     if (!from || mode !== "run") this.clearShown = target;
-    else {
-      const step = Math.min(1, dt * CLEAR_RATE);
-      const ease = (index: 0 | 1 | 2 | 3) => from[index] + (target[index] - from[index]) * step;
-      this.clearShown = [ease(0), ease(1), ease(2), ease(3)];
-    }
+    else this.clearShown = this.easeRect(from, target, Math.min(1, dt * CLEAR_RATE));
     return this.clearShown;
   }
 
@@ -441,21 +484,41 @@ export class ThemeEngine {
     const layout = this.layoutWatch.current();
     const measured = layout && layout.width > 0 && layout.height > 0 ? layout : null;
     const view = measured ?? size;
-    const rect = measured ? openRect(measured) : windowOpen(size);
-    const boxes = measured ? cardSlots(measured) : windowCards(size);
+    let rect: ReturnType<typeof openRect>;
+    let boxes: ReturnType<typeof cardSlots> | ReturnType<typeof windowCards>;
+    if (measured) {
+      if (this.openCache?.layout !== measured) {
+        this.openCache = { layout: measured, rect: openRect(measured), boxes: cardSlots(measured) };
+      }
+      rect = this.openCache.rect;
+      boxes = this.openCache.boxes;
+    } else {
+      rect = windowOpen(size);
+      boxes = windowCards(size);
+    }
     const step = mode === "run" ? Math.min(1, dt * CLEAR_RATE) : 1;
-    const ease = (from: ClearRect, target: ClearRect): ClearRect => [0, 1, 2, 3].map((index) => from[index]! + (target[index]! - from[index]!) * step) as unknown as ClearRect;
     const shown = this.openShown;
     const middle = shown ? (shown[0] + shown[2]) / 2 : 0;
     const target: ClearRect = rect ? clearFromRect(rect, view, canvas) : [middle, shown?.[1] ?? 0, middle, shown?.[3] ?? 0];
-    this.openShown = shown ? ease(shown, target) : target;
-    this.cardsShown = boxes.map((box, index) => {
+    this.openShown = shown && mode === "run" ? this.easeRect(shown, target, step) : target;
+    let cardsChanged = !this.cardsData || this.cardsShown.length !== boxes.length;
+    const nextCards: ClearRect[] = new Array(boxes.length);
+    for (let index = 0; index < boxes.length; index += 1) {
+      const box = boxes[index];
       const from = this.cardsShown[index];
-      if (!box) return NO_CARD;
+      if (!box) {
+        nextCards[index] = NO_CARD;
+        if (from !== NO_CARD) cardsChanged = true;
+        continue;
+      }
       const to = clearFromRect(box, view, canvas);
-      return from && from !== NO_CARD ? ease(from, to) : to;
-    });
-    return { open: this.openShown, cards: cardData(this.cardsShown) };
+      const next = from && from !== NO_CARD && mode === "run" ? this.easeRect(from, to, step) : to;
+      nextCards[index] = next;
+      if (!from || from[0] !== next[0] || from[1] !== next[1] || from[2] !== next[2] || from[3] !== next[3]) cardsChanged = true;
+    }
+    this.cardsShown = nextCards;
+    if (cardsChanged || !this.cardsData) this.cardsData = cardData(this.cardsShown);
+    return { open: this.openShown, cards: this.cardsData };
   }
 
   private draw(layer: Layer, look: ResolvedLook, mode: SceneMode, dt: number): void {
@@ -499,19 +562,36 @@ export class ThemeEngine {
   private fillWorkers(time: number, still: boolean): void {
     this.workers.fill(0);
     if (!this.shown?.appearance.effects.workers) return;
-    const slots = workerSlots(this.signals.workers);
-    for (const id of [...this.appeared.keys()]) if (!slots.has(id)) this.appeared.delete(id);
+    const slots = this.workerSlotMap;
+    if (this.appeared.size > 0) {
+      for (const id of this.appeared.keys()) if (!slots.has(id)) this.appeared.delete(id);
+    }
     for (const [threadId, slot] of slots) {
-      if (!this.appeared.has(threadId)) this.appeared.set(threadId, this.sceneTime);
-      const age = still ? slot * 3 : Math.max(0, time - this.appeared.get(threadId)!);
-      this.workers.set([workerSeed(slot), age, 1, 0], slot * 4);
+      let started = this.appeared.get(threadId);
+      if (started === undefined) {
+        started = this.sceneTime;
+        this.appeared.set(threadId, started);
+      }
+      const age = still ? slot * 3 : Math.max(0, time - started);
+      const offset = slot * 4;
+      this.workers[offset] = workerSeed(slot);
+      this.workers[offset + 1] = age;
+      this.workers[offset + 2] = 1;
+      this.workers[offset + 3] = 0;
     }
   }
 
   private fillRipples(still: boolean): void {
     this.rippleData.fill(0);
-    if (still) return;
-    this.ripples.forEach((ripple, index) => this.rippleData.set([ripple.x, ripple.y, this.sceneTime - ripple.start, ripple.kind], index * 4));
+    if (still || this.ripples.length === 0) return;
+    for (let index = 0; index < this.ripples.length; index += 1) {
+      const ripple = this.ripples[index]!;
+      const offset = index * 4;
+      this.rippleData[offset] = ripple.x;
+      this.rippleData[offset + 1] = ripple.y;
+      this.rippleData[offset + 2] = this.sceneTime - ripple.start;
+      this.rippleData[offset + 3] = ripple.kind;
+    }
   }
 }
 

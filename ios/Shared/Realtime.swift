@@ -20,8 +20,12 @@ public final class BBRealtime {
     private var backoff = ReconnectBackoff()
     /// When the current socket was opened, to tell a stable connection from one that drops at once.
     private var connectedAt: Date?
+    /// The socket failed or dropped since `start`: its next open says "connected".
+    private var dropped = false
     private var pingTimer: Timer?
     private var running = false
+    private let decoder = JSONDecoder()
+    private let encoder = JSONEncoder()
 
     public init(client: BBClient) {
         self.client = client
@@ -31,7 +35,11 @@ public final class BBRealtime {
         guard !running else { return }
         running = true
         backoff = ReconnectBackoff()
+        dropped = false
         connect()
+        // Launch and every return to the front (the socket closes in the
+        // background): everyone catches up once, socket or not.
+        emit(.connected)
     }
 
     public func stop() {
@@ -53,6 +61,23 @@ public final class BBRealtime {
     }
 
     public func subscribeThreadList() { subscribe(key: "thread-list", target: ["kind": "thread-list"]) }
+
+    /// Every thread's changes, including "events appended" up to twice a
+    /// second for each running agent: on a busy Mac a steady stream that keeps
+    /// the radio awake. While nobody touches the phone the list's socket
+    /// subscription rests (an open thread keeps its own); back in use it
+    /// subscribes again and tells the list's listeners to catch up.
+    public func pauseThreadList(_ paused: Bool) {
+        let key = "thread-list"
+        if paused {
+            guard let target = subscriptions.removeValue(forKey: key) else { return }
+            write(["type": "unsubscribe", "target": target])
+        } else {
+            guard subscriptions[key] == nil else { return }
+            subscribeThreadList()
+            emit(.changed(entity: "thread", id: nil, changes: []))
+        }
+    }
 
     public func subscribeThread(_ threadId: String) {
         subscribe(key: "thread:\(threadId)", target: ["kind": "thread-detail", "threadId": .string(threadId)])
@@ -81,7 +106,19 @@ public final class BBRealtime {
         pingTimer = Timer.scheduledTimer(withTimeInterval: 25, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.write(["type": "ping"]) }
         }
-        emit(.connected)
+        pingTimer?.tolerance = 5
+        // A retry says "connected" once the socket is open again (its first
+        // pong), for what the gap missed; not when an attempt starts. Every
+        // listener refetches on it, and while the Mac couldn't be reached
+        // (asleep, no network) each retry, every 15-30 s, had every screen
+        // reload everything. `start` already caught everyone up.
+        task.sendPing { [weak self] error in
+            Task { @MainActor in
+                guard let self, self.task === task, error == nil, self.dropped else { return }
+                self.dropped = false
+                self.emit(.connected)
+            }
+        }
     }
 
     private func receive(on task: URLSessionWebSocketTask) {
@@ -101,6 +138,7 @@ public final class BBRealtime {
 
     private func scheduleReconnect() {
         task = nil
+        dropped = true
         pingTimer?.invalidate()
         guard running else { return }
         // A socket that connects and drops at once keeps backing off; only one
@@ -120,7 +158,7 @@ public final class BBRealtime {
         case .data(let bytes): data = bytes
         @unknown default: data = nil
         }
-        guard let data, let json = try? JSONDecoder().decode(JSONValue.self, from: data) else { return }
+        guard let data, let json = try? decoder.decode(JSONValue.self, from: data) else { return }
         switch json["type"]?.stringValue {
         case "changed":
             let changes = json["changes"]?.arrayValue?.compactMap(\.stringValue) ?? []
@@ -140,7 +178,7 @@ public final class BBRealtime {
     }
 
     private func write(_ value: JSONValue) {
-        guard let task, let data = try? JSONEncoder().encode(value), let text = String(data: data, encoding: .utf8)
+        guard let task, let data = try? encoder.encode(value), let text = String(data: data, encoding: .utf8)
         else { return }
         task.send(.string(text)) { _ in }
     }

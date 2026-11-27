@@ -23,6 +23,7 @@ import {
   type ServerInput,
   type ServerView,
 } from "../contract";
+import { isAcpAgent, noteCatalog } from "../../provider-family";
 import { pluginSecretsDir } from "../../settings/key-store";
 import { isAppWindow, requireAppWindow } from "./caller";
 import { oauthCallbackUrl, OAUTH_CALLBACK_PATH, validatePastedCallback } from "./callback-url";
@@ -282,7 +283,8 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
     if (!providerCatalog || Date.now() - providerCatalog.at > 30_000) {
       let list: { id: string; name: string }[] = [];
       try {
-        const catalog = await bb.sdk.providers.catalog() as { id: string; displayName?: string; enabled?: boolean }[];
+        const catalog = await bb.sdk.providers.catalog() as { id: string; displayName?: string; enabled?: boolean; info?: { family?: string | null } | null }[];
+        noteCatalog(catalog);
         list = catalog.filter((entry) => entry.enabled !== false).map((entry) => ({ id: entry.id, name: entry.displayName || entry.id }));
       } catch { /* No catalog: the stored rows only. */ }
       providerCatalog = { at: Date.now(), list };
@@ -290,7 +292,7 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
     const stored = store.providers();
     const ids = new Map(providerCatalog.list.map((entry) => [entry.id, entry.name]));
     for (const id of Object.keys(stored)) if (!ids.has(id)) ids.set(id, id);
-    return [...ids].map(([id, name]) => ({ id, name, acp: id.startsWith("acp-"), ...store.providerAccessFor(id) }))
+    return [...ids].map(([id, name]) => ({ id, name, acp: isAcpAgent(id), ...store.providerAccessFor(id) }))
       .sort((a, b) => Number(a.acp) - Number(b.acp) || a.name.localeCompare(b.name));
   }
 

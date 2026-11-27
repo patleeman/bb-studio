@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // Esc clears a search field first; only an empty field lets Escape close
 // what is around it.
 import { act, useState } from "react";

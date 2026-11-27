@@ -156,15 +156,12 @@ private struct MorningSection: View {
 }
 
 /// An old morning card's compact row: icon, title and when. A tap opens its
-/// read-only card. A Studio without tasks shows nothing.
+/// read-only card.
 struct LoopRowLine: View {
     let id: String
-    @State private var tasks = TasksModel.shared
 
     var body: some View {
-        if tasks.supported != false {
-            TaskRowLine(id: id)
-        }
+        TaskRowLine(id: id)
     }
 
     static func trailing(_ task: TaskItem) -> String? {

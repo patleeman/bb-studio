@@ -93,7 +93,7 @@
     },
     "apps/app/src/components/sidebar/AppSidebar.tsx": {
       "seam": "sidebar, new-conversation",
-      "intent": "Renders PluginSidebarSections (ForkSidebarSections.tsx, imported at the top of the file) under the thread list, and once more with placement=\"footer\" right before the footer. Nothing else: the rail and the sidebar footer are upstream's. handleNewChat (the sidebar's New thread row) asks useForkNewConversation() (ForkNewConversation.ts, imported at the top of the file) first, the same way as Mod+N.",
+      "intent": "Renders PluginSidebarSections (ForkSidebarSections.tsx, imported at the top of the file) with placement=\"footer\" right before the footer; the in-scroll sections are drawn by SidebarThreadListContent (PluginThreadList.tsx). Nothing else: the rail and the sidebar footer are upstream's. handleNewChat (the sidebar's New thread row) asks useForkNewConversation() (ForkNewConversation.ts, imported at the top of the file) first, the same way as Mod+N.",
       "budget": 9
     },
     "apps/app/src/components/thread/timeline/ThreadTimelineRows.tsx": {
@@ -113,8 +113,8 @@
     },
     "apps/app/src/lib/plugin-navigation-hooks.ts": {
       "seam": "app-route, pop-out",
-      "intent": "useBbNavigate calls useForkNavigate(pluginId) (plugin-navigation.fork.ts: experimental_toAppPath, experimental_popOut, experimental_renameTab, experimental_closeFixedTab) and spreads it first into the result, with fork in the dependency list.",
-      "budget": 4
+      "intent": "createBbNavigate spreads createForkNavigate(pluginId, latest) (plugin-navigation.fork.ts: experimental_toAppPath, experimental_popOut, experimental_workbench, experimental_renameTab, experimental_closeFixedTab) first into the navigate object it returns, so useBbNavigate and every plugin action context (usePluginActionContextBinder, which thread actions use) carry the fork's methods. One import at the top of the file.",
+      "budget": 2
     },
     "apps/app/src/lib/plugin-panel-controller.ts": {
       "seam": "workbench-global-tabs",
@@ -136,11 +136,6 @@
       "intent": "MAIN_SPLITS_ENABLED = false caps the main view at one pane (MAX_PANES). splitPane keeps upstream's tree limit of 8 (SPLIT_TREE_MAX_PANES), since every main-view caller checks MAX_PANES before splitting and the side panel's split needs the shared operation.",
       "budget": 6
     },
-    "apps/app/src/lib/thread-actions/thread-action-registry.tsx": {
-      "seam": "app-route",
-      "intent": "useLatestNavigate takes forkNavigate = useForkLatestNavigate(latest) (plugin-navigation.fork.ts, imported at the top of the file) and its stable BbNavigate spreads it first, so the fork's navigate methods forward too. A hook rather than a call with the ref, so the React Compiler accepts it.",
-      "budget": 3
-    },
     "apps/app/src/main.tsx": {
       "seam": "fork-styles",
       "intent": "Imports fork.css right after app.css, so the fork's unlayered rules (sidebar header row, focus rings, narrow drawer width) win over bb's layered ones.",
@@ -158,8 +153,8 @@
     },
     "apps/app/src/views/thread-detail/ThreadDetailHeader.tsx": {
       "seam": "thread-header",
-      "intent": "The header asks useForkThreadHeader (components/fork/ForkThreadHeader.tsx) for the thread's decoration: the title text shown when not editing is its title (plugins' slots.experimental_threadHeader may replace it), and its after node is drawn right after the title div, before the actions menu. useSidebarRename, the pane drag label and the rename save keep the real threadTitle.",
-      "budget": 5
+      "intent": "The header asks useForkThreadHeader (components/fork/ForkThreadHeader.tsx) for the thread's decoration: the title text shown when not editing is its title (plugins' slots.experimental_threadHeader may replace it), and its after node is drawn right after the title div, before the actions menu; its end node is the first child of the header's workflow actions (the right end). useSidebarRename, the pane drag label and the rename save keep the real threadTitle.",
+      "budget": 6
     },
     "apps/cli/src/commands/server.ts": {
       "seam": "import-sync",
@@ -167,14 +162,14 @@
       "budget": 2
     },
     "apps/server/src/server.ts": {
-      "seam": "import-sync, approvals, skills-registry-policy, thread-successor, text-completion",
-      "intent": "Registers the fork's import routes (/api/v1/fork/import/* and /api/v1/fork/bring-over/*, given the plugin service so a plugin from bb can be added) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain. One fork import and registerForkTextCompletion(deps) right after it, so plugins' experimental_completeText can run bb's title task (services/ai/plugin-text-completion.fork.ts).",
-      "budget": 10
+      "seam": "import-sync, approvals, skills-registry-policy, thread-successor, text-completion, list-quiet, provider-move",
+      "intent": "Registers the fork's import routes (/api/v1/fork/import/* and /api/v1/fork/bring-over/*, given the plugin service so a plugin from bb can be added) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain. One fork import and registerForkTextCompletion(deps) right after it, so plugins' experimental_completeText can run bb's title task (services/ai/plugin-text-completion.fork.ts). One fork import and the /ws route's onOpen calls markListQuiet(socket, context.req.url) before onClientSocketOpen, so a client that opened /ws?listEvents=status is quiet (ws/list-quiet.fork.ts). One fork import and registerForkProviderMoveRoutes(publicApi, deps, pluginService) right after registerForkApprovalRoutes (the plugin service resolves plugin RPC callers for the move's \"by\"): POST/GET /api/v1/threads/:id/move-provider and /api/v1/fork/provider-move/* (services/threads/thread-provider-move-routes.fork.ts), which also hands deps.db to the turn-context seam.",
+      "budget": 18
     },
     "apps/server/src/services/plugins/plugin-service.ts": {
-      "seam": "quiet-turns, plugin-events, bundled-studio",
-      "intent": "The thread.idle plugin event spreads forkIdleFields (quiet-turn.fork.ts: experimental_quiet) as its first field, on its own line. The events object also registers the fork's event wiring (registerForkPluginEvents: emitThreadEvent, the database, buildThreadDto, toHostRecord) so fork-plugin-events.ts can emit its three events. The bundled plugin list is withForkBundledPlugins(listBundledPluginRegistrations()) (builtin-registry.fork.ts, imported at the top of the file), so Studio reconciles as a built-in when its bundle is in the app; an existing install of the same id from another source (a path install) is left alone while its folder is there. Just before reconcileBundled, releaseDeadBundledInstalls (builtin-registry.fork.ts) drops a bundled id's path row whose folder is gone, or its removed non-builtin row, so the bundled copy takes the id; the list's statusDetail falls back to forkReplacedInstallNote(row.id) so the dropped source shows on the plugin until restart.",
-      "budget": 16
+      "seam": "quiet-turns, plugin-events, bundled-studio, secret-redaction",
+      "intent": "The thread.idle plugin event spreads forkIdleFields (quiet-turn.fork.ts: experimental_quiet) as its first field, on its own line. The events object also registers the fork's event wiring (registerForkPluginEvents: emitThreadEvent, the database, buildThreadDto, toHostRecord) so fork-plugin-events.ts can emit its three events. The bundled plugin list is withForkBundledPlugins(listBundledPluginRegistrations()) (builtin-registry.fork.ts, imported at the top of the file), so Studio reconciles as a built-in when its bundle is in the app; an existing install of the same id from another source (a path install) is left alone while its folder is there. Just before reconcileBundled, releaseDeadBundledInstalls (builtin-registry.fork.ts) drops a bundled id's path row whose folder is gone, or its removed non-builtin row, so the bundled copy takes the id; the list's statusDetail falls back to forkReplacedInstallNote(row.id) so the dropped source shows on the plugin until restart. updateSettings passes the incoming values through forkKeepRedactedSettings (plugin-settings-redact.fork.ts, imported at the top of the file) with the values read before the write, and validates and writes what it returns, so a redacted value sent back unchanged keeps the stored secret and any other value holding a redaction label is refused.",
+      "budget": 24
     },
     "apps/server/src/services/threads/dispatch-attempt.ts": {
       "seam": "import-sync, system-compaction, thread-notices",
@@ -202,9 +197,9 @@
       "budget": 5
     },
     "apps/server/src/start-server.ts": {
-      "seam": "import-sync",
-      "intent": "Calls forkBeforeDatabase right after refuseInterruptedServerImport and before initDb. It runs the first-run import (services/fork-import/first-run.ts) when the data dir has no database yet, and tells the fork module which data dir is active.",
-      "budget": 2
+      "seam": "import-sync, cli-name",
+      "intent": "Calls forkBeforeDatabase right after refuseInterruptedServerImport and before initDb. It runs the first-run import (services/fork-import/first-run.ts) when the data dir has no database yet, and tells the fork module which data dir is active. A fork import at the top and one line after createCliCommandService: migrateLegacyStudioBbLink (cli-command.fork.ts) gives an old Studio `bb` link (before bbs) a `bbs` and `bb-studio` beside it, removes the old link only when another `bb` is on PATH, and logs what it did.",
+      "budget": 4
     },
     "apps/server/test/services/plugins/plugin-authoring-docs.test.ts": {
       "seam": "sdk-tables",
@@ -212,14 +207,14 @@
       "budget": 2
     },
     "packages/bb-app/src/launcher.ts": {
-      "seam": "bring-over-token",
-      "intent": "One fork import (withoutForkUiTokenHash, fork-ui-token-env.ts). createDaemonEnv and createCliEnv drop BB_STUDIO_UI_TOKEN_SHA256, so the host daemon (and every agent shell, provider and plugin host it starts) and bb commands never see the bring-over token's hash. createServerEnv keeps it, so every server start by this launcher, restarts included, gets the same hash.",
-      "budget": 7
+      "seam": "bring-over-token, cli-name",
+      "intent": "One fork import (withoutForkUiTokenHash, fork-ui-token-env.ts). createDaemonEnv and createCliEnv drop BB_STUDIO_UI_TOKEN_SHA256, so the host daemon (and every agent shell, provider and plugin host it starts) and bb commands never see the bring-over token's hash. createServerEnv keeps it, so every server start by this launcher, restarts included, gets the same hash. A second fork import (guardStudioCliEnv, @bb/config/cli-command) and one call at the start of runBbCli, guardStudioCliEnv(process.env, homedir()): Studio's launcher (bbs) drops stock bb's data folder, server and thread context, and follows BB_CLI only when it is Studio's (a `bbs` sits beside it), so it never runs stock bb's CLI with Studio's data folder.",
+      "budget": 9
     },
     "apps/server/src/routes/plugins.ts": {
-      "seam": "app-window-caller",
-      "intent": "One fork import (forkAppWindowCaller, fork-app-window-caller.ts) and the caller handed to invokeRpcHandler in POST /plugins/:id/rpc/:method goes through it. A client call that carries the per-launch app token and neither x-bb-caller-thread nor x-bb-cli reaches the handler as { kind: \"client\", studioAppWindow: true }; every other caller is unchanged.",
-      "budget": 6
+      "seam": "app-window-caller, secret-redaction",
+      "intent": "One fork import (forkAppWindowCaller, fork-app-window-caller.ts) and the caller handed to invokeRpcHandler in POST /plugins/:id/rpc/:method goes through it. A client call that carries the per-launch app token and neither x-bb-caller-thread nor x-bb-cli reaches the handler as { kind: \"client\", studioAppWindow: true }; every other caller is unchanged. GET /plugins/:id/logs returns its lines through redactSecrets (redact-secrets.fork.ts, imported at the top of the file), so log lines written before a plugin redacted its own text (a device token in an Expo error) never print.",
+      "budget": 9
     },
     "packages/domain/src/ui-preferences.ts": {
       "seam": "workbench-global-tabs",
@@ -257,9 +252,9 @@
       "budget": 19
     },
     "plugins/bb-guide/skills/bb-cli/references/command-index.md": {
-      "seam": "import-sync",
-      "intent": "Lists the `bb server mirror` commands; a test requires every core command path here.",
-      "budget": 7
+      "seam": "import-sync, provider-move",
+      "intent": "Lists the `bb server mirror` and `bb thread move-provider` (and its status) commands; a test requires every core command path here.",
+      "budget": 9
     },
     "plugins/bb-guide/skills/bb-plugin-authoring/SKILL.md": {
       "seam": "sdk-tables",
@@ -292,8 +287,8 @@
       "budget": 4
     },
     "apps/server/src/services/threads/thread-commands.ts": {
-      "seam": "turn-context, codex-computer-use",
-      "intent": "buildThreadStartCommand and prepareTurnSubmitCommandPayload (only for target.mode start, never a steer) pass their input through withTurnContext (turn-context.fork.ts), which appends each plugin's experimental_turnContext text as agent-only items to input and the last input group. Nothing is stored; no wire field changes. toRuntimeExecutionOptions spreads forkProviderOptionsContext(deps, providerId, threadId) (services/providers/provider-options-context.fork.ts, imported at the top) into the deriveProviderOptions context, so a provider sees the thread's metadata under its own plugin id.",
+      "seam": "turn-context, codex-computer-use, provider-move",
+      "intent": "buildThreadStartCommand and prepareTurnSubmitCommandPayload (as startsTurnForTurnContext says: target.mode start gets every plugin; auto gets only provider-move handlers, and only while a move is pending on a thread that is not active with no running turn; a steer gets none) pass their input through withTurnContext (turn-context.fork.ts), which appends each plugin's experimental_turnContext text as agent-only items to input and the last input group. Nothing is stored; no wire field changes. toRuntimeExecutionOptions spreads forkProviderOptionsContext(deps, providerId, threadId) (services/providers/provider-options-context.fork.ts, imported at the top) into the deriveProviderOptions context, so a provider sees the thread's metadata under its own plugin id.",
       "budget": 5
     },
     "apps/server/src/services/plugins/plugin-api.ts": {
@@ -367,9 +362,14 @@
       "budget": 4
     },
     "apps/server/src/ws/hub.ts": {
-      "seam": "plugin-events",
-      "intent": "notifyThread, where events-appended is announced to plugins, also calls announceThreadFilesChanged (fork-plugin-events.ts), which emits experimental_thread.fileChanged for new completed file-change items.",
-      "budget": 2
+      "seam": "plugin-events, list-quiet",
+      "intent": "notifyThread, where events-appended is announced to plugins, also calls announceThreadFilesChanged (fork-plugin-events.ts), which emits experimental_thread.fileChanged for new completed file-change items. One import and one condition in notifyThreadListOnlySockets: a socket isListQuiet (list-quiet.fork.ts) marked gets no thread-list events-appended for threads it does not subscribe to.",
+      "budget": 5
+    },
+    "apps/app/src/lib/ws.ts": {
+      "seam": "list-quiet",
+      "intent": "Wraps buildBrowserWebSocketUrl(\"/ws\") with withListQuiet (ws-list-quiet.fork.ts) so the desktop client opens /ws?listEvents=status and skips background thread-list events-appended wakeups for unviewed threads.",
+      "budget": 3
     },
     "plugins/git/ui/diff/DiffTab.tsx": {
       "seam": "diff-to-editor",
@@ -418,8 +418,8 @@
     },
     "apps/app/src/lib/thread-actions/core-thread-actions.ts": {
       "seam": "splits-off",
-      "intent": "The \"Open in split\" thread action is unavailable while MAIN_SPLITS_ENABLED is false (one condition, plus the import).",
-      "budget": 4
+      "intent": "CORE_THREAD_ACTIONS drops the core \"split\" action (Open in split, defined in core-contributions/thread-actions.ts, which may only import the plugin SDK) while MAIN_SPLITS_ENABLED is false: one .filter on the collected list, plus the import.",
+      "budget": 3
     },
     "apps/app/src/hooks/useTheme.ts": {
       "seam": "app-backdrop",
@@ -458,7 +458,7 @@
     },
     "apps/server/src/services/plugin-catalog/plugin-catalog-service.ts": {
       "seam": "studio-marketplaces",
-      "intent": "With an empty marketplace URL (BB Studio's default, set by identity.mjs) bb's Community catalog is not seeded: BB Studio's own catalog is added once instead (seedStudioMarketplace), the periodic refresh is timed from the latest attempt (refreshAnchor), and bb-community is not reserved: it is not official and can be added and removed by hand (isReservedMarketplace asks isShippedMarketplace, set once per service by configureShippedMarketplaces); its URLs fall back to getbb's v2 and v1 (curatedSourceUrl). Every fetched or added catalog loses entries whose id is a fork built-in (withoutForkBuiltins around materializeMarketplace). The helpers are in studio-marketplaces.fork.ts, imported at the top of the file. With a URL, bb's behavior is unchanged.",
+      "intent": "With an empty marketplace URL (BB Studio's default, set by identity.mjs) bb's Community catalog is not seeded: BB Studio's own catalog is added once instead (seedStudioMarketplace), and bb-community is not reserved: it is not official and can be added and removed by hand (isReservedMarketplace asks isShippedMarketplace, set once per service by configureShippedMarketplaces); its URLs fall back to getbb's v2 and v1 (curatedSourceUrl). Every fetched or added catalog loses entries whose id is a fork built-in (withoutForkBuiltins around materializeMarketplace). The helpers are in studio-marketplaces.fork.ts, imported at the top of the file. With a URL, bb's behavior is unchanged.",
       "budget": 24
     },
     "apps/server/src/services/system/desktop-app-update.ts": {
@@ -523,7 +523,7 @@
     },
     "apps/server/src/services/threads/thread-metadata-inference.ts": {
       "seam": "title-service",
-      "intent": "inferThreadMetadata calls noteTitleOutcome(deps, args, outcome) (title-retry.fork.ts, imported at the top of the file) right after the first title attempt, so a title that failed because no service was signed in, timed out or failed is tried again after the conversation's next finished turns (lifecycle-outcome.fork.ts runs it after a completed turn, up to three times).",
+      "intent": "inferThreadTitle calls noteTitleOutcome(deps, args, outcome) (title-retry.fork.ts, imported at the top of the file) right after the first title attempt, so a title that failed because no service was signed in, timed out or failed is tried again after the conversation's next finished turns (lifecycle-outcome.fork.ts runs it after a completed turn, up to three times).",
       "budget": 2
     },
     "plugins/provider-claude-code/server.ts": {
@@ -563,13 +563,13 @@
     },
     "apps/app/src/views/thread-detail/useParentThreadSection.ts": {
       "seam": "host-copy",
-      "intent": "The relationship comes from parentRelationship(originKind, originPluginId) (components/promptbox/banner/parentRelationship.fork.ts, imported at the top of the file): parent, fork, or reply for a plugin-made fork.",
+      "intent": "The returned relationship is parentRelationship(thread.originKind, thread.originPluginId) (components/promptbox/banner/parentRelationship.fork.ts, imported at the top of the file): parent, fork, or reply for a plugin-made fork. Upstream's own relationship still picks the related thread.",
       "budget": 4
     },
     "apps/app/src/views/thread-detail/ThreadContextCardCore.tsx": {
-      "seam": "host-copy",
-      "intent": "The Info card's parent row takes its icon and label from parentRowIcon and parentRowLabel (parentRelationship.fork.ts, imported at the top of the file), so a reply reads \"Reply to: <title>\".",
-      "budget": 5
+      "seam": "host-copy, no-child-threads-card",
+      "intent": "The Info card's parent row takes its icon and label from parentRowIcon and parentRowLabel (parentRelationship.fork.ts, imported at the top of the file), so a reply reads \"Reply to: <title>\". Both exported lists go through studioCoreCardEntries (threadContextCardCore.fork.ts, imported at the top of the file), which drops the \"childThreads\" section: the card shows no Child threads list; plugin rows and sections are untouched.",
+      "budget": 14
     },
     "apps/app/src/components/thread/timeline/GeneratedConversationMessage.tsx": {
       "seam": "host-copy, quiet-turns",
@@ -602,9 +602,9 @@
       "budget": 3
     },
     "plugins/provider-codex/src/bridge/bridge.ts": {
-      "seam": "sign-in-errors, codex-computer-use",
-      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): a reconnect whose error shows missing credentials, or the second 401 reconnect in a row, becomes the turn's final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects, while a single 401 can still recover after a token refresh. decodeCodexOptions spreads forkCodexSessionOptions(options.providerOptions) (src/computer-use.fork.ts, imported under the shebang), which carries computerUseEnabled: false into the session options, and constructionSignature includes computerUseEnabled, so a change rebuilds the session on the next turn.",
-      "budget": 9
+      "seam": "sign-in-errors, codex-computer-use, codex-defer-loading",
+      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): a reconnect whose error shows missing credentials, or the second 401 reconnect in a row, becomes the turn's final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects, while a single 401 can still recover after a token refresh. decodeCodexOptions spreads forkCodexSessionOptions(options.providerOptions) (src/computer-use.fork.ts, imported under the shebang), which carries computerUseEnabled: false into the session options, and constructionSignature includes computerUseEnabled, so a change rebuilds the session on the next turn. initializeChild passes the app-server's version to forkNoteCodexVersion (src/defer-loading.fork.ts, imported at the top, below the shebang), so deferred tools are grouped only on a Codex they were checked on.",
+      "budget": 11
     },
     "apps/app/src/views/thread-detail/ThreadDetailPromptArea.tsx": {
       "seam": "host-copy, sign-in-errors, host-entries",
@@ -623,13 +623,13 @@
     },
     "apps/app/src/components/ui/markdown-preview.tsx": {
       "seam": "soft-breaks, mention-links",
-      "intent": "When bb would not add remark-breaks and threadMentions was marked by withShortLineBreaks (markdown-short-line-breaks.fork.ts, imported at the top of the file), remarkShortLineBreaks is added: single newlines become line breaks in each paragraph that is not hard-wrapped prose. buildLocalAwareUrlTransform maps an href that is an @ mention (isMentionHref, markdown-mention-links.fork.ts, imported at the top of the file) through forkMentionHref before any local-file resolution: @thread:<id> becomes /threads/<id>, other mentions stay raw for the plugins' link handlers.",
-      "budget": 5
+      "intent": "baseRemarkPlugins is resolveMarkdownRemarkPlugins(...) wrapped in withShortLineBreakPlugins(threadMentions, ...) (markdown-short-line-breaks.fork.ts, imported at the top of the file): when threadMentions was marked by withShortLineBreaks, remarkShortLineBreaks is appended (one cached list per base list): single newlines become line breaks in each paragraph that is not hard-wrapped prose. buildLocalAwareUrlTransform maps an href that is an @ mention (isMentionHref, markdown-mention-links.fork.ts, imported at the top of the file) through forkMentionHref before any local-file resolution: @thread:<id> becomes /threads/<id>, other mentions stay raw for the plugins' link handlers.",
+      "budget": 7
     },
     "apps/app/src/components/thread/timeline/ConversationMessageContent.tsx": {
       "seam": "soft-breaks, quiet-turns",
-      "intent": "ASSISTANT_THREAD_MENTIONS is wrapped in withShortLineBreaks (markdown-short-line-breaks.fork.ts, imported at the top of the file), so an assistant's poem or address keeps its line breaks. A user-role row asks the plugins' classifyMessage about its text (usePluginMessageClassification, lib/fork-reply-classifiers.ts): an agent message takes the plugin's sender over the sending thread's title, and a row that would be the user's own bubble but that a plugin classified draws as a generated row from that sender (relayedGeneratedSource, relayedFold.fork.tsx). Both imports sit at the top of the file.",
-      "budget": 12
+      "intent": "The assistant markdown (settled and streaming tail) gets ASSISTANT_MARKDOWN_THREAD_MENTIONS (markdown-short-line-breaks.fork.ts, imported at the top of the file, marked by withShortLineBreaks) instead of upstream's shared AUTHORED_MARKDOWN_THREAD_MENTIONS, whose import is dropped, so an assistant's poem or address keeps its line breaks while plugin markdown keeps upstream's. A user-role row asks the plugins' classifyMessage about its text (usePluginMessageClassification, lib/fork-reply-classifiers.ts): an agent message takes the plugin's sender over the sending thread's title, and a row that would be the user's own bubble but that a plugin classified draws as a generated row from that sender (relayedGeneratedSource, relayedFold.fork.tsx). Both imports sit at the top of the file.",
+      "budget": 13
     },
     "apps/app/src/components/ui/markdown-link-target.ts": {
       "seam": "mention-links",
@@ -662,9 +662,9 @@
       "budget": 1
     },
     "apps/server/src/services/system/cli-command.ts": {
-      "seam": "beside-bb",
-      "intent": "A `bb` link counts as this app's (installed, replaced or removed) only when it points at this app's own launcher (pointsAtOwnLauncher, cli-command.fork.ts, imported under the marker import). Stock bb writes the same launcher marker, so without the check BB Studio would replace or delete stock bb's `bb` link; with it, stock bb's link reads as the `bb` already on PATH.",
-      "budget": 7
+      "seam": "beside-bb, cli-name",
+      "intent": "Studio's command is `bbs`: CLI_COMMAND_NAME is STUDIO_CLI_NAME, and every link this file installs, finds or removes is `bbs`, so it never touches a `bb`. linkStudioCliAliases runs after a `bbs` link is made or found (`bb-studio` beside it), removeStudioCliAliases in removeUnix. A link counts as this app's only when it points at this app's own launcher (pointsAtOwnLauncher); stock bb writes the same launcher marker. All four come from cli-command.fork.ts, imported under the marker import. The messages' `bbs` wording comes from rebrand.mjs.",
+      "budget": 12
     },
     "apps/server/src/services/system/app-keybindings.ts": {
       "seam": "close-all",
@@ -697,9 +697,9 @@
       "budget": 4
     },
     "apps/server/src/services/threads/turn-retry.ts": {
-      "seam": "system-compaction",
-      "intent": "dispatchRetry passes retrySystemCompactionNotice(db, { threadId, failed }) (system-compaction.fork.ts, imported at the top of the file) as the retry's systemNotice: a retried compaction bb ran on its own keeps its reason when it re-sends the same /compact; every other retry still has none.",
-      "budget": 3
+      "seam": "system-compaction, provider-move",
+      "intent": "dispatchRetry passes retrySystemCompactionNotice(db, { threadId, failed }) (system-compaction.fork.ts, imported at the top of the file) as the retry's systemNotice: a retried compaction bb ran on its own keeps its reason when it re-sends the same /compact; every other retry still has none. retryTurnAfterRestart, for an idle thread, calls assertRequestAfterProviderMove (provider-move-state.fork.ts, imported at the top) before dispatching the resume, so a request made before the thread's newest provider move is never replayed with its old execution on the new provider.",
+      "budget": 5
     },
     "plugins/provider-codex/server.ts": {
       "seam": "codex-computer-use",
@@ -707,9 +707,9 @@
       "budget": 2
     },
     "plugins/provider-codex/src/session-params.ts": {
-      "seam": "codex-computer-use",
-      "intent": "CodexSessionOptions has computerUseEnabled, and buildCodexConfig calls applyForkCodexConfig(config, args.options) (src/computer-use.fork.ts, imported at the top) last: with computerUseEnabled false it turns off the unified-computer-use plugin and adds a disabled cua_repl entry, so Codex's Computer Use server does not start in that thread. Without it the config is unchanged.",
-      "budget": 3
+      "seam": "codex-computer-use, codex-defer-loading",
+      "intent": "CodexSessionOptions has computerUseEnabled, and buildCodexConfig calls applyForkCodexConfig(config, args.options) (src/computer-use.fork.ts, imported at the top) last: with computerUseEnabled false it turns off the unified-computer-use plugin and adds a disabled cua_repl entry, so Codex's Computer Use server does not start in that thread. Without it the config is unchanged. toCodexDynamicTools passes its list through forkGroupDeferredCodexTools (src/defer-loading.fork.ts, imported at the top): a tool whose inputSchema carries the vendor key x-bb-defer-loading (true or a namespace name) goes to Codex without the key, with deferLoading: true, inside a namespace of that name. On a Codex older than DEFER_LOADING_MIN_CODEX, or of unknown version, the key is removed and every tool goes eagerly.",
+      "budget": 8
     },
     "apps/cli/src/commands/thread/actions.ts": {
       "seam": "thread-successor",
@@ -755,6 +755,106 @@
       "seam": "timeline-filter",
       "intent": "ThreadTimelineSurface is the upstream surface (renamed ThreadTimelineSurfaceView) wrapped in withTimelineFilter (timelineFilter.fork.tsx, imported at the top of the file), which applies a plugin's slots.experimental_timelineFilter to its rows and paging props and provides the expand context. With no filter the props pass through unchanged.",
       "budget": 4
+    },
+    "packages/provider-bridge-acp/src/session-params.ts": {
+      "seam": "acp-skills-listing",
+      "intent": "buildAcpSkillsInstructions first calls buildForkAcpSkillsInstructions(skillRoots, sanitizeAcpSkillDescription) (skills-listing.fork.ts, imported at the top) and returns its listing when it has one: each skill root's folder is named once (<root>/<name>/SKILL.md), then one name: description line per skill. Upstream's per-skill path lines below it are reached only when there is nothing to list.",
+      "budget": 3
+    },
+    "apps/server/src/services/threads/thread-runtime-config.ts": {
+      "seam": "agents-md-once",
+      "intent": "The <dataDir>/AGENTS.md section is added unless forkProviderReadsDataDirAgentsMd({ providerId, workspacePath, dataDir }) (agents-md-dedupe.fork.ts, imported at the top) says the provider reads that same file itself: Pi walks every parent folder for AGENTS.md, and the personal workspace sits inside the data dir.",
+      "budget": 3
+    },
+    "apps/server/src/services/plugins/plugin-settings.ts": {
+      "seam": "secret-redaction",
+      "intent": "buildPluginSettingsView shows a non-secret string setting's value through forkRedactSettingValue and each descriptor through forkRedactSettingDescriptor (its string default redacted; plugin-settings-view.fork.ts, imported at the top of the file), so the settings view never returns a token in a string setting or its default (the push relay URL's ?token=) to the CLI, the HTTP API or an agent.",
+      "budget": 5
+    },
+    "apps/app/src/components/plugin/PluginSettings.tsx": {
+      "seam": "secret-redaction",
+      "intent": "PluginSettingsForm draws ForkRedactedPluginSetting (ForkRedactedPluginSetting.tsx, imported at the top of the file) instead of AutosavingPluginSetting when isForkRedactedSetting says the stored value is redacted, so the redacted text is never in an editable field and Replace takes a whole new value.",
+      "budget": 5
+    },
+    "plugins/push-notifications/server.ts": {
+      "seam": "secret-redaction",
+      "intent": "The status command's stdout, text and --json, goes through redactSecrets (redact.fork.ts, imported at the top of the file), so the relay URL's token never prints. There is no flag that shows it.",
+      "budget": 5
+    },
+    "apps/cli/src/index.ts": {
+      "seam": "cli-name",
+      "intent": "Two fork imports at the top (guardStudioCliEnv from studio-cli-env.fork.ts, homedir) and one call, guardStudioCliEnv(process.env, homedir()), right before maybeReexecViaBbCli(). It drops what stock bb's shell or `bb` hands over (BB_DATA_DIR=~/.bb, a BB_SERVER_URL on port 38886 with that shell's thread context, BB_HOST_DAEMON_PORT 38887, a BB_CLI with no Studio `bbs` beside it) before the CLI re-execs or reads them. The guard file loads only node builtins, as startup-graph.test.ts requires. The CLI's name (`bbs`), description and Quick start come from rebrand.mjs.",
+      "budget": 3
+    },
+    "apps/cli/src/commands/guide.ts": {
+      "seam": "cli-name",
+      "intent": "One fork import (toStudioGuide, @bb/config/cli-command) and the rendered chapter wrapped in toStudioGuide(...), so `bbs guide` shows `bbs <command>` in its code. The command index prefix and hint come from rebrand.mjs.",
+      "budget": 3
+    },
+    "apps/host-daemon/scripts/build-bundles.mjs": {
+      "seam": "cli-name",
+      "intent": "One fork import and one call, writeStudioCliAliases(dist) after bb.cmd is written: the `bbs` and `bb-studio` files (scripts/fork/studio-cli-aliases.mjs) sit next to dist/bb, so agent shells, which put this folder first on PATH, run Studio's CLI under every name, and Studio's CLI can tell its own BB_CLI from stock bb's.",
+      "budget": 2
+    },
+    "packages/bb-app/scripts/build-host.mjs": {
+      "seam": "cli-name",
+      "intent": "One fork import and one call, writeStudioCliAliases(hostDaemonTarget), before bb-chunks is copied: the packaged host-daemon folder gets the same `bbs` and `bb-studio` files as apps/host-daemon/dist.",
+      "budget": 2
+    },
+    "packages/bb-app/package.json": {
+      "seam": "cli-name",
+      "intent": "`files` lists host-daemon/dist/bbs, bbs.cmd, bb-studio and bb-studio.cmd, so the package and the desktop app ship them.",
+      "budget": 4
+    },
+    "packages/config/src/cli-command.ts": {
+      "seam": "cli-name",
+      "intent": "One line at the top re-exports studio-cli.fork.ts (names, guardStudioCliEnv, isStudioCliPath, toStudioCommandText, toStudioGuide) through @bb/config/cli-command, which bb-app, the server and the CLI already import.",
+      "budget": 1
+    },
+    "apps/cli/src/commands/thread/index.ts": {
+      "seam": "provider-move",
+      "intent": "registerThreadCommands registers `thread move-provider` (and `move-provider status`) from commands/thread/move-provider.fork.ts, imported at the top.",
+      "budget": 2
+    },
+    "apps/server/src/services/threads/thread-events.ts": {
+      "seam": "provider-move",
+      "intent": "getLastExecutionOptions passes the newest stored turn request's execution through inheritedExecutionAfterProviderMove (provider-move-state.fork.ts, imported at the top), so until a turn is requested after a provider move every caller (the next turn's plan, forks, children's parent defaults) gets the move's model, lowered permission and reasoning, never the old provider's (which the target may reject or which could widen access).",
+      "budget": 3
+    },
+    "apps/server/src/services/threads/thread-edit-message.ts": {
+      "seam": "provider-move",
+      "intent": "editThreadMessage calls assertEditTargetAfterProviderMove (provider-move-state.fork.ts, imported at the top) on the request resolveEditableTurn chose, and again on the target it resolves after stopping the thread (a move may commit in between), so an edit of a request at or before the thread's newest provider move, or one whose rewind would return to a turn at or before it, is refused with 409 crosses_provider_move: it would rewind the old provider's session on the new one and cut the move record away.",
+      "budget": 3
+    },
+    "apps/server/src/services/threads/thread-fork.ts": {
+      "seam": "provider-move",
+      "intent": "createThreadForkFromRequest calls assertNotBeforeProviderMove (provider-move-state.fork.ts, imported at the top) with the request's sourceSeqEnd right after loading the source, so a fork whose point or anchor turn is at or before the source's newest provider move is refused with 409 crosses_provider_move: it would fork the old provider's session on the new provider.",
+      "budget": 2
+    },
+    "apps/app/src/components/sidebar/PluginThreadList.tsx": {
+      "seam": "sidebar",
+      "intent": "SidebarThreadListContent renders PluginSidebarSections (ForkSidebarSections.tsx, imported at the top of the file) after the thread list, inside the scrolling SidebarContent, so plugin sections scroll under the list.",
+      "budget": 2
+    },
+    "packages/plugin-sdk/src/internal/thread-event-gate.ts": {
+      "seam": "plugin-events",
+      "intent": "THREAD_OF_EVENT spreads FORK_THREAD_OF_EVENT (thread-event-gate.fork.ts, imported at the top of the file) first, so the fork's events (experimental_turn.interrupted, experimental_thread.fileChanged, experimental_host.connected/disconnected) name their thread, or none, for the delivery gate.",
+      "budget": 2
+    },
+    "packages/plugin-sdk/src/internal/plugin-app-component-fields.ts": {
+      "seam": "sdk-tables",
+      "intent": "PLUGIN_APP_COMPONENT_FIELDS spreads FORK_COMPONENT_FIELDS (plugin-app-component-fields.fork.ts, imported at the top of the file) first, so every fork slot kind lists its component fields for lazy loading and the component checks.",
+      "budget": 2
+    },
+    "scripts/provider-literal-baseline.json": {
+      "seam": "agents-md-once",
+      "intent": "The provider-literal ratchet counts and allowlists the one \"pi\" literal in apps/server/src/services/threads/agents-md-dedupe.fork.ts (total raised by one), so the guard stays live for every other file.",
+      "budget": 9
+    },
+    "apps/server/src/services/plugins/app-bundle.ts": {
+      "seam": "plugin-chunk-names",
+      "intent": "PLUGIN_APP_CHUNK_FILE_PATTERN accepts dots after the first character of a chunk name (chunks/subset-shared.chunk-<hash>.js, as esbuild names a chunk after a dependency's dotted file name), still one path segment under chunks/. Without it a Studio bundle built with the 0.6.204 CLI is refused at load and reload.",
+      "budget": 2
     }
   }
 }

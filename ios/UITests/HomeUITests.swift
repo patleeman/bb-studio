@@ -1,7 +1,7 @@
 import XCTest
 
 /// The conversation is home (slice 2), offline (`-qaSpacesDemo list -qaBotDemo
-/// chat -qaStrandsDemo -qaConversationHome`): the app opens on the
+/// chat -qaStrandsDemo`): the app opens on the
 /// conversation with its strands box; the header's Bot mark (or the name)
 /// opens the one list with the Bot and its places; picking a conversation
 /// shows it, and the app opens on it next time; the unfolded Duo shows the
@@ -10,7 +10,7 @@ final class HomeUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launch(_ extra: [String] = []) {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaStrandsDemo", "-qaConversationHome"] + extra
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaStrandsDemo"] + extra
         app.launchOffline()
     }
 
@@ -21,6 +21,8 @@ final class HomeUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation is the first thing")
         XCTAssertFalse(app.buttons["roomInput"].exists, "no presence screen")
         XCTAssertTrue(app.buttons["strands-toggle"].waitForExistence(timeout: 20), "its strands box")
+        XCTAssertTrue(app.shownConversation.waitForExistence(timeout: 10))
+        let first = app.shownConversation.label
         let list = app.buttons["roomList"]
         XCTAssertTrue(list.exists, "the Bot's mark in the header")
         shot("1-home")
@@ -30,37 +32,57 @@ final class HomeUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("roomListHeader").exists, "with the Bot")
         XCTAssertTrue(app.buttons["roomWorker-thr_demo_w2"].exists, "workers under their conversation")
         shot("2-list")
-        app.swipeUp()
-        XCTAssertTrue(app.buttons["roomPlace-memory"].waitForExistence(timeout: 5), "and the Bot's places")
-        XCTAssertTrue(app.buttons["roomSettings"].exists)
-        XCTAssertTrue(app.buttons["roomPlace-strands"].exists, "Strands, in Tasks' place")
+        XCTAssertTrue(any("homeSection-running").exists || any("homeSection-needsYou").exists, "grouped: needs you, running, earlier")
+        XCTAssertTrue(app.buttons["roomSettings"].exists, "Settings at the top")
+        XCTAssertTrue(app.buttons["roomNewConversation"].exists, "the composer starts conversations")
+        app.openBotMenu()
+        XCTAssertTrue(app.botMenuItem("memory").waitForExistence(timeout: 5), "the Bot's places are in its menu")
+        XCTAssertTrue(app.botMenuItem("strands").exists, "Strands, in Tasks' place")
         XCTAssertFalse(app.buttons["roomPlace-tasks"].exists, "no Tasks")
         shot("3-list-places")
-        app.buttons["roomPlace-memory"].tap()
-        XCTAssertTrue(app.navigationBars.buttons.firstMatch.waitForExistence(timeout: 10), "Memory opens in the list")
-        app.navigationBars.buttons.firstMatch.tap()
+        app.botMenuItem("memory").tap()
+        XCTAssertTrue(app.descendants(matching: .any)["memoryProfile"].firstMatch.waitForExistence(timeout: 10), "Memory opens in the list")
+        app.goBack()
 
         app.swipeDown()
         let launchPrep = app.buttons["roomConversation-thr_demo_interview"]
+        // Grouped (needs you, running, earlier), it can sit lower on a small screen.
+        for _ in 0..<4 where !(launchPrep.exists && launchPrep.isHittable) { app.swipeUp() }
         XCTAssertTrue(launchPrep.waitForExistence(timeout: 10))
         launchPrep.tap()
         XCTAssertTrue(any("RoomSheet-conversations").waitForNonExistence(timeout: 10), "the list closes")
-        let dots = any("conversationPageDots")
-        XCTAssertTrue(dots.waitForExistence(timeout: 10))
-        XCTAssertFalse(dots.label.hasPrefix("Conversation 1 of"), "another conversation shows: \(dots.label)")
+        let shown = app.shownConversation
+        XCTAssertTrue(shown.waitForExistence(timeout: 10))
+        let picked = shown.label
+        XCTAssertNotEqual(picked, first, "another conversation shows")
         shot("4-picked")
 
         app.terminate()
-        launch()
-        XCTAssertTrue(any("conversationPageDots").waitForExistence(timeout: 30))
-        XCTAssertEqual(any("conversationPageDots").label, dots.label, "it opens on the last conversation opened")
+        launch(["-qaRoomRemember"])
+        XCTAssertTrue(app.waitForRoom())
+        XCTAssertTrue(app.shownConversation.waitForExistence(timeout: 30))
+        XCTAssertEqual(app.shownConversation.label, picked, "it opens on the last conversation opened")
     }
 
-    func testTheTitleOpensTheListToo() {
+    /// Round 5: two header controls. Home (back and the avatar) opens the
+    /// list; the title opens the conversation's menu.
+    func testHomeOpensTheListAndTheTitleTheMenu() throws {
         launch()
-        let title = app.buttons["conversationTitleList"]
+        XCTAssertTrue(app.waitForRoom())
+        // The folded Duo's title is plain text; its side column's Bot mark opens the list.
+        try XCTSkipIf(app.isFoldedDuo, "the folded Duo has no title button")
+        let title = app.buttons["conversationMore"]
         XCTAssertTrue(title.waitForExistence(timeout: 30))
+        XCTAssertFalse(app.buttons["conversationModelChip"].exists, "no model chip")
+        XCTAssertFalse(app.buttons["conversationHandsFree"].exists, "no waveform in the header")
         title.tap()
+        XCTAssertTrue(any("workspaceStrip").waitForExistence(timeout: 5), "the title opens the Workspace")
+        XCTAssertTrue(app.buttons["workspaceModel"].exists, "Info has the model")
+        app.buttons["workspaceDone"].tap()
+        let home = app.buttons["roomList"]
+        XCTAssertTrue(home.waitForExistence(timeout: 5))
+        XCTAssertTrue(home.label.hasPrefix("Home"), home.label)
+        home.tap()
         XCTAssertTrue(any("RoomSheet-conversations").waitForExistence(timeout: 10))
     }
 

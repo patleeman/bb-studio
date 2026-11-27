@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "../migrations";
+import { migratedSqlDb, migratedSqlFileDb } from "../test/migrated-db";
 import { registerLoops } from "../loops/register";
 import { registerWorkCards } from "../work/register";
 import { checkTasks } from "./check";
@@ -24,8 +25,7 @@ let dir: string | null = null;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
-  db = new Database(":memory:");
-  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
+  db = migratedSqlDb();
 });
 afterEach(() => {
   if (db.open) db.close();
@@ -257,8 +257,7 @@ const MIGRATION_THREADS = [
 it("migration on a fresh database does nothing and takes no backup", () => {
   dir = mkdtempSync(join(tmpdir(), "task-links-"));
   db.close();
-  db = new Database(join(dir, "data.db"));
-  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
+  db = migratedSqlFileDb(join(dir, "data.db"));
   const report = linkAtStart(new TaskStore(db), [], new ThreadDirectory(db));
   expect(report).toMatchObject({ pairs: [], drops: [], create: [], created: [], backup: null });
   expect(readdirSync(dir).filter((n) => n.includes(".before-"))).toEqual([]);
@@ -267,8 +266,7 @@ it("migration on a fresh database does nothing and takes no backup", () => {
 it("migration on a populated database: one backup, tonight's pair nested, no task made for a running worker, ambiguity left alone; a second run changes nothing", () => {
   dir = mkdtempSync(join(tmpdir(), "task-links-"));
   db.close();
-  db = new Database(join(dir, "data.db"));
-  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
+  db = migratedSqlFileDb(join(dir, "data.db"));
   seedThreads(db, MIGRATION_THREADS);
   const store = new TaskStore(db);
   seedTonight(store);
@@ -319,8 +317,7 @@ it("migration on a populated database: one backup, tonight's pair nested, no tas
 it("after the move to strands, a start with workers still running makes no agent task, so the next start closes nothing and takes no backup", () => {
   dir = mkdtempSync(join(tmpdir(), "task-links-"));
   db.close();
-  db = new Database(join(dir, "data.db"));
-  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
+  db = migratedSqlFileDb(join(dir, "data.db"));
   seedThreads(db, MIGRATION_THREADS);
   const store = new TaskStore(db);
   seedTonight(store);
@@ -449,8 +446,7 @@ it("a nested spawner with two tasks gives its worker's made-up task no parent (r
 it("takes the backup even when a live write landed first, and links nothing when the backup fails (review P3-2)", () => {
   dir = mkdtempSync(join(tmpdir(), "task-links-"));
   db.close();
-  db = new Database(join(dir, "data.db"));
-  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
+  db = migratedSqlFileDb(join(dir, "data.db"));
   seedThreads(db, MIGRATION_THREADS);
   const store = new TaskStore(db);
   seedTonight(store);

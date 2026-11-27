@@ -57,6 +57,7 @@ export {
 } from "./studio-item";
 export { useOpenMain, useOpenTarget, type OpenPlace, type OpenTarget } from "./move";
 export { usePathname } from "./route";
+export { useNow, visiblePoll } from "./visible-poll";
 export { HostRouteBridge } from "./host-bridge";
 export { hostPanes, isHostSidePane, subscribeHostPanes } from "./host-panes";
 export { hostTheme, subscribeHostTheme } from "./host-theme";

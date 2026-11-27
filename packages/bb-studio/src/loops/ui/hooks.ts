@@ -12,9 +12,6 @@ export function useTodosZone(): string | undefined {
   return timeZone ?? undefined;
 }
 
-/** The old Todos pane's thread tab id; the Strands page shows in it now (src/ui/tab-kind-tabs.tsx). */
-export const LOOPS_PANE = "loops";
-
 let projectNames: Promise<Map<string, string>> | null = null;
 let projectNamesAt = 0;
 const PROJECT_NAMES_MS = 30_000;

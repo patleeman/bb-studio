@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { act, createElement } from "react";
 // @ts-expect-error: react-dom ships no types here (BB provides it).
 import { createRoot } from "react-dom/client";

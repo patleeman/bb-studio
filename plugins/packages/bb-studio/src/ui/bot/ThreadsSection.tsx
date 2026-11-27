@@ -10,6 +10,7 @@
 // A row drags onto a Bot in the Bots section to hand the thread to it; a
 // row from a Bot's list dropped here takes the thread back (bot_thread_release).
 import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
+import { errorMessage } from "../../kit/format";
 import {
   experimental_ThreadActionsContextMenu as ThreadActionsContextMenu,
   experimental_ThreadActionsMenu as ThreadActionsMenu,
@@ -143,7 +144,7 @@ export function ThreadsSection({ activeThreadId, onNavigate }: { activeThreadId:
       event.preventDefault();
       call("bot_thread_release", { threadId }).then(
         () => toast.success("Moved to your threads"),
-        (error: unknown) => toast.error(`Couldn't take it back: ${error instanceof Error ? error.message : String(error)}`),
+        (error: unknown) => toast.error(`Couldn't take it back: ${errorMessage(error)}`),
       );
     },
   };
@@ -307,7 +308,7 @@ export function ArchiveButton({ thread, title }: { thread: ReturnType<typeof men
 /** Rename in place: a sidebar thread, or a Bot's side thread (BotSidebar.tsx). */
 export function RenameInput({ thread, onDone }: { thread: Pick<Thread, "id" | "title" | "displayTitle">; onDone(): void }) {
   const sdk = useSdk();
-  const [value, setValue] = useState(thread.title ?? thread.displayTitle);
+  const [value, setValue] = useState(thread.title ?? thread.displayTitle ?? "");
   const commit = () => {
     const title = value.trim();
     onDone();

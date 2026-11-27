@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // On a BB with plugin windows, Visual Chat is its rail page and also an app window.
 import { act, type ComponentType } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";

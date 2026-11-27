@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { expect, it, vi } from "vitest";
 
 const openFrom = vi.fn();

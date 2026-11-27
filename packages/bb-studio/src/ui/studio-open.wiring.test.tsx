@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // Each kind of opener follows Studio's rule (./studio-open.tsx): in a thread,
 // a workbench tab; in the Studio app, a Studio tab; Mod-click the other place.
 // Links and reply cards follow the link router (../links/router.ts): the

@@ -72,6 +72,10 @@ function subscribe(notify: () => void): () => void {
   };
 }
 
+export function currentPathname(): string {
+  return typeof window === "undefined" ? (hostPathname ?? "/") : current();
+}
+
 export function usePathname(): string {
   return useSyncExternalStore(subscribe, current, () => "/");
 }

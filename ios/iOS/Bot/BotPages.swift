@@ -54,6 +54,7 @@ struct BotPageChips<Value: Hashable>: View {
 }
 
 struct MemoryPageView: View {
+    @Environment(\.look) private var look
     let botId: String?
     var open: (BotShellItem) -> Void
     @EnvironmentObject private var app: AppModel
@@ -64,7 +65,6 @@ struct MemoryPageView: View {
     @State private var query = ""
     @State private var topic: String?
     @State private var sort: MemoryPage.Sort = .newest
-    @State private var adding = false
     @State private var profileOpen = false
     @State private var profileText: String?
     @State private var replacedOpen = false
@@ -77,7 +77,8 @@ struct MemoryPageView: View {
 
     var body: some View {
         List {
-            if let overview { chips(overview) }
+            // Memory records are retired (Studio keeps memory in the Bot's always-on skill): no topics, so no chips.
+            if let overview, !overview.topics.isEmpty { chips(overview) }
             if overview != nil, let error = overviewLoad.error {
                 PageLoadErrorRow(message: error, id: "memoryOverviewRetry") { overviewLoad.retry() }
             }
@@ -90,7 +91,7 @@ struct MemoryPageView: View {
             }
             if let records {
                 let split = MemoryPage.split(records)
-                if records.isEmpty {
+                if records.isEmpty, !query.isEmpty || topic != nil {
                     Section {
                         ContentUnavailableView(query.isEmpty && topic == nil ? "No records" : "No records match", systemImage: "brain")
                     }
@@ -123,21 +124,8 @@ struct MemoryPageView: View {
                 }
             }
         }
-        .modifier(PageChrome(title: "Memory", query: $query, prompt: MemoryPage.searchPrompt((overview?.current ?? 0) + (overview?.replaced ?? 0))) {
-            Menu {
-                Picker("Sort", selection: $sort) { ForEach(MemoryPage.Sort.allCases) { Text($0.title).tag($0) } }
-            } label: { Image(systemName: "arrow.up.arrow.down") }
-            .accessibilityLabel("Sort")
-            Button { adding = true } label: { Image(systemName: "plus") }
-                .accessibilityLabel("New record")
-                .accessibilityIdentifier("memoryAdd")
-        })
-        .sheet(isPresented: $adding) {
-            MemoryRecordEditor(title: "New record", saveLabel: "Add", initial: (topic ?? "", ""), topics: overview?.topics.map(\.topic) ?? []) { topic, text in
-                try await app.client.memoryAdd(botId: botId, topic: topic, text: text)
-                await reload()
-            }
-        }
+        // No New record or Sort: Studio retired memory records; the Mac's Memory page edits the always-on skill.
+        .modifier(PageChrome(title: "Memory", query: $query, prompt: MemoryPage.searchPrompt((overview?.current ?? 0) + (overview?.replaced ?? 0))) {})
         .refreshable { await reload() }
         .task(id: scope) { reloadAll(force: false) }
         .onChange(of: botId) { _, _ in
@@ -154,7 +142,7 @@ struct MemoryPageView: View {
     private func header(_ title: String, _ count: Int) -> some View {
         HStack(spacing: 6) {
             Text(title)
-            Text("\(count)").monospacedDigit().foregroundStyle(.tertiary)
+            Text("\(count)").monospacedDigit().foregroundStyle(.secondary)
         }
     }
 
@@ -175,19 +163,18 @@ struct MemoryPageView: View {
                         }
                     }
                     .task { if profileText == nil { profileText = (try? await app.client.memoryProfile(botId: botId)) ?? "" } }
-                    NavigationLink(value: Route.page(id: profile.pageId)) {
-                        Label("Edit the core profile", systemImage: "pencil")
-                    }
-                    .accessibilityIdentifier("memoryProfileEdit")
+                    // Read-only here: it is the Bot's always-on skill now, edited on the Mac's Memory page.
+                    Text("Edit it on the Mac, in Memory.").font(.footnote).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("memoryProfileHint")
                 } else {
-                    Text("No core profile").foregroundStyle(.secondary)
+                    Text("Nothing always on yet").foregroundStyle(.secondary)
                 }
             } label: {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Core profile").font(.body.weight(.semibold))
+                    Text("Always on").font(.body.weight(.semibold))
                     if let profile = overview.profile {
                         Text(MemoryPage.profileCount(profile)).font(.footnote).monospacedDigit()
-                            .foregroundStyle(profile.over ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                            .foregroundStyle(profile.over ? AnyShapeStyle(look.error) : AnyShapeStyle(.secondary))
                     }
                 }
             }
@@ -222,7 +209,7 @@ struct MemoryPageView: View {
                     .foregroundStyle(record.isReplaced || record.archived ? .secondary : .primary)
                 HStack(spacing: 6) {
                     Text("\(record.topic) · \(MemoryPage.date(record.createdAt))")
-                    if record.archived { Text("Archived").foregroundStyle(.orange) }
+                    if record.archived { Text("Archived").foregroundStyle(.secondary) }
                 }
                 .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
             }
@@ -273,14 +260,11 @@ struct MemoryPageView: View {
 }
 
 struct MemoryRecordScreen: View {
+    @Environment(\.look) private var look
     @State var record: MemoryRecord
     let topics: [String]
     var open: (BotShellItem) -> Void
     var changed: () async -> Void
-    @EnvironmentObject private var app: AppModel
-    @State private var editing = false
-    @State private var busy = false
-    @State private var error: String?
 
     var body: some View {
         List {
@@ -292,35 +276,15 @@ struct MemoryRecordScreen: View {
                 LabeledContent("Added", value: MemoryPage.date(record.createdAt))
                 source
                 if let replaces = MemoryPage.replacesLabel(record) {
-                    LabeledContent("Replaces") { Text(replaces).foregroundStyle(.orange) }
+                    LabeledContent("Replaces") { Text(replaces).foregroundStyle(.secondary) }
                 }
                 if record.isReplaced, let at = record.replacedAt { LabeledContent("Replaced", value: MemoryPage.date(at)) }
                 if record.archived { LabeledContent("Status", value: "Archived") }
             }
-            if let error { Section { Text(error).foregroundStyle(.red).font(.callout) } }
-            Section {
-                Button(record.archived ? "Restore" : "Archive", systemImage: record.archived ? "arrow.uturn.backward" : "archivebox") {
-                    Task { await archive(!record.archived) }
-                }
-                .disabled(busy)
-                .accessibilityIdentifier("memoryArchive")
-            }
+            // Read-only: Studio retired memory records, so there's no Edit, Archive or Restore.
         }
         .navigationTitle(record.topic)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if !record.isReplaced {
-                Button("Edit") { editing = true }.accessibilityIdentifier("memoryEdit")
-            }
-        }
-        .sheet(isPresented: $editing) {
-            MemoryRecordEditor(title: "Edit record", saveLabel: "Save", initial: (record.topic, record.text), topics: topics,
-                               note: "Saves a new record that replaces this one; this one stays as history.") { topic, text in
-                let next = try await app.client.memoryUpdate(botId: record.botId, id: record.id, text: text, topic: topic == record.topic ? nil : topic)
-                if let next { record = next }
-                await changed()
-            }
-        }
     }
 
     @ViewBuilder private var source: some View {
@@ -332,88 +296,6 @@ struct MemoryRecordScreen: View {
             NavigationLink(value: Route.page(id: id)) { LabeledContent("Source", value: label) }.accessibilityIdentifier("memorySource")
         case nil:
             LabeledContent("Source", value: label)
-        }
-    }
-
-    private func archive(_ archived: Bool) async {
-        busy = true
-        defer { busy = false }
-        do {
-            if let next = try await app.client.memoryArchive(botId: record.botId, id: record.id, archived: archived) { record = next } else { record.archived = archived }
-            error = nil
-            await changed()
-        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
-    }
-}
-
-struct MemoryRecordEditor: View {
-    let title: String
-    let saveLabel: String
-    let initial: (topic: String, text: String)
-    let topics: [String]
-    var note: String?
-    var save: (String, String) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var topic = ""
-    @State private var text = ""
-    @State private var saving = false
-    @State private var error: String?
-
-    init(title: String, saveLabel: String, initial: (topic: String, text: String), topics: [String], note: String? = nil,
-         save: @escaping (String, String) async throws -> Void) {
-        self.title = title
-        self.saveLabel = saveLabel
-        self.initial = initial
-        self.topics = topics
-        self.note = note
-        self.save = save
-        _topic = State(initialValue: initial.topic)
-        _text = State(initialValue: initial.text)
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Topic") {
-                    HStack {
-                        TextField("Topic", text: $topic).accessibilityIdentifier("memoryTopicField")
-                        if !topics.isEmpty {
-                            Menu {
-                                ForEach(topics, id: \.self) { each in Button(each) { topic = each } }
-                            } label: { Image(systemName: "chevron.up.chevron.down") }
-                            .accessibilityLabel("Topics")
-                        }
-                    }
-                }
-                Section {
-                    TextField("A fact, decision or note", text: $text, axis: .vertical)
-                        .lineLimit(3...12)
-                        .accessibilityIdentifier("memoryTextField")
-                } header: { Text("Record") } footer: { if let note { Text(note) } }
-                if let error { Section { Text(error).foregroundStyle(.red).font(.callout) } }
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(saving ? "Saving…" : saveLabel) { Task { await submit() } }
-                        .disabled(saving || !MemoryPage.canSave(topic: topic, text: text, initial: initial))
-                        .accessibilityIdentifier("memorySave")
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-    }
-
-    private func submit() async {
-        saving = true
-        do {
-            try await save(topic.trimmingCharacters(in: .whitespacesAndNewlines), text.trimmingCharacters(in: .whitespacesAndNewlines))
-            dismiss()
-        } catch {
-            self.error = "Couldn't save the record: " + BBClient.describe(error)
-            saving = false
         }
     }
 }
@@ -472,7 +354,7 @@ struct LibraryPageView: View {
                     .autocorrectionDisabled()
                     .accessibilityIdentifier("librarySearchField")
                 if !query.isEmpty {
-                    Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
+                    Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Clear search")
                 }
@@ -582,7 +464,7 @@ struct LibraryPageView: View {
             } else {
                 Text(group.title).lineLimit(1)
             }
-            Text("\(group.count)").monospacedDigit().foregroundStyle(.tertiary)
+            Text("\(group.count)").monospacedDigit().foregroundStyle(.secondary)
         }
     }
 
@@ -704,7 +586,7 @@ struct ArchivePageView: View {
                     Image(systemName: "bubble.left").foregroundStyle(.secondary).frame(width: 22)
                     Text(row.title).lineLimit(1).foregroundStyle(.primary)
                     Spacer(minLength: 8)
-                    Text(BotShell.shortAge(row.at)).font(.subheadline).monospacedDigit().foregroundStyle(.tertiary)
+                    Text(BotShell.shortAge(row.at)).font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
                 }
             }
             .tint(.primary)

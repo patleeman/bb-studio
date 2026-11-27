@@ -29,9 +29,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm test:scripts
       - name: Stock bb compatibility (the current stable bb release and its plugin SDK)
         run: pnpm check:compat
+      - run: pnpm check:docs
       - run: pnpm check:marketplace
+      - run: pnpm check:icons
       - run: pnpm check:contracts
       - run: pnpm check:native-payloads
       - name: Monorepo invariant (main:desktop equals the desktop branch tree)

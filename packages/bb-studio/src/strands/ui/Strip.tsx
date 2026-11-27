@@ -11,7 +11,7 @@
 // finished, failed) show on its row, and workers no strand holds are counted
 // in the line and listed under "In no strand". Nothing open, no box. The
 // workbench Strands tab is the full view.
-import { experimental_useAppPanel, useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { experimental_useAppPanel, useBbNavigate, useComposer } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { toAppPathOf } from "../../kit/app/host-sdk";
@@ -23,21 +23,34 @@ import { Icon, Tooltip, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { messageLinkPath } from "../../work/ui/in-flight-model";
 import type { StrandAsk, StrandView } from "../contract";
-import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, rowWorkersOf, seqsOf, stepSeq, strayCountsOf, stripShown } from "./model";
+import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, replyAskOf, rowWorkersOf, seqsOf, stepSeq, strayCountsOf, stripShown } from "./model";
 import { hostContextSegments, useHidePromptStack } from "./prompt-stack";
-import { select, selectionOf, setStrandTurns, useSelection } from "./selection";
+import { flashReply } from "./ask-mark";
+import { openFoldOf, select, selectionOf, setStrandTurns, showSent, useSelection, zoomInHost } from "./selection";
 
 export const STRANDS_TAB = "strands";
 export const STRANDS_POLL_MS = 30_000;
 
-/** Opens message `seq` of a thread in the timeline (its #msg= link, the search jump). */
+/**
+ * Opens message `seq` of a thread in the timeline (its #msg= link, the search
+ * jump). Under a strand filter, the conversation's opening message (which BB's
+ * filtered timeline never shows) opens at its turn's reply, or not at all,
+ * instead of BB saying "Message not found".
+ */
 export function useJump(threadId: string): (seq: number) => boolean {
   const navigate = useBbNavigate();
   const pathname = usePathname();
-  return useCallback((seq: number) => {
+  const opening = useLive("strands.tags", { threadId }, { pollMs: 60_000 }).data?.opening ?? null;
+  const openingSeq = opening?.seq ?? null;
+  const openingReply = opening?.replySeq ?? null;
+  return useCallback((asked: number) => {
+    const seq = selectionOf(threadId) && asked === openingSeq ? openingReply : asked;
+    if (seq === null) return false;
     const path = messageLinkPath(pathname, threadId, seq);
+    // A message in a folded run of status replies: open the run first, so the jump lands on it.
+    openFoldOf(threadId, seq);
     return !!path && !!toAppPathOf(navigate)?.(path, { replace: true });
-  }, [navigate, pathname, threadId]);
+  }, [navigate, pathname, threadId, openingSeq, openingReply]);
 }
 
 /**
@@ -60,9 +73,65 @@ export function useSelectStrand(threadId: string) {
   }, [call, jump, tags.data, list.data, threadId]);
 }
 
+/**
+ * A conversation's strand filter, wherever it is shown (the box, or the
+ * header where BB zooms): the filtered strand and its messages, stepping
+ * through them, Esc to clear it (unless something else is typed in; `own` is
+ * the box's own search field), and the strand's new turns joining the filter
+ * as they are learned.
+ */
+export function useStrandFilter(threadId: string, own?: { readonly current: HTMLElement | null }) {
+  const list = useLive("strands.list", { threadId }, { pollMs: STRANDS_POLL_MS });
+  const tags = useLive("strands.tags", { threadId }, { pollMs: 60_000 });
+  const selection = useSelection(threadId);
+  const jump = useJump(threadId);
+  const data = list.data;
+  const current = currentOf(data, selection);
+  const filtered = selection ? current : null;
+  // New turns of the filtered strand (and asks waiting elsewhere) join the filter as they are learned.
+  useEffect(() => {
+    if (!selection) return;
+    const turns = filterTurnsOf(tags.data, data, selection.strandId, threadId);
+    if (turns.turnIds.length) setStrandTurns(threadId, selection.strandId, turns.turnIds, filtered?.firstSeq ?? turns.firstSeq);
+  }, [tags.data, data, selection, threadId, filtered?.firstSeq]);
+  // Esc clears the filter (unless something else is being typed in).
+  useEffect(() => {
+    if (!selection) return;
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      const typing = !!target && (target.isContentEditable || /^(?:INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) && target !== own?.current;
+      if (typing) return;
+      // Handled: Esc Esc (keyboard mode) doesn't count this one.
+      event.preventDefault();
+      select(threadId, null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selection, threadId, own]);
+  const seqs = filtered ? seqsOf(tags.data, filtered.id) : [];
+  const step = (by: -1 | 1) => {
+    if (!filtered) return;
+    const seq = stepSeq(seqs, selection?.seq ?? null, by);
+    if (seq === null) return;
+    select(threadId, { ...selection!, seq });
+    jump(seq);
+  };
+  return { list, tags, data, selection, current, filtered, seqs, step };
+}
+
+/** Opens the conversation's Strands tab (the full list, asks, merging, stray workers). */
+export function useOpenStrandsTab() {
+  const panel = experimental_useAppPanel();
+  return useCallback(() => { if (panel) openThreadTab(panel, { actionId: STRANDS_TAB, title: "Strands" }); }, [panel]);
+}
+
 /** In flight's place: the strands box, in BB's card above the composer; nothing where strands don't run or nothing is open. */
 export function StrandsBoxBanner() {
   const threadId = useComposerThread();
+  const composer = useComposer();
+  // A message sent here (queued ones too) is drawn at once, not after strands tags its turn.
+  useEffect(() => (threadId ? composer.onSubmitted(() => showSent(threadId)) : undefined), [composer, threadId]);
   return threadId ? <StrandsBoxFor threadId={threadId} /> : null;
 }
 
@@ -71,11 +140,14 @@ export function StrandsBoxFor({ threadId }: { threadId: string }) {
   const list = useLive("strands.list", { threadId }, { enabled: !!threadId, pollMs: STRANDS_POLL_MS });
   const shown = stripShown(list.data);
   // The box stands in for BB's running children; where strands run, the Info tab shows BB's context row.
+  // BB's running children give way only to a box actually drawn (not where BB zooms and the box is gone).
+  const drawn = shown && !zoomInHost();
   useHidePromptStack(threadId, [
-    ...(shown && hasOpen(list.data) ? ["active-child-threads" as const] : []),
+    ...(drawn && hasOpen(list.data) ? ["active-child-threads" as const] : []),
     ...(list.data?.enabled && hostContextSegments() ? ["thread-context" as const] : []),
   ]);
-  if (!shown) return null;
+  // Where BB zooms (the fork's zoom seam), the header's switch, filter chip and Strands button take the box's place.
+  if (!drawn) return null;
   return <StrandsBox threadId={threadId} />;
 }
 
@@ -92,10 +164,36 @@ export function StateMark({ strand, now }: { strand: StrandView; now: number }) 
 
 const smallButton = "h-6 cursor-pointer whitespace-nowrap rounded-md border px-2 text-[11.5px] disabled:opacity-50";
 
-export function AskButtonsFor({ ask, threadId }: { ask: StrandAsk; threadId: string }) {
+/** Opens message `seq` of a conversation: in place when it is open, else by its link. */
+function useOpenMessage() {
+  const navigate = useBbNavigate();
+  const pathname = usePathname();
+  return useCallback((threadId: string, seq: number) => {
+    openFoldOf(threadId, seq);
+    const here = messageLinkPath(pathname, threadId, seq);
+    if (!toAppPathOf(navigate)?.(here ?? `/threads/${encodeURIComponent(threadId)}#msg=${seq}`, here ? { replace: true } : undefined)) navigate.toThread(threadId);
+  }, [navigate, pathname]);
+}
+
+export function AskButtonsFor({ ask, threadId, onOpen }: { ask: StrandAsk; threadId: string; /** After Jump to reply opens the reply (the box closes so it shows). */ onOpen?(): void }) {
   const call = useCall();
   const navigate = useBbNavigate();
+  const openMessage = useOpenMessage();
   const [busy, setBusy] = useState(false);
+  // A reply that needs you: open it, or mark it done.
+  if (ask.kind === "reply") {
+    const done = async () => {
+      if (ask.seq === null) return;
+      setBusy(true);
+      try { if (!(await call("strands.resolveReply", { threadId: ask.threadId, seq: ask.seq })).ok) toast.error("Couldn't mark it done."); }
+      catch (error) { toast.error("Couldn't mark it done.", { description: errorMessage(error) }); }
+      finally { setBusy(false); }
+    };
+    return <>
+      {ask.seq !== null ? <button type="button" data-reply-jump={ask.seq} onClick={() => { flashReply(ask.threadId, ask.seq!); openMessage(ask.threadId, ask.seq!); onOpen?.(); }} className={cn(smallButton, "border-transparent bg-foreground font-semibold text-background")}>Jump to reply</button> : null}
+      <button type="button" data-reply-done={ask.seq ?? ""} disabled={busy || ask.seq === null} onClick={() => void done()} className={cn(smallButton, "border-border bg-transparent hover:bg-accent")}>Done</button>
+    </>;
+  }
   const decide = async (decision: StrandAsk["decisions"][number]) => {
     setBusy(true);
     try { await call("bot_worker_approval_resolve", { threadId: ask.threadId, interactionId: ask.id, decision }); }
@@ -161,7 +259,7 @@ function WorkerLine({ worker }: { worker: StrandView["workers"][number] }) {
 }
 
 /** One strand in the box's list: mark, name, its running workers and age, its one-line summary, its workers, and an ask with its whole details and buttons. */
-function StrandOption({ strand, threadId, active, now, onPick }: { strand: StrandView; threadId: string; active: boolean; now: number; onPick(): void }) {
+function StrandOption({ strand, threadId, active, now, onPick, onClose }: { strand: StrandView; threadId: string; active: boolean; now: number; onPick(): void; onClose(): void }) {
   const ask = strand.state === "needs-you" ? strand.asks[0] ?? null : null;
   const workers = rowWorkersOf(strand, now);
   const running = workers.filter((worker) => worker.status === "running").length;
@@ -189,7 +287,7 @@ function StrandOption({ strand, threadId, active, now, onPick }: { strand: Stran
               {ask.details.map((line, index) => <li key={index} className="whitespace-pre-wrap break-all">{line}</li>)}
             </ul>
           ) : null}
-          <div className="mt-1.5 flex flex-wrap gap-1.5"><AskButtonsFor ask={ask} threadId={threadId} /></div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5"><AskButtonsFor ask={ask} threadId={threadId} onOpen={onClose} /></div>
         </div>
       ) : null}
     </li>
@@ -197,57 +295,25 @@ function StrandOption({ strand, threadId, active, now, onPick }: { strand: Stran
 }
 
 export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; now?: number }) {
-  const list = useLive("strands.list", { threadId }, { pollMs: STRANDS_POLL_MS });
-  const tags = useLive("strands.tags", { threadId }, { pollMs: 60_000 });
-  const selection = useSelection(threadId);
   const choose = useSelectStrand(threadId);
-  const jump = useJump(threadId);
   const panel = experimental_useAppPanel();
   const navigate = useBbNavigate();
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState("");
   const input = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const data = list.data;
-  const current = currentOf(data, selection);
-  const filtered = selection ? current : null;
-  // New turns of the filtered strand (and asks waiting elsewhere) join the filter as they are learned.
-  useEffect(() => {
-    if (!selection) return;
-    const turns = filterTurnsOf(tags.data, data, selection.strandId, threadId);
-    if (turns.turnIds.length) setStrandTurns(threadId, selection.strandId, turns.turnIds, filtered?.firstSeq ?? turns.firstSeq);
-  }, [tags.data, data, selection, threadId, filtered?.firstSeq]);
-  // Esc clears the filter (unless something else is being typed in).
-  useEffect(() => {
-    if (!selection) return;
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      const target = event.target as HTMLElement | null;
-      const typing = !!target && (target.isContentEditable || /^(?:INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) && target !== input.current;
-      if (typing) return;
-      select(threadId, null);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [selection, threadId]);
+  const { data, selection, current, filtered, seqs, step } = useStrandFilter(threadId, input);
   useEffect(() => { if (expanded) input.current?.focus(); }, [expanded]);
   if (!data || !hasOpen(data)) return null;
   const counts = countsOf(data);
-  const seqs = filtered ? seqsOf(tags.data, filtered.id) : [];
-  const step = (by: -1 | 1) => {
-    if (!filtered) return;
-    const seq = stepSeq(seqs, selection?.seq ?? null, by);
-    if (seq === null) return;
-    select(threadId, { ...selection!, seq });
-    jump(seq);
-  };
   const groups = boxGroups(data, query);
   const matches = groups.flatMap((group) => group.strands);
   const needle = query.trim().toLowerCase();
   const stray = data.strayWorkers ?? [];
   const strayCounts = strayCountsOf(data);
   const strayShown = needle ? stray.filter((worker) => worker.title.toLowerCase().includes(needle)) : stray;
-  const pick = (strand: StrandView) => { choose(strand, true); setExpanded(false); setQuery(""); };
+  // A strand waiting on a reply opens at that reply.
+  const pick = (strand: StrandView) => { const reply = replyAskOf(strand); if (reply) flashReply(threadId, reply.seq); choose(reply ? { ...strand, latestSeq: reply.seq } : strand, true); setExpanded(false); setQuery(""); };
   const openTab = () => { setExpanded(false); if (panel) openThreadTab(panel, { actionId: STRANDS_TAB, title: "Strands" }); };
   const onInputKey = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter" && matches[0]) { event.preventDefault(); pick(matches[0]); }
@@ -320,7 +386,7 @@ export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; n
               <section key={group.label} aria-label={group.label}>
                 <div className="px-2 pb-0.5 pt-1.5 text-[11px] font-semibold text-muted-foreground/70">{group.label}</div>
                 <ul className="flex flex-col gap-px">
-                  {group.strands.map((strand) => <StrandOption key={strand.id} strand={strand} threadId={threadId} now={now} active={selection?.strandId === strand.id} onPick={() => pick(strand)} />)}
+                  {group.strands.map((strand) => <StrandOption key={strand.id} strand={strand} threadId={threadId} now={now} active={selection?.strandId === strand.id} onPick={() => pick(strand)} onClose={() => { setExpanded(false); setQuery(""); }} />)}
                 </ul>
               </section>
             ))}
@@ -344,7 +410,7 @@ export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; n
           </div>
           <div className="flex items-center border-t border-border/60 px-1 py-1">
             <button type="button" data-strand-option="all" onClick={openTab} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left text-[12px] text-muted-foreground outline-none hover:bg-accent/60 hover:text-foreground focus-visible:bg-accent/60">
-              <Icon name="LayoutList" className="size-3.5" />All strands
+              <Icon name="ListView" className="size-3.5" />All strands
             </button>
           </div>
         </div>

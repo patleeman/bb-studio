@@ -346,6 +346,12 @@ export function useFixedPanelTabsState(
   return useAtomValue(getFixedPanelTabsStateAtom(panelStateId));
 }
 
+export function useFixedPanelTabsStateSnapshot(
+  panelStateId: FixedPanelTabsPanelStateId,
+): FixedPanelTabsState {
+  return useAtomValue(getFixedPanelTabsStateAtom(panelStateId));
+}
+
 export function useGetFixedPanelTabsState(
   panelStateId: FixedPanelTabsPanelStateId,
 ): () => FixedPanelTabsState {

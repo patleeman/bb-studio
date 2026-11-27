@@ -1,5 +1,6 @@
 // Built-in Bot housekeeping. Every destructive decision is recomputed before
 // execution; unknown ownership, targets or workspace status fail closed.
+import { ALWAYS_ON_CAP, SECTION_CAPS, bulletCount, lintAlwaysOn, sectionText } from "./core-skill";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -87,9 +88,17 @@ export async function pullRequestMerged(plugins: Pick<Sdk["plugins"], "callRpc">
     .then((rows) => { const row = pullRequestRows.parse(rows)[environmentId]; return row?.outcome === "available" && row.pullRequest?.attention === "merged"; })
     .catch(() => false);
 }
-export function memoryNeedsTidy(text: string, budget: number, updatedAt: number, now: number): boolean {
-  const dates = [...text.matchAll(/\b(20\d{2}-\d{2}-\d{2})\b/g)].map((m) => Date.parse(m[1]!)).filter(Number.isFinite);
-  return text.trim().split(/\s+/).filter(Boolean).length > budget || (text.trim().length > 0 && now - Math.min(updatedAt, ...dates) >= 60 * DAY);
+/**
+ * Whether the always-on skill needs a tidy: over its character budget or a
+ * section cap (src/core-skill.ts), or a "## Right now" with lines that
+ * nobody has touched for a week (it is pruned weekly).
+ */
+export function memoryNeedsTidy(text: string, totalChars: number, updatedAt: number, now: number, options: { migrated?: boolean; askedAt?: number | null } = {}): boolean {
+  // At most one ask a week, whatever the Bot replied ([PASS] included).
+  if (options.askedAt && now - options.askedAt < 7 * DAY) return false;
+  // Text moved from the old core profile page is the user's until they edit it: lint flags it, Maintenance doesn't trim it.
+  if (!options.migrated && lintAlwaysOn(text, totalChars).length) return true;
+  return bulletCount(sectionText(text, "Right now")) > 0 && now - Math.max(updatedAt, options.askedAt ?? 0) >= 7 * DAY;
 }
 const automation = z.object({ id: z.string(), name: z.string().optional(), updatedAt: z.number().optional(), enabled: z.boolean(), lastRunAt: z.number().nullish(), nextRunAt: z.number().nullish(), lastRunStatus: z.string().nullish(), createdByThreadId: z.string().nullish(), execution: z.object({ targetThreadId: z.string().nullish(), prompt: z.string().optional() }).passthrough(), trigger: z.object({ cron: z.string().optional() }).passthrough() }).passthrough();
 const overview = z.object({ automations: z.array(z.object({ automation, project: z.object({ id: z.string() }).passthrough() }).passthrough()) }).passthrough();
@@ -100,7 +109,10 @@ export interface MaintenanceDeps {
   bots(): { id: string; threadId: string | null; state: string; kind?: string }[];
   owned(botId: string): ReadonlySet<string>;
   refreshOwned(): Promise<unknown>;
-  memory(botId: string): { id: string; markdown: string; updatedAt: number } | null;
+  /** The Bot's always-on core skill: its name, text, last edit, and the characters of all its always-on skills. */
+  memory(botId: string): { id: string; markdown: string; updatedAt: number; totalChars: number; migrated?: boolean; askedAt?: number | null } | null;
+  /** Records that Maintenance asked the Bot to tidy its core skill (the weekly limit). */
+  tidyAsked?(botId: string, now: number): void;
   curate(botId: string, dryRun: boolean): Promise<{ result: string }>;
   automationPause(id: string, botId: string): Promise<unknown>;
   automationDelete(id: string, botId: string): Promise<unknown>;
@@ -300,7 +312,7 @@ export class BotMaintenance {
       // Do not stop threads based solely on their last update time.
       if (settings.rules.memory && bot.threadId) {
         const memory = this.deps.memory(botId);
-        if (memory && memoryNeedsTidy(memory.markdown, settings.memoryWords, memory.updatedAt, now)) await act("Memory tidy requested", () => this.deps.sdk.threads.send({ threadId: bot.threadId!, mode: "auto", input: [{ type: "text", text: `Maintenance: rewrite Memory page ${memory.id}. Merge duplicates, drop entries older than 60 days that are stale or contradicted, preserve useful facts, and stay under ${settings.memoryWords} words. Page history preserves the old version. Reply exactly [PASS].`, mentions: [], visibility: "agent-only" }] }));
+        if (memory && memoryNeedsTidy(memory.markdown, memory.totalChars, memory.updatedAt, now, { migrated: memory.migrated, askedAt: memory.askedAt })) await act("Always-on skill tidy requested", () => { this.deps.tidyAsked?.(botId, now); return this.deps.sdk.threads.send({ threadId: bot.threadId!, mode: "auto", input: [{ type: "text", text: `Maintenance: tidy your always-on skill ${memory.id} with bot_skill (op: edit, change: "patch"). Delete "## Right now" lines that no longer hold; merge or drop lines so "## Preferences" stays at ${SECTION_CAPS.Preferences} lines or fewer, "## Right now" at ${SECTION_CAPS["Right now"]} or fewer, and all always-on skills under ${ALWAYS_ON_CAP.toLocaleString("en-US")} characters. Delete obsolete lines cleanly, with no "retired" notes. Its version history keeps the old text. Reply exactly [PASS].`, mentions: [], visibility: "agent-only" }] }); });
       }
       if (settings.rules.skills) { const skills = await this.deps.curate(botId, dryRun); result.actions.push(`Skills: ${skills.result.replace(/^Dry run: /, "")}`); }
       if (this.deps.taskProblems && bot.id === this.deps.bots()[0]?.id) {

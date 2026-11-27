@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { act, type ComponentType } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -67,11 +67,12 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("Studio's settings sections", () => {
-  it("registers Voice, Recordings and calls, Agent replies, Threads, Smart Queue model and Advanced in order, then Model router, Skill registry, Phone notifications, API keys, Tool Gateway and Bring things over from bb last", () => {
-    expect(order).toEqual(["settings-voice", "settings-recordings", "settings-replies", "settings-threads", "settings-jev", "settings-advanced", "model-router", "skills-registry", "mobile-push", "api-keys", "tool-gateway", "bring-over"]);
+  it("registers Voice, Recordings and calls, Agent replies, Threads, Smart Queue model and Advanced in order, then Model router, Skill registry, Phone notifications, API keys, Tool Gateway, Agent context and Bring things over from bb last", () => {
+    expect(order).toEqual(["settings-voice", "settings-recordings", "settings-replies", "settings-threads", "settings-jev", "settings-advanced", "model-router", "skills-registry", "mobile-push", "api-keys", "tool-gateway", "agent-context", "bring-over"]);
     expect(sections.get("model-router")).toMatchObject({ title: "Model router" });
     expect(sections.get("api-keys")).toMatchObject({ title: "API keys" });
     expect(sections.get("tool-gateway")).toMatchObject({ title: "Tool Gateway" });
+    expect(sections.get("agent-context")).toMatchObject({ title: "Agent context" });
     expect(sections.get("bring-over")).toMatchObject({ title: "Bring things over from bb" });
     expect([...sections.values()].slice(0, 6).map((section) => section.title)).toEqual(["Voice", "Recordings and calls", "Agent replies", "Threads", "Smart Queue model", "Advanced"]);
     // Stable BB draws experimental_page "mobile" sections only for the machine-access plugin, so it's on Studio's page.

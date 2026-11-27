@@ -2,25 +2,41 @@ import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import { APP_POINTER, CONTINUE_POINTER, endOfReplyPointer, MINI_POINTER, PAGE_POINTER, studioInstructions, STRAND_POINTER } from "./agent-instructions";
 import { botInstructions } from "./bot";
+import { SKILLS_LINE, skillsCountLine } from "./bot-model";
 import { conversationInstructions } from "./bot-threads";
 import { DEFAULT_REPLIES } from "./explore/prompt";
 import { BUILTIN_KINDS, resolveKinds, routingInstructions } from "./kinds";
-import { withMemory } from "./memory/service";
+import { MemoryService, withMemory } from "./memory/service";
 import { INSTRUCTIONS_LIMIT } from "./memory/shared";
-import { memoryHost } from "./memory/test-fixture";
+import { ALWAYS_ON_CAP, CORE_TEMPLATE } from "./core-skill";
 import { STUDIO_SETTINGS } from "./settings/schema";
 
-/** A Bot like Chief of Staff: a role in the user's words and eight skills. */
+/** Eight on-demand skills with descriptions as long as real ones. */
+const SKILLS = Array.from({ length: 8 }, (_, n) => ({ name: `weekly-task-${n}`, description: "Use when the user asks for the weekly staff sweep or the homelab backup check; the steps and what to report." }));
+
+/** A Bot like Chief of Staff: a role in the user's words, and its skill list as a slot (as a session gets it). */
 function realisticBot(): string {
-  const skills = Array.from({ length: 8 }, (_, n) => ({ name: `weekly-task-${n}`, description: "Use when the user asks for the weekly staff sweep or the homelab backup check; the steps and what to report." }));
-  return botInstructions({ name: "Chief of Staff", state: "active", primary: true, role: "Runs Sam's personal ops: inbox triage, calendar, the home server, launch prep and the BB Studio fork.", skills });
+  return botInstructions({ name: "Chief of Staff", state: "active", primary: true, role: "Runs Sam's personal ops: inbox triage, calendar, the home server, launch prep and the BB Studio fork.", skills: SKILLS, skillsSlot: "bot_main" });
 }
 
-it("keeps a typical conversation's instructions within 4,096 characters, the Bot, the note and the whole core profile first", async () => {
-  const x = await memoryHost();
-  x.legacy("bot_main");
-  x.memory.autoSplit("bot_main");
-  const profile = x.pages.get("pg_new1")!.markdown.trim();
+/** A typical always-on core skill: a dozen preferences, a few "right now" lines, the check-in list. */
+const PROFILE = CORE_TEMPLATE
+  .replace("## Preferences\n", `## Preferences\n\n${Array.from({ length: 5 }, (_, n) => `- Rule ${n}: one clear recommendation; say what failed.`).join("\n")}\n`)
+  .replace("## Right now\n", "## Right now\n\n- Travelling until the 9th: keep replies short.\n- The launch is in review: don't change the site.\n");
+
+function memoryFor(skills: { name: string; body: string }[]) {
+  return new MemoryService({
+    bots: { list: () => [{ id: "bot_main", name: "Chief of Staff", primary: true }] },
+    alwaysOn: () => skills,
+    onDemand: () => SKILLS,
+    botThread: (threadId) => (threadId === "thr_main" ? { botId: "bot_main", kind: "conversation", isMain: true, title: null } : threadId === "thr_worker" ? { botId: "bot_main", kind: "worker", isMain: false, title: null } : null),
+    sideBot: () => null, ownedBot: () => null, chainBot: () => null, ownBot: () => null, runnerBot: () => null,
+  });
+}
+
+it("keeps a typical conversation's instructions within 4,096 characters, the Bot, the note and the whole always-on skill first", async () => {
+  const memory = memoryFor([{ name: "core-profile", body: PROFILE }]);
+  const profile = PROFILE.trim();
   const bot = realisticBot();
   const note = conversationInstructions({ isMain: false, forkedFrom: { threadId: "thr_main", messageId: null, turnId: null } }, "Fork redesign", "Main");
   const settings = { off: ["design"], use: {} };
@@ -29,22 +45,109 @@ it("keeps a typical conversation's instructions within 4,096 characters, the Bot
     tools: [], skills: ["studio-code", "studio"],
     instructions: studioInstructions({ bot, conversation: note, runner: "", pages: true, minis: true, appCards: false, endOfReply: endOfReplyPointer({ next: true, explore: true, replies: DEFAULT_REPLIES }), routing }),
   });
-  const { instructions } = withMemory(() => x.memory, () => false, inner)({ thread: { id: "thr_main", parentThreadId: null, sourceThreadId: null }, pluginMetadata: {} });
+  const { instructions } = withMemory(() => memory, () => false, inner)({ thread: { id: "thr_main", parentThreadId: null, sourceThreadId: null }, pluginMetadata: {} });
   expect(instructions.length).toBeLessThanOrEqual(INSTRUCTIONS_LIMIT);
   // In order: the Bot, which conversation, memory with the whole profile, then the pointers.
   const at = (text: string) => instructions.indexOf(text);
-  expect(at(bot)).toBe(0);
+  expect(at(bot.slice(0, bot.indexOf("\u0000")))).toBe(0);
+  expect(instructions).not.toContain("\u0000");
+  // Room to spare: the skill list keeps its descriptions.
+  expect(instructions).toContain(`- weekly-task-0: ${SKILLS[0]!.description}`);
   expect(at(note)).toBeGreaterThan(0);
   expect(at("## Memory")).toBeGreaterThan(at(note));
-  expect(instructions).toContain(`<core-profile>\n${profile}\n</core-profile>`);
+  expect(instructions).toContain(`<always-on skill="core-profile">\n${profile}\n</always-on>`);
   expect(instructions).not.toContain("Cut here");
-  expect(at(PAGE_POINTER)).toBeGreaterThan(at("</core-profile>"));
+  expect(instructions).not.toMatch(/memory \(op|memory_search|memory records/);
+  expect(at(PAGE_POINTER)).toBeGreaterThan(at("</always-on>"));
   expect(at(MINI_POINTER)).toBeGreaterThan(at(PAGE_POINTER));
   expect(at(STRAND_POINTER)).toBeGreaterThan(at(MINI_POINTER));
   expect(at(CONTINUE_POINTER)).toBeGreaterThan(at(STRAND_POINTER));
   expect(instructions).toContain("::next{reply=\"…\" btw=\"…\" do=\"…\"}");
   expect(instructions).toContain("Quick replies to prefer: 👍 Looks good | 🔁 Try another way | ❓ Explain more.");
   expect(instructions.endsWith("Studio kinds: designs are off, don't offer them.")).toBe(true);
+});
+
+/** The pointers that follow the memory slot: none may ever be cut. */
+const POINTERS = [PAGE_POINTER, MINI_POINTER, STRAND_POINTER, CONTINUE_POINTER, endOfReplyPointer({ next: true, explore: true, replies: DEFAULT_REPLIES })!];
+
+it("fits a realistic Bot with a full 2,000-character always-on skill in 4,096 characters: the skill whole, every pointer, and the skill list as names or a count", () => {
+  // At the cap: 2,000 characters of preferences, right-now lines and the check-in list.
+  const lines = ["## Preferences", "", ...Array.from({ length: 20 }, (_, n) => `- Rule ${String(n).padStart(2, "0")}: give one clear recommendation and say what failed.`), "", "## Right now", "", "- The launch is in review until Friday.", "", "## Check-in", "", "- Anything waiting on the user?"];
+  let body = lines.join("\n");
+  while (body.length < 2000) body += "\n- Project leads: anything stuck?";
+  body = body.slice(0, 2000);
+  expect(body.length).toBe(ALWAYS_ON_CAP);
+  const memory = memoryFor([{ name: "core-profile", body }]);
+  const settings = { off: ["design"], use: {} };
+  const routing = routingInstructions(resolveKinds([], settings), settings);
+  for (const note of [
+    conversationInstructions({ isMain: true, forkedFrom: null }, "Main", null),
+    conversationInstructions({ isMain: false, forkedFrom: { threadId: "thr_main", messageId: null, turnId: null } }, "Plan the spring launch and the press kit", "Main"),
+  ]) {
+    const inner = () => ({ tools: [], instructions: studioInstructions({ bot: realisticBot(), conversation: note, runner: "", pages: true, minis: true, appCards: false, endOfReply: endOfReplyPointer({ next: true, explore: true, replies: DEFAULT_REPLIES }), routing }) });
+    const { instructions } = withMemory(() => memory, () => false, inner)({ thread: { id: "thr_main", parentThreadId: null, sourceThreadId: null }, pluginMetadata: {} });
+    expect(instructions.length, note).toBeLessThanOrEqual(INSTRUCTIONS_LIMIT);
+    expect(instructions).toContain(`<always-on skill="core-profile">\n${body.trim()}\n</always-on>`);
+    expect(instructions).not.toContain("Cut here");
+    for (const pointer of [...POINTERS, routing, note]) expect(instructions, pointer.slice(0, 40)).toContain(pointer);
+    expect(instructions.endsWith(routing)).toBe(true);
+    // The skill tools, "view one before you follow it" and the history pointer are fixed text: there at any budget.
+    expect(instructions).toContain(SKILLS_LINE);
+    expect(instructions).toContain("view one before you follow it");
+    expect(instructions).toContain("bot_info (view: history)");
+    expect(instructions).toContain("edit patches always-on too");
+    // The list itself gives way first: names, else the count; never nothing.
+    const names = `Yours: ${SKILLS.map((skill) => skill.name).join(", ")}.`;
+    expect(instructions.includes(names) || instructions.includes(skillsCountLine(SKILLS.length)), note).toBe(true);
+    expect(instructions).not.toContain("\u0000");
+  }
+});
+
+it("fills the skill list from the instructions' Bot when the session's role isn't known, and reads + New's metadata", () => {
+  const memory = memoryFor([{ name: "core-profile", body: PROFILE }]);
+  const inner = () => ({ tools: [], instructions: studioInstructions({ bot: realisticBot(), conversation: "", runner: "", pages: true, minis: false, appCards: false, endOfReply: null, routing: "" }) });
+  // A thread Studio hasn't placed and no metadata: no memory block, but the Bot's own list still fills.
+  const unknown = withMemory(() => memory, () => false, inner)({ thread: { id: "thr_new", parentThreadId: null, sourceThreadId: null }, pluginMetadata: {} }).instructions;
+  expect(unknown).toContain(`- weekly-task-0: ${SKILLS[0]!.description}`);
+  expect(unknown).not.toContain("\u0000");
+  // + New's conversation says whose it is before Studio records it.
+  expect(memory.threadRole({ thread: { id: "thr_new", parentThreadId: null, sourceThreadId: null }, pluginMetadata: { botConversation: "bot_main" } })).toEqual({ botId: "bot_main", role: "conversation" });
+});
+
+it("never goes over 4,096 characters, whatever the role and however many skills", () => {
+  const many = Array.from({ length: 140 }, (_, n) => ({ name: `skill-number-${n}`, description: "Use when it matters." }));
+  const memory = new MemoryService({
+    bots: { list: () => [{ id: "bot_main", name: "Chief of Staff", primary: true }] },
+    alwaysOn: () => [{ name: "core-profile", body: "- A rule.\n".repeat(200) }],
+    onDemand: () => many,
+    botThread: () => ({ botId: "bot_main", kind: "conversation", isMain: true, title: null }),
+    sideBot: () => null, ownedBot: () => null, chainBot: () => null, ownBot: () => null, runnerBot: () => null,
+  });
+  for (const role of ["Short role.", "A very long role in the user's own words. ".repeat(40)]) {
+    const bot = botInstructions({ name: "Chief of Staff", state: "active", primary: true, role, skills: many, skillsSlot: "bot_main" });
+    const inner = () => ({ tools: [], instructions: studioInstructions({ bot, conversation: conversationInstructions({ isMain: true, forkedFrom: null }, "Main", null), runner: "", pages: true, minis: true, appCards: false, endOfReply: endOfReplyPointer({ next: true, explore: true, replies: DEFAULT_REPLIES }), routing: "" }) });
+    const { instructions } = withMemory(() => memory, () => false, inner)({ thread: { id: "thr_main", parentThreadId: null, sourceThreadId: null }, pluginMetadata: {} });
+    expect(instructions.length, role.slice(0, 20)).toBeLessThanOrEqual(INSTRUCTIONS_LIMIT);
+    for (const pointer of POINTERS) expect(instructions).toContain(pointer);
+    expect(instructions).toContain(SKILLS_LINE);
+    expect(instructions).not.toContain("\u0000");
+  }
+});
+
+it("never cuts an always-on skill silently: what doesn't fit says so and where the rest is", () => {
+  const long = `## Preferences\n\n${"- A rule that matters to the user.\n".repeat(150)}`;
+  const memory = memoryFor([{ name: "core-profile", body: long }]);
+  const conversation = memory.instructionsFor({ botId: "bot_main", role: "conversation" }, 2000)!;
+  expect(conversation.length).toBeLessThanOrEqual(2000);
+  expect(conversation).toMatch(/\(Cut here: core-profile didn't fit; always-on skills are 5,\d{3} characters, over their 2,000 budget\. read the rest with bot_skill \(op: view, name: "core-profile"\)\.\)$/);
+  const worker = memory.instructionsFor({ botId: "bot_main", role: "worker" }, 2000)!;
+  expect(worker).toMatch(/^## Memory\nYou work for "Chief of Staff"/);
+  expect(worker).toMatch(/ask the Bot or open its Memory page/);
+  // Room to spare: whole, no note.
+  expect(memoryFor([{ name: "core-profile", body: PROFILE }]).instructionsFor({ botId: "bot_main", role: "worker" })).not.toContain("Cut here");
+  // External Bots and sessions without a Bot get nothing.
+  expect(memory.threadRole({ thread: { id: "thr_other", parentThreadId: null, sourceThreadId: null }, pluginMetadata: {} })).toBeNull();
+  expect(memory.threadRole({ thread: { id: "thr_worker", parentThreadId: null, sourceThreadId: null }, pluginMetadata: {} })).toEqual({ botId: "bot_main", role: "worker" });
 });
 
 it("keeps each pointer to one or two lines and says which end-of-reply attributes are on", () => {
@@ -77,11 +180,15 @@ it("describes apps, and says ::mini by default and ::app with the App cards sett
 it("moves the long guidance into the studio skill, which the pointers name", () => {
   const skill = readFileSync(new URL("../skills/studio/SKILL.md", import.meta.url), "utf8");
   expect(skill).toMatch(/^---\nname: studio\n/);
-  for (const heading of ["## Agent guide", "### Pages", "### Apps", "### The Next row", "### Explore", "### Kinds"]) expect(skill).toContain(heading);
+  for (const heading of ["## Agent guide", "### Pages", "### Apps", "### The Next row", "### Explore", "### Kinds", "## Where information goes", "### What never to save (in Preferences or skills)", "### Calibration rules", "### Links stay links"]) expect(skill).toContain(heading);
+  expect(skill).toContain("Default to saving nothing.");
+  expect(skill).toContain("code spans aren't linked");
+  // The prompt points at it, and carries the link rule itself.
+  expect(PAGE_POINTER).toContain("No @thread: or page/design ids in backticks: code isn't linked.");
   // The rules that were in every session's instructions.
   expect(skill).toContain("call those\nscheduled items, never automations");
   expect(skill).toContain("Never put `@thread:` inside a Markdown\nlink");
-  for (const rule of ["```chart", "replace_all only when asked", "sandboxed iframe", "pages_comments", "minis_update", "one stray \" breaks the whole line", "“curly” quotes", "Don't also write ::reactions or ::explore lines", "1 to 4 items separated by |"]) expect(skill).toContain(rule);
+  for (const rule of ["```chart", "replace_all only when asked", "sandboxed iframe", "pages_read (comments)", "apps (op: update)", "one stray \" breaks the whole line", "“curly” quotes", "Don't also write ::reactions or ::explore lines", "1 to 4 items separated by |"]) expect(skill).toContain(rule);
 });
 
 it("tells only a Bot's conversations to propose a new conversation and wait for a yes", () => {

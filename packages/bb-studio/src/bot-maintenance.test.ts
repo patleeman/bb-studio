@@ -1,7 +1,7 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
 import { BotMaintenance, archiveAge, finished, maintenanceDefaults, maintenanceDryRun, memoryNeedsTidy, pullRequestMerged, readWorkspaceStatus, workspaceBlock } from "./bot-maintenance";
-import { MIGRATIONS } from "./migrations";
+import { migratedPluginDb } from "./test/migrated-db";
 import { testScheduler } from "./test/scheduler-fixture";
 import { SkillLearning, type SkillState } from "./skill-learning";
 const DAY = 86_400_000;
@@ -34,9 +34,12 @@ async function setup() {
     }) as never },
   } });
   dispose.push(() => harness.lifecycle.dispose());
-  const db = bb.storage.database(); bb.storage.migrate(db, MIGRATIONS);
+  const mem = migratedPluginDb();
+  const db = mem as unknown as ReturnType<typeof bb.storage.database>;
+  bb.storage.database = () => db;
+  dispose.push(async () => { mem.close(); });
   const bot = { id: "bot", state: "active", threadId: "main" };
-  let memory: { id: string; markdown: string; updatedAt: number } | null = null;
+  let memory: { id: string; markdown: string; updatedAt: number; totalChars: number; migrated?: boolean; askedAt?: number | null } | null = null;
   const owned = new Set(["child"]);
   const { engine, scheduler } = testScheduler(db, bb.sdk);
   const maintenance = new BotMaintenance({ db, sdk: bb.sdk, scheduler, changed: () => {}, bots: () => [bot], owned: () => owned, refreshOwned, memory: () => memory, curate, automationPause: pause, automationDelete: del, adoptable: async () => [], alert });
@@ -78,12 +81,24 @@ it("blocks only tracked uncommitted changes and unpushed commits", () => {
   // A status call that failed (null) fails closed: real work may be there.
   expect(workspaceBlock(null)).toBe("Couldn't read the workspace's git status.");
 });
-it("checks Memory word budget and old entries", () => {
-  expect(memoryNeedsTidy("one two three", 2, now, now)).toBe(true);
-  expect(memoryNeedsTidy("one two", 2, now, now)).toBe(false);
-  expect(memoryNeedsTidy("remember this", 8000, now - 61 * DAY, now)).toBe(true);
-  expect(memoryNeedsTidy("2020-01-01 old fact", 8000, Date.now(), Date.now())).toBe(true);
-  expect(memoryNeedsTidy("", 8000, 0, now)).toBe(false);
+it("asks for a tidy of the always-on skill over its budget or caps, or with a week-old Right now", () => {
+  expect(memoryNeedsTidy("## Preferences\n\n- Short.", 3001, now, now)).toBe(true);
+  expect(memoryNeedsTidy(`## Preferences\n\n${Array.from({ length: 26 }, (_, i) => `- Rule ${i}`).join("\n")}`, 400, now, now)).toBe(true);
+  expect(memoryNeedsTidy("## Right now\n\n- Busy this month.", 40, now - 8 * DAY, now)).toBe(true);
+  expect(memoryNeedsTidy("## Right now\n\n- Busy this month.", 40, now - 2 * DAY, now)).toBe(false);
+  expect(memoryNeedsTidy("## Preferences\n\n- Short.\n\n## Right now\n", 40, 0, now)).toBe(false);
+  expect(memoryNeedsTidy("## Preferences\n\n- Short.", 2001, now, now)).toBe(true);
+});
+
+it("never trims text moved from the core profile page until the user edits it, and asks at most weekly", () => {
+  // Over budget, but moved and not yet edited by the user: no trim ask (lint still flags it).
+  expect(memoryNeedsTidy("## Preferences\n\n- Short.", 5000, now, now, { migrated: true })).toBe(false);
+  // Its Right now still gets the weekly ask.
+  expect(memoryNeedsTidy("## Right now\n\n- Busy.", 5000, now - 8 * DAY, now, { migrated: true })).toBe(true);
+  // An ask in the last week, answered with [PASS] or not, holds the next one off.
+  expect(memoryNeedsTidy("## Preferences\n\n- Short.", 5000, now, now, { askedAt: now - 2 * DAY })).toBe(false);
+  expect(memoryNeedsTidy("## Right now\n\n- Busy.", 40, now - 30 * DAY, now, { askedAt: now - 6 * DAY })).toBe(false);
+  expect(memoryNeedsTidy("## Right now\n\n- Busy.", 40, now - 30 * DAY, now, { askedAt: now - 8 * DAY })).toBe(true);
 });
 it("archives only owned, finished threads; records a single run", async () => {
   const x = await setup(); x.rows.push(thread("user")); await x.enable();
@@ -101,7 +116,7 @@ it("does nothing while off, paused, or in the initial dry-run day", async () => 
   x.bot.state = "paused"; expect(await x.maintenance.run("bot", { now: now + DAY })).toBeNull();
 });
 it("dry run leaves threads, automations, Memory and skills alone", async () => {
-  const x = await setup(); await x.enable(); x.local("done", "reminder", "done", 15); x.memory({ id: "mem", markdown: "word ".repeat(8001), updatedAt: now });
+  const x = await setup(); await x.enable(); x.local("done", "reminder", "done", 15); x.memory({ id: "core-profile", markdown: "word ".repeat(8001), updatedAt: now, totalChars: 40_005 });
   const result = await x.maintenance.run("bot", { dryRun: true, now }); expect(result?.actions).toContain("Delete done reminder: done"); expect(x.archive).not.toHaveBeenCalled(); expect(x.del).not.toHaveBeenCalled(); expect(x.send).not.toHaveBeenCalled(); expect(x.curate).toHaveBeenCalledWith("bot", true);
 });
 it("protects BB automation targets, pending interactions and open plans", async () => {
@@ -151,9 +166,25 @@ it("lists ten empty successful runs without pausing them", async () => {
   const x = await setup(); await x.enable(); x.rows.push(thread("main")); x.local("report", "checkin"); x.runs.push(...Array.from({ length: 10 }, () => ({ status: "succeeded", output: "[PASS]" })));
   const r = await x.maintenance.run("bot", { now }); expect(r?.suggestions.some((s) => s.text.includes("no useful output"))).toBe(true); expect(x.pause).not.toHaveBeenCalled();
 });
-it("asks for Memory maintenance in one agent-only message", async () => {
-  const x = await setup(); await x.enable(); x.memory({ id: "mem", markdown: "word ".repeat(8001), updatedAt: now });
-  await x.maintenance.run("bot", { now }); expect(x.send).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ input: [expect.objectContaining({ visibility: "agent-only", text: expect.stringContaining("8000 words") })] }));
+it("asks for an always-on skill tidy in one agent-only message", async () => {
+  const x = await setup(); await x.enable(); x.memory({ id: "core-profile", markdown: "word ".repeat(8001), updatedAt: now, totalChars: 40_005 });
+  await x.maintenance.run("bot", { now }); expect(x.send).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ input: [expect.objectContaining({ visibility: "agent-only", text: expect.stringContaining("under 2,000 characters") })] }));
+});
+it("records the tidy ask, so the next daily run doesn't ask again that week", async () => {
+  const asked: number[] = [];
+  const x = await setup(); await x.enable();
+  (x.maintenance as unknown as { deps: { tidyAsked(botId: string, at: number): void } }).deps.tidyAsked = (_botId, at) => { asked.push(at); };
+  x.memory({ id: "core-profile", markdown: "## Right now\n\n- Busy.", updatedAt: now - 9 * DAY, totalChars: 30 });
+  await x.maintenance.run("bot", { now });
+  expect(asked).toEqual([now]);
+  x.memory({ id: "core-profile", markdown: "## Right now\n\n- Busy.", updatedAt: now - 9 * DAY, totalChars: 30, askedAt: now });
+  x.send.mockClear();
+  await x.maintenance.run("bot", { now: now + DAY });
+  expect(x.send).not.toHaveBeenCalledWith(expect.objectContaining({ input: [expect.objectContaining({ text: expect.stringContaining("tidy your always-on skill") })] }));
+  // A dry run asks nothing and records nothing.
+  x.memory({ id: "core-profile", markdown: "## Right now\n\n- Busy.", updatedAt: now - 9 * DAY, totalChars: 30 });
+  await x.maintenance.run("bot", { now: now + 2 * DAY, dryRun: true });
+  expect(asked).toEqual([now]);
 });
 it("runs at 4 AM local and deduplicates heartbeat runs that day", async () => {
   const x = await setup(); const at = new Date(2026, 9, 21, 4).getTime(); await x.maintenance.set("bot", { enabled: true }, at - 2 * DAY);
@@ -266,7 +297,7 @@ it("uses Maintenance's Skills rule for real curation, ignoring legacy curator Pa
   const x = await setup();
   const skill = { name: "old", description: "Old skill", body: "Old steps", state: "active" as SkillState, pinned: false, usedAt: 0, updatedAt: 0 };
   const bot = { ...x.bot, name: "Dot" };
-  const learning = new SkillLearning({ db: x.db, sdk: x.bb.sdk, changed: () => {}, bots: () => [bot], bot: () => bot, memoryPage: () => null, skills: () => [skill], setState: (_bot, _name, state) => { skill.state = state; } });
+  const learning = new SkillLearning({ db: x.db, sdk: x.bb.sdk, changed: () => {}, bots: () => [bot], bot: () => bot, conversations: () => [], skills: () => [skill], setState: (_bot, _name, state) => { skill.state = state; } });
   await learning.view("bot");
   x.db.prepare("UPDATE bot_learning SET curator_paused = 1 WHERE bot_id = 'bot'").run();
   const maintenance = new BotMaintenance({ ...(x.maintenance as unknown as { deps: ConstructorParameters<typeof BotMaintenance>[0] }).deps, curate: (id, dryRun) => learning.curate(id, { dryRun, now }) });

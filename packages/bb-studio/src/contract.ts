@@ -142,7 +142,7 @@ const bot = z.object({
   avatar: z.string(),
   state: botStateSchema,
   threadId: z.string().nullable(),
-  /** Its Memory page (a Studio page), once made. */
+  /** Its old core profile page (a Studio page), when it has one; its text moved to the always-on skill. */
   memoryPageId: z.string().nullable().optional(),
   /** Its drawn avatar, a shape with eyes in a color; null shows the emoji. */
   shape: z.string().nullable().optional(),
@@ -184,13 +184,20 @@ const botSkill = z.object({
   pinned: z.boolean().optional(),
   /** When the Bot last loaded or saved it. */
   usedAt: z.number().nullable().optional(),
+  /** Always on: injected in full into every conversation and worker of the Bot (src/core-skill.ts). */
+  alwaysOn: z.boolean().optional(),
 });
-/** A Bot's skill learning (src/skill-learning.ts): background reviews and the curator. */
+/** A Bot's skill learning (src/skill-learning.ts): reviews once a day and when a conversation is archived, and the curator. */
 const botLearning = z.object({
-  enabled: z.boolean(), interval: z.number(), reviewModel: z.string().nullable(), defaultModel: z.string().nullable(), models: z.array(z.string()),
+  enabled: z.boolean(), reviewModel: z.string().nullable(), defaultModel: z.string().nullable(), models: z.array(z.string()),
   modelNames: z.record(z.string(), z.string()).optional(),
   consolidate: z.boolean(),
-  toolTurns: z.number(), userTurns: z.number(), reviewing: z.boolean(),
+  /** When reviews run: once a day (Main and unarchived conversations with new turns) and when a conversation is archived. */
+  cadence: z.literal("daily-and-archive"),
+  reviewing: z.boolean(),
+  /** Conversations waiting for their review. */
+  queued: z.number(),
+  lastSweepAt: z.number().nullable(),
   lastReview: z.object({ at: z.number(), result: z.string() }).nullable(),
   lastCurator: z.object({ at: z.number(), result: z.string() }).nullable(),
 });
@@ -383,7 +390,7 @@ const botAutomation = z.object({
   name: z.string(),
   /** The schedule ids behind this Studio job: one `trg_…` id on Studio's scheduler, or a watcher's BB automation ids (a schedule can compile to several). */
   bbIds: z.array(z.string()).optional(),
-  /** The Bot's original check-in (its heartbeat): its instruction is the Memory page's Check-in section. */
+  /** The Bot's original check-in (its heartbeat): its instruction is the Check-in section of the Bot's always-on skill. */
   original: z.boolean(),
   /** On a BB Studio copy: imported from bb and paused here so it doesn't run twice. Read-only: edit, pause, resume, run and delete are refused. */
   inBb: z.boolean().optional(),
@@ -575,7 +582,7 @@ export const rpcContract = defineRpcContract({
   bot_cache_banner_hide: { input: z.object({ threadId: threadIdInput }), output: z.object({ ok: z.literal(true) }) },
   /** Starts BB's compaction of an idle Bot chat (the user's manual action). */
   bot_cache_compact: { input: z.object({ threadId: threadIdInput }), output: z.object({ ok: z.literal(true) }) },
-  /** The Bot's Memory page, made on first need. */
+  /** The Bot's old core profile page, when it still exists (none is made now: the always-on skill holds its text). */
   bot_memory: { input: forBot, output: z.object({ pageId: z.string().nullable() }) },
   /** The Bot's chat as one conversation: its thread and the ones it handed off from, oldest first. `threads` carries each one's title: they're hidden, so BB's title lookup shows nothing. */
   bot_chain: { input: forBot, output: z.object({ threadIds: z.array(z.string()), threads: z.array(z.object({ id: z.string(), title: z.string() })) }) },
@@ -607,12 +614,23 @@ export const rpcContract = defineRpcContract({
     }),
   },
   bot_welcome_opened: { input: z.object({}), output: z.object({ ok: z.boolean() }) },
-  /** A check-in preset: sets the schedule and adds its one-line instruction to the Memory page's Check-in section. */
+  /** A check-in preset: sets the schedule and adds its one-line instruction to the Check-in section of the Bot's always-on skill. */
   bot_checkin_preset: { input: z.object({ botId, preset: z.enum(["morning", "evening", "working", "off"]) }), output: botView },
   /** The Bot's own skills. */
   bot_skills: { input: forBot, output: z.object({ skills: z.array(botSkill) }) },
-  /** Adds or replaces one of the Bot's skills (as its bot_skill_edit tool does with op "write"). */
-  bot_skill_write: { input: z.object({ botId, name: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(64), description: z.string().trim().min(1).max(500), body: z.string().min(1).max(20_000) }), output: botSkill },
+  /** The Bot's always-on skills (src/core-skill.ts) in full, the core skill first, with their advisory notes and the shared character budget: Memory's Core layer. */
+  bot_core: { input: forBot, output: z.object({
+    skills: z.array(z.object({ name: z.string(), description: z.string(), body: z.string(), updatedAt: z.number(), warnings: z.array(z.string()),
+      /** The Bot's core skill (its marker in bot_core_skills): its sections are Core's. */
+      core: z.boolean().optional() })),
+    chars: z.number(), cap: z.number(), over: z.boolean(),
+  }) },
+  /**
+   * Adds or replaces one of the Bot's skills (as its bot_skill_edit tool does with op "write").
+   * `ifBody` makes it a compare-and-swap: written only while the skill's body is still exactly that text
+   * (null: only while no such skill exists); otherwise it fails and writes nothing (src/bot-skills.ts, SKILL_CHANGED).
+   */
+  bot_skill_write: { input: z.object({ botId, name: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(64), description: z.string().trim().min(1).max(500), body: z.string().min(1).max(20_000), alwaysOn: z.boolean().optional(), ifBody: z.string().max(20_000).nullable().optional() }), output: botSkill },
   /** Shares a Bot skill: it moves into BB's user skills, for every agent. */
   bot_skill_share: { input: z.object({ botId, name: z.string().min(1).max(100) }), output: z.object({ path: z.string() }) },
   /** Deletes a Bot skill. */
@@ -624,7 +642,7 @@ export const rpcContract = defineRpcContract({
   /** The Bot's skill learning: settings, counters, the last review and curator run. */
   bot_learning: { input: forBot, output: botLearning },
   /** Changes the Bot's skill learning settings. */
-  bot_learning_set: { input: z.object({ botId, enabled: z.boolean().optional(), interval: z.number().int().min(2).max(200).optional(), reviewModel: z.string().max(200).nullable().optional(), consolidate: z.boolean().optional() }), output: botLearning },
+  bot_learning_set: { input: z.object({ botId, enabled: z.boolean().optional(), reviewModel: z.string().max(200).nullable().optional(), consolidate: z.boolean().optional() }), output: botLearning },
   /** Starts a skill review now (a fork of the Bot's idle thread); started is false when one is running or the Bot is busy. */
   bot_learning_review: { input: forBot, output: z.object({ started: z.boolean() }) },
   /** Runs the skill curator now; dryRun lists what it would change. */

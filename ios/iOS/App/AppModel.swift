@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 import UIKit
@@ -21,6 +22,8 @@ enum Route: Hashable {
     case visualChats
     case visualChat(threadId: String?)
     case memoryRecord(id: String)
+    /// A Bot's place (Strands, Memory, Library…) pushed in Home's list; only the list draws it.
+    case roomPlace(String)
 }
 
 extension Route {
@@ -85,62 +88,36 @@ enum Sheet: Identifiable, Hashable {
     }
 }
 
-/// Where the Bots tab goes: its list, the primary bot, or one bot by id.
-enum BotRoute: Hashable {
-    case list, primary, bot(String)
-}
-
-enum BotShellLink: Hashable {
-    case thread(String, worker: Bool)
-    case page(BotPage, botId: String?)
-    case push(Route)
-}
-
-enum Tab: Hashable {
-    case inbox, studio, bot, settings
-}
-
 @MainActor
 final class AppModel: ObservableObject {
     static let shared = AppModel()
 
     @Published private(set) var client: BBClient
     @Published private(set) var realtime: BBRealtime
-    /// Bot is the primary tab: every launch opens on it. Links, notification
-    /// taps, widgets and Siri set their own tab after this, so they always win.
-    @Published var tab: Tab = .bot {
-        didSet { if tab == .bot, oldValue != .bot { TouchClock.forget() } }
-    }
-    @Published var path: [Route] = []
-    @Published var studioPath: [Route] = []
-    /// What the Bots tab should show next, set by links and the Action button.
-    @Published var botRoute: BotRoute?
-    /// The Studio tab's kind filter; nil for everything.
-    @Published var studioKind: String?
-    @Published var sheet: Sheet?
+    /// All navigation state; `open` is the one way in.
+    let router = Router.shared
     @Published var notificationError: String?
     /// A brief message over the whole app for something that went partly wrong, like Studio's flash.
     @Published private(set) var notice: String?
-    /// Opens the new-thread composer, optionally prefilled.
-    @Published var newThreadDraft: String?
-    /// Set by `bbstudio://reply/<id>`; that thread focuses its composer.
-    @Published var replyThreadId: String?
-    /// Text for the Bot chat's composer (Nudge them drafts; it never sends).
-    @Published var botDraft: String?
-    /// Set to show the Bot's Loops (the morning card's "N more", `bbstudio://loops`).
-    /// The classic Bot tab shows the Strands screen (a link came before the Bot loaded).
-    @Published var botShowsStrands = false
-    @Published var shellLink: BotShellLink?
+    private var idleWatch: AnyCancellable?
 
     /// The last thread opened.
     var lastThreadId: String {
         get { UserDefaults.standard.string(forKey: ServerScope.key("lastThreadId", serverURL: serverURL)) ?? "" }
-        set { UserDefaults.standard.set(newValue, forKey: ServerScope.key("lastThreadId", serverURL: serverURL)) }
+        set {
+            let key = ServerScope.key("lastThreadId", serverURL: serverURL)
+            if UserDefaults.standard.string(forKey: key) != newValue {
+                UserDefaults.standard.set(newValue, forKey: key)
+            }
+        }
     }
 
     private init() {
         let client = BBClient()
         self.client = client
+        // From launch, so an accessibility install before the first
+        // transcript still counts (it wakes the transcript's hosted chrome).
+        _ = AccessibilityTurnOn.watch()
         realtime = BBRealtime(client: client)
         // Started when the scene becomes active, so a background launch (a watch
         // relay, a Live Activity token) doesn't open a socket.
@@ -148,9 +125,11 @@ final class AppModel: ObservableObject {
         flushOutboxOnConnect()
         BotSpacesStore.shared.attach(client: client, realtime: realtime)
         BotLiveActivities.shared.attach(store: BotSpacesStore.shared, client: client)
+        idleWatch = EnergyGate.shared.$idle.removeDuplicates().dropFirst().sink { [weak self] idle in
+            self?.realtime.pauseThreadList(idle)
+        }
         #if DEBUG
         BotSpacesDemo.install(BotSpacesStore.shared)
-        if ProcessInfo.processInfo.arguments.contains("-qaStartOnThreads") { tab = .inbox }
         #endif
     }
 
@@ -170,8 +149,7 @@ final class AppModel: ObservableObject {
         Spotlight.reset()
         StatusWidgets.reset()
         PhoneRelay.shared.pushStatus([])
-        studioKind = nil
-        sheet = nil
+        router.reset()
         realtime.stop()
         client = BBClient(baseURL: url)
         realtime = BBRealtime(client: client)
@@ -181,10 +159,6 @@ final class AppModel: ObservableObject {
         BotSpacesStore.shared.attach(client: client, realtime: realtime)
         BotLiveActivities.shared.attach(store: BotSpacesStore.shared, client: client)
         BotSpacesStore.shared.askIfUnknown()
-        path = []
-        studioPath = []
-        newThreadDraft = nil
-        replyThreadId = nil
         Outbox.shared.flush()
         TalkOutbox.shared.kick()
         registerPushWithNewServer()
@@ -225,70 +199,71 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://mini[/<id>]`, `bbstudio://visual-chat[/<threadId>|/new]`,
-    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://handsfree`, `bbstudio://studio` (or `talk`), `bbstudio://bots` (the list), `bbstudio://bot[/<id>]` (also `chief` and the old `web`, the primary), `bbstudio://bot-talk` (also `chief-talk`, hands-free voice started at once), `bbstudio://strands` (also the older `loops`, the Strands screen).
+    /// `bbstudio://` links. Entity links (`thread`, `page`, `design`, `bot`…)
+    /// go through the shared link router; the rest: `reply/<id>`, `capture`,
+    /// `dictate`, `record`, `write`, `handsfree`, `new`, `studio` (or `talk`),
+    /// `usage`, `archived`, `drawing[s][/<id>]`, `pages`, `recordings`,
+    /// `artifacts`, `designs`, `mini[s][/<id>]`, `visual-chat[/<threadId>|/new]`,
+    /// `bots`, `chief`/`web`, `bot-talk` (also `chief-talk`), `strands` (also
+    /// `loops`) and `settings`. Anything else opens the conversation list.
     func handle(_ url: URL) {
         guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
         let id = url.pathComponents.dropFirst().first
-        if let target = Self.linkTarget(url, inSpaces: inSpaces) {
+        if let target = Self.linkTarget(url) {
             openLink(target)
             return
         }
         switch url.host() {
-        case "capture": sheet = .capture
-        case "thread": if let id { openThread(id) }
-        case "reply":
-            if let id {
-                openThread(id)
-                replyThreadId = id
-            }
-        case "page": if let id { openPage(id) }
-        case "automations": open(.automations)
-        case "usage": open(.usage)
-        case "archived": open(.archived)
-        case "drawing", "drawings": openStudio(kind: "drawing", id.map { .drawing(id: $0) })
-        case "pages": openStudio(kind: "page")
-        case "recording", "recordings": openStudio(kind: "recording", id.map { .recording(id: $0) })
-        case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
-        case "design", "designs": openStudio(kind: "design", id.map { .design(id: $0) })
-        case "mini", "minis": openStudio(kind: "mini", id.map { .mini(id: $0) })
+        case "bot-talk", "chief-talk": toggleBotTalk(botId: id)
         case "dashboard", "dashboards": flash("Dashboards open in BB on your Mac.")
         case "visual-chat":
             // The list under the chat, so Back goes to it.
-            openStudio(kind: nil, .visualChats)
-            if let id { studioPath.append(.visualChat(threadId: id == "new" ? nil : id)) }
-        case "dictate": startDictation(threadId: id)
-        case "record": sheet = .recording
-        case "write": sheet = .write
-        case "handsfree", "hands-free": sheet = .handsFree(threadId: id)
-        case "new": newThread()
-        case "studio", "talk": openStudio(kind: nil)
-        case "bots": openBots(.list)
-        case "loops", "strands": openStrands()
-        case "bot": openBots(id.map { .bot($0) } ?? .primary)
-        case "chief", "web": openBots(.primary)
-        case "bot-talk", "chief-talk": toggleBotTalk(botId: id)
-        case "settings": tab = .settings
-        case "file": break  // Opened by the thread view, which knows the workspace.
-        default: tab = .inbox
+            open(.studio(kind: nil, .visualChats))
+            if let id { router.studioPath.append(.visualChat(threadId: id == "new" ? nil : id)) }
+        default:
+            if let destination = Self.destination(url, id: id) { open(destination) }
+            if url.host() == "reply", let id { router.replyThreadId = id }
         }
     }
 
-    var inSpaces: Bool { BotSpacesStore.shared.useSpaces }
-
-    nonisolated static let legacyLinkHosts: Set<String> = ["page", "recording", "artifact", "design", "dashboard", "bot", "automations", "file"]
-
-    nonisolated static func linkTarget(_ url: URL, inSpaces: Bool) -> LinkTarget? {
-        let host = url.host() ?? ""
-        let routed: Bool
-        if host == "thread" {
-            routed = inSpaces
-        } else if let kind = LinkKind(rawValue: host) {
-            routed = !legacyLinkHosts.contains(kind.rawValue) || (inSpaces && kind != .file)
-        } else {
-            routed = false
+    /// Where a `bbstudio://` link that isn't an entity goes.
+    static func destination(_ url: URL, id: String?) -> Destination? {
+        switch url.host() {
+        case "capture": .sheet(.capture)
+        case "reply": id.map(Destination.conversation)
+        // The link router doesn't take these: a Studio item's own screen.
+        case "page": id.map { .studio(kind: nil, .page(id: $0)) }
+        case "automations": .route(.automations)
+        case "usage": .route(.usage)
+        case "archived": .route(.archived)
+        case "drawing", "drawings": .studio(kind: "drawing", id.map { .drawing(id: $0) })
+        case "pages": .studio(kind: "page", nil)
+        case "recording", "recordings": .studio(kind: "recording", id.map { .recording(id: $0) })
+        case "artifact", "artifacts": .studio(kind: "artifact", id.map { .artifact(id: $0) })
+        case "design", "designs": .studio(kind: "design", id.map { .design(id: $0) })
+        case "bot": .bot(id)
+        case "mini", "minis": .studio(kind: "mini", id.map { .mini(id: $0) })
+        case "visual-chat": .studio(kind: nil, .visualChats)
+        case "dictate": .sheet(.dictation(threadId: id, autoStart: true))
+        case "record": .sheet(.recording)
+        case "write": .sheet(.write)
+        case "handsfree", "hands-free": .sheet(.handsFree(threadId: id))
+        case "new": .compose("")
+        case "studio", "talk": .studio(kind: nil, nil)
+        case "bots": .list
+        case "loops", "strands": .place(.strands, botId: nil)
+        case "chief", "web": .bot(nil)
+        case "bot-talk", "chief-talk": nil
+        case "settings": .settings
+        default: .list
         }
-        guard routed else { return nil }
+    }
+
+    /// A link the shared link router opens: `thread` and every entity kind
+    /// but `file`, which the thread view opens in its workspace.
+    nonisolated static func linkTarget(_ url: URL) -> LinkTarget? {
+        let host = url.host() ?? ""
+        guard host == "thread" || LinkKind(rawValue: host).map({ $0 != .file }) == true else { return nil }
         let text = host == "thread" ? "bb://conversation" + url.path(percentEncoded: true) : url.absoluteString
         guard case .entity(let ref)? = Links.parse(text) else { return nil }
         return .entity(ref)
@@ -315,44 +290,22 @@ final class AppModel: ObservableObject {
     func follow(_ destination: LinkDestination, push: ((Route) -> Void)? = nil) {
         switch destination {
         case .thread(let id, let worker):
-            // A plain bb thread (not a Bot's conversation or worker) opens as a thread.
-            if inSpaces, worker || BotSpacesStore.shared.knows(threadId: id) != false {
-                tab = .bot
-                shellLink = .thread(id, worker: worker || BotSpacesStore.shared.views.values.contains { $0.workers.contains { $0.threadId == id } })
-            } else {
-                openThread(id)
-            }
+            let store = BotSpacesStore.shared
+            open(worker || store.views.values.contains { $0.workers.contains { $0.threadId == id } } ? .worker(id) : .conversation(id))
         case .bot(let id):
-            openBots(.bot(id))
+            open(.bot(id))
         case .botPage(let page, let botId):
-            if inSpaces {
-                tab = .bot
-                shellLink = .page(page, botId: botId)
-            } else {
-                switch page {
-                case .strands: openStrands()
-                case .automations: open(.automations)
-                default: openBots(botId.map(BotRoute.bot) ?? .primary)
-                }
-            }
+            open(.place(page, botId: botId))
         case .automation:
-            follow(.botPage(.automations, botId: nil), push: push)
+            open(.place(.automations, botId: nil))
         case .todo(let id):
-            if id.isEmpty { follow(.botPage(.strands, botId: nil), push: push) } else { openTask(id, conversation: nil) }
-        case .record(let id):
-            follow(.route(.memoryRecord(id: id)), push: push)
+            // An old card's link: its read-only card over the room.
+            open(id.isEmpty ? .place(.strands, botId: nil) : .sheet(.task(id: id)))
+        case .record:
+            // Memory records are retired (Links.destination sends old record links to Memory); kept for older callers.
+            open(.place(.memory, botId: nil))
         case .route(let route):
-            if let push {
-                push(route)
-            } else if inSpaces {
-                tab = .bot
-                shellLink = .push(route)
-            } else if case .visualChat(let threadId) = route {
-                openStudio(kind: nil, .visualChats)
-                studioPath.append(.visualChat(threadId: threadId))
-            } else {
-                openStudio(kind: nil, route)
-            }
+            if let push { push(route) } else { open(.route(route)) }
         case .safari(let url):
             UIApplication.shared.open(url)
         case .threadFiles:
@@ -362,69 +315,11 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func newThread(text: String = "") {
-        tab = .inbox
-        newThreadDraft = text
-    }
+    /// The one way in (`Router.open`).
+    func open(_ destination: Destination) { router.open(destination) }
 
-    func openThread(_ id: String) {
-        tab = .inbox
-        path = [.thread(id: id)]
-    }
-
-    func openTaskThread(_ id: String) {
-        if case .task? = sheet { sheet = nil }
-        if inSpaces {
-            tab = .bot
-            shellLink = .thread(id, worker: false)
-        } else {
-            openThread(id)
-        }
-    }
-
-    /// A tap on an older Studio's to-do push (`BB_LOOP`): its conversation, or
-    /// the read-only card when it names none.
-    func openTaskPush(_ id: String, conversation: String?) {
-        if let conversation {
-            if case .task? = sheet { sheet = nil }
-            openTaskThread(conversation)
-        } else {
-            openTask(id, conversation: nil)
-        }
-    }
-
-    func openTask(_ id: String, conversation: String?) {
-        if let conversation { openTaskThread(conversation) } else if inSpaces { tab = .bot } else { openBots(.primary) }
-        Task {
-            try? await Task.sleep(for: .milliseconds(450))
-            sheet = .task(id: id)
-        }
-    }
-
-    func open(_ route: Route) {
-        tab = .inbox
-        path = [route]
-    }
-
-    /// Onto the stack of the tab showing, so Back returns where you were.
-    func push(_ route: Route) {
-        if tab == .studio {
-            studioPath.append(route)
-        } else {
-            tab = .inbox
-            path.append(route)
-        }
-    }
-
-    func openPage(_ id: String) {
-        openStudio(kind: nil, .page(id: id))
-    }
-
-    func openStudio(kind: String?, _ route: Route? = nil) {
-        tab = .studio
-        if let kind { studioKind = StudioKind.family(kind) }
-        studioPath = route.map { [$0] } ?? []
-    }
+    /// Onto the stack showing, so Back returns where you were.
+    func push(_ route: Route) { router.push(route) }
 
     /// Shows `message` at the bottom of the app for a few seconds.
     func flash(_ message: String) {
@@ -435,21 +330,15 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func startDictation(threadId: String? = nil) {
-        sheet = .dictation(threadId: threadId, autoStart: true)
-    }
-
-    /// Talk to Bot (the Action button, Siri, `bbstudio://bot-talk`): a hands-free
-    /// voice session with the Bot, started at once. Run again, it ends the session.
-    /// Talk to Bot: hands-free voice with a Bot's Main (the current Bot's, or
-    /// `botId`'s), started at once; again ends it. On a Studio without Bot
-    /// spaces, Studio picks the voice's identity as before.
+    /// Talk to Bot (the Action button, Siri, `bbstudio://bot-talk`): hands-free
+    /// voice with a Bot's Main (the current Bot's, or `botId`'s), started at
+    /// once. Run again, it ends the session.
     func toggleBotTalk(botId: String? = nil) {
-        if case .handsFree = sheet {
-            sheet = nil
+        if case .handsFree = router.sheet {
+            router.sheet = nil
             return
         }
-        sheet = .handsFree(autoStart: true, threadId: Self.talkThreadId(store: BotSpacesStore.shared, botId: botId))
+        router.sheet = .handsFree(autoStart: true, threadId: Self.talkThreadId(store: BotSpacesStore.shared, botId: botId))
     }
 
     static func talkThreadId(store: BotSpacesStore, botId: String?) -> String? {
@@ -457,28 +346,5 @@ final class AppModel: ObservableObject {
         let bot = spaces.bots.first { $0.id == botId } ?? BotShell.shownBot(spaces, chosen: store.shownBotId)
         guard let bot else { return nil }
         return bot.mainThreadId(in: store.view(for: bot.id))
-    }
-
-    /// The Bot's Strands screen (`bbstudio://strands`, and the older `bbstudio://loops`).
-    func openStrands() {
-        if inSpaces {
-            tab = .bot
-            shellLink = .page(.strands, botId: nil)
-            return
-        }
-        if tab != .bot { openBots(.primary) }
-        botShowsStrands = true
-    }
-
-    /// Puts text in the Bot chat's composer and shows the chat.
-    func draftForBot(_ text: String) {
-        botShowsStrands = false
-        if tab != .bot { openBots(.primary) }
-        botDraft = text
-    }
-
-    func openBots(_ route: BotRoute) {
-        botRoute = route
-        tab = .bot
     }
 }

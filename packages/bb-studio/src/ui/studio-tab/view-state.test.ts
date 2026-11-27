@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TAB_KINDS, enabledKinds } from "./model";
 import { applyScroll, elementAt, elementPath, forgetView, loadView, onViewForgotten, saveView, validTarget, VIEW_LIMIT, VIEW_STORAGE_KEY, viewKey } from "./view-state";

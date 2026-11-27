@@ -6,13 +6,17 @@
 // finished), only when it was active in the last 14 days, one at a time,
 // the most recently active first.
 import type Database from "better-sqlite3";
-import { type OverviewConversation, type StrandItemView, type StrandList, type StrandView } from "./contract";
+import { type OverviewConversation, type ReplyTagView, type StrandItemView, type StrandList, type StrandView } from "./contract";
 import { firstLineTitle } from "./naming";
 import { JEV_DAILY_CAP, StrandDetector, type DetectorDeps, type OpenTask } from "./detector";
 import { approvalDecisions, approvalLines, isWorkerApproval, shortApproval, type Interaction } from "../worker-approvals";
 import { byState, liveState, strayWorkersOf, type AskSignal, type Signals, type TaskSignal, type WorkerSignal, type WorkerStatus } from "./states";
 import { StrandStore, type Strand } from "./store";
+import { REPLY_OPEN_MS } from "./reply";
+import { isPingRequest } from "../bot-cache";
+import type { EventRow } from "./turns";
 import { USER_OWNER } from "../tasks/contract";
+import { mapPool } from "../kit/pool";
 
 export interface WorkerFact { threadId: string; title: string; status: WorkerStatus; createdAt: number; endedAt: number | null }
 
@@ -63,6 +67,10 @@ export function askOf(interaction: Interaction & { createdAt?: number }, threadI
 export const BACKFILL_RETRY_MS = 5 * 60 * 1000;
 export const BACKFILL_RETRY_MAX_MS = 60 * 60 * 1000;
 
+/** How long a worker whose spawn wasn't found yet waits before it is looked up again, and how many workers' spawn turns are kept. */
+export const SPAWN_MISS_MS = 60_000;
+export const SPAWN_CACHE = 500;
+
 /** Only conversations active this recently are backfilled. */
 export const BACKFILL_ACTIVE_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -73,6 +81,10 @@ export class StrandService {
   /** Conversations whose backfill failed: not tried again until `until` (5 minutes, doubling up to an hour). */
   private readonly backfillFailed = new Map<string, { until: number; delay: number }>();
   private backfilling: Promise<void> | null = null;
+  /** The turn that started each worker, once looked up; a miss (null) is kept for SPAWN_MISS_MS, then looked up again. At most SPAWN_CACHE workers. */
+  private readonly spawnTurns = new Map<string, { turnId: string | null; at: number }>();
+  /** Workers whose strand Jev is choosing now (one call at a time per worker). */
+  private readonly choosing = new Set<string>();
   /** After a reload the old instance's database is closed: nothing new starts, and work in flight ends quietly. */
   private disposed = false;
 
@@ -82,7 +94,7 @@ export class StrandService {
       ...deps, store: this.store, openTasks: (threadId) => openAgentTasks(deps.db, threadId),
       workerStrand: async (threadId, workerThreadId) => {
         const worker = (await deps.workers(threadId).catch(() => [] as WorkerFact[])).find((each) => each.threadId === workerThreadId);
-        return worker ? this.workerStrand(threadId, worker, false) : undefined;
+        return worker ? await this.workerStrand(threadId, worker, false) : undefined;
       },
     });
   }
@@ -153,7 +165,10 @@ export class StrandService {
       this.deps.interactions(threadId).catch(() => []),
     ]);
     const runningStrandId = busy ? this.detector.runningStrand(threadId) : null;
-    const workers: WorkerSignal[] = workerFacts.map((worker) => ({ ...worker, strandId: this.workerStrand(threadId, worker, busy) }));
+    const workers: WorkerSignal[] = await mapPool(workerFacts, 6, async (worker) => ({
+      ...worker,
+      strandId: await this.workerStrand(threadId, worker, busy),
+    }));
     const turnStrand = (at: number) => (busy && this.detector.hasRunningTurn(threadId) ? runningStrandId : this.store.strandAt(threadId, at)?.strandId ?? null);
     // The turn an ask waits in: the running turn, else the newest sorted one at or before it.
     const turnOf = (at: number) => {
@@ -163,10 +178,12 @@ export class StrandService {
     };
     const asks: AskSignal[] = interactions.map((ask) => ({ ...askOf(ask, threadId, turnStrand(ask.createdAt ?? now)), turnId: turnOf(ask.createdAt ?? now) }));
     // A worker that needs the user: what it waits on, with its approval's choices.
-    for (const worker of workers.filter((each) => each.status === "needs-you")) {
+    const needsYouWorkers = workers.filter((each) => each.status === "needs-you");
+    const workerAsks = await mapPool(needsYouWorkers, 6, async (worker) => {
       const pending = await this.deps.interactions(worker.threadId).catch(() => []);
-      asks.push(...pending.map((ask) => ({ ...askOf(ask, worker.threadId, worker.strandId), label: `${worker.title}: ${askOf(ask, worker.threadId, null).label}` })));
-    }
+      return pending.map((ask) => ({ ...askOf(ask, worker.threadId, worker.strandId), label: `${worker.title}: ${askOf(ask, worker.threadId, null).label}` }));
+    });
+    for (const group of workerAsks) asks.push(...group);
     for (const request of this.gatewayRequests()) {
       const worker = workers.find((each) => each.threadId === request.threadId);
       const label = `Add MCP server: ${request.input?.label ?? request.input?.name ?? "a server"}`;
@@ -175,21 +192,61 @@ export class StrandService {
     }
     // An area's item that needs the user, or the conversation's flag: on the strand of the turn it was raised in.
     for (const ask of this.deps.extraAsks?.(threadId) ?? []) asks.push({ id: ask.id, kind: ask.kind, strandId: turnStrand(ask.at), label: ask.label, threadId, details: [], decisions: [], turnId: turnOf(ask.at) });
+    // A reply that asks the user something, until they answer in its strand or mark it done.
+    for (const reply of this.store.openReplies(threadId, now - REPLY_OPEN_MS)) {
+      asks.push({ id: `reply:${reply.seq}`, kind: "reply", strandId: reply.strandId, label: reply.ask ?? "A reply needs you", threadId, details: [], decisions: [], turnId: reply.turnId, seq: reply.seq });
+    }
     const tasks: TaskSignal[] = openAgentTasks(this.deps.db, threadId).flatMap((task) => {
       const strand = this.store.byTask(task.id);
       return strand ? [{ id: task.id, strandId: strand.id, waitingOn: task.waitingOn ?? null }] : [];
     });
-    return { now, runningStrandId, workers, asks, tasks };
+    return { now, busy, runningStrandId, workers, asks, tasks };
   }
 
   /**
-   * A worker's strand: the turn it started in (its conversation's newest
-   * sorted message at or before its start), kept once that turn is settled.
-   * While the turn it started in is still running and unsorted, none.
+   * A worker's strand: the strand of the turn that started it, a link read
+   * from the conversation (the spawn's item names the worker), kept once that
+   * turn is sorted. A turn about more than one strand asks Jev which one the
+   * worker's task is. While that turn isn't sorted yet, none, and nothing is
+   * kept. When no item names it (an older BB, a worker started elsewhere),
+   * the newest sorted message at or before its start, as before.
    */
-  private workerStrand(threadId: string, worker: WorkerFact, busy: boolean): string | null {
+  private async workerStrand(threadId: string, worker: WorkerFact, busy: boolean): Promise<string | null> {
     const kept = this.store.db.prepare("SELECT strand_id FROM strand_items WHERE thread_id = ? AND kind = 'worker' AND ref = ? LIMIT 1").get(threadId, worker.threadId) as { strand_id: string | null } | undefined;
     if (kept) return kept.strand_id;
+    const cached = this.spawnTurns.get(worker.threadId);
+    // Found, or not found once the conversation was idle (no item will name it), is kept; a miss while busy only for a while.
+    let turnId = cached && (cached.turnId !== null || !busy || this.now() - cached.at < SPAWN_MISS_MS) ? cached.turnId : undefined;
+    if (turnId === undefined) {
+      // A read that failed isn't a miss: nothing is kept, and the next read looks again.
+      try { turnId = await this.detector.spawnTurn(threadId, worker.threadId, worker.createdAt); } catch { return null; }
+      // A miss while its turn may still be writing is looked up again after a while, not on every read.
+      this.spawnTurns.delete(worker.threadId);
+      this.spawnTurns.set(worker.threadId, { turnId, at: this.now() });
+      while (this.spawnTurns.size > SPAWN_CACHE) this.spawnTurns.delete(this.spawnTurns.keys().next().value!);
+    }
+    if (turnId) {
+      const head = this.store.byTurn(threadId, turnId);
+      if (!head) return busy && this.detector.hasRunningTurn(threadId) ? this.detector.runningStrand(threadId) : null;
+      // A turn about two strands, with richer sorting: Jev picks the worker's (one call at a time per worker, in the background); until then the turn's main strand, not kept.
+      if (head.strandId && head.also.length && this.deps.richSorting?.()) {
+        if (!this.choosing.has(worker.threadId)) {
+          this.choosing.add(worker.threadId);
+          const found = turnId;
+          void this.detector.workerChoice(threadId, worker.title, [head.strandId, ...head.also])
+            .then((strandId) => {
+              if (this.disposed || this.store.item(threadId, "worker", head.seq, worker.threadId)) return;
+              this.store.put({ threadId, seq: head.seq, kind: "worker", ref: worker.threadId, turnId: found, at: worker.createdAt, line: worker.title, strandId, confidence: null, by: "inherit" });
+              this.deps.changed(threadId);
+            })
+            .catch((error) => this.deps.log(`Strands: choosing a worker's strand failed: ${error instanceof Error ? error.message : String(error)}`))
+            .finally(() => this.choosing.delete(worker.threadId));
+        }
+        return head.strandId;
+      }
+      this.store.put({ threadId, seq: head.seq, kind: "worker", ref: worker.threadId, turnId, at: worker.createdAt, line: worker.title, strandId: head.strandId, confidence: null, by: "inherit" });
+      return head.strandId;
+    }
     const at = this.store.strandAt(threadId, worker.createdAt);
     if (!at) return null;
     const later = this.store.db.prepare("SELECT 1 FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND at > ? LIMIT 1").get(threadId, worker.createdAt);
@@ -230,15 +287,15 @@ export class StrandService {
       const count = counts.get(strand.id);
       return {
         id: strand.id, title: strand.title, summary: strand.summary, named: strand.named, state: live.state, detail: live.detail,
-        asks: live.asks.map(({ id, kind, threadId: askThread, label, details, decisions, turnId }) => ({ id, kind, threadId: askThread, label, details, decisions, turnId: turnId ?? null })), workers: live.workers,
+        asks: live.asks.map(({ id, kind, threadId: askThread, label, details, decisions, turnId, seq }) => ({ id, kind, threadId: askThread, label, details, decisions, turnId: turnId ?? null, seq: seq ?? null })), workers: live.workers,
         lastAt: strand.lastAt, firstAt: first?.at ?? null, firstSeq: first?.seq ?? null, latestSeq: latest?.seq ?? null, latestTurnId: latest?.turnId ?? null, messages: count?.messages ?? 0, unsure: count?.unsure ?? 0,
-        pinned: strand.pinned, origin: strand.origin, taskId: strand.taskId,
+        pinned: strand.pinned, origin: strand.origin, taskId: strand.taskId, parentId: strand.parentId, trunk: strand.trunk,
       };
     };
     const ordered = byState(rows);
     return {
       ...base,
-      sortingTurn: (await this.deps.busy(threadId).catch(() => false)) && this.detector.hasRunningTurn(threadId) && !this.detector.runningStrand(threadId),
+      sortingTurn: !!signals.busy && this.detector.hasRunningTurn(threadId) && !this.detector.runningStrand(threadId),
       strands: ordered.filter((row) => !row.live.earlier).map(view),
       earlier: ordered.filter((row) => row.live.earlier).map(view),
       strayWorkers,
@@ -247,16 +304,65 @@ export class StrandService {
 
   items(threadId: string, limit: number): StrandItemView[] {
     if (!this.enabled(threadId)) return [];
-    return this.store.items(threadId, limit, ["user", "report", "worker"]).map((item) => ({ ...item }));
+    return this.store.items(threadId, limit, ["user", "report", "worker"]).map(({ quiet: _quiet, ...item }) => ({ ...item }));
   }
 
-  tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null }[]; strands: { id: string; title: string }[] } {
-    if (!this.enabled(threadId)) return { tags: [], strands: [] };
-    const rows = this.store.db.prepare("SELECT turn_id, seq, strand_id FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq DESC LIMIT 2000").all(threadId) as { turn_id: string; seq: number; strand_id: string | null }[];
+  tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null; kind: "user" | "report"; at: number | null; line: string | null; also: string[] }[]; strands: { id: string; title: string; done: boolean; parentId: string | null; trunk: boolean }[]; replies: ReplyTagView[]; opening: { seq: number; replySeq: number | null } | null } {
+    if (!this.enabled(threadId)) return { tags: [], strands: [], replies: [], opening: null };
+    const rows = this.store.db.prepare("SELECT turn_id, seq, strand_id, kind, at, line, also_strands FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq DESC LIMIT 2000").all(threadId) as { turn_id: string; seq: number; strand_id: string | null; kind: "user" | "report"; at: number | null; line: string | null; also_strands: string | null }[];
+    const first = this.store.db.prepare("SELECT seq, turn_id FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq LIMIT 1").get(threadId) as { seq: number; turn_id: string } | undefined;
+    const alsoOf = (value: string | null): string[] => { try { const list = value ? JSON.parse(value) as unknown : []; return Array.isArray(list) ? list.filter((each): each is string => typeof each === "string") : []; } catch { return []; } };
     return {
-      tags: rows.reverse().map((row) => ({ turnId: row.turn_id, seq: row.seq, strandId: row.strand_id })),
-      strands: this.store.list(threadId).map((strand) => ({ id: strand.id, title: strand.title })),
+      tags: rows.reverse().map((row) => ({ turnId: row.turn_id, seq: row.seq, strandId: row.strand_id, kind: row.kind, at: row.at, line: row.line, also: alsoOf(row.also_strands) })),
+      strands: this.store.list(threadId).map((strand) => ({ id: strand.id, title: strand.title, done: strand.doneAt !== null, parentId: strand.parentId, trunk: strand.trunk })),
+      replies: this.store.replies(threadId, this.now() - REPLY_OPEN_MS).flatMap((reply) => (reply.turnId && reply.tag ? [{ turnId: reply.turnId, seq: reply.seq, tag: reply.tag, ask: reply.ask, resolved: reply.resolved, line: reply.line }] : [])),
+      opening: first ? { seq: first.seq, replySeq: this.store.replyOfTurn(threadId, first.turn_id)?.seq ?? null } : null,
     };
+  }
+
+  /**
+   * The seq of the conversation's newest message that starts a turn (not a
+   * cache keepalive, not a steer), read by type so a long turn's tool events
+   * can't hide it; null when there is none or it can't be read.
+   */
+  async newestRequest(threadId: string): Promise<number | null> {
+    const rows = await this.deps.events({ threadId, order: "desc", limit: 10, types: ["client/turn/requested"] }).catch(() => [] as EventRow[]);
+    const request = rows.filter((row) => row.type === "client/turn/requested" && !isPingRequest(row.data) && (row.data as { target?: { kind?: string } } | undefined)?.target?.kind !== "steer")
+      .sort((x, y) => (y.seq ?? 0) - (x.seq ?? 0))[0];
+    return request?.seq ?? null;
+  }
+
+  /** The user marked a reply that needs them done. */
+  resolveReply(threadId: string, seq: number): boolean {
+    if (!this.enabled(threadId) || !this.store.resolveReply(threadId, seq)) return false;
+    this.deps.changed(threadId);
+    return true;
+  }
+
+  /**
+   * Whether a turn's reply is worth a phone push (Main's own push and Studio
+   * Mobile's check of BB's): the turn `requestSeq` started (by default the
+   * newest, read once when called, so a later turn's tag is never taken),
+   * once Jev tagged its reply, waiting up to `waitMs` for the sort. Unknown
+   * where strands don't run, when the turn or its reply can't be found, when
+   * Jev couldn't tag it, or when it isn't tagged in time: the caller pushes
+   * as before.
+   */
+  async replyPush(threadId: string, waitMs = 20_000, requestSeq?: number | null): Promise<{ decision: "push" | "quiet" | "unknown"; ask: string | null }> {
+    const unknown = { decision: "unknown" as const, ask: null };
+    if (this.disposed || !this.enabled(threadId) || this.detector.needsBackfill(threadId)) return unknown;
+    const deadline = this.now() + waitMs;
+    const request = requestSeq ?? await this.newestRequest(threadId);
+    if (!request) return unknown;
+    for (;;) {
+      await Promise.race([this.detector.settled(threadId), new Promise((resolve) => { const timer = setTimeout(resolve, Math.max(0, Math.min(1_000, deadline - this.now()))); (timer as { unref?: () => void }).unref?.(); })]);
+      const turn = this.store.turnOfRequest(threadId, request);
+      const reply = turn?.turnId ? this.store.replyOfTurn(threadId, turn.turnId) : null;
+      if (reply?.by === "none") return unknown;
+      if (reply?.tag) return reply.tag === "needs-you" ? { decision: "push", ask: reply.ask } : { decision: "quiet", ask: null };
+      if (this.disposed || this.now() >= deadline) return unknown;
+      await new Promise((resolve) => { const timer = setTimeout(resolve, 250); (timer as { unref?: () => void }).unref?.(); });
+    }
   }
 
   /** Every conversation of a Bot with strands showing (not only Earlier), needs you first, then the most recently active. */
@@ -286,10 +392,11 @@ export class StrandService {
     const candidates = (await this.deps.conversationsOf(botId))
       .filter((conversation) => conversation.lastActiveAt >= since && this.store.list(conversation.threadId).some(open))
       .sort((a, b) => b.lastActiveAt - a.lastActiveAt);
+    const lists = await mapPool(candidates, 6, (conversation) => this.list(conversation.threadId));
     const conversations: OverviewConversation[] = [];
-    for (const conversation of candidates) {
-      const list = await this.list(conversation.threadId);
-      if (list.strands.length) conversations.push({ ...conversation, strands: list.strands });
+    for (let i = 0; i < candidates.length; i += 1) {
+      const list = lists[i]!;
+      if (list.strands.length) conversations.push({ ...candidates[i]!, strands: list.strands });
     }
     return { conversations, checked: candidates.map((conversation) => conversation.threadId) };
   }

@@ -7,6 +7,11 @@ import { useSyncExternalStore } from "react";
 const owned = new Map<string, boolean>();
 const listeners = new Set<() => void>();
 
+function subscribeBotThreads(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
+
 export function noteBotThread(threadId: string, isBots: boolean): void {
   if (owned.get(threadId) === isBots) return;
   owned.set(threadId, isBots);
@@ -14,7 +19,7 @@ export function noteBotThread(threadId: string, isBots: boolean): void {
 }
 
 export function useIsBotThread(threadId: string): boolean {
-  return useSyncExternalStore((listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; }, () => owned.get(threadId) === true, () => false);
+  return useSyncExternalStore(subscribeBotThreads, () => owned.get(threadId) === true, () => false);
 }
 
 /** True once the thread is known to be a Bot's; false while unknown. */

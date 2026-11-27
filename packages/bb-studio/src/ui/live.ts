@@ -6,7 +6,6 @@ import type { rpcContract } from "../contract";
 import type { rpcContract as loopsContract } from "../loops/contract";
 import type { rpcContract as workContract } from "../work/contract";
 import type { tasksContract } from "../tasks/rpc-contract";
-import type { areasContract } from "../areas/contract";
 import type { scheduledContract } from "../loops/scheduled";
 import type { authContract } from "../auth/contract";
 import type { accountsContract } from "../accounts/contract";
@@ -14,7 +13,7 @@ import type { rpcContract as strandsContract } from "../strands/contract";
 import { useRealtime, useRealtimeConnectionState, useRpc, type PluginRpcCallArgs, type PluginRpcResult } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
-type Contract = typeof rpcContract & typeof loopsContract & typeof scheduledContract & typeof workContract & typeof tasksContract & typeof areasContract & typeof authContract & typeof accountsContract & typeof strandsContract;
+type Contract = typeof rpcContract & typeof loopsContract & typeof scheduledContract & typeof workContract & typeof tasksContract & typeof authContract & typeof accountsContract & typeof strandsContract;
 export type Method = keyof Contract;
 export type RpcInput<M extends Method> = PluginRpcCallArgs<Contract[M]>[0];
 type Call = <M extends Method>(method: M, input: RpcInput<M>) => Promise<PluginRpcResult<Contract[M]>>;
@@ -34,6 +33,7 @@ interface LiveEntry {
   again: boolean;
   timer: ReturnType<typeof setTimeout> | null;
   poll: ReturnType<typeof setInterval> | null;
+  pollPeriod: number | null;
   visible: (() => void) | null;
   loadedAt: number;
   /** The last loaded data as JSON, to tell a refetch that changed nothing. */
@@ -45,7 +45,7 @@ const DISABLED: LiveState<never> = { data: null, error: null, loading: false };
 function liveEntry(key: string): LiveEntry {
   let entry = liveEntries.get(key);
   if (!entry) {
-    entry = { state: { data: null, error: null, loading: true }, listeners: new Set(), subscribers: new Map(), call: null, requests: requestGeneration(), inflight: false, again: false, timer: null, poll: null, visible: null, loadedAt: 0, json: null };
+    entry = { state: { data: null, error: null, loading: true }, listeners: new Set(), subscribers: new Map(), call: null, requests: requestGeneration(), inflight: false, again: false, timer: null, poll: null, pollPeriod: null, visible: null, loadedAt: 0, json: null };
     liveEntries.set(key, entry);
   }
   return entry;
@@ -89,9 +89,20 @@ function scheduleLive(entry: LiveEntry) {
   entry.timer = setTimeout(() => { entry.timer = null; loadLive(entry); }, COALESCE_MS);
 }
 function pollLive(entry: LiveEntry) {
+  let next: number | null = null;
+  for (const ms of entry.subscribers.values()) {
+    if (ms > 0 && (next === null || ms < next)) next = ms;
+  }
+  if (next === entry.pollPeriod) return;
   if (entry.poll) clearInterval(entry.poll);
-  const periods = [...entry.subscribers.values()].filter((ms) => ms > 0);
-  entry.poll = periods.length ? setInterval(() => scheduleLive(entry), Math.min(...periods)) : null;
+  entry.pollPeriod = next;
+  entry.poll = next !== null ? setInterval(() => { if (document.visibilityState === "visible") scheduleLive(entry); }, next) : null;
+}
+
+/** Reads cached live data synchronously without subscribing (for click handlers that don't need reactive updates). */
+export function peekLive<M extends Method>(method: M, input: RpcInput<M>): PluginRpcResult<Contract[M]> | null {
+  const key = `${method}:${JSON.stringify(input ?? null)}`;
+  return (liveEntries.get(key)?.state.data as PluginRpcResult<Contract[M]> | null | undefined) ?? null;
 }
 
 /** Active readers share one request and scheduler. The last unsubscribe evicts

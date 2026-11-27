@@ -346,11 +346,19 @@ extension BBClient {
 extension Studio.BotThreadsChangedEvent {
     init?(signal event: RealtimeEvent) {
         guard case .pluginSignal("studio", Studio.Channel.bot_threads_changed, let payload) = event,
-            let data = try? JSONEncoder().encode(payload),
-            let decoded = try? JSONDecoder().decode(Self.self, from: data),
-            let botId = decoded.botId, !botId.isEmpty
+            let botId = payload["botId"]?.stringValue, !botId.isEmpty
         else { return nil }
-        self = decoded
+        let changes: [Studio.BotThreadsChangedEventChangesItem]? = payload["changes"]?.arrayValue?.compactMap { item in
+            guard let raw = item.stringValue else { return nil }
+            switch raw {
+            case "conversations": return .conversations
+            case "workers": return .workers
+            case "needs-you": return .needs_you
+            case "presence": return .presence
+            default: return .unknown(raw)
+            }
+        }
+        self.init(botId: botId, changes: changes)
     }
 }
 

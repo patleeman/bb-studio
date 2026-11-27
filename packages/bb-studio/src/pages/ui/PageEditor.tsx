@@ -19,7 +19,7 @@ import { itemReferenceFrom } from "../../kit/app/index";
 import { clickModifiers } from "../../links/open";
 import { useRpc, useSdk } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
-import { useCallback, useEffect, useMemo, useRef, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Icon, cn } from "../../kit/ui/index";
 import { HTTP_ROOT, HUMAN_USER_ID, MAX_UPLOAD_BYTES, UPLOAD_PATH } from "../constants";
 import { type BotView, type PageMetaView, type rpcContract } from "../contract";
@@ -34,6 +34,7 @@ import { authorInfo, usePagesUi } from "./context";
 import { useDarkMode } from "./shared";
 import { CommentsPortal, PageCommentButton, StartCommentProvider, usePageComments } from "./PageComments";
 import { editWhiteboardWhenShown } from "./whiteboard";
+import { ImageLightbox, PAGE_IMAGE_OPEN_EVENT, pageImages, type LightboxImage } from "./image-lightbox";
 import { pageImageUrl } from "../../kit/pages-contract";
 import {
   dictationParagraphs,
@@ -414,6 +415,36 @@ export function PageEditor({
     return () => field.removeEventListener(TALK_INSERT_EVENT, onInsert);
   }, [editor]);
 
+  // An image opens in the lightbox from its expand button or a double-click;
+  // a single click still selects it for resizing and its caption.
+  const [lightbox, setLightbox] = useState<{ images: LightboxImage[]; index: number } | null>(null);
+  useEffect(() => {
+    const field = fieldRef.current;
+    if (!field) return;
+    const open = (target: HTMLImageElement | null | undefined) => {
+      if (!target) return;
+      const { images, elements } = pageImages(field);
+      const index = elements.indexOf(target);
+      if (index >= 0) setLightbox({ images, index });
+    };
+    const onOpen = (event: Event) =>
+      open((event.target as Element).closest(".bn-visual-media-wrapper")?.querySelector<HTMLImageElement>("img.bn-visual-media"));
+    const onDoubleClick = (event: MouseEvent) => {
+      const target = (event.target as Element | null)?.closest?.<HTMLImageElement>('[data-content-type="image"] img.bn-visual-media');
+      if (!target) return;
+      event.preventDefault();
+      open(target);
+    };
+    field.addEventListener(PAGE_IMAGE_OPEN_EVENT, onOpen);
+    field.addEventListener("dblclick", onDoubleClick);
+    return () => {
+      field.removeEventListener(PAGE_IMAGE_OPEN_EVENT, onOpen);
+      field.removeEventListener("dblclick", onDoubleClick);
+    };
+  }, []);
+  const closeLightbox = useCallback(() => setLightbox(null), []);
+  const stepLightbox = useCallback((index: number) => setLightbox((current) => current && { ...current, index }), []);
+
   const mentionItems = useCallback(async (query: string): Promise<DefaultReactSuggestionItem[]> => {
     const insert = (kind: string, target: string, label: string) => () => {
       editor.insertInlineContent([{ type: "mention", props: { kind, target, label } } as never, " "]);
@@ -507,6 +538,7 @@ export function PageEditor({
         <BlockNoteViewEditor />
         {itemDrop.indicator}
       </div>
+      {lightbox ? <ImageLightbox images={lightbox.images} index={lightbox.index} onIndex={stepLightbox} onClose={closeLightbox} /> : null}
       <CommentsPortal slot={panelSlot}>{comments.panel}</CommentsPortal>
       <PageSideMenu pageId={page.id} />
       <SuggestionMenuController triggerCharacter="/" getItems={slashMenuItems} />

@@ -3,7 +3,7 @@ import SwiftUI
 struct BotSpacesRoot: View {
     @EnvironmentObject private var app: AppModel
     @ObservedObject var store: BotSpacesStore
-    @StateObject private var shell = BotShellModel()
+    @ObservedObject private var router = Router.shared
     @ObservedObject private var looks = LookStore.shared
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.duoLayout) private var layout
@@ -12,7 +12,11 @@ struct BotSpacesRoot: View {
     private var pages: DuoPages? {
         Self.qaSplit ? nil : DuoPages(window: layout.windowSize, phone: UIDevice.current.userInterfaceIdiom == .phone)
     }
-    private var inRoom: Bool { compact || pages != nil }
+    /// The room on any phone (the split view is the iPad's): a phone's size
+    /// class and window size change at different moments while the window
+    /// resizes (the Duo folding, iOS's split), and asking them then swapped
+    /// in the split for a moment, rebuilding the room and losing its place.
+    private var inRoom: Bool { compact || pages != nil || (UIDevice.current.userInterfaceIdiom == .phone && !Self.qaSplit) }
 
     static var qaSplit: Bool {
         #if DEBUG
@@ -21,16 +25,16 @@ struct BotSpacesRoot: View {
         false
         #endif
     }
-    private var shownBot: BotSpace? { BotShell.shownBot(store.spaces, chosen: shell.shownBotId) }
+    private var shownBot: BotSpace? { BotShell.shownBot(store.spaces, chosen: router.shownBotId) }
     private func roomTheme(_ bot: BotSpace) -> LookTheme {
-        RoomTheme.resolve(botThemeId: shell.themeOverride[bot.id] ?? bot.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog)
+        RoomTheme.resolve(botThemeId: router.themeOverride[bot.id] ?? bot.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog)
     }
     private var shownMain: String? { shownBot.flatMap { BotShell.mainThreadId($0, view: store.view(for: $0.id)) } }
 
     var body: some View {
         Group {
             if inRoom, let bot = shownBot, let main = shownMain {
-                RoomView(store: store, shell: shell, bot: bot, mainThreadId: main, pages: pages)
+                RoomView(store: store, bot: bot, mainThreadId: main, pages: pages)
                     .id(main)
                     .transition(.opacity)
                     .lookRoot(bot: bot, theme: roomTheme(bot))
@@ -39,81 +43,78 @@ struct BotSpacesRoot: View {
             }
         }
         .task(id: store.spaces) { await LookExport.run(store: store, client: app.client) }
-        .onChange(of: shell.selection) { _, item in
-            if inRoom { routeRoom(item) } else { shell.detailPath = shell.takePendingPush() }
+        .onChange(of: router.selection) { _, item in
+            if inRoom { routeRoom(item) } else { router.detailPath = router.takePendingPush() }
         }
         .onChange(of: inRoom) { _, inRoom in
-            if !inRoom, shell.selection == nil, let main = shownMain { shell.openConversation(main) }
+            if !inRoom, router.selection == nil, let main = shownMain { router.openConversation(main) }
         }
-        .onAppear { shell.land(store); consumeLinks() }
-        .onChange(of: store.spaces) { _, _ in shell.land(store); consumeLinks() }
-        .onChange(of: store.views) { _, _ in shell.land(store) }
-        .onChange(of: app.shellLink, initial: true) { _, _ in consumeLinks() }
-        .onChange(of: app.botRoute, initial: true) { _, _ in consumeLinks() }
+        .onAppear { router.land(store); consumeLinks() }
+        .onChange(of: store.spaces) { _, _ in router.land(store); consumeLinks() }
+        .onChange(of: store.views) { _, _ in router.land(store) }
+        .onChange(of: router.pending, initial: true) { _, _ in consumeLinks() }
     }
 
     private var split: some View {
-        NavigationSplitView(preferredCompactColumn: $shell.compactColumn) {
-            BotSpaceList(store: store, shell: shell)
+        NavigationSplitView(preferredCompactColumn: $router.compactColumn) {
+            BotSpaceList(store: store)
         } detail: {
-            NavigationStack(path: $shell.detailPath) {
+            NavigationStack(path: $router.detailPath) {
                 detail
                     .navigationDestination(for: Route.self) { RouteDestination(route: $0).environment(\.botConversation, context) }
             }
             .environment(\.botConversation, context)
-            .id(shell.selection)
+            .id(router.selection)
         }
     }
 
     private func routeRoom(_ item: BotShellItem?) {
         guard let item else { return }
-        let pending = shell.takePendingPush()
-        let landing = shell.takeLanding()
+        let pending = router.takePendingPush()
+        let landing = router.takeLanding()
         switch item {
         case .conversation(let id):
-            shell.detailPath = pending
-            if !landing { shell.roomFocus = id }
+            router.detailPath = pending
+            if !landing { router.request = .focus(id) }
         case .worker(let id):
-            shell.detailPath = [.thread(id: id)] + pending
+            router.detailPath = [.thread(id: id)] + pending
         case .page(let page):
-            shell.detailPath = []
-            shell.roomOpen = page
+            router.detailPath = []
+            router.request = .place(page)
         }
-        shell.selection = nil
+        router.selection = nil
     }
 
-    /// A link or route that came before the Bots loaded waits for them; once
+    /// A destination that came before the Bots loaded waits for them; once
     /// followed it is cleared, so the same link works again.
     private func consumeLinks() {
-        let used = shell.consume(link: app.shellLink, route: app.botRoute, store: store)
-        if used.link { app.shellLink = nil }
-        if used.route { app.botRoute = nil }
+        router.consume(store)
     }
 
     private var context: BotConversationContext? {
         let threadId: String
         let kind: BotConversationContext.Kind
-        switch shell.selection {
+        switch router.selection {
         case .conversation(let id): (threadId, kind) = (id, .conversation)
         case .worker(let id): (threadId, kind) = (id, .worker)
         case .page, nil: return nil
         }
-        guard let bot = BotShell.shownBot(store.spaces, chosen: shell.shownBotId) else { return nil }
+        guard let bot = BotShell.shownBot(store.spaces, chosen: router.shownBotId) else { return nil }
         return BotShell.context(threadId: threadId, kind: kind, bot: bot, view: store.view(for: bot.id), splitsThreads: sizeClass == .regular,
-                                push: { [shell] route in shell.detailPath.append(route) },
-                                openConversation: { [shell] id in shell.openConversation(id) },
-                                showList: { [shell] in shell.showList() },
+                                push: { [router] route in router.detailPath.append(route) },
+                                openConversation: { [router] id in router.openConversation(id) },
+                                showList: { [router] in router.showList() },
                                 refresh: { [store] in Task { await store.refresh() } })
     }
 
     @ViewBuilder private var detail: some View {
-        switch shell.selection {
+        switch router.selection {
         case .conversation(let id), .worker(let id):
             ThreadView(threadId: id).id(id)
         case .page(let page):
-            let bot = BotShell.shownBot(store.spaces, chosen: shell.shownBotId)
-            BotPageScreen(page: page, bot: bot, open: { [shell] in shell.open($0) }, openMain: { [shell, store] in
-                if let main = BotShell.mainThreadId(bot, view: bot.flatMap { store.view(for: $0.id) }) { shell.openConversation(main) }
+            let bot = BotShell.shownBot(store.spaces, chosen: router.shownBotId)
+            BotPageScreen(page: page, bot: bot, open: { [router] in router.open(item: $0) }, openMain: { [router, store] in
+                if let main = BotShell.mainThreadId(bot, view: bot.flatMap { store.view(for: $0.id) }) { router.openConversation(main) }
             }, refresh: { [store] in Task { await store.refresh() } })
         case nil:
             ContentUnavailableView("No conversation selected", systemImage: Symbols.thread)
@@ -122,20 +123,21 @@ struct BotSpacesRoot: View {
 }
 
 struct BotSpaceList: View {
+    @ObservedObject private var router = Router.shared
     @EnvironmentObject private var app: AppModel
     @ObservedObject var store: BotSpacesStore
-    @ObservedObject var shell: BotShellModel
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var showsDone = false
     @State private var startingConversation = false
+    @State private var composeText = ""
     @Environment(\.look) private var look
 
-    private var bot: BotSpace? { BotShell.shownBot(store.spaces, chosen: shell.shownBotId) }
+    private var bot: BotSpace? { BotShell.shownBot(store.spaces, chosen: router.shownBotId) }
     private var view: BotThreadsView? { bot.flatMap { store.view(for: $0.id) } }
     private var compact: Bool { sizeClass != .regular }
 
     var body: some View {
-        List(selection: $shell.selection) {
+        List(selection: $router.selection) {
             if let bot {
                 header(bot)
                     .listRowBackground(Color.clear)
@@ -169,7 +171,13 @@ struct BotSpaceList: View {
         .toolbar(compact ? .hidden : .automatic, for: .navigationBar)
         .onChange(of: bot?.id) { _, _ in showsDone = false }
         .sheet(isPresented: $startingConversation) {
-            NewConversationSheet(botName: bot?.name ?? "Bot") { try await startConversation($0) }
+            NewThreadView(text: composeText, botId: bot?.id) { id, botId in startedConversation(id, botId: botId) }
+        }
+        .onChange(of: router.request, initial: true) { _, request in
+            guard case .compose(let text)? = request else { return }
+            router.request = nil
+            composeText = text
+            startingConversation = true
         }
     }
 
@@ -227,7 +235,7 @@ struct BotSpaceList: View {
         .gesture(DragGesture(minimumDistance: 24).onEnded { value in
             let dx = value.translation.width
             guard abs(dx) > 50, abs(dx) > abs(value.translation.height) * 1.5 else { return }
-            withAnimation(.snappy) { shell.step(dx < 0 ? 1 : -1, store: store, compact: compact) }
+            withAnimation(.snappy) { router.step(dx < 0 ? 1 : -1, store: store, compact: compact) }
         })
     }
 
@@ -245,7 +253,7 @@ struct BotSpaceList: View {
             HStack {
                 Text("Conversations").font(.title3.bold()).foregroundStyle(.primary).textCase(nil).lookHalo(look)
                 Spacer()
-                Button { startingConversation = true } label: {
+                Button { composeText = ""; startingConversation = true } label: {
                     Image(systemName: "plus").font(.body.weight(.semibold)).frame(width: 32, height: 32)
                 }
                 .buttonStyle(.plain)
@@ -256,11 +264,12 @@ struct BotSpaceList: View {
         }
     }
 
-    private func startConversation(_ text: String) async throws {
-        guard let bot else { return }
-        let id = try await BotShell.startConversation(text, bot: bot, view: view, client: app.client)
-        await store.refresh()
-        shell.openConversation(id)
+    /// A conversation with this Bot opens here; with another Bot, that Bot's space opens on it; a plain thread opens as a thread.
+    private func startedConversation(_ id: String, botId: String?) {
+        guard let botId else { return app.open(.conversation(id)) }
+        if botId != bot?.id { router.show(botId, store: store, compact: false) }
+        router.openConversation(id)
+        Task { await store.refresh() }
     }
 
     @ViewBuilder private var workers: some View {
@@ -277,7 +286,7 @@ struct BotSpaceList: View {
                                 Image(systemName: "checkmark").font(.footnote.weight(.semibold)).frame(width: 16)
                                 Text("\(split.done.count) done")
                                 Spacer()
-                                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                             }
                             .foregroundStyle(.secondary)
                         }
@@ -308,7 +317,7 @@ struct BotSpaceList: View {
 
     private var bottomBar: some View {
         HStack {
-            Button { app.tab = .settings } label: {
+            Button { router.tab = .settings } label: {
                 Image(systemName: "gearshape").font(.body.weight(.medium)).frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
@@ -316,16 +325,16 @@ struct BotSpaceList: View {
             .accessibilityLabel("Settings")
             .accessibilityIdentifier("BotSpaceSettings")
             Spacer()
-            BotSpaceDots(dots: BotShell.dots(store.spaces, shown: shell.shownBotId, views: store.views)) { id in
-                withAnimation(.snappy) { shell.show(id, store: store, compact: compact) }
+            BotSpaceDots(dots: BotShell.dots(store.spaces, shown: router.shownBotId, views: store.views)) { id in
+                withAnimation(.snappy) { router.show(id, store: store, compact: compact) }
             }
             .gesture(DragGesture(minimumDistance: 16).onEnded { value in
                 guard abs(value.translation.width) > 30 else { return }
-                withAnimation(.snappy) { shell.step(value.translation.width < 0 ? 1 : -1, store: store, compact: compact) }
+                withAnimation(.snappy) { router.step(value.translation.width < 0 ? 1 : -1, store: store, compact: compact) }
             })
             Spacer()
             Menu {
-                Button { app.tab = .studio } label: { Label("Studio", systemImage: "square.stack") }
+                Button { router.tab = .studio } label: { Label("Studio", systemImage: "square.stack") }
             } label: {
                 Image(systemName: "ellipsis").font(.body.weight(.medium)).frame(width: 44, height: 44)
             }
@@ -338,8 +347,8 @@ struct BotSpaceList: View {
     }
 
     private func open(_ item: BotShellItem) {
-        shell.selection = item
-        shell.compactColumn = .detail
+        router.selection = item
+        router.compactColumn = .detail
     }
 }
 

@@ -139,4 +139,101 @@ describe("Transcriber", () => {
     expect(() => files.inside("../data.db")).toThrow(/outside/);
     expect(() => files.inside("/etc/passwd")).toThrow(/outside/);
   });
+
+  it("times out a hung transcribe call, aborts its signal, schedules a retry (never drops), and frees the slot for other recordings", async () => {
+    const { store, files, put } = await setup();
+    await put(0, "hung");
+    const rec2 = "rec_dddddddddddddddd";
+    store.create({ id: rec2, kind: "recording", projectId: null, threadId: null });
+    const file2 = await files.write(rec2, "sessionb-0", "audio/webm;codecs=opus", Buffer.from("ok"));
+    store.addSegment({
+      recordingId: rec2,
+      sessionId: "sessionb",
+      index: 0,
+      startedAt: 200,
+      durationMs: 10_000,
+      mimeType: "audio/webm;codecs=opus",
+      bytes: 2,
+      file: file2,
+    });
+
+    let hungSignal: AbortSignal | undefined;
+    const transcriber = new Transcriber({
+      store,
+      files,
+      concurrency: 1,
+      timeoutMs: 40,
+      transcribe: async (_audio, _hint, signal, segment) => {
+        if (segment.recordingId === REC) {
+          hungSignal = signal;
+          return new Promise<string>(() => {}); // hangs forever
+        }
+        return "second ok";
+      },
+      onSegment: () => {},
+      warn: () => {},
+    });
+
+    const lifetime = new AbortController();
+    const running = transcriber.run(lifetime.signal);
+    await until(() => store.transcript(rec2) === "second ok");
+    lifetime.abort();
+    await running;
+
+    expect(hungSignal?.aborted).toBe(true);
+    const [seg] = store.segments(REC);
+    expect(seg).toMatchObject({ status: "pending", attempts: 1 });
+    expect(seg!.error).toMatch(/timed out/i);
+    expect(store.transcript(REC)).toBe("");
+    expect(store.transcript(rec2)).toBe("second ok");
+  });
+
+  it("returns promptly on shutdown even if transcribe ignores abort, without counting an attempt", async () => {
+    const { store, files, put } = await setup();
+    await put(0, "hung");
+    let started!: () => void;
+    const began = new Promise<void>((resolve) => { started = resolve; });
+    const transcriber = new Transcriber({
+      store,
+      files,
+      timeoutMs: 5_000,
+      transcribe: () => {
+        started();
+        return new Promise<string>(() => {}); // ignores abort, hangs forever
+      },
+      onSegment: () => {},
+      warn: () => {},
+    });
+    const lifetime = new AbortController();
+    const running = transcriber.run(lifetime.signal);
+    await began;
+    const t0 = Date.now();
+    lifetime.abort();
+    await running;
+    expect(Date.now() - t0).toBeLessThan(500);
+    expect(store.segments(REC)[0]).toMatchObject({ status: "pending", attempts: 0, error: null });
+  });
+
+  it("ignores a late transcribe() resolution after timeout (writes nothing)", async () => {
+    const { store, files, put } = await setup();
+    await put(0, "late");
+    let resolveLate!: (text: string) => void;
+    const transcriber = new Transcriber({
+      store,
+      files,
+      timeoutMs: 30,
+      transcribe: () => new Promise<string>((resolve) => { resolveLate = resolve; }),
+      onSegment: () => {},
+      warn: () => {},
+    });
+    const lifetime = new AbortController();
+    const running = transcriber.run(lifetime.signal);
+    await until(() => store.segments(REC)[0]!.attempts === 1);
+    resolveLate("late text that must not land");
+    await new Promise((r) => setTimeout(r, 20));
+    lifetime.abort();
+    await running;
+    expect(store.transcript(REC)).toBe("");
+    expect(store.segments(REC)[0]).toMatchObject({ status: "pending", attempts: 1 });
+  });
 });

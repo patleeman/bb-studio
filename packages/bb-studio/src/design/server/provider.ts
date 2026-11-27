@@ -18,7 +18,7 @@ export const DESIGN_KIND: StudioKind = {
   mentionProviderId: "design",
 
   blurb: "UI prototypes.",
-  agentHint: "Read it with pages_read and change it with design_write_screen or design_edit_screen.",
+  agentHint: "Read it with pages_read and change it with design_screen (op: write) or design_screen (op: edit).",
 };
 
 const PREVIEW_CHARS = 140;

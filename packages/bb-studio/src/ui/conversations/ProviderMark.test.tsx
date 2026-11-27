@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // The Bot sidebar's provider marks: one per provider as BB draws it, BB's
 // generic agent glyph for a provider it doesn't list, the tooltip and name
 // ("Claude Code · Opus 5.5"), and a running row keeping its spinner.

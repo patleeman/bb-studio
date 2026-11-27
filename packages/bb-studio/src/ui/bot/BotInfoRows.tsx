@@ -49,10 +49,10 @@ export function BotInfoRows({ threadId, view, refresh, openPath }: { threadId: s
           {controls}
         </span>
       </DetailRow>
-      <DetailRow label="Status" icon="Activity"><span data-testid="bot-info-status">{botStatusText(bot)}</span></DetailRow>
-      {model ? <DetailRow label="Model" icon="Cpu"><span data-testid="bot-info-model" className="truncate">{model}</span></DetailRow> : null}
+      <DetailRow label="Status" icon="Zap"><span data-testid="bot-info-status">{botStatusText(bot)}</span></DetailRow>
+      {model ? <DetailRow label="Model" icon="Brain"><span data-testid="bot-info-model" className="truncate">{model}</span></DetailRow> : null}
       {needs ? (
-        <DetailRow label="Needs you" icon="CircleAlert">
+        <DetailRow label="Needs you" icon="AlertCircle">
           <button type="button" data-testid="bot-info-needs" className="hover:underline" onClick={() => openPath(botPath(bot.id))}>{needs}</button>
         </DetailRow>
       ) : null}

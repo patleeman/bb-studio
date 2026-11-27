@@ -263,8 +263,84 @@ export interface ExperimentalTimelineFilterRegistration {
   id: string;
   /** The filter for a thread's timeline, or null for none. */
   get(threadId: string): ExperimentalTimelineFilter | null;
-  /** Calls `listener` whenever any thread's filter changes; returns the unsubscribe. */
+  /** Calls `listener` whenever any thread's filter or folds change; returns the unsubscribe. */
   subscribe(listener: () => void): () => void;
+  /**
+   * Optional. Runs of a thread's timeline to fold, each into one line, while
+   * no filter is on (see {@link ExperimentalTimelineFold}). Same rules as
+   * `get`: cheap, pure, the same array while unchanged. Registrations are
+   * asked in plugin-id order; the first that returns folds wins.
+   */
+  folds?(threadId: string): readonly ExperimentalTimelineFold[] | null;
+  /** Optional. The user opened fold `id` of a thread (clicked its line). */
+  expandFold?(threadId: string, id: string): void;
+  /**
+   * Optional. Semantic zoom: a thread zoomed out draws the plugin's `View` in
+   * its timeline's place (see {@link ExperimentalTimelineZoom}). The first
+   * registration with `zoom` wins.
+   */
+  zoom?: ExperimentalTimelineZoom;
+}
+
+/**
+ * A thread's timeline zoomed out (Studio's strands): at level 0 bb draws its
+ * own timeline; above 0 it draws `View` in the timeline's place, in the same
+ * scroll body, until `level` returns 0 again. The registration's `subscribe`
+ * signals level changes. Zooming back in to a message is the plugin's: set
+ * level 0 and go to the message's link (`#msg=<seq>`). Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalTimelineZoom {
+  /** A thread's zoom level; 0 (or anything not above 0) draws bb's timeline. Cheap and pure. */
+  level(threadId: string): number;
+  /** What a zoomed-out thread shows in the timeline's place. */
+  View: ComponentType<ExperimentalTimelineZoomViewProps>;
+}
+
+/** What a zoomed-out thread's `View` is drawn with. */
+export interface ExperimentalTimelineZoomViewProps {
+  threadId: string;
+  /** The zoom level, above 0. */
+  level: number;
+  /** The message (seq) at the middle of the screen when the thread left level 0, or null. */
+  anchorSeq: number | null;
+  /** The newest message the user typed (its seq), or null: it changes when the user sends. */
+  latestUserSeq: number | null;
+}
+
+/**
+ * What `slots.experimental_timelineFilter` answers: which of a registration's
+ * optional parts this bb draws. A bb that answers nothing (undefined) folds
+ * and zooms nothing. Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalTimelineFilterHost {
+  /** This bb applies `folds` and calls `expandFold`. */
+  folds: boolean;
+  /** This bb draws `zoom.View` while `zoom.level` is above 0. */
+  zoom: boolean;
+}
+
+/**
+ * One run of a thread's timeline folded into one line (Studio's runs of
+ * status replies). The rows of the listed turns, and rows of no turn between
+ * two of them, give way to one line with `label` where the run's first message
+ * was. Another turn's rows, errors, alerts and rows still running stay; a
+ * message the user typed stays and ends the run there. Clicking the line calls
+ * the registration's `expandFold`. Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalTimelineFold {
+  /** The plugin's id for the fold, passed back to `expandFold`. */
+  id: string;
+  /** The turns whose rows fold. */
+  turnIds: readonly string[];
+  /** The line shown in the run's place. */
+  label: string;
+  /**
+   * Optional. The line when bb folds only some of the turns (a message the
+   * user typed, a row it keeps or another turn cuts the run short): called
+   * with the turns actually folded, in order.
+   */
+  labelFor?(turnIds: readonly string[]): string;
 }
 
 /**
@@ -389,7 +465,14 @@ export interface ExperimentalThreadHeaderArgs {
  */
 export interface ExperimentalThreadHeaderDecoration {
   title?: string;
+  /** Drawn right after the title. */
   after?: ReactNode;
+  /**
+   * Drawn at the header's right end, first among bb's own header actions.
+   * Both `after` and `end` sit outside the desktop window's drag strip, so
+   * their controls take clicks.
+   */
+  end?: ReactNode;
 }
 
 /**
@@ -1114,7 +1197,7 @@ export interface ForkPluginAppSlots {
    */
   experimental_timelineFilter(
     registration: ExperimentalTimelineFilterRegistration,
-  ): void;
+  ): ExperimentalTimelineFilterHost | void;
   /**
    * Add a section of the plugin's own rows to the sidebar, below the thread
    * list (see {@link ExperimentalSidebarSectionRegistration}). Experimental:

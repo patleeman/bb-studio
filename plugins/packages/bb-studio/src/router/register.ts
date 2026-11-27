@@ -1,5 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { noteProviders, type ProviderFamilyInfo } from "../provider-family";
 import { ROUTER_CHANNEL, routerContract, type Policy, type Target } from "./contract";
+import type { AgentErrorText } from "./select";
 import type { RouterDecisions } from "./decide";
 import { ModelRouter, type FailedTurnEvent, type RouterProvider } from "./router";
 
@@ -11,7 +13,7 @@ interface RouterHooks {
     label?: string;
     enabled?: () => boolean;
     isDefault?: () => boolean;
-    resolve(request: { projectId: string; text: string; permissionMode?: string | null; signal: AbortSignal }): Promise<Target | null>;
+    resolve(request: { projectId: string; text: string; permissionMode?: string | null; parentThreadId?: string | null; signal: AbortSignal }): Promise<Target | null>;
   }) => void;
   experimental_completeText?: (request: { prompt: string; timeoutMs?: number; signal?: AbortSignal }) => Promise<{ ok: true; text: string } | Failure>;
   /** Present on BB Studio's desktop app, which draws its own sign-in prompt on a sign-in failure. */
@@ -23,7 +25,7 @@ function message(error: unknown): string {
 }
 
 /** Fills each target's label with its model's name from the provider's catalog. */
-async function labelled(bb: BbPluginApi, policy: Policy): Promise<Policy> {
+export async function labelled(bb: BbPluginApi, policy: Policy): Promise<Policy> {
   const catalogs = new Map<string, Promise<ReadonlyMap<string, string>>>();
   const names = (providerId: string) => {
     let names = catalogs.get(providerId);
@@ -35,7 +37,12 @@ async function labelled(bb: BbPluginApi, policy: Policy): Promise<Policy> {
     }
     return names;
   };
-  const label = async (target: Target): Promise<Target> => target.label ? target : { ...target, label: (await names(target.providerId)).get(target.model) ?? undefined };
+  // No name (an agent that isn't installed has no catalog): no label key at all, since an RPC result can't carry undefined.
+  const label = async (target: Target): Promise<Target> => {
+    if (target.label) return target;
+    const name = (await names(target.providerId)).get(target.model);
+    return name ? { ...target, label: name } : target;
+  };
   return {
     ...policy,
     rules: await Promise.all(policy.rules.map(async (rule) => ({ ...rule, chain: await Promise.all(rule.chain.map(label)) }))),
@@ -43,24 +50,63 @@ async function labelled(bb: BbPluginApi, policy: Policy): Promise<Policy> {
   };
 }
 
-export async function registerRouter(bb: BbPluginApi, jev: Pick<RouterDecisions, "systemOne">): Promise<ModelRouter> {
+interface ErrorRow {
+  type: string;
+  scope?: { kind?: string; turnId?: string } | null;
+  turnId?: string | null;
+  data?: unknown;
+}
+
+/**
+ * What a failed turn's own provider/error event says, newest first in `rows`:
+ * only rows of that turn, none the provider is retrying (`willRetry`). ACP
+ * agents report their errors only as words.
+ */
+export function errorEventText(rows: readonly ErrorRow[], turnId: string): AgentErrorText | null {
+  const text = (value: unknown) => (typeof value === "string" && value.trim() !== "" ? value : null);
+  for (const row of rows) {
+    if (row.type !== "provider/error") continue;
+    if ((row.scope?.turnId ?? row.turnId ?? null) !== turnId) continue;
+    const data = (row.data ?? null) as { message?: unknown; detail?: unknown; willRetry?: unknown } | null;
+    if (!data || data.willRetry === true) continue;
+    const found = { message: text(data.message), detail: text(data.detail) };
+    if (found.message || found.detail) return found;
+  }
+  return null;
+}
+
+export async function registerRouter(
+  bb: BbPluginApi,
+  jev: Pick<RouterDecisions, "systemOne">,
+  options: { lean?: (providerId: string, model: string) => boolean } = {},
+): Promise<ModelRouter> {
   const hooks = (bb as { experimental_hooks?: RouterHooks }).experimental_hooks;
   const primaryHostId = async () => (await bb.sdk.system.config()).primaryHostId ?? null;
   const completeText = typeof hooks?.experimental_completeText === "function" ? hooks.experimental_completeText.bind(hooks) : null;
+  const noted = <P extends ProviderFamilyInfo>(list: P[]): P[] => (noteProviders(list), list);
   const router = new ModelRouter({
     kv: bb.storage.kv,
     providerStates: async () => {
       const hostId = await primaryHostId();
       return (await bb.sdk.system.providerStates(hostId ? { hostId } : undefined)).providers;
     },
-    providers: async () => new Map((await bb.sdk.providers.list()).map((provider) => {
+    providers: async () => new Map(noted(await bb.sdk.providers.list()).map((provider) => {
       const modes = (provider as { capabilities?: { permissionModes?: readonly string[] } }).capabilities?.permissionModes ?? [];
       return [provider.id, { name: provider.displayName, permissionModes: [...modes] } satisfies RouterProvider] as const;
     })),
-    models: async (providerId) => {
-      const options = await bb.sdk.providers.models({ providerId });
-      if ((options as { modelLoadError?: unknown }).modelLoadError) return null;
+    models: async (providerId, scope) => {
+      // OpenCode's catalog is per workspace: read it on the host, for the project when there is one.
+      const where = scope?.hostId ? { hostId: scope.hostId, ...(scope.projectId ? { projectId: scope.projectId } : {}) } : scope?.projectId ? { projectId: scope.projectId } : {};
+      const options = await bb.sdk.providers.models({ providerId, ...where });
+      const failure = (options as { modelLoadError?: { code?: string; detail?: string | null } | null }).modelLoadError;
+      // A sign-in error is readiness's to report, not an unreachable agent.
+      if (failure) return failure.code === "auth_required" ? null : { error: `${failure.code ?? "failed"}${failure.detail ? `: ${failure.detail}` : ""}` };
       return new Set([...options.models, ...(options.selectedOnlyModels ?? [])].map((model) => model.model));
+    },
+    primaryHostId,
+    threadHost: async (thread) => {
+      if (!thread.environmentId) return null;
+      return (await bb.sdk.environments.get({ environmentId: thread.environmentId })).hostId ?? null;
     },
     thread: async (threadId) => {
       try {
@@ -93,6 +139,13 @@ export async function registerRouter(bb: BbPluginApi, jev: Pick<RouterDecisions,
       return cancelled;
     },
     changed: (threadId) => bb.realtime.publish(ROUTER_CHANNEL, { threadId }),
+    errorText: async (threadId, turnId) => errorEventText(await bb.sdk.threads.events.list({ threadId, types: ["provider/error"], order: "desc", limit: "20" }) as never, turnId),
+    usage: async (providerId) => {
+      const hostId = await primaryHostId();
+      const usage = await bb.sdk.system.usageLimits({ providerId, refresh: false, ...(hostId ? { hostId } : {}) }) as Record<string, { status: string } | undefined>;
+      return (usage[providerId] ?? null) as never;
+    },
+    ...(options.lean ? { lean: options.lean } : {}),
     decisions: {
       systemOne: jev.systemOne,
       completeText: completeText

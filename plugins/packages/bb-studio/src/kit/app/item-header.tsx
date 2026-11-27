@@ -223,17 +223,24 @@ function useBarSlot(anchor: React.RefObject<HTMLElement | null>, inline = false)
     if (inline) return;
     // The title bar and the view mount together; give the slot a few frames.
     let frame = 0, tries = 0, current: HTMLElement | null = null;
+    let currentPane: HTMLElement | null = null;
+    let isWorkspaceEditor = false;
     const find = () => (anchor.current ? paneSlot(anchor.current) : null);
+    const setFound = (found: HTMLElement | null) => {
+      current = found;
+      isWorkspaceEditor = !!anchor.current?.closest("[data-studio-workspace-editor]");
+      currentPane = found && !isWorkspaceEditor ? found.closest("header")?.parentElement ?? null : null;
+      setSlot(found);
+    };
     // A retained view set aside leaves its pane; its bar must leave that title bar too.
     const owns = (slot: HTMLElement) => {
-      if (anchor.current?.closest("[data-studio-workspace-editor]")) return paneSlot(anchor.current) === slot;
-      const pane = slot.closest("header")?.parentElement;
-      return !!pane && !!anchor.current && pane.contains(anchor.current);
+      if (isWorkspaceEditor) return paneSlot(anchor.current!) === slot;
+      return !!currentPane && !!anchor.current && currentPane.contains(anchor.current);
     };
     const look = () => {
       frame = 0;
       const found = find();
-      if (found || ++tries > 20) { current = found; setSlot(found); return; }
+      if (found || ++tries > 20) { setFound(found); return; }
       frame = requestAnimationFrame(look);
     };
     look();
@@ -241,11 +248,11 @@ function useBarSlot(anchor: React.RefObject<HTMLElement | null>, inline = false)
     // late: follow the slot to the new one, or keep looking, once a frame.
     const observer = new MutationObserver(() => {
       if (frame || (current?.isConnected && owns(current))) return;
-      if (current) { current = null; setSlot(null); tries = 0; look(); return; }
+      if (current) { setFound(null); tries = 0; look(); return; }
       frame = requestAnimationFrame(() => {
         frame = 0;
-        current = find();
-        if (current) setSlot(current);
+        const found = find();
+        if (found) setFound(found);
       });
     });
     observer.observe(document.body, { childList: true, subtree: true });

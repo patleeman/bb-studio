@@ -12,7 +12,6 @@ import { STUDIO_TAB, tabKind } from "./studio-tab/model";
 /** What a drag or a link shows. An item id is a Studio item id (page, whiteboard, app, design…). */
 export type TabTarget = { kind: "thread"; id: string } | { kind: "item"; id: string };
 
-export const targetKey = (target: TabTarget): string => `${target.kind}:${target.id}`;
 export const sameTarget = (a: TabTarget | null | undefined, b: TabTarget | null | undefined): boolean => !!a && !!b && a.kind === b.kind && a.id === b.id;
 
 const THREAD_PATH = /^\/(?:projects\/[^/?#]+\/)?threads\/([^/?#]+)(?:\/|$)/;

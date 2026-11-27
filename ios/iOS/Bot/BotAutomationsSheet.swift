@@ -5,10 +5,14 @@ import SwiftUI
 /// runs, Run now and Edit; + makes one of each kind. "Turn off check-ins"
 /// pauses every check-in, the old sheet's Off.
 struct BotAutomationsSheet: View {
+    @Environment(\.look) private var look
     var botId: String? = nil
     var botName: String = BotInfo.defaultName
     var active = true
     var embedded = false
+    /// The Bot's Schedules place: BB's own automations (every project's) are a row here, not on a thread list.
+    var allAutomations = false
+    @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var automations: [BotAutomation]?
@@ -30,7 +34,7 @@ struct BotAutomationsSheet: View {
             if automation.state == "active" || automation.state == "paused" {
                 Button { act(automation.active ? .pause : .resume, automation) } label: {
                     Label(automation.active ? "Pause" : "Resume", systemImage: automation.active ? "pause" : "play")
-                }.tint(.orange)
+                }.tint(look.accent)
             }
         }
     }
@@ -64,6 +68,10 @@ struct BotAutomationsSheet: View {
         }
         .confirmationDialog(deleteTitle, isPresented: deletingShown, titleVisibility: .visible) { deleteButton }
         .task { await load() }
+        .task {
+            guard allAutomations, let running = try? await app.client.runningPlugins() else { return }
+            runningPlugins = running.sorted().joined(separator: ",")
+        }
     }
 
     // `body` in parts, so each type-checks quickly (Xcode 26 took 1.6 s on it whole).
@@ -84,6 +92,12 @@ struct BotAutomationsSheet: View {
                 Section {
                     Button("Turn off check-ins", role: .destructive) { Task { await checkinsOff() } }.disabled(busy)
                 } footer: { Text("Pauses every check-in; \(botName) then only wakes when you write.") }
+            }
+            if allAutomations, runningPlugins.split(separator: ",").contains("automations") {
+                Section {
+                    NavigationLink { AutomationsView() } label: { Label("All automations", systemImage: "clock.arrow.circlepath") }
+                        .accessibilityIdentifier("schedulesAllAutomations")
+                } footer: { Text("Every automation in BB, in every project.") }
             }
         }
     }

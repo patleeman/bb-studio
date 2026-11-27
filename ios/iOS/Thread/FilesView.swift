@@ -197,6 +197,7 @@ private struct ChangeRow: View {
 }
 
 struct ChangeBadge: View {
+    @Environment(\.look) private var look
     /// Git's letter; untracked comes as `?` or `??`.
     private let status: String
 
@@ -218,7 +219,7 @@ struct ChangeBadge: View {
         case "A", "?": .green
         case "D": .red
         case "R", "C": .purple
-        default: .orange
+        default: .yellow
         }
     }
 

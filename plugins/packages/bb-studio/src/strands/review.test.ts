@@ -231,7 +231,7 @@ describe("the backfill and the conversations strands run in", () => {
     new StrandStore(db).create({ threadId: "thr_other", title: "Stored", origin: "jev", seq: 1, at: 1 });
     expect((await svc.list("thr_other")).strands).toEqual([]);
     expect(svc.items("thr_other", 10)).toEqual([]);
-    expect(svc.tags("thr_other")).toEqual({ tags: [], strands: [] });
+    expect(svc.tags("thr_other")).toEqual({ tags: [], strands: [], replies: [], opening: null });
   });
 
   it("lets an agent's `bb studio strands` see only its own Bot's conversations", () => {

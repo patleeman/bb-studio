@@ -11,6 +11,7 @@ import type { ExperimentalThreadHeaderDecoration } from "@get-bb/plugin-sdk";
 import { PluginSlotMount } from "@/components/plugin/PluginSlotMount";
 import type { PluginThreadHeaderSlot } from "@/lib/fork-slots";
 import { usePluginSlots } from "@/lib/plugin-slots";
+import { MACOS_WINDOW_NO_DRAG_CLASS } from "@/lib/bb-desktop";
 
 interface ReportedDecoration {
   threadId: string;
@@ -87,6 +88,8 @@ function DecorationReport({
 export interface ForkThreadHeader {
   title: string;
   after: ReactNode;
+  /** The decoration's right-end part, drawn first among the header's actions. */
+  end: ReactNode;
 }
 
 export function useForkThreadHeader(
@@ -128,7 +131,7 @@ export function useForkThreadHeader(
     },
     [],
   );
-  if (slots.length === 0) return { title, after: null };
+  if (slots.length === 0) return { title, after: null, end: null };
   let winner: PluginThreadHeaderSlot | undefined;
   let decoration: ExperimentalThreadHeaderDecoration | null = null;
   for (const slot of slots) {
@@ -144,8 +147,28 @@ export function useForkThreadHeader(
       ? decoration.title
       : title;
   const afterNode = decoration?.after;
+  const endNode = decoration?.end;
   return {
     title: decoratedTitle,
+    // The header is the desktop window's drag strip: the plugin's parts carve themselves out, as bb's own buttons do.
+    end:
+      winner !== undefined && endNode != null && endNode !== false ? (
+        <PluginSlotMount
+          key={`${slotKey(winner)}/end`}
+          pluginId={winner.pluginId}
+          slotKind="threadHeaderEnd"
+          slotId={winner.id}
+          instanceId={threadId}
+          crashFallback={null}
+        >
+          <span
+            data-fork-thread-header-end={`${winner.pluginId}/${winner.id}`}
+            className={`flex min-w-0 shrink-0 items-center gap-1 ${MACOS_WINDOW_NO_DRAG_CLASS}`}
+          >
+            {endNode}
+          </span>
+        </PluginSlotMount>
+      ) : null,
     after: (
       <>
         {slots.map((slot) => (
@@ -176,7 +199,7 @@ export function useForkThreadHeader(
           >
             <span
               data-fork-thread-header-after={`${winner.pluginId}/${winner.id}`}
-              className="flex min-w-0 shrink-0 items-center gap-1.5"
+              className={`flex min-w-0 shrink-0 items-center gap-1.5 ${MACOS_WINDOW_NO_DRAG_CLASS}`}
             >
               {afterNode}
             </span>

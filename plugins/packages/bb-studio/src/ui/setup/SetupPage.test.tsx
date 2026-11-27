@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -23,7 +23,7 @@ vi.mock("../../kit/ui/index", () => ({
 const { SetupPage } = await import("./SetupPage");
 
 const summary = (): SetupSummary => ({
-  checkedAt: 0, marketplaceAdded: true, marketplaceCommand: "bb marketplace add x",
+  checkedAt: 0, marketplaceAdded: true, marketplaceCommand: "bb marketplace add x", cliName: "bbs",
   addOns: [
     { id: "studio", name: "Studio", summary: "The home.", status: "installed", optional: null, problems: [], passed: [], unanswered: null, command: null },
     { id: "pages", name: "Studio Pages", summary: "Pages.", status: "not-installed", optional: null, problems: [], passed: [], unanswered: null, command: "bb plugin install pages@bb-studio --yes" },

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RootView: View {
+    @ObservedObject private var router = Router.shared
     @EnvironmentObject private var model: AppModel
 
     @State private var windowSize = CGSize.zero
@@ -9,9 +10,8 @@ struct RootView: View {
     @State private var innerScreen = false
     @State private var pane = DuoPaneState.shared
     @ObservedObject private var spaces = BotSpacesStore.shared
-    @State private var launch = SpacesLaunch(timedOut: BotSpacesStore.shared.skipsLoading)
-    @State private var classic = ClassicBotActivity.shared
-    @State private var tick = 0
+    @State private var timedOut = false
+    @State private var attempt = 0
 
     var body: some View {
         #if DEBUG
@@ -19,55 +19,46 @@ struct RootView: View {
         #endif
         let layout = DuoLayout(size: windowSize, leadingInset: windowLeadingInset, trailingInset: windowTrailingInset,
                                pane: pane.pane, dragWidth: pane.dragWidth, innerScreen: innerScreen)
-        let _ = tick
-        let idle = model.tab == .bot && model.path.isEmpty && model.botDraft == nil
-        let quiet = model.sheet == nil && !classic.busy && !(launch.shown == .classic && ClassicBotActivity.held())
-        let shown = launch.next(support: spaces.support, idle: idle, quiet: quiet, linked: model.botShowsStrands)
+        let shown = StudioLaunch.shown(support: spaces.support, failed: spaces.answeredWithError, timedOut: timedOut)
         Group {
             switch shown {
             case .room:
-                spacesRoot(layout)
+                BotSpacesRoot(store: spaces)
+                    .transformEnvironment(\.horizontalSizeClass) { if layout.twoPages { $0 = .regular } }
             case .loading:
                 SpacesLoadingView(serverURL: spaces.serverURL)
                     .transition(.opacity)
-                    .modifier(RootNotice())
-            case .classic:
-                HStack(spacing: 0) {
-                    DuoTabRail(selection: $model.tab)
-                        .frame(width: layout.railWidth)
-                        .clipped()
-                        .background {
-                            if layout.twoPages {
-                                RegularSurfaceBackground(name: "rail", style: AnyShapeStyle(.bar))
-                            }
-                        }
-                        .accessibilityHidden(!layout.twoPages)
-                    tabs
+            case .unreachable:
+                StudioUnreachableView(unavailable: spaces.support == .unavailable, error: spaces.error,
+                                      serverURL: spaces.serverURL, retry: retry, settings: { router.tab = .settings })
+                    .transition(.opacity)
+            }
+        }
+        .modifier(RootNotice())
+        // Capture, dictation, Write and the rest work while Studio loads, too.
+        .modifier(RootSheets(active: router.tab == .bot))
+        .sheet(item: secondary) { tab in
+            Group {
+                switch tab {
+                case .studio: StudioTab()
+                case .settings: SettingsTab()
+                case .bot: EmptyView()
                 }
             }
+            .environment(\.duoLayout, DuoLayout(size: .zero))
+            .environment(\.horizontalSizeClass, .compact)
+            .presentationDragIndicator(.visible)
+            .presentationSizing(.page)
+            .modifier(RootSheets(active: true))
         }
         .animation(.easeInOut(duration: 0.25), value: shown)
-        .onChange(of: shown, initial: true) { old, value in
-            launch.shown = value
-            if old != .classic, value == .classic { TouchClock.forget() }
-            if old == .loading, value != .loading { UIAccessibility.post(notification: .screenChanged, argument: nil) }
-            if value == .room, model.botShowsStrands {
-                model.botShowsStrands = false
-                model.shellLink = .page(.strands, botId: nil)
-            }
+        .onChange(of: shown) { old, _ in
+            if old == .loading { UIAccessibility.post(notification: .screenChanged, argument: nil) }
         }
-        .task(id: spaces.support == .available && launch.shown == .classic && model.tab == .bot) {
-            guard spaces.support == .available, launch.shown == .classic, model.tab == .bot else { return }
-            while !Task.isCancelled {
-                TouchClock.watch()
-                try? await Task.sleep(for: .seconds(1))
-                tick += 1
-            }
-        }
-        .onAppear { TouchClock.watch() }
-        .task {
-            try? await Task.sleep(for: fallback)
-            launch.timedOut = true
+        .task(id: attempt) {
+            timedOut = false
+            try? await Task.sleep(for: timeout)
+            timedOut = true
         }
         .background {
             if layout.twoPages {
@@ -94,72 +85,49 @@ struct RootView: View {
         })
     }
 
-    private var fallback: Duration {
+    private func retry() {
+        attempt += 1
+        spaces.retryNow()
+    }
+
+    private var timeout: Duration {
         #if DEBUG
         let ms = UserDefaults.standard.integer(forKey: "qaSpacesFallback")
         if ms > 0 { return .milliseconds(ms) }
         #endif
-        return SpacesLaunch.fallback
-    }
-
-    private var tabVisibility: Visibility { DuoLayout(size: windowSize).twoPages ? .hidden : .automatic }
-
-    private var tabs: some View {
-        TabView(selection: $model.tab) {
-            BotsTab()
-                .toolbar(tabVisibility, for: .tabBar)
-                .tabItem { Label("Bot", systemImage: "face.smiling") }
-                .tag(Tab.bot)
-
-            InboxTab()
-                .toolbar(tabVisibility, for: .tabBar)
-                .tabItem { Label("Threads", systemImage: "bubble.left.and.bubble.right") }
-            .tag(Tab.inbox)
-
-            StudioTab()
-            // A Visual Chat board fills the screen down to its chat line.
-            .toolbar(model.studioPath.last.map(\.isVisualChatBoard) == true ? .hidden : tabVisibility, for: .tabBar)
-            .tabItem { Label("Studio", systemImage: "square.stack") }
-            .tag(Tab.studio)
-
-            SettingsTab()
-                .toolbar(tabVisibility, for: .tabBar)
-                .tabItem { Label("Settings", systemImage: "gear") }
-                .tag(Tab.settings)
-        }
-        .tabViewStyle(.tabBarOnly)
-        // Use our rail on a two-page window. Portrait keeps the phone tabs.
-        .environment(\.horizontalSizeClass, DuoLayout(size: windowSize).twoPages ? .regular : .compact)
-        .toolbar(DuoLayout(size: windowSize).twoPages ? .hidden : .automatic, for: .tabBar)
-        .modifier(RootNotice())
-        .modifier(RootSheets(active: true))
+        return StudioLaunch.timeout
     }
 
     private var secondary: Binding<Tab?> {
-        Binding(get: { model.tab == .bot ? nil : model.tab }, set: { if $0 == nil { model.tab = .bot } })
+        Binding(get: { router.tab == .bot ? nil : router.tab }, set: { if $0 == nil { router.tab = .bot } })
     }
+}
 
-    @ViewBuilder
-    private func spacesRoot(_ layout: DuoLayout) -> some View {
-        BotSpacesRoot(store: spaces)
-            .transformEnvironment(\.horizontalSizeClass) { if layout.twoPages { $0 = .regular } }
-            .modifier(RootNotice())
-            .modifier(RootSheets(active: model.tab == .bot))
-            .sheet(item: secondary) { tab in
-                Group {
-                    switch tab {
-                    case .inbox: InboxTab()
-                    case .studio: StudioTab()
-                    case .settings: SettingsTab()
-                    case .bot: EmptyView()
-                    }
-                }
-                .environment(\.duoLayout, DuoLayout(size: .zero))
-                .environment(\.horizontalSizeClass, .compact)
-                .presentationDragIndicator(.visible)
-                .presentationSizing(.page)
-                .modifier(RootSheets(active: true))
-            }
+/// Studio's Bots didn't answer: it isn't installed on this server, the server
+/// answered with an error, or nothing came back in time.
+struct StudioUnreachableView: View {
+    let unavailable: Bool
+    let error: String?
+    let serverURL: URL
+    let retry: () -> Void
+    let settings: () -> Void
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(unavailable ? "Studio isn't on this server" : "Can't reach Studio", systemImage: unavailable ? "puzzlepiece.extension" : "wifi.exclamationmark")
+        } description: {
+            Text(unavailable
+                 ? "Install BB Studio on \(serverURL.host() ?? serverURL.absoluteString), then try again."
+                 : error ?? "\(serverURL.host() ?? serverURL.absoluteString) didn't answer.")
+        } actions: {
+            Button("Try Again", action: retry)
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("studioRetry")
+            Button("Settings", action: settings)
+                .accessibilityIdentifier("studioSettings")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("studioUnreachable")
     }
 }
 
@@ -199,12 +167,13 @@ private struct RootNotice: ViewModifier {
 }
 
 private struct RootSheets: ViewModifier {
+    @ObservedObject private var router = Router.shared
     @EnvironmentObject private var model: AppModel
     let active: Bool
 
     func body(content: Content) -> some View {
         content
-        .sheet(item: active ? $model.sheet : .constant(nil)) { sheet in
+        .sheet(item: active ? $router.sheet : .constant(nil)) { sheet in
             switch sheet {
             case .capture:
                 CaptureSheet()
@@ -225,43 +194,6 @@ private struct RootSheets: ViewModifier {
     }
 }
 
-/// The destination stack never moves to a different structural branch on resize.
-/// ThreadView owns its live model, draft and ScrollPosition throughout the change.
-struct InboxTab: View {
-    @EnvironmentObject private var model: AppModel
-    @Environment(\.duoLayout) private var layout
-    @StateObject private var inbox = InboxModel()
-
-    var body: some View {
-        RegularPages {
-            ZStack {
-                if layout.twoPages {
-                    NavigationStack { InboxView(selectsDetail: true, model: inbox) }
-                }
-            }
-        } detail: {
-            NavigationStack(path: $model.path) {
-                InboxView(model: inbox)
-                .opacity(layout.twoPages ? 0 : 1)
-                .accessibilityHidden(layout.twoPages)
-                .overlay {
-                    if layout.twoPages {
-                        DuoEmptyDetail(title: "No thread selected", systemImage: Symbols.thread)
-                    }
-                }
-                .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
-            }
-        }
-        // One live store and load task for both presentations. On the phone,
-        // an inactive navigation root must not own the sidebar's data load.
-        .task(id: model.serverURL) {
-            inbox.restore()
-            inbox.attach(model)
-            await inbox.load(model.client)
-        }
-    }
-}
-
 /// The screen for a route, in whichever tab pushed it.
 struct RouteDestination: View {
     let route: Route
@@ -271,7 +203,7 @@ struct RouteDestination: View {
     var body: some View {
         switch route {
         case .page: threadsAndTools.studioStar(route)
-        case .thread, .pages, .automations, .automation, .usage, .archived, .memoryRecord: threadsAndTools
+        case .thread, .pages, .automations, .automation, .usage, .archived, .memoryRecord, .roomPlace: threadsAndTools
         case .visualChats, .visualChat: visualChat
         case .terminals: studioItems
         default: studioItems.studioStar(route)
@@ -311,14 +243,4 @@ struct RouteDestination: View {
         default: EmptyView()
         }
     }
-}
-
-/// What the Bot tab shows for the selected server.
-enum BotLead: Equatable {
-    case loading
-    case bot(BotInfo)
-    case none
-    case unavailable(String)
-
-    init(_ bot: BotInfo?) { self = bot.map(BotLead.bot) ?? .none }
 }

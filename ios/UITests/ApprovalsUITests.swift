@@ -13,17 +13,10 @@ final class ApprovalsUITests: ServerIsolatedUITestCase {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "needs"]
         app.launchOffline()
         XCTAssertTrue(app.waitForRoom(), "the app opens on the room")
-        app.standRoomChat()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
-
-    private func back() {
-        let down = app.buttons["roomLayDown"]
-        XCTAssertTrue(down.waitForExistence(timeout: 20))
-        down.tap()
-    }
 
     private func openWorker() {
         app.openRoomPlace("conversations")
@@ -53,7 +46,6 @@ final class ApprovalsUITests: ServerIsolatedUITestCase {
         shot("approved")
         XCTAssertTrue(card.waitForNonExistence(timeout: 15), "then it goes")
 
-        back()
         openWorker()
         XCTAssertEqual(any("workerTitle").value as? String, "running", "the worker runs again")
         XCTAssertFalse(app.buttons["workerPendingOpen"].exists)
@@ -62,7 +54,6 @@ final class ApprovalsUITests: ServerIsolatedUITestCase {
     func testTheWorkerPointsAtTheCardInItsConversation() {
         launch()
         XCTAssertTrue(any("workerApproval").waitForExistence(timeout: 15))
-        back()
         openWorker()
         XCTAssertEqual(any("workerTitle").value as? String, "needs-you")
         let marker = app.buttons["workerPendingOpen"]

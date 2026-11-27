@@ -1,8 +1,12 @@
+import { createElement } from "react";
+// @ts-expect-error react-dom ships no types here; the test only needs renderToStaticMarkup.
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { accentOf, ORGANIC_LOOKS } from "../looks";
 import { defaultBbTheme } from "../theme";
 import { frameSrcDoc } from "./frame";
 import { canvasKit, type CanvasKit } from "./kit";
+import { RichText } from "./organic-items";
 
 const kit = canvasKit();
 const EVIL = `<img src=x onerror="alert(1)">`;
@@ -120,11 +124,7 @@ describe("the canvas kit", () => {
 });
 
 describe("rich text", () => {
-  it("renders Markdown links as links (http only), not raw brackets", async () => {
-    // @ts-expect-error react-dom ships no types here; the test only needs renderToStaticMarkup.
-    const { renderToStaticMarkup } = (await import("react-dom/server")) as { renderToStaticMarkup(element: unknown): string };
-    const { createElement } = await import("react");
-    const { RichText } = await import("./organic-items");
+  it("renders Markdown links as links (http only), not raw brackets", () => {
     const html = renderToStaticMarkup(createElement(RichText, { text: "See [AP](https://apnews.com/x) and [bad](javascript:alert(1))." }));
     expect(html).toContain('<a href="https://apnews.com/x"');
     expect(html).not.toContain("[AP]");

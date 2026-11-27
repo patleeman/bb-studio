@@ -25,6 +25,8 @@ type ShownProps = Omit<PresenceViewProps, "custom" | "form"> & { surfaceLight: b
 
 const START_TIME = 5.5;
 const CUSTOM_STEP = 1 / 31;
+const BUILTIN_STEP = 1 / 31;
+const IDLE_STEP = 1 / 16;
 
 function watchSeen(element: Element, set: (seen: boolean) => void): () => void {
   if (typeof IntersectionObserver !== "function") return () => {};
@@ -50,21 +52,29 @@ function BuiltinPresence(props: ShownProps & { form: BuiltinForm }) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     element.width = Math.round(props.size * dpr);
     element.height = Math.round(props.size * dpr);
-    const clock = { real: 0, form: START_TIME };
+    const clock = { real: 0, form: START_TIME, due: 0 };
     let seen = true;
     const draw = () => {
       const now = live.current;
       drawPresence(ctx, { form: now.form, size: now.size, dpr, clock: clock.real, formTime: clock.form, state: now.state, workers: now.workers, palette: now.palette, light: now.light });
       applyHalo(element, haloFilter({ surfaceLight: now.surfaceLight, state: now.state, size: now.size, clock: clock.real, palette: now.palette }));
     };
-    paint.current = draw;
+    paint.current = () => { clock.due = 0; draw(); };
     draw();
     if (props.still) return () => { paint.current = () => {}; };
     const unseen = watchSeen(element, (next) => { seen = next; });
     const remove = sharedLoop().add({
       visible: () => seen,
-      frame: (dt) => { clock.real += dt; clock.form += dt * STATE_SPEED[live.current.state] * live.current.motion; draw(); },
-      still: draw,
+      frame: (dt) => {
+        clock.real += dt;
+        clock.form += dt * STATE_SPEED[live.current.state] * live.current.motion;
+        clock.due += dt;
+        const step = live.current.state === "idle" ? IDLE_STEP : BUILTIN_STEP;
+        if (clock.due < step) return;
+        clock.due = 0;
+        draw();
+      },
+      still: () => { clock.due = 0; draw(); },
     });
     return () => { remove(); unseen(); paint.current = () => {}; };
   }, [props.size, props.still]);

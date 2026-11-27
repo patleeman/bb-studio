@@ -1,9 +1,6 @@
 // A Bot's page and Bot info. The Bot page (/plugins/studio/studio/bot[/<botId>],
 // BotPanel) is one scroll, most important first (BotPage.tsx); Controls
-// (bot/<botId>/controls, BotControls.tsx) holds every setting; Strands
-// (bot/<botId>/strands, and the older bot/<botId>/loops; src/strands/ui/StrandsPage.tsx)
-// is every conversation's strands and the areas, on the Bot-page template
-// like Memory and the Library. The top
+// (bot/<botId>/controls, BotControls.tsx) holds every setting. The top
 // of BB's Info tab on a Bot's thread (BotInfoSection) is a few of BB's own
 // Info rows (BotInfoRows.tsx). Its chat and the threads it lists open as BB
 // threads.
@@ -15,8 +12,6 @@ import { BOT_STYLES } from "./BotAvatar";
 import { BotPage, isControlsPath } from "./BotPage";
 import { BotInfoRows } from "./BotInfoRows";
 import { BotControls } from "./BotControls";
-import { StrandsPage } from "../../strands/ui/StrandsPage";
-import { isStrandsPath } from "../../strands/ui/overview-route";
 
 /** The Bot page (nav panel `bot`): the selected Bot's Info, or the create flow. */
 export function BotPanel() {
@@ -26,7 +21,6 @@ export function BotPanel() {
 // The page scrolls as a whole, at the page's width, like every Studio page.
 function InfoPage({ view, refresh }: { view: BotView; refresh(): void }) {
   const pathname = usePathname();
-  if (isStrandsPath(pathname)) return <StrandsPage view={view} />;
   const body = isControlsPath(pathname) ? <BotControls view={view} refresh={refresh} /> : <BotPage view={view} refresh={refresh} />;
   return (
     <PageColumn className="max-w-6xl pt-0 pb-0 @max-3xl/page:pt-0">

@@ -8,6 +8,10 @@ export class ChangeLog {
   private oldest = 0;
   private entries: { cursor: number; change: ItemChange | null }[] = [];
 
+  current(): number {
+    return this.cursor;
+  }
+
   append(change: ItemChange | null): number {
     const cursor = ++this.cursor;
     this.entries.push({ cursor, change });

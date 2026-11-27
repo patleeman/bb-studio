@@ -131,7 +131,6 @@ function spawnRecordedClaudeProcess(args: {
     env: args.spawnOptions.env,
     signal: args.spawnOptions.signal,
     stdio: ["pipe", "pipe", "pipe"],
-    windowsHide: true,
   });
   child.stderr?.setEncoding("utf8").on("data", (data: string) => {
     args.onStderr(data);
@@ -205,6 +204,13 @@ export class SdkSession {
 
   async supportedCommands(): Promise<SlashCommand[]> {
     return this.query ? this.query.supportedCommands() : [];
+  }
+
+  async stopTask(taskId: string): Promise<void> {
+    if (!this.query) {
+      throw new Error("Claude SDK session is not running");
+    }
+    await this.query.stopTask(taskId);
   }
 
   async setModel(model: string | undefined): Promise<void> {

@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Each conversation's strands, polled while its screen is open
-/// (`strands.list`, every 30 s as on the desktop). A Studio without strands
-/// answers "unknown method": the conversation keeps In flight then.
+/// (`strands.list`, every 30 s as on the desktop, longer while the phone is
+/// idle, and held in the background).
 @MainActor @Observable
 final class StrandsModel {
     static let shared = StrandsModel()
@@ -12,25 +12,36 @@ final class StrandsModel {
     private(set) var tags: [String: StrandTags] = [:]
     /// The strand a conversation shows only (a divider or a strand tapped); nil shows everything.
     var only: [String: String] = [:]
-    /// Per server: nil until asked, false when Studio has no strands.
-    private(set) var supported: [URL: Bool] = [:]
+    /// Jump to reply: the reply (its message seq) a conversation brings into view and flashes.
+    private(set) var flash: [String: Double] = [:]
+    private var flashEnds: [String: Task<Void, Never>] = [:]
+    /// Servers where `strands.list` has answered once, so list and tags fetch concurrently.
+    @ObservationIgnored private var supportedServers: Set<URL> = []
     private var client: BBClient { AppModel.shared.client }
-
-    /// The box replaces In flight: Studio has strands (or hasn't answered yet, so In flight doesn't flash in).
-    func replacesInFlight() -> Bool { supported[client.baseURL] != false }
 
     func list(_ threadId: String) -> StrandList? { lists[threadId] }
 
     func load(_ threadId: String) async {
         let base = client.baseURL
+        if supportedServers.contains(base) {
+            async let listRequest = client.strandsList(threadId: threadId)
+            async let tagsRequest = try? client.strandsTags(threadId: threadId)
+            do {
+                let next = try await listRequest
+                guard base == client.baseURL else { return }
+                if lists[threadId] != next { lists[threadId] = next }
+            } catch {
+                _ = await tagsRequest
+                return
+            }
+            if let next = await tagsRequest, base == client.baseURL, tags[threadId] != next { tags[threadId] = next }
+            return
+        }
         do {
             let next = try await client.strandsList(threadId: threadId)
             guard base == client.baseURL else { return }
-            supported[base] = true
+            supportedServers.insert(base)
             if lists[threadId] != next { lists[threadId] = next }
-        } catch where BBClient.isUnknownRPC(error) {
-            supported[base] = false
-            return
         } catch {
             return
         }
@@ -49,8 +60,7 @@ final class StrandsModel {
     func poll(_ threadId: String) async {
         while !Task.isCancelled {
             await load(threadId)
-            if supported[client.baseURL] == false { return }
-            try? await Task.sleep(for: .seconds(30))
+            await EnergyGate.shared.pollWait(.seconds(30))
         }
     }
 
@@ -58,6 +68,22 @@ final class StrandsModel {
     func opened(_ strand: Strand, in threadId: String) async {
         try? await client.strandOpened(strand.id)
         await load(threadId)
+    }
+
+    /// Jump to reply: the conversation scrolls to the reply and its asking sentence flashes for a moment.
+    func flashReply(_ seq: Double, in threadId: String) {
+        flashEnds[threadId]?.cancel()
+        flash[threadId] = seq
+        var duration = 1_600
+        #if DEBUG
+        // Long enough for a UI test to see it past XCUITest's wait for the app to settle.
+        if BotSpacesDemo.replyAsk { duration = 4_000 }
+        #endif
+        flashEnds[threadId] = Task { [weak self, duration] in
+            try? await Task.sleep(for: .milliseconds(duration))
+            guard !Task.isCancelled else { return }
+            self?.flash[threadId] = nil
+        }
     }
 
     func decide(_ ask: Strand.Ask, _ decision: WorkerApproval.Decision, in threadId: String) async throws {
@@ -120,8 +146,10 @@ struct StrandsBox: View {
 
     private func header(_ list: StrandList) -> some View {
         let counts = StrandsBoxModel.counts(list)
-        let headline = StrandsBoxModel.headline(list)
-        let current = StrandsBoxModel.current(list)
+        // What runs, never a needs-you count: approvals take the slot, and
+        // replies that ask are ordinary messages.
+        let headline = StrandsBoxModel.line(list)
+        let current = StrandsBoxModel.lineStrand(list)
         return Button {
             if typing {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -131,14 +159,10 @@ struct StrandsBox: View {
             withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { open.toggle() }
         } label: {
             HStack(spacing: 7) {
-                if counts.needs > 0 {
-                    Circle().fill(look.needsYou).frame(width: 7, height: 7)
-                } else if let current {
-                    StrandMark(state: current.state)
+                if let current {
+                    StrandMark(state: current.state == .needsYou ? .active : current.state)
                 }
                 Text(headline)
-                    .fontWeight(counts.needs > 0 ? .semibold : .regular)
-                    .foregroundStyle(counts.needs > 0 ? AnyShapeStyle(look.needsYou) : AnyShapeStyle(.primary))
                     .lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 4)
                 if counts.running > 0 {
@@ -155,7 +179,7 @@ struct StrandsBox: View {
             }
             .font(.footnote)
             .padding(.horizontal, 12)
-            .frame(minHeight: typing ? 34 : 40)
+            .frame(minHeight: 44)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -196,7 +220,7 @@ struct StrandsBox: View {
 
     private func section(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+            .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             .padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 2)
             .accessibilityAddTraits(.isHeader)
     }
@@ -207,12 +231,13 @@ struct StrandsBox: View {
                 if strand.state == .doneUnseen { Task { await model.opened(strand, in: threadId) } }
                 if !panel { withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { open = false } }
                 model.only[threadId] = strand.id
+                if let reply = StrandsBoxModel.replyAsk(strand), reply.threadId == threadId, let seq = reply.seq { model.flashReply(seq, in: threadId) }
             } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     StrandMark(state: strand.state).frame(width: 12)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(strand.title).font(.subheadline.weight(.semibold)).lineLimit(2)
-                        if let line = strand.summary ?? strand.detail, !line.isEmpty {
+                        if let line = StrandsBoxModel.summary(strand.summary) ?? StrandsBoxModel.summary(strand.detail) {
                             Text(line).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
                         }
                     }
@@ -229,7 +254,68 @@ struct StrandsBox: View {
         .padding(.vertical, 8)
     }
 
+    /// What tapping an ask's row does: a reply in this conversation comes into
+    /// view and flashes; one elsewhere opens there. Approvals have their own buttons.
+    private func askAction(_ ask: Strand.Ask) -> (() -> Void)? {
+        switch ask.kind {
+        case .approval, .gateway: return nil
+        case .reply:
+            if let seq = ask.seq, ask.threadId == threadId {
+                return {
+                    if !panel { withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { open = false } }
+                    model.flashReply(seq, in: threadId)
+                }
+            }
+            return ask.threadId != threadId ? { openThread(ask.threadId) } : nil
+        case .question, .other:
+            return ask.threadId != threadId ? { openThread(ask.threadId) } : nil
+        }
+    }
+
     @ViewBuilder private func askView(_ ask: Strand.Ask) -> some View {
+        if let action = askAction(ask) {
+            // The row is the button: one per ask, not a Show under each.
+            Button(action: action) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(ask.label.isEmpty ? "A reply needs you" : ask.label).font(.footnote).multilineTextAlignment(.leading)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                }
+                .frame(minHeight: 32)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(ask.threadId == threadId ? "Shows the reply" : "Opens its conversation")
+            .accessibilityIdentifier(ask.kind == .reply && ask.threadId == threadId ? "strand-reply-\(Int(ask.seq ?? 0))" : "strand-ask-\(ask.id)")
+        } else {
+            decisionAsk(ask)
+        }
+    }
+
+    @ViewBuilder private func decisionAsk(_ ask: Strand.Ask) -> some View {
+        if let cardId = ApprovalSlots.shared.cardId(for: ask, in: threadId) {
+            // The card above the composer answers it; here it only brings the card up.
+            Button {
+                if !panel { withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { open = false } }
+                ApprovalSlots.shared.bringUp(cardId, in: threadId)
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(ask.label.isEmpty ? "An approval" : ask.label).font(.footnote).multilineTextAlignment(.leading)
+                    Spacer(minLength: 4)
+                    Text("Show").font(.footnote.weight(.semibold)).foregroundStyle(.tint)
+                }
+                .frame(minHeight: 44)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Brings up the approval above the composer")
+            .accessibilityIdentifier("strand-show-\(ask.id)")
+        } else {
+            decisionButtons(ask)
+        }
+    }
+
+    @ViewBuilder private func decisionButtons(_ ask: Strand.Ask) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if !ask.label.isEmpty { Text(ask.label).font(.footnote) }
             if ask.kind == .approval, !ask.details.isEmpty {
@@ -252,11 +338,8 @@ struct StrandsBox: View {
                 }
             case .gateway:
                 Text("Approve on the desktop").font(.caption).foregroundStyle(.secondary)
-            case .question, .other:
-                if ask.threadId != threadId {
-                    Button("Open") { openThread(ask.threadId) }
-                        .font(.footnote).buttonStyle(.bordered)
-                }
+            case .reply, .question, .other:
+                EmptyView()
             }
         }
     }
@@ -267,7 +350,7 @@ struct StrandsBox: View {
                 BotWorkerGlyph(status: worker.status).frame(width: 14)
                 Text(worker.title.isEmpty ? "Worker" : worker.title).font(.footnote).lineLimit(1)
                 Spacer(minLength: 4)
-                Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             }
             .frame(minHeight: 32)
             .contentShape(.rect)
@@ -314,7 +397,7 @@ struct StrandsPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("\(title) · strands".uppercased())
-                .font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                 .accessibilityAddTraits(.isHeader)
             StrandsBox(threadId: threadId, panel: true, openThread: openThread)
         }

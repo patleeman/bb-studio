@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // "Studio: Show the Bot": the current Bot's last conversation, else its Main.
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("../../kit/app/nav", () => ({ openAppPath: vi.fn() }));

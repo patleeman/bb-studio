@@ -3,12 +3,16 @@
 // Inside plugin surfaces this shows the title as a styled tooltip after a
 // short delay instead, so a `title` on a button works like a real tooltip.
 //
-// One document listener serves every Studio plugin: the first bundle to load
-// installs it. While the pointer is over an element, its `title` moves to
-// `data-bb-fast-title` so the native tooltip stays hidden, and it comes back
-// when the pointer leaves. React never sees the change.
+// One window-global document listener serves every Studio plugin: first bundle
+// to load wins across plugins, and a same-plugin reload replaces only its own
+// listeners (never tied to a single plugin's unload). Older bundles stored
+// `true` at the symbol; if present, those listeners are kept as-is. While the
+// pointer is over an element, its `title` moves to `data-bb-fast-title` so the
+// native tooltip stays hidden, and it comes back when the pointer leaves.
+// React never sees the change.
 
 const INSTALLED = Symbol.for("bb-studio.fast-title");
+const DEFAULT_OWNER = "studio";
 const SCOPE = "[data-bb-plugin-root]";
 const HELD = "data-bb-fast-title";
 export const FAST_TITLE_DELAY_MS = 300;
@@ -18,13 +22,32 @@ const SKIP_DELAY_MS = 400;
 const GAP = 4;
 const EDGE = 8;
 
-type FastTitleWindow = Window & { [INSTALLED]?: true };
+type FastTitleEntry = { owner: string; dispose: () => void };
+type FastTitleWindow = Window & { [INSTALLED]?: true | FastTitleEntry };
 
-export function installFastTitles(doc: Document = document): void {
+function isFastTitleEntry(value: unknown): value is FastTitleEntry {
+  return !!value && typeof value === "object"
+    && typeof (value as { owner?: unknown }).owner === "string"
+    && typeof (value as { dispose?: unknown }).dispose === "function";
+}
+
+export function installFastTitles(
+  doc: Document = document,
+  options?: { signal?: AbortSignal; replace?: boolean; owner?: string },
+): () => void {
   const win = doc.defaultView as FastTitleWindow | null;
-  if (!win || win[INSTALLED]) return;
-  win[INSTALLED] = true;
+  if (!win) return () => {};
+  const owner = options?.owner ?? DEFAULT_OWNER;
+  const existing = win[INSTALLED];
+  if (existing) {
+    // Legacy bundle stored `true` or another plugin owns the window-global listeners: first wins.
+    if (!isFastTitleEntry(existing) || existing.owner !== owner) return () => {};
+    if (!options?.replace) return existing.dispose;
+    existing.dispose();
+  }
+  if (options?.signal?.aborted) return () => {};
 
+  const controller = new AbortController();
   let target: HTMLElement | null = null;
   let tip: HTMLDivElement | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -57,6 +80,7 @@ export function installFastTitles(doc: Document = document): void {
     place(tip, target, win);
   };
 
+  const captureSignal = { capture: true, signal: controller.signal } as const;
   doc.addEventListener(
     "pointerover",
     (event) => {
@@ -71,7 +95,7 @@ export function installFastTitles(doc: Document = document): void {
       const delay = Date.now() - lastHiddenAt < SKIP_DELAY_MS ? 0 : FAST_TITLE_DELAY_MS;
       timer = setTimeout(show, delay);
     },
-    true,
+    captureSignal,
   );
   doc.addEventListener(
     "pointerout",
@@ -81,14 +105,26 @@ export function installFastTitles(doc: Document = document): void {
       if (next instanceof Node && target.contains(next)) return;
       release();
     },
-    true,
+    captureSignal,
   );
   // Clicking, typing, scrolling, or leaving the window ends the tooltip, as
   // it does for a native one.
-  doc.addEventListener("pointerdown", release, true);
-  doc.addEventListener("keydown", release, true);
-  doc.addEventListener("scroll", release, true);
-  win.addEventListener("blur", release);
+  doc.addEventListener("pointerdown", release, captureSignal);
+  doc.addEventListener("keydown", release, captureSignal);
+  doc.addEventListener("scroll", release, captureSignal);
+  win.addEventListener("blur", release, { signal: controller.signal });
+
+  const entry: FastTitleEntry = {
+    owner,
+    dispose: () => {
+      controller.abort();
+      release();
+      if (win[INSTALLED] === entry) delete win[INSTALLED];
+    },
+  };
+  win[INSTALLED] = entry;
+  options?.signal?.addEventListener("abort", entry.dispose, { once: true });
+  return entry.dispose;
 }
 
 function titled(node: EventTarget | null): HTMLElement | null {
@@ -138,4 +174,4 @@ function place(tip: HTMLElement, anchor: HTMLElement, win: Window): void {
   tip.style.transform = `translate(${Math.round(left)}px, ${Math.round(Math.max(EDGE, top))}px)`;
 }
 
-if (typeof document !== "undefined") installFastTitles();
+if (typeof document !== "undefined") installFastTitles(document, { replace: true });

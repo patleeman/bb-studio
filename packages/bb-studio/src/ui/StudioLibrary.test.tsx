@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // One library for both new tab pages: the Studio app's and the Studio tab in
 // a thread's workbench (like PageLayout serves PageView and the side panel).
 import { readFileSync } from "node:fs";

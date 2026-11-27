@@ -85,5 +85,9 @@ extension BBClient {
         let _: JSONValue = try await rpc("studio", Studio.Method.designs_sendComment, ["id": .string(id)])
     }
 
-    public static func isDesignId(_ value: String) -> Bool { value.wholeMatch(of: /dsn_[0-9a-f]{16}/) != nil }
+    public static func isDesignId(_ value: String) -> Bool {
+        let utf8 = value.utf8
+        guard utf8.count == 20, value.hasPrefix("dsn_") else { return false }
+        return utf8.dropFirst(4).allSatisfy { ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x61 && $0 <= 0x66) }
+    }
 }

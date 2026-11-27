@@ -334,6 +334,7 @@ export class CommandRouter {
       fetchProjectAttachment: this.options.fetchProjectAttachment,
       skillTreeTransport: this.options.skillTreeTransport,
       fetchPluginHostArtifact: this.options.fetchPluginHostArtifact,
+      pluginHost: this.options.pluginHostManager,
       runtimeManager: this.options.runtimeManager,
       desktopBrowserBroker: this.options.desktopBrowserBroker,
       dataDir: this.options.dataDir,
@@ -484,6 +485,7 @@ export class CommandRouter {
       case "thread.stop":
       case "thread.storage.delete":
       case "thread.plan.cancel":
+      case "thread.background_task.stop":
       case "thread.goal.clear":
         return `${command.environmentId}\0thread:${command.threadId}`;
       default:

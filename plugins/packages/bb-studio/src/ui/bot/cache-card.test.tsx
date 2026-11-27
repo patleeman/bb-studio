@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // The prompt cache on a BB whose context popover takes plugin rows: the
 // "Prompt cache" row, and the footer chip that only opens that card. On a BB
 // without the slot the chip keeps Studio's own popover.

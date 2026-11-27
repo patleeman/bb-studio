@@ -86,7 +86,6 @@ export function tonightDriver(deps: TonightDriverDeps = browserTonightDeps): Sce
     let shownAt: number | null = null;
     let lapse: { from: number; to: number; elapsed: number } | null = null;
     let motion: CameraMotion | null = null;
-    let mode: Mode | null = null;
     let stopMotion: (() => void) | null = null;
     const canvas = deps.createCanvas();
     const context = canvas?.getContext("2d") ?? null;
@@ -110,7 +109,7 @@ export function tonightDriver(deps: TonightDriverDeps = browserTonightDeps): Sce
       }
       drawn = true;
       const sky = nightSky(new Date(shownAt), place);
-      mode = skyVariant(sky.sun.altitude, mode);
+      const mode: Mode = skyVariant(sky.sun.altitude, null);
       const view = deps.size();
       const target = frameAim(aimSky(sky, settings?.view ?? DEFAULT_VIEW), place.latitude, view, scene?.layout() ?? null);
       motion = still || !motion ? restCamera(target) : easeCamera(motion, target, seconds);

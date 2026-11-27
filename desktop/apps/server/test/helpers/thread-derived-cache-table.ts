@@ -168,6 +168,10 @@ export const THREAD_DATA_ROUTE_SURFACES: Record<
         `/threads/${threadId}/events/wait?type=turn/started&waitMs=0`,
     },
   ],
+  "GET /threads/:id/status/wait": {
+    excluded:
+      "returns the thread response, whose runtime display reads live daemon sessions; no derived cache",
+  },
   "GET /threads/:id/default-execution-options": [
     {
       name: "default execution options",
@@ -303,6 +307,7 @@ export function registerGoalsProvider(
   declaration: PluginProviderDeclaration,
 ): { dispose(): void } {
   return harness.deps.providerRegistry.register({
+    reportBridgeFailure: () => undefined,
     ...buildPluginProviderRegistration({
       iconHash: null,
       available: true,

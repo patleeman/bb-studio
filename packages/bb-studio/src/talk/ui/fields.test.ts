@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
 import { INSERT_EVENT, OPEN_FIELD_EVENT, clearStatus, fieldAt, insertIntoField, parseField, publishStatus, requestOpenField } from "./fields";
 

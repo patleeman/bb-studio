@@ -1,6 +1,6 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { COMPOSER_REFERENCE_EVENT, findComposer, insertDictationIntoComposer } from "./composer-dom";
+import { COMPOSER_REFERENCE_EVENT, findComposer, insertDictationIntoComposer, interceptBuiltInMic } from "./composer-dom";
 
 afterEach(() => { document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -68,5 +68,45 @@ describe("findComposer", () => {
     expect(findComposer()).toBe(boxes[0]);
     (document.activeElement as HTMLElement).blur();
     expect(findComposer()).toBe(boxes[1]);
+  });
+});
+
+describe("interceptBuiltInMic", () => {
+  it("claims a composer mic button and skips full-document scans on unrelated streaming mutations", async () => {
+    const box = document.createElement("form");
+    box.setAttribute("data-promptbox", "");
+    const mic = document.createElement("button");
+    mic.setAttribute("aria-label", "Start voice input");
+    box.append(mic);
+    document.body.append(box);
+
+    const ctrl = new AbortController();
+    let listener = () => {};
+    let mode: "idle" | "active" = "idle";
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 1; });
+    interceptBuiltInMic({
+      enabled: () => true,
+      stateFor: () => ({ mode, title: mode === "active" ? "Stop dictation" : "Dictate" }),
+      onPress: vi.fn(),
+      subscribe: (fn) => { listener = fn; return () => {}; },
+    }, ctrl.signal);
+
+    expect(mic.hasAttribute("data-talk-mic")).toBe(true);
+    expect(mic.title).toBe("Dictate");
+
+    const qsa = vi.spyOn(document, "querySelectorAll");
+    const msg = document.createElement("p");
+    msg.textContent = "Streaming chunk";
+    document.body.append(msg);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(qsa).not.toHaveBeenCalled();
+
+    mode = "active";
+    listener();
+    expect(mic.hasAttribute("data-talk-dictating")).toBe(true);
+    expect(mic.title).toBe("Stop dictation");
+    expect(qsa).not.toHaveBeenCalled();
+
+    ctrl.abort();
   });
 });

@@ -698,6 +698,12 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
+      "file": "ios/Shared/ProjectThreads.swift",
+      "plugin": "studio",
+      "method": "bot_threads_older",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/Shared/ReactionSettings.swift",
       "plugin": "studio",
       "method": "settings.get",
@@ -878,6 +884,24 @@
       "coverage": "generated method"
     },
     {
+      "file": "ios/Shared/Workspace.swift",
+      "plugin": "studio",
+      "method": "threadWorkbenchGet",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Workspace.swift",
+      "plugin": "studio",
+      "method": "threadWorkbenchMutate",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Workspace.swift",
+      "plugin": "studio",
+      "method": "threadWorkbenchShown",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/iOS/App/Links.swift",
       "plugin": "studio",
       "method": "links.resolve",
@@ -905,24 +929,6 @@
       "file": "ios/iOS/Bot/BotPagesModel.swift",
       "plugin": "studio",
       "method": "memory.profile",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Bot/BotPagesModel.swift",
-      "plugin": "studio",
-      "method": "memory.add",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Bot/BotPagesModel.swift",
-      "plugin": "studio",
-      "method": "memory.update",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Bot/BotPagesModel.swift",
-      "plugin": "studio",
-      "method": "memory.archive",
       "coverage": "generated method"
     },
     {
@@ -990,12 +996,6 @@
       "plugin": "studio",
       "method": "presences_list",
       "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Loops/Loops.swift",
-      "plugin": "studio",
-      "method": "request",
-      "coverage": "dynamic dispatch; runtime validation required"
     },
     {
       "file": "ios/iOS/Room/BotControls.swift",
@@ -1066,12 +1066,6 @@
     {
       "file": "ios/iOS/Tasks/TasksModel.swift",
       "plugin": "studio",
-      "method": "tasks.list",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
       "method": "tasks.get",
       "coverage": "generated method"
     },
@@ -1079,36 +1073,6 @@
       "file": "ios/iOS/Tasks/TasksModel.swift",
       "plugin": "studio",
       "method": "tasks.act",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "tasks.inFlight",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "tasks.flight",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "tasks.board",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "work.dismiss",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "work.clear",
       "coverage": "generated method"
     },
     {

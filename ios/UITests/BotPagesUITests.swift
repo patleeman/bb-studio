@@ -17,10 +17,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         switch page {
         case "automations": app.openRoomPlace("schedules")
         case "archive":
-            app.openRoomPlace("conversations")
-            let archive = app.buttons["roomArchive"]
-            XCTAssertTrue(archive.waitForExistence(timeout: 15), "Archive in Conversations")
-            archive.tap()
+            app.openRoomPlace("archive")
         default: app.openRoomPlace(page)
         }
     }
@@ -31,53 +28,24 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", contains)).firstMatch
     }
 
-    func testMemoryShowsTheProfileAndRecordsAndEdits() {
+    func testMemoryShowsTheAlwaysOnSkillReadOnly() {
         launch()
         openPage("memory")
         XCTAssertTrue(app.navigationBars["Memory"].waitForExistence(timeout: 15))
-        XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 15), "the core profile")
-        XCTAssertTrue(text("of 2,500 characters").exists, "its length against the cap")
-        XCTAssertTrue(app.buttons["memory-record-mem_3"].waitForExistence(timeout: 15), "records")
-        XCTAssertFalse(app.buttons["memory-record-mem_0"].exists, "replaced records fold away")
+        XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 15), "the always-on skill")
+        XCTAssertTrue(text("of 2,000 characters").exists, "its length against the budget")
+        // Memory records are retired: no list, no New record, no Sort.
+        XCTAssertFalse(app.buttons["memoryAdd"].exists, "no New record")
+        XCTAssertFalse(app.buttons["Sort"].exists, "no Sort")
+        XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'memory-record-'")).firstMatch.exists, "no records")
+        XCTAssertFalse(app.staticTexts["No records"].exists, "no empty-records placeholder either")
         shot("memory")
 
         any("memoryProfile").tap()
-        XCTAssertTrue(text("Who I work for").waitForExistence(timeout: 10), "the profile opens in place")
-        XCTAssertTrue(app.staticTexts["Edit the core profile"].exists, "and edits in Pages")
+        XCTAssertTrue(text("Short answers first").waitForExistence(timeout: 10), "its text opens in place")
+        XCTAssertTrue(text("Edit it on the Mac, in Memory.").exists, "read-only, edited on the Mac")
+        XCTAssertFalse(app.staticTexts["Edit the core profile"].exists, "no link to a stale or empty page")
         shot("memory-profile")
-        any("memoryProfile").tap()
-
-        app.buttons["chip-Home"].tap()
-        XCTAssertTrue(app.buttons["memory-record-mem_4"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["memory-record-mem_3"].waitForNonExistence(timeout: 10), "the topic filters")
-        app.buttons["chip-All"].tap()
-
-        app.buttons["memory-record-mem_3"].tap()
-        XCTAssertTrue(any("memoryRecordText").waitForExistence(timeout: 10))
-        XCTAssertTrue(text("replaces “Interview with Sam is Thursday 15:00.”").exists, "what it replaced")
-        XCTAssertTrue(any("memorySource").label.contains("from “Launch prep”"), "where it came from")
-        shot("memory-record")
-        app.buttons["memoryEdit"].tap()
-        let field = app.textFields["memoryTextField"].exists ? app.textFields["memoryTextField"] : app.textViews["memoryTextField"]
-        XCTAssertTrue(field.waitForExistence(timeout: 10))
-        field.tap()
-        field.typeText(" Bring the laptop.")
-        app.buttons["memorySave"].tap()
-        XCTAssertTrue(text("Bring the laptop.").waitForExistence(timeout: 10), "the new record replaces it")
-        XCTAssertTrue(text("replaces “Interview with Sam is Friday 10:00.”").exists)
-
-        app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
-        app.buttons["memoryAdd"].tap()
-        let topic = app.textFields["memoryTopicField"]
-        XCTAssertTrue(topic.waitForExistence(timeout: 10))
-        topic.tap()
-        topic.typeText("Food")
-        let record = app.textFields["memoryTextField"].exists ? app.textFields["memoryTextField"] : app.textViews["memoryTextField"]
-        record.tap()
-        record.typeText("No cilantro.")
-        app.buttons["memorySave"].tap()
-        XCTAssertTrue(text("No cilantro.").waitForExistence(timeout: 10), "the new record is listed")
-        XCTAssertTrue(app.buttons["chip-Food"].exists, "with its topic as a chip")
     }
 
     func testLibraryGroupsFilesAndOpensThem() {
@@ -119,8 +87,9 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         app.openRoomPlace("conversations")
         XCTAssertTrue(app.buttons["roomNewConversation"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["roomConversation-thr_demo_lisbon"].exists)
-        let archive = app.buttons["roomArchive"]
-        for _ in 0..<4 where !archive.isHittable { app.swipeUp() }
+        app.openBotMenu()
+        let archive = app.botMenuItem("archive")
+        XCTAssertTrue(archive.waitForExistence(timeout: 10), "Archive in the Bot menu")
         archive.tap()
         XCTAssertTrue(app.navigationBars["Archive"].waitForExistence(timeout: 15))
         let finished = app.buttons["archive-finished-thr_demo_lisbon"]
@@ -140,9 +109,11 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         shot("archive-finished")
         app.buttons["archiveReopen"].tap()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 15), "the reopened conversation")
-        app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
+        app.goBack()
         app.openRoomPlace("conversations")
-        XCTAssertTrue(app.buttons["roomConversation-thr_demo_lisbon"].waitForExistence(timeout: 15), "back in Conversations")
+        let reopened = app.buttons["roomConversation-thr_demo_lisbon"]
+        for _ in 0..<3 where !reopened.waitForExistence(timeout: 3) { app.swipeUp() }
+        XCTAssertTrue(reopened.waitForExistence(timeout: 15), "back in Conversations")
     }
 
     func testSlowMemoryAndLibraryLoadThroughTheBotFlip() {
@@ -152,7 +123,6 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         XCTAssertFalse(any("memoryProfile").exists, "still loading while the answer is slow")
         shot("slow-memory-loading")
         XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 20), "Memory loads after the Bot's id changes under it")
-        XCTAssertTrue(app.buttons["memory-record-mem_3"].waitForExistence(timeout: 20), "and its records")
         XCTAssertFalse(any("memoryLoading").exists, "no spinner left")
         shot("slow-memory-loaded")
         app.closeRoomSheet()

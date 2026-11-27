@@ -21,6 +21,10 @@ enum RoomHome {
 
     /// The conversation the app opens on: the last one opened, while it's still listed, else Main.
     static func opening(main: String, order: [String], botId: String) -> String {
+        #if DEBUG
+        // UI tests start each launch on Main unless one tests this memory (`-qaRoomRemember`).
+        if ProcessInfo.processInfo.arguments.contains("-qaRoomForget") { return main }
+        #endif
         guard let last = AppGroup.defaults.string(forKey: lastKey + "." + botId), order.contains(last) else { return main }
         return last
     }
@@ -30,8 +34,9 @@ enum RoomHome {
     }
 }
 
-/// The header's Bot mark: its avatar still (no animation), amber while
-/// something needs you. Opens the conversation list.
+/// The header's way home (round 5): a back chevron and the Bot's avatar
+/// still (no animation), with an amber dot while something else needs you.
+/// Opens the conversation list.
 struct RoomHomeButton: View {
     let bot: BotSpace
     let view: BotThreadsView?
@@ -41,6 +46,8 @@ struct RoomHomeButton: View {
 
     var body: some View {
         Button(action: action) {
+            HStack(spacing: 2) {
+            Image(systemName: "chevron.left").font(.body.weight(.semibold)).foregroundStyle(.primary)
             ZStack(alignment: .topTrailing) {
                 PresenceView(bot: bot, state: bot.presenceState(live: view),
                              workers: view?.workers.filter { $0.status == .running }.count ?? bot.activity.workers,
@@ -51,11 +58,14 @@ struct RoomHomeButton: View {
                         .offset(x: 2, y: -2)
                 }
             }
-            .frame(width: 44, height: 44)
+            }
+            .padding(.horizontal, 4)
+            .frame(minHeight: 44)
+            .fixedSize()
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(needsYou ? "Conversations, something needs you" : "Conversations")
+        .accessibilityLabel(needsYou ? "Home, something needs you" : "Home")
         .accessibilityIdentifier("roomList")
     }
 }
@@ -67,6 +77,12 @@ struct RoomListHeader: View {
     let view: BotThreadsView?
     /// With it, the Bot's controls (Pause, Resume, Stop, the Main) sit at the right.
     var refresh: (() async -> Void)? = nil
+    /// With it and more than one Bot, the name is a menu of the Bots: pick one to switch to it.
+    var switchBot: ((String) -> Void)? = nil
+    /// With it, the name is the Bot menu (round 5): the Bots, then this Bot's
+    /// places (Strands, Memory, Library, Schedules, Theme, Archive).
+    var openPlace: ((RoomPlace) -> Void)? = nil
+    @ObservedObject private var spaces = BotSpacesStore.shared
 
     var body: some View {
         HStack(spacing: 12) {
@@ -74,13 +90,56 @@ struct RoomListHeader: View {
                          workers: view?.workers.filter { $0.status == .running }.count ?? bot.activity.workers,
                          size: 44, stillOnly: true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(bot.name).font(.title3.weight(.semibold))
+                name
                 Text(Self.status(view, paused: bot.paused ? bot.state : nil)).font(.subheadline).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("roomListHeader")
+                    .accessibilityLabel("\(bot.name), \(Self.status(view, paused: bot.paused ? bot.state : nil))")
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("roomListHeader")
             Spacer(minLength: 0)
             if let refresh { BotControlsMenu(bot: bot, view: view, refresh: refresh) }
+        }
+    }
+
+    @ViewBuilder private var name: some View {
+        let bots = spaces.spaces?.bots ?? []
+        let switches = switchBot != nil && bots.count > 1
+        if switches || openPlace != nil {
+            Menu {
+                if let switchBot, switches {
+                    Picker("Bot", selection: Binding(get: { bot.id }, set: { if $0 != bot.id { switchBot($0) } })) {
+                        ForEach(bots) { each in
+                            Label {
+                                Text(each.name)
+                            } icon: {
+                                if each.needsYou { Image(systemName: "exclamationmark.circle") }
+                            }
+                            .tag(each.id)
+                            .accessibilityIdentifier("botSwitch-\(each.id)")
+                        }
+                    }
+                    .pickerStyle(.inline)
+                }
+                if let openPlace {
+                    Section(bot.name) {
+                        ForEach(RoomPlace.homeList + [.archive]) { place in
+                            Button { openPlace(place) } label: { Label(place.title, systemImage: place.symbol) }
+                                .accessibilityIdentifier(place == .archive ? "roomArchive" : "roomPlace-\(place.rawValue)")
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(bot.name).font(.title3.weight(.semibold))
+                    Image(systemName: "chevron.down").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                }
+                .foregroundStyle(.primary)
+                .frame(minHeight: 44)
+                .contentShape(.rect)
+            }
+            .accessibilityLabel(switches ? "\(bot.name), switch Bot and places" : "\(bot.name), places")
+            .accessibilityIdentifier("botSwitcher")
+        } else {
+            Text(bot.name).font(.title3.weight(.semibold))
         }
     }
 
@@ -109,6 +168,8 @@ struct RoomContextPane: View {
     var openPlace: (RoomPlace) -> Void
     var settings: () -> Void
     var refresh: (() async -> Void)? = nil
+    var switchBot: ((String) -> Void)? = nil
+    var newConversation: (() -> Void)? = nil
     @State private var openFolds: Set<String> = []
     @Environment(\.look) private var look
 
@@ -120,7 +181,7 @@ struct RoomContextPane: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                RoomListHeader(bot: bot, view: view, refresh: refresh).padding(.horizontal, 4)
+                RoomListHeader(bot: bot, view: view, refresh: refresh, switchBot: switchBot).padding(.horizontal, 4)
                 StrandsPanel(threadId: shown, title: title, openThread: openThread)
                 workers
                 conversations
@@ -181,6 +242,18 @@ struct RoomContextPane: View {
     private var conversations: some View {
         VStack(alignment: .leading, spacing: 0) {
             section("Conversations")
+            if let newConversation {
+                Button(action: newConversation) {
+                    Label("New conversation", systemImage: "plus.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(look.accent)
+                        .padding(.horizontal, 8)
+                        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("contextNewConversation")
+            }
             ForEach(BotShell.lines(view)) { line in
                 Button { pick(line.threadId) } label: {
                     BotConversationRow(line: line)
@@ -216,7 +289,7 @@ struct RoomContextPane: View {
 
     private func section(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+            .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             .padding(.bottom, 4)
             .accessibilityAddTraits(.isHeader)
     }

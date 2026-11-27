@@ -33,7 +33,7 @@ import {
   SettingsRow,
   SettingsRowList,
   SettingsSection,
-} from "@/components/ui/settings-section";
+} from "@bb/shared-ui/settings-section";
 import { SkillDetailView } from "@/components/tools/SkillDetailView";
 import { PluginPanelView } from "@/views/PluginPanelView";
 import { RootComposeHome } from "@/views/RootComposeHome";
@@ -426,6 +426,9 @@ async function renderThreadInLayout() {
           environmentCheckout: undefined,
           environmentChrome: undefined,
           contextEnvironmentId: null,
+          focusRequest: null,
+          onCreateNewThreadInEnvironment: null,
+          onOpenThreadInfo: null,
           permissionPolicy: "snapshot",
         }}
         environment={null}
@@ -435,8 +438,12 @@ async function renderThreadInLayout() {
         thread={THREAD}
         timelineEnabled
         timelineHost={{
+          consumerMessageActions: [],
           environmentHostName: null,
-          includePluginMessageActions: false,
+          leadingContent: null,
+          messageActionSurface: "thread-view",
+          onForkMessage: null,
+          onTitleAction: null,
           unreadDividerAutoScroll: false,
           unreadDividerPlacement: null,
         }}

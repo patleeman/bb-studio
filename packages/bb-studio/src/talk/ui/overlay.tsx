@@ -15,6 +15,7 @@ import { HTTP_ROOT, NEW_RECORDING_EVENT, RECORDING_CHANGED, formatClock, holdKey
 import type { StudioCreateEventDetail } from "../../kit/contract";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
 import { type OpenTarget } from "../../kit/app/index";
+import { useNow } from "../../kit/app/visible-poll";
 import { useStudioOpen } from "../../ui/studio-open";
 
 /**
@@ -73,16 +74,6 @@ function useControllerWiring(): void {
     const id = (payload as { id?: unknown } | null)?.id;
     if (typeof id === "string") void talk.refresh(id);
   });
-}
-
-function useNow(active: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(timer);
-  }, [active]);
-  return now;
 }
 
 const EXPANDED_KEY = "bb-plugin-talk:pill-expanded";
@@ -286,7 +277,7 @@ export function TalkOverlay() {
   const capturing = state.phase === "recording";
   // Ticks whenever the pill shows: the clock runs, and the Back button
   // follows the composer on screen.
-  const now = useNow(state.phase !== "idle");
+  const now = useNow(500, state.phase !== "idle");
 
   if (state.phase === "idle") {
     if (state.pendingUploads === 0) return null;

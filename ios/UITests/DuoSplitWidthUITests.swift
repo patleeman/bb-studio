@@ -1,7 +1,8 @@
 import XCTest
 
-/// The Duo inner screen (951×669, phone idiom): every thread in the right page
-/// fits that page, however long its title. Run on an owned iPhone Duo simulator.
+/// The Duo inner screen (951×669, phone idiom): the room's conversation, a
+/// worker and another conversation on the right page all fit that page,
+/// however long the title. Runs on an iPhone, emulating the inner screen.
 @MainActor
 final class DuoSplitWidthUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
@@ -15,33 +16,26 @@ final class DuoSplitWidthUITests: ServerIsolatedUITestCase {
         app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
 
-        // The Bot's chat, then threads from its Running and Waiting groups.
+        // Main, whose title is long; a worker from the left page; another
+        // conversation; then Main again.
         try assertFits("bot-chat", text: "Duo message 80")
-        try open(row: "iOS: black on reopen", name: "bot-running")
-        try open(row: "Summarize inbox", name: "bot-waiting")
-        try open(row: "Chat", name: "bot-chat-again", text: "Duo message 80")
-
-        // A normal thread from the Threads list.
-        command("tab?threads")
-        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
-        XCTAssertTrue(conversation.waitForExistence(timeout: 15))
-        conversation.tap()
-        XCTAssertTrue(app.staticTexts["duoThreadTitle"].waitForExistence(timeout: 15))
-        try assertFits("thread", text: "Duo message 80")
+        try open("contextWorker-thr_demo_w2", name: "worker", text: "Theme stills renderer: work on it", composer: "workerAsk")
+        try open("contextConversation-thr_demo_interview", name: "conversation", text: "Mock with Sam moved to Friday 10:00. I asked")
+        try open("contextConversation-thr_botdemo01", name: "bot-chat-again", text: "Duo message 80")
     }
 
-    private func open(row label: String, name: String, text: String = "Wide 12") throws {
-        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", label)).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 15), "Sidebar row \(label)")
-        XCTAssertLessThan(row.frame.midX, 951 / 2)
-        row.tap()
-        try assertFits(name, text: text)
+    private func open(_ row: String, name: String, text: String, composer: String = "threadComposer") throws {
+        let button = app.buttons[row]
+        XCTAssertTrue(button.waitForExistence(timeout: 15), "Left page row \(row)")
+        XCTAssertLessThan(button.frame.midX, 951 / 2)
+        button.tap()
+        try assertFits(name, text: text, composer: composer)
     }
 
-    private func assertFits(_ name: String, text: String) throws {
+    private func assertFits(_ name: String, text: String, composer composerId: String = "threadComposer") throws {
         let message = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", text)).firstMatch
         XCTAssertTrue(message.waitForExistence(timeout: 15), "\(name): transcript loads")
-        let composer = app.otherElements["threadComposer"].firstMatch
+        let composer = app.otherElements[composerId].firstMatch
         XCTAssertTrue(composer.waitForExistence(timeout: 10))
         // Let the push transition settle before measuring.
         expectation(for: NSPredicate { _, _ in message.frame.minX >= self.pageMinX - 1 && composer.frame.minX >= self.pageMinX - 1 },
@@ -58,11 +52,10 @@ final class DuoSplitWidthUITests: ServerIsolatedUITestCase {
         XCTAssertLessThanOrEqual(composer.frame.maxX, 951 - 12 + 1, "\(name): composer ends inside the page")
         XCTAssertGreaterThanOrEqual(message.frame.minX, pageMinX - 1, "\(name): transcript text is not cut at the crease")
         XCTAssertLessThanOrEqual(message.frame.maxX, 951 + 1, "\(name): transcript text is not cut at the window edge")
-        let title = app.staticTexts["duoThreadTitle"]
-        if title.exists {
-            XCTAssertGreaterThanOrEqual(title.frame.minX, pageMinX - 1, "\(name): title starts in the right page")
-            XCTAssertLessThanOrEqual(title.frame.maxX, 951 + 1, "\(name): title ends in the window")
-        }
+        // The header's title, the first text at the top of the right page.
+        let title = app.staticTexts.allElementsBoundByIndex.first { $0.frame.minX >= pageMinX - 1 && $0.frame.minY > 20 && $0.frame.maxY < 160 }
+        let header = try XCTUnwrap(title, "\(name): a title in the right page's header")
+        XCTAssertLessThanOrEqual(header.frame.maxX, 951 - geometry.safeRight + 1, "\(name): title ends before the status column")
         let jump = app.buttons["Jump to latest"]
         if jump.exists { XCTAssertLessThanOrEqual(jump.frame.maxX, 951 - 12 + 1, "\(name): jump button is on screen") }
         let detail = try XCTUnwrap(geometry.scrolls.first { $0.x + $0.width > 951 / 2 + 100 && $0.height > 200 && $0.contentHeight > 0 },

@@ -21,7 +21,7 @@ function Diff({ diff }: { diff: string }) {
 function VersionRow({ version, showName, busy, open, onToggle, onRevert }: { version: Version; showName: boolean; busy: boolean; open: boolean; onToggle(): void; onRevert(): void }) {
   return (
     <div data-testid="skill-version" data-version={version.id} className="flex flex-col">
-      <BotPageRow icon={version.body === null ? "Trash2" : "History"} title={showName ? version.name : `Version ${version.id}`} titleText={version.name}
+      <BotPageRow icon={version.body === null ? "Trash2" : "Clock"} title={showName ? version.name : `Version ${version.id}`} titleText={version.name}
         status={version.body === null ? { label: "Deleted", tone: "danger" } : version.warnings.length ? { label: version.warnings.length === 1 ? "1 warning" : `${version.warnings.length} warnings`, tone: "warning" } : null}
         meta={relativeTime(version.at)} selected={open} onOpen={onToggle}
         actions={<Button type="button" variant="outline" size="sm" data-testid="skill-revert" disabled={busy} className={SMALL} aria-label={`Revert ${version.name} to version ${version.id}`} onClick={onRevert}><Icon name="RotateCcw" />Revert</Button>} />
@@ -58,13 +58,52 @@ function Versions({ botId, name, busy, revert }: { botId: string; name?: string;
   );
 }
 
-function SkillDetail({ botId, name, description, busy, revert }: { botId: string; name: string; description: string; busy: boolean; revert(version: Version): void }) {
+/** A skill opened in place: its description and text (editable when `editable`), then its version history. */
+export function SkillDetail({ botId, name, description, busy, revert, editable = false, onSaved }: { botId: string; name: string; description: string; busy: boolean; revert(version: Version): void; editable?: boolean; onSaved?(): void }) {
+  const call = useCall();
   const history = useLive("bot_skill_history", { botId, name }, { pollMs: 30_000 });
   const body = history.data?.versions.find((version) => version.body !== null)?.body ?? null;
+  const [draft, setDraft] = useState<{ description: string; body: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (!draft) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await call("bot_skill_write", { botId, name, description: draft.description.trim() || description, body: draft.body });
+      setDraft(null);
+      history.refresh();
+      onSaved?.();
+    } catch (cause) {
+      setError(errorMessage(cause) || "It didn't save.");
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
     <div data-testid="skill-detail" className="flex flex-col gap-3 px-2 pt-1 pb-4 pl-9">
-      <p className="text-sm text-foreground">{description}</p>
-      {body !== null ? <pre data-testid="skill-body" className="max-h-80 overflow-auto rounded-md border border-border px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap">{body}</pre> : null}
+      {draft ? (
+        <form data-testid="skill-edit" className="flex flex-col gap-2" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+          <input aria-label="When to use it" value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+            className="h-8 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none" />
+          <textarea aria-label={`${name} instructions`} value={draft.body} rows={Math.min(20, Math.max(6, draft.body.split("\n").length + 1))} onChange={(event) => setDraft({ ...draft, body: event.target.value })}
+            className="rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs leading-relaxed focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none" />
+          {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
+          <div className="flex gap-1">
+            <Button type="submit" size="sm" className={SMALL} disabled={saving || !draft.body.trim()} data-testid="skill-save">Save</Button>
+            <Button type="button" variant="ghost" size="sm" className={SMALL} onClick={() => setDraft(null)}>Cancel</Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <div className="flex items-start gap-2">
+            <p className="min-w-0 flex-1 text-sm text-foreground">{description}</p>
+            {editable && body !== null ? <Button type="button" variant="outline" size="sm" data-testid="skill-edit-open" className={SMALL} onClick={() => setDraft({ description, body })}>Edit</Button> : null}
+          </div>
+          {body !== null ? <pre data-testid="skill-body" className="max-h-80 overflow-auto rounded-md border border-border px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap">{body}</pre> : null}
+        </>
+      )}
       <BotPageGroup title="History" count={history.data?.versions.length} testId="skill-history">
         <Versions botId={botId} name={name} busy={busy} revert={revert} />
       </BotPageGroup>

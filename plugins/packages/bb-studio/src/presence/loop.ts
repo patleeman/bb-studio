@@ -19,6 +19,7 @@ export const MAX_ACTIVE = 12;
 export class PresenceLoop {
   private readonly items = new Set<LoopItem>();
   private readonly owed = new Map<LoopItem, number>();
+  private readonly seen: LoopItem[] = [];
   private handle: number | null = null;
   private last: number | null = null;
   private unwatch: (() => void) | null = null;
@@ -65,8 +66,13 @@ export class PresenceLoop {
     const dt = this.last === null ? 0 : Math.min(MAX_STEP, Math.max(0, (time - this.last) / 1000));
     this.last = time;
     this.frames++;
-    const seen = [...this.items].filter((item) => item.visible());
-    for (const item of seen) this.owed.set(item, Math.min(MAX_OWED, (this.owed.get(item) ?? 0) + dt));
+    const seen = this.seen;
+    seen.length = 0;
+    for (const item of this.items) if (item.visible()) seen.push(item);
+    for (let i = 0; i < seen.length; i++) {
+      const item = seen[i]!;
+      this.owed.set(item, Math.min(MAX_OWED, (this.owed.get(item) ?? 0) + dt));
+    }
     const count = Math.min(this.cap, seen.length);
     if (seen.length <= this.cap) this.cursor = 0;
     for (let i = 0; i < count; i++) {
@@ -77,6 +83,7 @@ export class PresenceLoop {
       item.frame(step);
     }
     if (seen.length > this.cap) this.cursor = (this.cursor + count) % seen.length;
+    seen.length = 0;
     if (this.items.size > 0 && this.live()) this.handle = this.env.request(this.tick);
   };
 }

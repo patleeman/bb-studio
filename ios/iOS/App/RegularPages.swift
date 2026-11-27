@@ -47,6 +47,7 @@ struct DuoEmptyDetail: View {
 }
 
 struct StudioTab: View {
+    @ObservedObject private var router = Router.shared
     @EnvironmentObject private var app: AppModel
     @Environment(\.duoLayout) private var layout
 
@@ -56,7 +57,7 @@ struct StudioTab: View {
                 NavigationStack { StudioView(selectsDetail: true) }
             }
         } detail: {
-            NavigationStack(path: $app.studioPath) {
+            NavigationStack(path: $router.studioPath) {
                 Group {
                     if layout.twoPages {
                         DuoEmptyDetail(title: "Select an item", systemImage: "square.stack")

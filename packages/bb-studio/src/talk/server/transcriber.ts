@@ -15,11 +15,15 @@ export interface TranscriberDeps {
   onSegment(recordingId: string): void;
   warn(message: string): void;
   concurrency?: number;
+  /** Per-segment transcription timeout; defaults to TRANSCRIBE_TIMEOUT_MS. */
+  timeoutMs?: number;
 }
 
 const BACKOFF_MS = [5_000, 15_000, 60_000, 180_000, 600_000];
-/** Transient failures keep retrying for about nine hours (4 short waits, then 10 minutes each) before giving up. */
+/** Transient failures keep retrying for about 11 hours (4 short waits, then 10 minutes + up to 2 minutes per attempt) before giving up. */
 export const MAX_ATTEMPTS = 60;
+/** Max time one segment's transcription request may run before timing out and retrying. */
+export const TRANSCRIBE_TIMEOUT_MS = 120_000;
 /** While the voice service is off or signed out, check back every 10 minutes. */
 const UNAVAILABLE_RETRY_MS = 600_000;
 
@@ -77,15 +81,44 @@ export class Transcriber {
 
   private async process(segment: PendingSegment, signal: AbortSignal): Promise<void> {
     const { store, files, transcribe, onSegment, warn } = this.deps;
+    const timeoutMs = this.deps.timeoutMs ?? TRANSCRIBE_TIMEOUT_MS;
+    const attempt = new AbortController();
+    let rejectLate: ((reason: unknown) => void) | null = null;
+    const onParentAbort = () => {
+      attempt.abort(signal.reason);
+      rejectLate?.(signal.reason ?? new Error("aborted"));
+    };
+    if (signal.aborted) {
+      attempt.abort(signal.reason);
+      return;
+    }
+    signal.addEventListener("abort", onParentAbort, { once: true });
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const bytes = await files.read(segment.file);
+      if (attempt.signal.aborted) return;
       const audio = new File([new Uint8Array(bytes)], segment.file.split("/").pop()!, {
         type: segment.mimeType.split(";")[0],
       });
-      const text = await transcribe(audio, segment.hint, signal, segment);
+      const timeoutError = new Error(`Transcription timed out after ${Math.max(1, Math.round(timeoutMs / 1000))} s`);
+      const late = new Promise<never>((_, reject) => {
+        rejectLate = reject;
+        timer = setTimeout(() => {
+          if (signal.aborted) return;
+          timedOut = true;
+          attempt.abort(timeoutError);
+          reject(timeoutError);
+        }, timeoutMs);
+        (timer as { unref?: () => void }).unref?.();
+      });
+      const work = transcribe(audio, segment.hint, attempt.signal, segment);
+      work.catch(() => {});
+      const text = await Promise.race([work, late]);
+      if (signal.aborted || timedOut) return;
       store.markTranscribed(segment.recordingId, segment.id, text);
     } catch (cause) {
-      if (signal.aborted) return;
+      if (signal.aborted && !timedOut) return;
       const error = errorMessage(cause);
       const missing = /ENOENT/.test(error);
       const delay = missing ? null : retryDelay(segment.attempts, error);
@@ -93,6 +126,10 @@ export class Transcriber {
         warn(`Transcribing ${segment.recordingId}/${segment.id} failed: ${error}`);
       }
       store.markFailed(segment.recordingId, segment.id, error, delay);
+    } finally {
+      rejectLate = null;
+      if (timer) clearTimeout(timer);
+      signal.removeEventListener("abort", onParentAbort);
     }
     onSegment(segment.recordingId);
   }

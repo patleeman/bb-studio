@@ -24,10 +24,6 @@ export function setLinkRuntime(next: LinkRuntime | null): () => void {
   return () => { if (runtime === next) runtime = null; };
 }
 
-export function hasLinkRuntime(): boolean {
-  return runtime !== null;
-}
-
 export const BARE_WINDOW_KEY = "bbBare";
 
 export function inMainWindow(location: { pathname: string; search: string } = typeof window === "undefined" ? { pathname: "", search: "" } : window.location): boolean {

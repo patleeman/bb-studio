@@ -10,7 +10,7 @@ final class ComposerKeyboardUITests: ServerIsolatedUITestCase {
         variant = room ? "room" : "chat"
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat"]
             + (room ? ["-qaSpacesDemo", "list", "-qaLoopsDemo", "-qaRoomTheme", ProcessInfo.processInfo.environment["ROOM_THEME"] ?? "forest"] : [])
-        let ready = room ? app.buttons["roomMic"] : field
+        let ready = field
         app.launchOffline()
         if !ready.waitForExistence(timeout: 30) {
             app.terminate()
@@ -96,7 +96,7 @@ final class ComposerKeyboardUITests: ServerIsolatedUITestCase {
 
     func testTheRoomsChatKeepsSixLinesAboveTheKeyboard() throws {
         launch(room: true)
-        app.buttons["roomInput"].tap()
+        app.textViews["Message"].tap()
         XCTAssertTrue(field.waitForExistence(timeout: 10), "the chat stands up")
         try typeSixLines()
     }

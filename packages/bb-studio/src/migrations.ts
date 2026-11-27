@@ -1225,4 +1225,39 @@ export const MIGRATIONS: string[] = [
        backfill TEXT,
        read_at INTEGER NOT NULL
      );`,
+  // Always-on skills (src/core-skill.ts): the core profile becomes a skill injected into every prompt.
+  // bot_core_skills marks each Bot whose core profile page was moved into its always-on skill (once).
+  // memory_records, its index and memory_profiles are left as they are: Studio stops reading and writing them.
+  `ALTER TABLE bot_skills ADD COLUMN always_on INTEGER NOT NULL DEFAULT 0;
+   CREATE TABLE bot_core_skills (
+       bot_id TEXT PRIMARY KEY,
+       skill_name TEXT NOT NULL,
+       source_page_id TEXT,
+       chars INTEGER NOT NULL,
+       migrated_at INTEGER NOT NULL
+     );`,
+  // Skill reviews run once a day and when a conversation is archived (src/skill-learning.ts), not every N turns.
+  // The turn counters in bot_learning stay, unread.
+  `ALTER TABLE bot_learning ADD COLUMN daily_at INTEGER;
+   ALTER TABLE bot_skill_reviews ADD COLUMN source_thread_id TEXT;
+   CREATE TABLE bot_skill_review_queue (
+       thread_id TEXT PRIMARY KEY,
+       bot_id TEXT NOT NULL,
+       reason TEXT NOT NULL,
+       queued_at INTEGER NOT NULL
+     );
+   CREATE TABLE bot_skill_review_marks (
+       thread_id TEXT PRIMARY KEY,
+       bot_id TEXT NOT NULL,
+       seq INTEGER NOT NULL,
+       at INTEGER NOT NULL
+     );`,
+  // Review fixes: the core skill's first user edit and last tidy ask, and a review's source tip (its mark moves only on success).
+  `ALTER TABLE bot_core_skills ADD COLUMN user_edited_at INTEGER;
+   ALTER TABLE bot_core_skills ADD COLUMN tidy_asked_at INTEGER;
+   ALTER TABLE bot_skill_reviews ADD COLUMN source_seq INTEGER;`,
+  // Why a review ran (archive, daily, manual): the daily cap counts daily and archive passes only.
+  `ALTER TABLE bot_skill_reviews ADD COLUMN reason TEXT;`,
+  // A queued review's failed starts before its fork existed (retried a few times, then dropped).
+  `ALTER TABLE bot_skill_review_queue ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;`,
 ];

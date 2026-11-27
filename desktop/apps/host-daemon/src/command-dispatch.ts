@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { withVcsProcessPriority } from "@bb/process-utils";
 import { operationEnvironment } from "./operation-environment.js";
@@ -13,6 +13,7 @@ import {
   type DesktopBrowserResult,
   type HostDaemonCommand,
   type HostDaemonCommandResult,
+  type HostDaemonContributedEnvEntry,
   type HostDaemonOnlineRpcCommand,
   type HostDaemonOnlineRpcCommandType,
   type HostDaemonOnlineRpcResult,
@@ -24,6 +25,7 @@ import type { AgentRuntime, AgentRuntimeBridgeLaunch } from "@bb/agent-runtime";
 import semver from "semver";
 import {
   ExpectedCommandDispatchError,
+  getErrorCode,
   resolveRuntimeBridgeLaunch,
   type CommandOf,
   type CommandDispatchOptions,
@@ -57,6 +59,7 @@ import {
 } from "./command-handlers/host-files.js";
 import { writeHostFile } from "./command-handlers/file-write.js";
 import { discoverRepos } from "./command-handlers/discover-repos.js";
+import { findGitRepos } from "./command-handlers/find-git-repos.js";
 import {
   mkdirHostPath,
   moveHostPath,
@@ -188,6 +191,25 @@ function throwExpectedWorkspacePathNotFoundOrRethrow(error: unknown): never {
   throw error;
 }
 
+async function isMissingWorkspaceError(
+  error: unknown,
+  workspacePath: string,
+): Promise<boolean> {
+  const code = getErrorCode(error);
+  if (code !== "missing_executable" && code !== "path_not_found") {
+    return false;
+  }
+  try {
+    return !(await stat(workspacePath)).isDirectory();
+  } catch (error) {
+    return (
+      error instanceof Error &&
+      "code" in error &&
+      (error.code === "ENOENT" || error.code === "ENOTDIR")
+    );
+  }
+}
+
 function providerCliEnvFromShellEnv(
   shellEnv: NodeJS.ProcessEnv,
 ): NodeJS.ProcessEnv {
@@ -306,6 +328,7 @@ async function runProviderInstallationOnHost(
     const maintenanceArgs = {
       providerId: command.providerId,
       bridgeLaunch,
+      contributedEnv: command.contributedEnv,
     };
     const run = await options.providerInstallationRun({
       ...maintenanceArgs,
@@ -417,6 +440,7 @@ async function withResolvedBridgeLaunch<TResult>(
     providerId: string;
     bridgeLaunch: AgentRuntimeBridgeLaunch;
     cwd?: string;
+    contributedEnv: readonly HostDaemonContributedEnvEntry[];
   }) => Promise<TResult>,
 ): Promise<TResult> {
   const bridgeLaunch = await resolveRuntimeBridgeLaunch(
@@ -427,6 +451,7 @@ async function withResolvedBridgeLaunch<TResult>(
     providerId: command.providerId,
     ...(command.cwd !== undefined ? { cwd: command.cwd } : {}),
     bridgeLaunch,
+    contributedEnv: command.contributedEnv,
   });
 }
 
@@ -484,6 +509,28 @@ const commandHandlers: CommandHandlerMap = {
     await options.eventSink.flush();
     return { cancelled: true };
   },
+  "thread.background_task.stop": async (command, options) => {
+    const owners = options.runtimeManager.listThreadOwnerEntries(
+      command.threadId,
+    );
+    if (owners.length === 0) {
+      throw new ExpectedCommandDispatchError(
+        "unknown_thread_runtime",
+        `No provider runtime available for thread ${command.threadId}`,
+      );
+    }
+    for (const owner of owners) {
+      const result = await owner.runtime.stopBackgroundTask({
+        threadId: command.threadId,
+        itemId: command.itemId,
+      });
+      if (result.stopped) {
+        await options.eventSink.flush();
+        return result;
+      }
+    }
+    return { stopped: false };
+  },
   "thread.rename": async (command, options) => {
     const entry = await options.runtimeManager.getOrAwait(
       command.environmentId,
@@ -498,21 +545,38 @@ const commandHandlers: CommandHandlerMap = {
     return {};
   },
   "thread.archive": async (command, options) => {
-    const entry = await requireResolvedWorkspaceForCommand({
-      environmentId: command.environmentId,
-      runtimeManager: options.runtimeManager,
-      workspaceContext: command.workspaceContext,
-    });
     const bridgeLaunch = await resolveRuntimeBridgeLaunch(
       command.bridgeLaunch,
       options,
     );
-    await entry.runtime.archiveThread({
-      threadId: command.threadId,
-      providerId: command.providerId,
-      providerThreadId: command.providerThreadId,
-      bridgeLaunch,
-    });
+    const archiveThread = (runtime: AgentRuntime) =>
+      runtime.archiveThread({
+        threadId: command.threadId,
+        providerId: command.providerId,
+        providerThreadId: command.providerThreadId,
+        bridgeLaunch,
+      });
+    try {
+      const entry = await requireResolvedWorkspaceForCommand({
+        environmentId: command.environmentId,
+        runtimeManager: options.runtimeManager,
+        workspaceContext: command.workspaceContext,
+      });
+      await archiveThread(entry.runtime);
+    } catch (error) {
+      if (
+        !(await isMissingWorkspaceError(
+          error,
+          command.workspaceContext.workspacePath,
+        ))
+      ) {
+        throw error;
+      }
+      await options.runtimeManager.withProviderMaintenanceRuntime(
+        { dataDir: options.dataDir },
+        archiveThread,
+      );
+    }
     return {};
   },
   "thread.unarchive": async (command, options) => {
@@ -551,7 +615,14 @@ const commandHandlers: CommandHandlerMap = {
         options.emitEnvironmentHookProgress?.({
           type: "environment.hook.progress",
           operationId: command.operationId,
-          entry: { type: "output", text, status: null },
+          entry: {
+            type: "output",
+            key: "clone-output",
+            text,
+            status: null,
+            startedAt: null,
+            metadata: null,
+          },
         }),
       ...userExecutableProcessOptions(options.runtimeManager.getShellEnv()),
       ...(command.targetPath !== undefined
@@ -608,6 +679,7 @@ const onlineRpcHandlers: OnlineRpcHandlerMap = {
   "host.remove_path": removeHostPath,
   "host.browse_directory": browseHostDirectory,
   "host.paths_exist": checkHostPathsExist,
+  "host.find_git_repos": findGitRepos,
   "project.inspect": async (command, options) =>
     inspectProjectPath(
       command.path,
@@ -663,6 +735,7 @@ const onlineRpcHandlers: OnlineRpcHandlerMap = {
         options,
       ),
       cwd,
+      contributedEnv: command.contributedEnv,
     });
   },
   "provider.health": (command, options) =>
@@ -691,6 +764,7 @@ const onlineRpcHandlers: OnlineRpcHandlerMap = {
     return options.providerInstallationStatus({
       providerId: command.providerId,
       bridgeLaunch,
+      contributedEnv: command.contributedEnv,
     });
   },
   "provider.installation.run": runProviderInstallationOnHost,
@@ -719,6 +793,22 @@ export async function dispatchCommand<
       commandHandlers[command.type](command, options),
     );
   } catch (error) {
+    const workspaceContext =
+      "workspaceContext" in command
+        ? command.workspaceContext
+        : "resumeContext" in command
+          ? command.resumeContext.workspaceContext
+          : null;
+    if (
+      command.type !== "thread.archive" &&
+      workspaceContext !== null &&
+      (await isMissingWorkspaceError(error, workspaceContext.workspacePath))
+    ) {
+      throw new ExpectedCommandDispatchError(
+        "path_not_found",
+        `Workspace directory does not exist: ${workspaceContext.workspacePath}`,
+      );
+    }
     throwExpectedWorkspacePathNotFoundOrRethrow(error);
   }
 }

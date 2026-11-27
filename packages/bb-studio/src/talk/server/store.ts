@@ -174,11 +174,15 @@ export class TalkStore {
     return row ? this.toRecording(row) : null;
   }
 
-  /** Newest first. Archived recordings are left out unless asked for. */
-  list(options: { query?: string; limit?: number; includeArchived?: boolean } = {}): Recording[] {
+  /**
+   * Newest first: last changed, or with `order: "created"` last made (id breaks ties), so a capped list
+   * and its parts agree on which recordings it holds. Archived recordings are left out unless asked for.
+   */
+  list(options: { query?: string; limit?: number; includeArchived?: boolean; order?: "updated" | "created" } = {}): Recording[] {
     const limit = options.limit ?? 50;
     const query = options.query?.trim();
     const live = options.includeArchived ? "" : "AND r.archived_at IS NULL";
+    const order = options.order === "created" ? "r.created_at DESC, r.id DESC" : "r.updated_at DESC";
     const rows = query
       ? (this.db
           .prepare(
@@ -186,11 +190,11 @@ export class TalkStore {
              WHERE (r.title LIKE @like ESCAPE '\\'
                 OR EXISTS (SELECT 1 FROM segments s
                            WHERE s.recording_id = r.id AND s.text LIKE @like ESCAPE '\\')) ${live}
-             ORDER BY r.updated_at DESC LIMIT @limit`,
+             ORDER BY ${order} LIMIT @limit`,
           )
           .all({ like: `%${query.replace(/[\\%_]/g, "\\$&")}%`, limit }) as RecordingRow[])
       : (this.db
-          .prepare(`SELECT * FROM recordings r WHERE 1 ${live} ORDER BY updated_at DESC LIMIT ?`)
+          .prepare(`SELECT * FROM recordings r WHERE 1 ${live} ORDER BY ${order} LIMIT ?`)
           .all(limit) as RecordingRow[]);
     return rows.map((row) => this.toRecording(row));
   }

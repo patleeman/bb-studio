@@ -67,15 +67,16 @@ struct WorkerApprovalCard: View {
     let card: ConversationApprovals.Card
     let openWorker: () -> Void
     let decide: (WorkerApproval.Decision) -> Void
+    @Environment(\.look) private var look
 
     private var approval: WorkerApproval { card.approval }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                if approval.state.waiting { Circle().fill(.orange).frame(width: 8, height: 8) }
+                if approval.state.waiting { Circle().fill(look.needsYou).frame(width: 8, height: 8) }
                 Button(action: openWorker) {
-                    Text(approval.worker.title).lineLimit(1).foregroundStyle(.orange)
+                    Text(approval.worker.title).lineLimit(1).foregroundStyle(look.needsYou)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Open \(approval.worker.title)")
@@ -116,8 +117,8 @@ struct WorkerApprovalCard: View {
             }
         }
         .padding(14)
-        .background(.orange.opacity(approval.state.waiting ? 0.09 : 0.04), in: .rect(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.orange.opacity(approval.state.waiting ? 0.34 : 0.15)))
+        .background(look.needsYou.opacity(approval.state.waiting ? 0.09 : 0.04), in: .rect(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(look.needsYou.opacity(approval.state.waiting ? 0.34 : 0.15)))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Approval for \(approval.worker.title)")
         .accessibilityIdentifier("workerApproval")
@@ -134,8 +135,7 @@ struct WorkerApprovalCard: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
                     .foregroundStyle(decision == .allowOnce ? Color(uiColor: .systemBackground) : .primary)
-                    .background(decision == .allowOnce ? Color.primary : .clear, in: .capsule)
-                    .glassEffect(decision == .allowOnce ? .identity : .regular, in: .capsule)
+                    .background(decision == .allowOnce ? AnyShapeStyle(Color.primary) : AnyShapeStyle(.fill.tertiary), in: .capsule)
                     .contentShape(.capsule)
                 }
                 .buttonStyle(.plain)
@@ -167,10 +167,11 @@ struct WorkerPendingApproval: View {
     let title: String
     let owner: String
     let open: () -> Void
+    @Environment(\.look) private var look
 
     var body: some View {
         HStack(spacing: 10) {
-            Circle().fill(.orange).frame(width: 8, height: 8)
+            Circle().fill(look.needsYou).frame(width: 8, height: 8)
             Text(title).font(.subheadline).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
             Button(action: open) {
                 HStack(spacing: 4) {
@@ -178,7 +179,7 @@ struct WorkerPendingApproval: View {
                     Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
                 }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(look.needsYou)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -187,8 +188,8 @@ struct WorkerPendingApproval: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .background(.orange.opacity(0.09), in: .rect(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.orange.opacity(0.3)))
+        .background(look.needsYou.opacity(0.09), in: .rect(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(look.needsYou.opacity(0.3)))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("workerPendingApproval")
     }

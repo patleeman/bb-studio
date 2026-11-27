@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 @MainActor
@@ -13,7 +14,11 @@ final class BotSpacesStore: ObservableObject {
     var shownBotId: String?
 
     var coalesceDelay: Duration = .milliseconds(300)
-    var retryDelays: [Duration] = SpacesLaunch.retries
+    /// The last flush, for the energy gate's gap between flushes while the phone is idle.
+    private var lastFlush = ContinuousClock.now - .seconds(600)
+    /// Something waits that mustn't be paced: a first load, a watch, a reconnect, a retry.
+    private var unpaced = false
+    var retryDelays: [Duration] = StudioLaunch.retries
 
     private(set) var watched: Set<String> = []
     private var client: BBClient?
@@ -24,6 +29,8 @@ final class BotSpacesStore: ObservableObject {
     private var spacesDirty = false
     private var dirtyViews: Set<String> = []
     private var flushTask: Task<Void, Never>?
+    private var waitTask: Task<Void, Never>?
+    private var idleWatch: AnyCancellable?
     private var spacesGeneration = 0
     private var viewGeneration: [String: Int] = [:]
     private var retryTask: Task<Void, Never>?
@@ -32,6 +39,14 @@ final class BotSpacesStore: ObservableObject {
     init(serverURL: URL = ServerScope.selectedURL) {
         self.serverURL = serverURL
         support = BotSpacesSupport.stored(serverURL: serverURL)
+        idleWatch = EnergyGate.shared.$idle.removeDuplicates().sink { [weak self] idle in
+            if !idle { self?.wakePacedWait() }
+        }
+    }
+
+    private func wakePacedWait() {
+        waitTask?.cancel()
+        waitTask = nil
     }
 
     var useSpaces: Bool { support == .available }
@@ -88,7 +103,7 @@ final class BotSpacesStore: ObservableObject {
             guard support != .unavailable, let signal = Studio.BotThreadsChangedEvent(signal: event),
                 let botId = signal.botId
             else { return }
-            schedule(spaces: true, views: watched.contains(botId) ? [botId] : [])
+            schedule(spaces: true, views: watched.contains(botId) ? [botId] : [], paced: true)
         default:
             break
         }
@@ -96,7 +111,9 @@ final class BotSpacesStore: ObservableObject {
 
     var configured: Bool { serverURL != ServerScope.unconfiguredURL }
 
-    var skipsLoading: Bool { support == .unknown && BotSpacesSupport.answeredWithError(serverURL: serverURL) }
+    /// The server answered `bot_spaces` with an error last time: the root
+    /// shows Studio unreachable at once instead of loading.
+    var answeredWithError: Bool { support == .unknown && BotSpacesSupport.answeredWithError(serverURL: serverURL) }
 
     func askIfUnknown() {
         guard support == .unknown, client != nil, configured else { return }
@@ -106,7 +123,17 @@ final class BotSpacesStore: ObservableObject {
         schedule(spaces: true)
     }
 
+    /// Try Again on the unreachable screen: ask now, whatever was answered.
+    func retryNow() {
+        guard client != nil, configured else { return }
+        stopRetrying()
+        BotSpacesSupport.rememberErrorAnswer(false, serverURL: serverURL)
+        if support == .unavailable { support = .unknown }
+        schedule(spaces: true)
+    }
+
     func refresh() async {
+        wakePacedWait()
         flushTask?.cancel()
         flushTask = nil
         spacesDirty = true
@@ -114,15 +141,37 @@ final class BotSpacesStore: ObservableObject {
         await flush()
     }
 
-    private func schedule(spaces: Bool = false, views: Set<String> = []) {
+    /// `paced`: a change signal's refresh, which the energy gate may hold while the phone is idle.
+    private func schedule(spaces: Bool = false, views: Set<String> = [], paced: Bool = false) {
         spacesDirty = spacesDirty || spaces
         dirtyViews.formUnion(views)
+        if !paced {
+            unpaced = true
+            wakePacedWait()
+        }
         guard flushTask == nil, spacesDirty || !dirtyViews.isEmpty else { return }
         flushTask = Task { [weak self] in
             guard let delay = self?.coalesceDelay else { return }
             try? await Task.sleep(for: delay)
+            // Signals only, while idle: sleep for the full gap (30 s, or 5 min
+            // at rest) with zero timer wakeups, waking immediately on a touch
+            // (EnergyGate.$idle -> false) or an unpaced request.
+            while let self, !Task.isCancelled, !self.unpaced {
+                let wait = self.lastFlush + EnergyGate.shared.changeGap(.zero) - ContinuousClock.now
+                if wait <= .zero { break }
+                let sleeper = Task<Void, Never> { _ = try? await Task.sleep(for: wait) }
+                self.waitTask = sleeper
+                await withTaskCancellationHandler {
+                    await sleeper.value
+                } onCancel: {
+                    sleeper.cancel()
+                }
+                self.waitTask = nil
+            }
             guard !Task.isCancelled, let self else { return }
             while spacesDirty || !dirtyViews.isEmpty {
+                lastFlush = .now
+                unpaced = false
                 await flush()
                 if Task.isCancelled { return }
             }
@@ -206,7 +255,7 @@ final class BotSpacesStore: ObservableObject {
 
     private func retryLater() {
         guard retryTask == nil, configured else { return }
-        let delay = SpacesLaunch.retryDelay(retries, delays: retryDelays)
+        let delay = StudioLaunch.retryDelay(retries, delays: retryDelays)
         retries += 1
         retryTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
@@ -247,12 +296,6 @@ extension BotSpacesStore {
         support = .unknown
         spaces = nil
         views = [:]
-    }
-
-    func seedUnavailableForDemo() {
-        restored = true
-        stopRetrying()
-        support = .unavailable
     }
 }
 #endif

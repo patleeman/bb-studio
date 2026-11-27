@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { linkRecordingMentions } from "./recording-mentions";
 
@@ -62,5 +62,17 @@ describe("saved recording pills", () => {
     expect(element.hasAttribute("tabindex")).toBe(false);
     expect(element.hasAttribute("data-talk-recording-link")).toBe(false);
     element.click(); expect(open).not.toHaveBeenCalled();
+  });
+
+  it("ignores unrelated streaming mutations without rescanning the document", async () => {
+    start();
+    const qsa = vi.spyOn(document, "querySelectorAll");
+    const p = document.createElement("p");
+    document.body.append(p);
+    const span = document.createElement("span");
+    span.textContent = "token";
+    p.append(span);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(qsa).not.toHaveBeenCalled();
   });
 });

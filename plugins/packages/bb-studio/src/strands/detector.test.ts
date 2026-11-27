@@ -85,10 +85,12 @@ describe("sorting each finished turn", () => {
     expect(state.replyStart.length).toBeLessThanOrEqual(800);
     expect(state.strands.length).toBeLessThanOrEqual(12);
     expect(Object.keys((last.questions.strand as { criteria: object }).criteria)).toEqual(expect.arrayContaining(["s1", "new", "none"]));
-    expect(JSON.stringify(last).length).toBeLessThan(9_000);
+    // Each open strand also carries its newest lines (at most 3 of 160 characters), and the state the turn before it.
+    expect((state.strands as { newest?: string[] }[]).every((strand) => (strand.newest ?? []).length <= 3 && (strand.newest ?? []).every((line) => line.length <= 160))).toBe(true);
+    expect(JSON.stringify(last).length).toBeLessThan(16_000);
   });
 
-  it("doesn't sort pings or a report the reply says nothing about, and sorts a report that it does", async () => {
+  it("doesn't sort pings; files a report the reply passes over quietly with the previous turn's strand, without Jev (richer sorting asks Jev)", async () => {
     const x = setup();
     await x.detector.backfill(x.thread.id);
     const ping = x.thread.turn("", "[PASS]", { kind: "ping" });
@@ -96,7 +98,7 @@ describe("sorting each finished turn", () => {
     const report = x.thread.turn("Backup check: 2 snapshots failed", "The backup failed twice; I'll look.", { kind: "report" });
     await x.detector.idle(x.thread.id);
     expect(x.store.item(x.thread.id, "report", ping.seq)).toBeNull();
-    expect(x.store.item(x.thread.id, "report", quiet.seq)).toBeNull();
+    expect(x.store.item(x.thread.id, "report", quiet.seq)).toMatchObject({ by: "fallback" });
     expect(x.store.item(x.thread.id, "report", report.seq)).toMatchObject({ by: "jev" });
   });
 
@@ -183,7 +185,9 @@ describe("a running turn", () => {
     const calls = x.jevCalls.length;
     x.thread.finish(turn.turnId, "Released.");
     await x.detector.idle(x.thread.id);
-    expect(x.jevCalls.length).toBe(calls);
+    // Not sorted again: the one call at its end only tags its reply (src/strands/reply.ts).
+    expect(x.jevCalls.length).toBe(calls + 1);
+    expect(Object.keys(x.jevCalls.at(-1)!.questions)).toEqual(["reply", "askSentence"]);
     expect(x.detector.hasRunningTurn(x.thread.id)).toBe(false);
     expect(x.store.items(x.thread.id, 10, ["reply"])).toHaveLength(1);
   });

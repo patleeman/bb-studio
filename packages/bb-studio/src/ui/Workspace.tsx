@@ -3,6 +3,7 @@ import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { Icon, StudioBar, usePathname, hostPanes, isHostSidePane, subscribeHostPanes, registerWorkspaceCloser, setWorkspaceActive, canOpenWorkspaceItem, openAppPath, publishWorkspaceAnchor, registerWorkspaceOpener, studioTargetAt, subscribeWorkspace, workspaceRevision, WORKSPACE_DRAG, WORKSPACE_PATH, type WorkspaceItem, type WorkspacePlacement } from "../kit/app/index";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "../kit/ui/index";
 import { toast } from "sonner";
+import { errorMessage } from "../kit/format";
 import { hasHostNavigator } from "../kit/app/nav";
 import { requestThreadTab } from "../kit/app/thread-panel";
 import { workbenchReturn } from "./studio-open";
@@ -237,11 +238,10 @@ function EditorSlot({ tab, instance }: { tab: Tab; instance: string }) {
   }, [tab.href, instance]);
   // The item's tools go to its slot in the tab row (barSlot), not a bar of its own.
   return <div data-studio-workspace-frame={barSlot(instance, tab.href)} className="flex min-h-0 min-w-0 flex-1 flex-col">
-    {!available && <div className="p-6 text-sm text-muted-foreground">This item's plugin is unavailable. Enable it to reopen this tab. <button className="underline" onClick={() => openAppPath(tab.href)}>Open item page</button></div>}
+    {!available && <div className="p-6 text-sm text-muted-foreground">This item's plugin is unavailable. Enable it to reopen this tab. <button type="button" className="underline" onClick={() => openAppPath(tab.href)}>Open item page</button></div>}
     <div ref={element} data-studio-workspace-editor={tab.href} className="flex min-h-0 min-w-0 flex-1 flex-col" />
   </div>;
 }
-/** A tab's right-click menu: the usual tab actions, then where it goes. */
 /** Renames the item a tab shows, through Studio's add-on hub, and the tab with it. */
 async function renameTab(rpc: ReturnType<typeof useRpc<typeof rpcContract>>, href: string, title: string) {
   const { item } = await rpc.call("itemAt", { path: href });
@@ -259,7 +259,7 @@ function TabRename({ tab, onDone }: { tab: Tab; onDone(): void }) {
     ended.current = true;
     onDone();
     const title = value.trim();
-    if (title && title !== tab.title) void renameTab(rpc, tab.href, title).catch((cause: unknown) => toast.error(`Couldn't rename: ${cause instanceof Error ? cause.message : String(cause)}`));
+    if (title && title !== tab.title) void renameTab(rpc, tab.href, title).catch((cause: unknown) => toast.error(`Couldn't rename: ${errorMessage(cause)}`));
   };
   return <input autoFocus defaultValue={tab.title} aria-label={`Rename ${tab.title}`} maxLength={200}
     className="h-full w-44 min-w-0 rounded-md bg-background px-2 text-[13px] outline outline-1 outline-ring"
@@ -328,7 +328,7 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
         {pane.tabs.map((tab, index) => <ContextMenu key={tab.href}><ContextMenuTrigger asChild><div onDragEnd={() => setDragging(null)} className={`group/tab flex h-7 max-w-56 shrink-0 items-center rounded-md outline-none transition-colors ${pane.active !== tab.href ? "text-muted-foreground hover:bg-state-hover hover:text-foreground" : focused === pane.id ? "bg-state-active text-foreground" : "bg-state-hover text-foreground"}`} data-studio-workspace-tab={tab.href} draggable onDragStart={event => { event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify(tab)); event.dataTransfer.effectAllowed = "move"; setDragging({ source: tab.href }); }}
           onDragOver={event => { if (accepts(event)) event.preventDefault(); }}
           onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab", tab.href); } }}>
-          {renaming === tab.href ? <TabRename tab={tab} onDone={() => setRenaming(null)} /> : <button role="tab" aria-selected={pane.active === tab.href} aria-controls={`view-${instance}-${pane.id}-${index}`} id={`tab-${instance}-${pane.id}-${index}`} tabIndex={pane.active === tab.href ? 0 : -1}
+          {renaming === tab.href ? <TabRename tab={tab} onDone={() => setRenaming(null)} /> : <button type="button" role="tab" aria-selected={pane.active === tab.href} aria-controls={`view-${instance}-${pane.id}-${index}`} id={`tab-${instance}-${pane.id}-${index}`} tabIndex={pane.active === tab.href ? 0 : -1}
             className="flex h-full min-w-0 items-center gap-1.5 rounded-md pl-2 pr-0.5 text-[13px] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
             onClick={() => select(pane.id, tab.href)} onDoubleClick={() => { if (tab.href !== BROWSE.href) setRenaming(tab.href); }} onKeyDown={event => {
               if (event.key === "F2" && tab.href !== BROWSE.href) { event.preventDefault(); setRenaming(tab.href); return; }
@@ -339,12 +339,12 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
             {tab.icon ? <span aria-hidden className="w-3.5 shrink-0 text-center text-xs leading-none">{tab.icon}</span> : <Icon name={tab.kindIcon ?? "File"} className="size-3.5 shrink-0 opacity-70" />}
             <span className="truncate">{tab.title}</span>
           </button>}
-          <button className={`mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100 ${pane.active === tab.href ? "" : "opacity-0"}`} aria-label={`Close ${tab.title}`} onClick={() => update(current => closeTab(current, tab.href))}><Icon name="X" className="size-3" /></button>
+          <button type="button" className={`mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100 ${pane.active === tab.href ? "" : "opacity-0"}`} aria-label={`Close ${tab.title}`} onClick={() => update(current => closeTab(current, tab.href))}><Icon name="X" className="size-3" /></button>
         </div></ContextMenuTrigger><TabMenu pane={pane} tab={tab} index={index} onRename={() => setRenaming(tab.href)} /></ContextMenu>)}
       </div>
       {/* + opens a new tab; ▾ beside it makes a Studio item. The row is 28 px tall, so both match +. */}
       <div role="group" aria-label="New" className="flex shrink-0 items-center">
-        <button className={`${BUTTON} rounded-r-none`} aria-label="New tab" title="New tab" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" /></button>
+        <button type="button" className={`${BUTTON} rounded-r-none`} aria-label="New tab" title="New tab" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" /></button>
         <NewItemMenu className={`${BUTTON} w-5 rounded-l-none`} />
       </div>
       </div>
@@ -356,7 +356,7 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
     {titleBar ? <StudioBar>{tabRow}</StudioBar> : tabRow}
     <div ref={dropElement} data-studio-workspace-drop="" className="relative flex min-h-0 flex-1 flex-col">
       {pane.tabs.map((tab, index) => <div key={tab.href} role="tabpanel" id={`view-${instance}-${pane.id}-${index}`} aria-labelledby={`tab-${instance}-${pane.id}-${index}`} hidden={pane.active !== tab.href} style={{ display: pane.active === tab.href ? "flex" : "none" }} className="min-h-0 min-w-0 flex-1 flex-col"><EditorSlot tab={tab} instance={instance} /></div>)}
-      {!pane.tabs.length && <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground"><p>No open tabs</p><button className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-foreground hover:bg-state-hover" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" />New tab</button></div>}
+      {!pane.tabs.length && <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground"><p>No open tabs</p><button type="button" className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-foreground hover:bg-state-hover" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" />New tab</button></div>}
       {drag && <div data-studio-workspace-drop-layer="" className="absolute inset-0 z-30"
         onDragOver={event => { if (own || !accepts(event)) return; event.preventDefault(); setDrop(place(event)); }}
         onDragLeave={() => setDrop(null)}

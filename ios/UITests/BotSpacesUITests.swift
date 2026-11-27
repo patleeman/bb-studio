@@ -13,11 +13,7 @@ final class BotSpacesUITests: ServerIsolatedUITestCase {
 
     private var list: XCUIElement { app.collectionViews["BotSpaceList"] }
 
-    private func back() {
-        let bar = app.navigationBars.firstMatch
-        XCTAssertTrue(bar.waitForExistence(timeout: 20))
-        bar.buttons.element(boundBy: 0).tap()
-    }
+    private func back() { app.goBack() }
 
     func testLaunchOpensMainAndBackShowsTheList() {
         launch()
@@ -67,15 +63,13 @@ final class BotSpacesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["Studio"].exists)
         app.buttons["Studio"].tap()
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10), "Studio opens over the list")
-        app.navigationBars["Studio"].swipeDown(velocity: .fast)
+        app.closeRoomSheet()
         XCTAssertTrue(app.navigationBars["Studio"].waitForNonExistence(timeout: 10))
         XCTAssertTrue(list.waitForExistence(timeout: 10))
         app.buttons["BotSpaceSettings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10), "Settings opens over the list")
-        let all = app.buttons["settingsAllThreads"]
-        XCTAssertTrue(all.waitForExistence(timeout: 10), "Settings → All BB threads")
-        all.tap()
-        XCTAssertTrue(app.navigationBars["Threads"].waitForExistence(timeout: 10), "the Threads list opens")
+        XCTAssertTrue(app.textFields["settingsServerURL"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["settingsAllThreads"].exists, "no separate Threads list: the conversation list is the one list")
     }
 
     private func shot(_ name: String) {

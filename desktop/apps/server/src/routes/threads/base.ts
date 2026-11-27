@@ -1,3 +1,4 @@
+import { operationComplete } from "../../services/lib/operation-response.js";
 import { countUnarchivedThreadDescendants } from "../../services/threads/thread-archive.js";
 import { askBeforeThreadDelete } from "../../services/threads/thread-delete-hooks.fork.js";
 import { listThreadCascades } from "../../services/threads/thread-cascade.js";
@@ -205,6 +206,7 @@ function buildThreadSearchGroupResponse(
 
   return {
     total: args.group.total,
+    totalCapped: args.group.totalCapped,
     results: args.group.results.flatMap((result) => {
       const thread = threadEntriesById.get(result.thread.id);
       if (thread === undefined) {
@@ -543,6 +545,6 @@ export function registerThreadBaseRoutes(app: Hono, deps: AppDeps): void {
           : getEnvironment(deps.db, deleted.environmentId),
       );
     }
-    return context.json({ ok: true });
+    return context.json(operationComplete());
   });
 }

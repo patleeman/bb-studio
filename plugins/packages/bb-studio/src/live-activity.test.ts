@@ -112,7 +112,7 @@ it("builds the digest newest first in each part, with states, ages, owners and t
     "Workers:",
     "- \"Fable lead\" (lead) running · 5m ago · for this conversation · bb-studio-native",
     "- \"Codex: iOS build\" (ios) failed · 2h ago · for \"Main\" · bb-studio",
-    "Details: bot_activity_lookup { threadId }; the full list: bot_conversations.",
+    'Details: bot_info { view: "thread", threadId }; the full list: bot_info { view: "conversations" }.',
   ]);
   expect(buildDigest({ now: T0, conversations: [], workers: [] })).toMatch(/^Elsewhere: no other conversation was active/);
 });
@@ -123,7 +123,7 @@ it("caps the digest and counts what didn't fit", () => {
   const text = buildDigest({ now: T0, conversations, workers, cap: 1500 });
   expect(text.length).toBeLessThanOrEqual(1500);
   const shown = text.split("\n").filter((line) => line.startsWith("- ")).length;
-  expect(text).toContain(`…and ${50 - shown} more. Details: bot_activity_lookup`);
+  expect(text).toContain(`…and ${50 - shown} more. Details: bot_info { view: "thread", threadId }`);
   // The newest ones are the ones kept.
   expect(text).toContain("(c0)");
   expect(text).not.toContain("(c39)");
@@ -172,6 +172,10 @@ it("registers the digest on the per-turn context hook where BB has it, and nothi
   const hooks = { experimental_turnContext: vi.fn() };
   registerTurnContext({ experimental_hooks: hooks }, () => { throw new Error("db closed"); });
   expect((hooks.experimental_turnContext.mock.calls[0]![0] as (context: { threadId: string }) => unknown)({ threadId: "t" })).toBeNull();
+  // Only a registration with the move handoff handler opts in to the provider-move budget.
+  expect(hooks.experimental_turnContext.mock.calls[0]![1]).toBeUndefined();
+  registerTurnContext({ experimental_hooks: hooks }, () => null, { providerMove: true });
+  expect(hooks.experimental_turnContext.mock.calls[1]![1]).toEqual({ providerMove: true });
   const plain = await setup();
   expect(plain.live.hooked).toBe(false);
 });

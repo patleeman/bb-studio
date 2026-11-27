@@ -1,20 +1,37 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
-import { jevRoutes } from "../server/jev-providers";
+import { jevPresets, jevProviderChoices, jevProviders, jevRoutes } from "../server/jev-providers";
+import { checkSetting, effectiveSettings } from "../../settings/schema";
+import { SETTINGS_KV_KEY, StudioSettingsStore } from "../../settings/store";
 
 const names = (settings: Parameters<typeof jevRoutes>[0], env = {}) =>
   jevRoutes(settings, env).routes.map((route) => route.name);
 
-test("auto tries TypeSafe first, then every other provider with a key", () => {
+test("OpenCode Go bills the Go plan's inference route with jev-1.14 and the OpenCode key", () => {
+  assert.deepEqual(jevPresets["opencode-go"], {
+    name: "OpenCode Go",
+    endpoint: "https://opencode.ai/inference/go/v1/systemone",
+    model: "jev-1.14",
+    keySetting: "zenApiKey",
+    keyEnv: "OPENCODE_API_KEY",
+  });
+  // Zen and the plain inference route bill the cash balance.
+  assert.ok(!("opencode-zen" in jevPresets));
+  assert.ok(Object.values(jevPresets).every((preset) => !preset.endpoint.includes("/zen/")));
+});
+
+test("auto tries OpenCode Go first, then every other provider with a key", () => {
+  assert.deepEqual(jevProviderChoices, ["auto", "opencode-go", "typesafe", "vercel", "openrouter", "custom"]);
   assert.deepEqual(
     names({ zenApiKey: "z", openRouterApiKey: "o", typesafeApiKey: "t", vercelApiKey: "v" }),
-    ["TypeSafe", "Vercel AI Gateway", "OpenRouter", "OpenCode Zen"],
+    ["OpenCode Go", "TypeSafe", "Vercel AI Gateway", "OpenRouter"],
   );
+  assert.deepEqual(names({ openRouterApiKey: "o", typesafeApiKey: "t" }), ["TypeSafe", "OpenRouter"]);
   assert.deepEqual(names({}), []);
 });
 
 test("keys fall back to each provider's standard environment variable", () => {
-  assert.deepEqual(names({}, { TYPESAFE_API_KEY: "t", OPENCODE_API_KEY: "z" }), ["TypeSafe", "OpenCode Zen"]);
+  assert.deepEqual(names({}, { TYPESAFE_API_KEY: "t", OPENCODE_API_KEY: "z" }), ["OpenCode Go", "TypeSafe"]);
   assert.deepEqual(names({}, { AI_GATEWAY_API_KEY: "v", OPENROUTER_API_KEY: "o" }), ["Vercel AI Gateway", "OpenRouter"]);
 });
 
@@ -22,7 +39,33 @@ test("a pinned provider uses only that provider and reports a missing key", () =
   const pinned = jevRoutes({ jevProvider: "typesafe", zenApiKey: "z" }, {});
   assert.deepEqual(pinned.routes, []);
   assert.match(pinned.problems[0]!, /TypeSafe has no API key/);
-  assert.deepEqual(names({ jevProvider: "opencode-zen", typesafeApiKey: "t", zenApiKey: "z" }), ["OpenCode Zen"]);
+  assert.deepEqual(names({ jevProvider: "opencode-go", typesafeApiKey: "t", zenApiKey: "z" }), ["OpenCode Go"]);
+});
+
+test("a saved opencode-zen choice now means opencode-go", () => {
+  assert.deepEqual(names({ jevProvider: "opencode-zen", typesafeApiKey: "t", zenApiKey: "z" }), ["OpenCode Go"]);
+  assert.deepEqual(checkSetting("decisions_jevProvider", "opencode-zen"), { ok: true, value: "opencode-go" });
+  assert.equal(effectiveSettings({ decisions_jevProvider: "opencode-zen" }).decisions_jevProvider, "opencode-go");
+  assert.equal(checkSetting("decisions_jevProvider", "opencode-free").ok, false);
+});
+
+test("a stored opencode-zen choice loads as opencode-go and saves that way on the next write", async () => {
+  const saved = new Map<string, unknown>([[SETTINGS_KV_KEY, { decisions_jevProvider: "opencode-zen" }]]);
+  const kv = { get: async <T,>(key: string) => saved.get(key) as T | undefined, set: async (key: string, value: unknown) => void saved.set(key, value) };
+  const store = new StudioSettingsStore(kv);
+  assert.equal((await store.load()).decisions_jevProvider, "opencode-go");
+  await store.set({ decisions_enabled: true });
+  assert.deepEqual(saved.get(SETTINGS_KV_KEY), { decisions_jevProvider: "opencode-go", decisions_enabled: true });
+});
+
+test("the provider list reports presence and source, never a key", () => {
+  const list = jevProviders({ typesafeApiKey: "secret-t", customJevEndpoint: "https://gw.example.com/x", customJevModel: "m" }, { OPENCODE_API_KEY: "secret-o" });
+  assert.deepEqual(
+    list.map(({ id, configured, keyFrom }) => [id, configured, keyFrom]),
+    [["opencode-go", true, "environment"], ["typesafe", true, "setting"], ["vercel", false, null], ["openrouter", false, null], ["custom", true, null]],
+  );
+  assert.equal(list[0]!.endpoint, "https://opencode.ai/inference/go/v1/systemone");
+  assert.doesNotMatch(JSON.stringify(list), /secret/);
 });
 
 test("the TypeSafe model can follow previews or pin a version", () => {
@@ -35,7 +78,7 @@ test("a custom endpoint joins auto after the presets", () => {
     { zenApiKey: "z", customJevEndpoint: "https://gw.example.com/v1/systemone", customJevModel: "jev", customJevApiKey: "c" },
     {},
   );
-  assert.deepEqual(routes.map((route) => route.name), ["OpenCode Zen", "Custom (gw.example.com)"]);
+  assert.deepEqual(routes.map((route) => route.name), ["OpenCode Go", "Custom (gw.example.com)"]);
   assert.equal(routes[1]!.apiKey, "c");
 });
 

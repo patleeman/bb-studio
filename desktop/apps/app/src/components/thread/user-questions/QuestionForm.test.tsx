@@ -14,6 +14,11 @@ import type {
 } from "@bb/shared-ui/question-form-state";
 import { ThreadQuestionFormHost } from "./ThreadQuestionFormHost";
 import { AppCommandProvider } from "@/components/commands/AppCommandProvider";
+import { LazyPluginMarkdown } from "@/components/plugin/lazy-plugin-renderers";
+import { LazyMarkdownHtml } from "@/components/ui/lazy-markdown-html";
+
+await Promise.all([LazyPluginMarkdown.preload(), LazyMarkdownHtml.preload()]);
+
 type InteractionPayload = { questions: Question[] };
 type InteractionResponse = { answers: Record<string, QuestionAnswer> };
 
@@ -100,7 +105,6 @@ function render(
     draftKey?: string;
     density?: "default" | "compact";
     promptShownAbove?: string;
-    closeInline?: () => void;
   } = {},
 ) {
   return renderReact(
@@ -108,7 +112,6 @@ function render(
       <ThreadQuestionFormHost
         density={handlers.density ?? "default"}
         promptShownAbove={handlers.promptShownAbove ?? null}
-        closeInline={handlers.closeInline ?? null}
       >
         <QuestionForm
           draftKey={handlers.draftKey}
@@ -139,6 +142,39 @@ function getButtonByText(
 }
 
 describe("answering a single-select question", () => {
+  it("renders a Markdown plan and submits the selected answer", async () => {
+    const submit = vi.fn(async () => {});
+    const slot = render(
+      {
+        questions: [
+          {
+            ...singleSelect.questions[0]!,
+            prompt:
+              "## Review plan\n\nFirst paragraph.\n\n- Inspect the inputs\n- Run the checks\n\nRead [documentation](https://example.com/docs).",
+          },
+        ],
+      },
+      { submit },
+    );
+
+    expect(
+      slot.getByRole("heading", { name: "Review plan", level: 2 }),
+    ).not.toBeNull();
+    expect(
+      slot.getAllByRole("listitem").map((item) => item.textContent),
+    ).toEqual(["Inspect the inputs", "Run the checks"]);
+    expect(
+      slot.getByRole("link", { name: "documentation" }).getAttribute("href"),
+    ).toBe("https://example.com/docs");
+    fireEvent.click(getButtonByText(slot, "SQLite"));
+    await act(async () =>
+      fireEvent.click(getButtonByText(slot, "Submit answer")),
+    );
+    expect(submit).toHaveBeenCalledWith({
+      answers: { q0: { selected: ["q0o1"] } },
+    });
+  });
+
   it("isolates interactions and ignores corrupt drafts or changed questions", () => {
     const firstKey = "thr_isolation:pint_first";
     const secondKey = "thr_isolation:pint_second";
@@ -293,21 +329,6 @@ describe("answering a single-select question", () => {
     const slot = render(singleSelect, { density: "compact" });
     expect(getButtonByText(slot, "Submit")).toBeTruthy();
     expect(slot.queryByText("Submit answer")).toBeNull();
-  });
-
-  it("closes the inline form on Cancel without cancelling the question", () => {
-    const cancel = vi.fn(async () => undefined);
-    const closeInline = vi.fn();
-    const slot = render(singleSelect, {
-      density: "compact",
-      cancel,
-      closeInline,
-    });
-
-    fireEvent.click(getButtonByText(slot, "Cancel"));
-
-    expect(closeInline).toHaveBeenCalledTimes(1);
-    expect(cancel).not.toHaveBeenCalled();
   });
 
   it("hides the compact prompt only when the host already shows that text", () => {

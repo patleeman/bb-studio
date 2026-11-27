@@ -63,30 +63,72 @@ export function interceptBuiltInMic(options: MicInterceptOptions, signal: AbortS
     @media (prefers-reduced-motion: reduce) { button[${CLAIMED_ATTR}] svg { animation: none !important; } }
   `;
   document.head.append(style);
-  const sync = () => {
+  const claimed = new Set<HTMLButtonElement>();
+  const setAttr = (el: Element, name: string, on: boolean) => {
+    if (el.hasAttribute(name) !== on) el.toggleAttribute(name, on);
+  };
+  const syncButton = (button: HTMLButtonElement, enabled: boolean) => {
+    const promptbox = button.closest<HTMLElement>("[data-promptbox]");
+    const state = enabled && promptbox ? options.stateFor(promptbox) : null;
+    setAttr(button, CLAIMED_ATTR, state !== null);
+    setAttr(button, ACTIVE_ATTR, state?.mode === "active");
+    setAttr(button, BUSY_ATTR, state?.mode === "busy");
+    if (state && button.title !== state.title) button.title = state.title;
+    if (state !== null) claimed.add(button);
+    else claimed.delete(button);
+  };
+  const syncAll = () => {
+    for (const button of claimed) if (!button.isConnected) claimed.delete(button);
     const enabled = options.enabled();
     for (const button of document.querySelectorAll<HTMLButtonElement>(BUILT_IN_MIC_SELECTOR)) {
-      const promptbox = button.closest<HTMLElement>("[data-promptbox]");
-      const state = enabled && promptbox ? options.stateFor(promptbox) : null;
-      button.toggleAttribute(CLAIMED_ATTR, state !== null);
-      button.toggleAttribute(ACTIVE_ATTR, state?.mode === "active");
-      button.toggleAttribute(BUSY_ATTR, state?.mode === "busy");
-      if (state) button.title = state.title;
+      syncButton(button, enabled);
     }
   };
+  const syncKnown = () => {
+    let missing = claimed.size === 0;
+    for (const button of claimed) {
+      if (!button.isConnected) {
+        claimed.delete(button);
+        missing = true;
+      }
+    }
+    if (missing) {
+      syncAll();
+      return;
+    }
+    const enabled = options.enabled();
+    for (const button of claimed) syncButton(button, enabled);
+  };
+  const relevantMutation = (records: readonly MutationRecord[]): boolean => {
+    for (const button of claimed) if (!button.isConnected) return true;
+    for (const record of records) {
+      if (record.addedNodes.length === 0) continue;
+      const target = record.target instanceof Element ? record.target : null;
+      if (target?.closest("[data-promptbox]")) return true;
+      for (const node of record.addedNodes) {
+        if (!(node instanceof Element)) continue;
+        if (node.hasAttribute("data-promptbox")) return true;
+        if (node.firstElementChild !== null && node.querySelector("[data-promptbox]") !== null) return true;
+      }
+    }
+    return false;
+  };
   let queued = false;
-  const observer = new MutationObserver(() => {
-    if (queued) return;
+  const observer = new MutationObserver((records) => {
+    if (queued || !relevantMutation(records)) return;
     queued = true;
     requestAnimationFrame(() => {
       queued = false;
-      sync();
+      syncAll();
     });
   });
   observer.observe(document.body, { childList: true, subtree: true });
-  const timer = window.setInterval(sync, 1000);
-  const unsubscribe = options.subscribe(sync);
-  sync();
+  const timer = window.setInterval(() => {
+    if (document.visibilityState === "hidden") return;
+    syncKnown();
+  }, 1000);
+  const unsubscribe = options.subscribe(syncKnown);
+  syncAll();
   signal.addEventListener(
     "abort",
     () => {

@@ -56,7 +56,7 @@ describe("the review queue", () => {
   });
 });
 
-describe("design_ready during a running review", () => {
+describe("design_review (op: ready) during a running review", () => {
   it("queues one follow-up of the latest call instead of dropping it", async () => {
     const { deps, runs, queue } = harness();
     queue.request("dsn_a", request(["1a"]));
@@ -118,7 +118,7 @@ describe("the automatic review cap", () => {
   });
 });
 
-describe("design_ready's description", () => {
+describe("design_review (op: ready)'s description", () => {
   it("says findings go to the design's own thread, as they do", async () => {
     const { DESIGN_READY_DESCRIPTION } = await import("../server");
     expect(DESIGN_READY_DESCRIPTION).toContain("in the design's own thread");

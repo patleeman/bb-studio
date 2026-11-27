@@ -10,38 +10,63 @@ struct MarkdownImage: View {
     let alt: String
     let src: String
     @State private var url: URL?
+    @State private var image: UIImage?
+    @State private var loadedSrc: String?
+    @State private var failed = false
     @State private var resolved = false
     @State private var viewing = false
 
+    /// Max decoded edge in pixels (420 pt @ 3x = 1260 px) so large screenshots
+    /// don't decode at full camera/desktop resolution inside a scrolling transcript.
+    private static let maxPixels = 1_260
+
     var body: some View {
         Group {
-            if let url {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFit()
-                            .clipShape(.rect(cornerRadius: 10))
-                            .frame(maxHeight: 420, alignment: .leading)
-                            .onTapGesture { viewing = true }
-                            .accessibilityLabel(alt.isEmpty ? "Image" : alt)
-                            .accessibilityAddTraits(.isButton)
-                            .accessibilityIdentifier("markdownImage")
-                    case .failure:
-                        placeholder("photo.badge.exclamationmark")
-                    default:
-                        ProgressView().frame(maxWidth: .infinity, minHeight: 120)
-                    }
-                }
-                .fullScreenCover(isPresented: $viewing) { ImageViewer(url: url) }
-            } else if resolved {
+            if let image, let url {
+                Image(uiImage: image).resizable().scaledToFit()
+                    .clipShape(.rect(cornerRadius: 10))
+                    .frame(maxHeight: 420, alignment: .leading)
+                    .onTapGesture { viewing = true }
+                    .accessibilityLabel(alt.isEmpty ? "Image" : alt)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityIdentifier("markdownImage")
+                    .fullScreenCover(isPresented: $viewing) { ImageViewer(url: url) }
+            } else if failed {
+                placeholder("photo.badge.exclamationmark")
+            } else if resolved && url == nil {
                 placeholder("photo")
             } else {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 120)
             }
         }
         .task(id: src) {
-            url = await resolve()
+            if loadedSrc != src {
+                image = nil
+                url = nil
+                resolved = false
+            }
+            failed = false
+            let resolvedURL = await resolve()
+            url = resolvedURL
             resolved = true
+            guard let resolvedURL else {
+                image = nil
+                loadedSrc = src
+                return
+            }
+            if let hit = AttachmentImages.shared.cached(resolvedURL, pixels: Self.maxPixels) {
+                image = hit
+                loadedSrc = src
+                return
+            }
+            if let loaded = await AttachmentImages.shared.image(resolvedURL, pixels: Self.maxPixels) {
+                image = loaded
+                loadedSrc = src
+            } else if !Task.isCancelled {
+                image = nil
+                loadedSrc = nil
+                failed = true
+            }
         }
     }
 

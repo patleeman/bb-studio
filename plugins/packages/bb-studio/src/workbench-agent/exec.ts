@@ -23,7 +23,7 @@ export interface PanelTab {
   title: string;
   closable: boolean;
   detail:
-    | { kind: "plugin"; pluginId: string; tab: { id: string }; params: JsonValue | null }
+    | { kind: "plugin"; pluginId: string; tab: { id: string; availability?: string }; params: JsonValue | null }
     | { kind: "file"; path: string }
     | { kind: "browser"; url: string }
     | { kind: "terminal"; terminalId: string }
@@ -257,7 +257,7 @@ function tabOf(wb: WorkbenchLike, key: string): { list: PanelTabs; tab: PanelTab
   return { list, tab: list.tabs.find((each) => each.key === key) ?? null };
 }
 
-const unknownKey = (key: string) => `No tab has key ${JSON.stringify(key)}. Call workbench_list for the current keys.`;
+const unknownKey = (key: string) => `No tab has key ${JSON.stringify(key)}. Call workbench (op: list) for the current keys.`;
 
 function close(wb: WorkbenchLike, op: Extract<WorkbenchOp, { type: "close" }>, record: WorkbenchRecord): ExecResult {
   const { list, tab } = tabOf(wb, op.key);

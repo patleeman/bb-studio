@@ -35,7 +35,7 @@ final class TranscriptHangUITests: ServerIsolatedUITestCase {
     }
 
     /// The Duo's window changing with the keyboard up and a question waiting:
-    /// fold and unfold, the split, the list's width, and back from the
+    /// fold and unfold (the room's two pages), the split, and back from the
     /// background. Every change must settle within a few frames.
     func testDuoWindowChangesWithTheKeyboardUpSettle() {
         open(messages: Self.messages ?? 600, duo: true)
@@ -43,8 +43,6 @@ final class TranscriptHangUITests: ServerIsolatedUITestCase {
         step("keyboard up") { composer.tap() }
         for cycle in 0..<2 {
             step("c\(cycle) unfold") { command("landscape") }
-            step("c\(cycle) narrow list") { command("pane?narrow") }
-            step("c\(cycle) even list") { command("pane?even") }
             step("c\(cycle) split") { command("split-right") }
             step("c\(cycle) portrait") { command("portrait") }
             step("c\(cycle) fold") { command("outer") }

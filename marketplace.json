@@ -84,6 +84,32 @@
           "ref": "stable"
         }
       }
+    },
+    {
+      "id": "provider-antigravity",
+      "displayName": "Google Antigravity",
+      "description": "Run conversations with Google Antigravity CLI (agy), with account health, quota usage, and CLI updates.",
+      "icon": {
+        "url": "./plugins/packages/provider-antigravity/icons/antigravity.svg"
+      },
+      "tags": [
+        "provider",
+        "antigravity",
+        "gemini",
+        "acp",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "plugins/packages/provider-antigravity",
+          "ref": "stable"
+        }
+      }
     }
   ]
 }

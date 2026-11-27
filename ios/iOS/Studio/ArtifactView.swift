@@ -280,7 +280,7 @@ struct ArtifactView: View {
     private func menu(_ artifact: Artifact) -> some View {
         Menu {
             Button {
-                operation.complete(on: app) { app.newThread(text: "[\(artifact.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(artifact.href)) ") }
+                operation.complete(on: app) { app.open(.compose("[\(artifact.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(artifact.href)) ")) }
             } label: { Label("New Thread with This", systemImage: "square.and.pencil") }
             StudioChatMenuButton(isPresented: $chatting)
             if let text, version?.isText == true, textVersion == version?.id {
@@ -474,8 +474,21 @@ struct ArtifactCard: View {
     /// Text past this is left to the viewer.
     static let textLimit = 20_000
 
+    private final class CachedArtifact {
+        let artifact: Artifact
+        let text: String?
+        init(artifact: Artifact, text: String?) {
+            self.artifact = artifact
+            self.text = text
+        }
+    }
+
     /// Replies re-render often; a card starts from what the last one showed.
-    @MainActor private static var cache: [String: (artifact: Artifact, text: String?)] = [:]
+    @MainActor private static let cache: NSCache<NSString, CachedArtifact> = {
+        let cache = NSCache<NSString, CachedArtifact>()
+        cache.countLimit = 100
+        return cache
+    }()
 
     var body: some View {
         StudioCardChrome(
@@ -495,11 +508,14 @@ struct ArtifactCard: View {
             preview
         }
         .task(id: id) {
-            let cacheKey = ServerScope.key(id, serverURL: client.baseURL)
-            if let cached = Self.cache[cacheKey] { (artifact, text) = cached }
+            let cacheKey = ServerScope.key(id, serverURL: client.baseURL) as NSString
+            if let cached = Self.cache.object(forKey: cacheKey) {
+                artifact = cached.artifact
+                text = cached.text
+            }
             guard let result = try? await client.artifact(id) else { return }
             guard let found = result.artifact else {
-                Self.cache[cacheKey] = nil
+                Self.cache.removeObject(forKey: cacheKey)
                 missing = true
                 return
             }
@@ -507,7 +523,7 @@ struct ArtifactCard: View {
             if found.version.isText, let read = try? await client.artifactText(found.id, versionId: found.version.id).text {
                 text = String(read.prefix(Self.textLimit))
             }
-            Self.cache[cacheKey] = (found, text)
+            Self.cache.setObject(CachedArtifact(artifact: found, text: text), forKey: cacheKey)
         }
     }
 
@@ -523,9 +539,7 @@ struct ArtifactCard: View {
             switch artifact.version.type {
             case "image":
                 NavigationLink(value: Route.artifact(id: artifact.id)) {
-                    AsyncImage(url: url) { image in
-                        image.resizable().scaledToFit()
-                    } placeholder: {
+                    DownsampledRemoteImage(url: url, pixels: 960, contentMode: .fit) {
                         ProgressView()
                     }
                     .frame(maxWidth: .infinity, maxHeight: 240)
@@ -563,13 +577,53 @@ struct ArtifactCard: View {
     @ViewBuilder
     private var thumbnail: some View {
         if let artifact, artifact.version.type == "image" {
-            AsyncImage(url: client.artifactContentURL(artifact.id, versionId: artifact.version.id)) { image in
-                image.resizable().scaledToFill()
-            } placeholder: {
+            DownsampledRemoteImage(url: client.artifactContentURL(artifact.id, versionId: artifact.version.id), pixels: 180, contentMode: .fill) {
                 Image(systemName: "photo").foregroundStyle(.teal)
             }
         } else {
             Image(systemName: artifact?.version.symbol ?? "doc").font(.body.weight(.medium)).foregroundStyle(.teal)
+        }
+    }
+}
+
+/// A remote image backed by `AttachmentImages` (shared deduplicated download,
+/// 200 MB disk URLCache, cost-limited memory NSCache, and `CGImageSource` downsampling).
+struct DownsampledRemoteImage<Placeholder: View>: View {
+    let url: URL?
+    let pixels: Int
+    var contentMode: ContentMode = .fill
+    @ViewBuilder let placeholder: () -> Placeholder
+    @State private var image: UIImage?
+
+    init(url: URL?, pixels: Int, contentMode: ContentMode = .fill, @ViewBuilder placeholder: @escaping () -> Placeholder) {
+        self.url = url
+        self.pixels = pixels
+        self.contentMode = contentMode
+        self.placeholder = placeholder
+        _image = State(initialValue: url.flatMap { AttachmentImages.shared.cached($0, pixels: pixels) })
+    }
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image).resizable().aspectRatio(contentMode: contentMode)
+            } else {
+                placeholder()
+            }
+        }
+        .task(id: url) {
+            guard let url else {
+                image = nil
+                return
+            }
+            if let hit = AttachmentImages.shared.cached(url, pixels: pixels) {
+                image = hit
+                return
+            }
+            image = nil
+            if let loaded = await AttachmentImages.shared.image(url, pixels: pixels) {
+                image = loaded
+            }
         }
     }
 }

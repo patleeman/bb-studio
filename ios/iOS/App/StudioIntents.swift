@@ -26,7 +26,7 @@ struct OpenPageIntent: AppIntent {
     static let openAppWhenRun = true
     @Parameter(title: "Page") var page: PageEntity
     @MainActor func perform() async throws -> some IntentResult {
-        AppModel.shared.openPage(page.id)
+        AppModel.shared.open(.studio(kind: nil, .page(id: page.id)))
         return .result()
     }
 }
@@ -45,7 +45,7 @@ struct StartRecordingIntent: AppIntent {
     static let title: LocalizedStringResource = "Start BB recording"
     static let openAppWhenRun = true
     @MainActor func perform() async throws -> some IntentResult {
-        AppModel.shared.sheet = .recording
+        Router.shared.sheet = .recording
         return .result()
     }
 }

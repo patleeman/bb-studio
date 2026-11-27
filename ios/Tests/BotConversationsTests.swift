@@ -178,6 +178,45 @@ final class BotConversationsTests: XCTestCase {
         XCTAssertEqual(((request["input"] as? [[String: Any]])?.first)?["text"] as? String, "Plan the trip")
     }
 
+    func testNewConversationCarriesThePickedModelAndWorkspace() async throws {
+        let (client, calls) = makeClient { _, _ in ["threadId": "thr_new", "projectId": "proj"] }
+        let choice = ExecutionChoice(providerId: "auto", model: "auto", permissionMode: "full")
+        _ = try await client.startConversation(botId: "bot_a", projectId: "proj", text: "Plan the trip", choice: choice,
+                                               workspace: .worktree(hostId: "host_1", baseBranch: "main"))
+        let request = try XCTUnwrap(calls().first { $0.0 == "bot_conversation_start" }?.1["request"] as? [String: Any])
+        XCTAssertEqual(request["providerId"] as? String, "auto")
+        XCTAssertEqual(request["model"] as? String, "auto")
+        XCTAssertEqual(request["permissionMode"] as? String, "full")
+        let environment = try XCTUnwrap(request["environment"] as? [String: Any])
+        XCTAssertEqual(environment["environmentProviderId"] as? String, "git-worktree")
+        XCTAssertEqual(((environment["inputs"] as? [String: Any])?["branch"] as? [String: Any])?["name"] as? String, "main")
+    }
+
+    func testNewConversationDefaultsLikeTheDesktop() {
+        let project = ExecutionChoice(providerId: "claude-code", model: "opus", reasoningLevel: "high", permissionMode: "auto")
+        let bot = ExecutionChoice(providerId: "codex", model: "gpt-6", reasoningLevel: "low")
+        XCTAssertEqual(NewConversationChoice.defaults(bot: bot, project: project),
+                       ExecutionChoice(providerId: "codex", model: "gpt-6", reasoningLevel: "low", permissionMode: "auto"),
+                       "the Bot's model, with the project's permission mode")
+        XCTAssertEqual(NewConversationChoice.defaults(bot: nil, project: project), project, "no Bot model: the project's")
+        XCTAssertEqual(NewConversationChoice.defaults(bot: ExecutionChoice(), project: project), project)
+
+        let kept = NewConversationChoice.resolve(provider: "", model: "", reasoning: "", permission: "", defaults: bot,
+                                                 shownProvider: "claude-code", shownModel: "opus")
+        XCTAssertEqual(kept, bot, "nothing picked: the default")
+        let picked = NewConversationChoice.resolve(provider: "claude-code", model: "", reasoning: "", permission: "full", defaults: bot,
+                                                   shownProvider: "claude-code", shownModel: "sonnet")
+        XCTAssertEqual(picked, ExecutionChoice(providerId: "claude-code", model: "sonnet", permissionMode: "full"),
+                       "another provider: its shown model, not the Bot's, and no reasoning of the Bot's")
+        let auto = NewConversationChoice.resolve(provider: "", model: "", reasoning: "", permission: "",
+                                                 defaults: ExecutionChoice(providerId: "auto", model: "auto"), shownProvider: nil, shownModel: "opus")
+        XCTAssertEqual(auto.providerId, "auto")
+        XCTAssertEqual(auto.model, "auto", "Auto's one model is Auto")
+        let none = NewConversationChoice.resolve(provider: "", model: "", reasoning: "", permission: "", defaults: nil,
+                                                 shownProvider: "auto", shownModel: "opus")
+        XCTAssertEqual(none, ExecutionChoice(providerId: "auto", model: "auto"), "no default anywhere: the picker's first, Auto when the router leads")
+    }
+
     func testQuietCheckRendersForPass() throws {
         let pass = try Self.row(#"{"id":"p1","kind":"conversation","role":"assistant","text":"[PASS]"}"#)
         XCTAssertTrue(pass.isPassReply)

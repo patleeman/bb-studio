@@ -36,7 +36,7 @@ struct BBStudioApp: App {
                         if parts.count == 2 {
                             let host = ["pages": "page", "talk": "recording", "excalidraw": "drawing", "artifacts": "artifact"][parts[0]]
                             if let host, let url = URL(string: "bbstudio://\(host)/\(parts[1])") { model.handle(url) }
-                        } else { model.openThread(id) }
+                        } else { model.open(.conversation(id)) }
                     }
                 }
                 .task {
@@ -150,9 +150,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                     return
                 }
                 if let route = NotificationActions.taskRoute(userInfo) {
-                    await MainActor.run { AppModel.shared.openTaskPush(route.id, conversation: route.conversation) }
+                    // A loop's push: its conversation, else the Strands screen.
+                    await MainActor.run {
+                        if let conversation = route.conversation { AppModel.shared.open(.conversation(conversation)) } else { AppModel.shared.open(.place(.strands, botId: nil)) }
+                    }
                 } else if let threadId = userInfo["threadId"] as? String {
-                    await MainActor.run { AppModel.shared.openThread(threadId) }
+                    await MainActor.run { AppModel.shared.open(.conversation(threadId)) }
                 }
             }
             completionHandler()
@@ -165,7 +168,7 @@ final class SceneDelegate: NSObject, UIWindowSceneDelegate {
     static let shortcuts: [UIApplicationShortcutItem] = [
         .init(type: "bbstudio://dictate", localizedTitle: "Dictate", localizedSubtitle: nil, icon: .init(systemImageName: "mic.fill")),
         .init(type: "bbstudio://write", localizedTitle: "Write", localizedSubtitle: nil, icon: .init(systemImageName: "square.and.pencil")),
-        .init(type: "bbstudio://new", localizedTitle: "New Thread", localizedSubtitle: nil, icon: .init(systemImageName: Symbols.newThread)),
+        .init(type: "bbstudio://new", localizedTitle: "New Conversation", localizedSubtitle: nil, icon: .init(systemImageName: Symbols.newThread)),
     ]
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {

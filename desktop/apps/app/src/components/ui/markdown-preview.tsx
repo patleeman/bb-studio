@@ -1,5 +1,5 @@
-import { keepsShortLineBreaks, remarkShortLineBreaks } from "./markdown-short-line-breaks.fork";
 import { forkMentionHref, isMentionHref } from "./markdown-mention-links.fork";
+import { withShortLineBreakPlugins } from "./markdown-short-line-breaks.fork";
 import { parseApplicationUrl } from "@bb/domain/application-url";
 import { openApplicationUrl } from "@/lib/application-url";
 import {
@@ -128,7 +128,6 @@ import {
   resolveMarkdownPiecesUnlessHtml,
   type MarkdownPieceRenderConfig,
 } from "./markdown-incremental-pieces.js";
-import { PAGE_CONTAINER_INSET_END_VARIABLE } from "./page-shell-content-style.js";
 import { normalizePromptBlockquoteBoundaries } from "./markdown-prompt-blockquote-boundaries.js";
 import { MarkdownMermaidDiagram } from "./markdown-mermaid-diagram.js";
 import type { PromptTextMention } from "@bb/domain";
@@ -169,6 +168,11 @@ export interface MarkdownThreadMentions {
   mentions: readonly PromptTextMention[];
   preserveSoftBreaks: boolean;
 }
+
+export const AUTHORED_MARKDOWN_THREAD_MENTIONS: MarkdownThreadMentions = {
+  mentions: [],
+  preserveSoftBreaks: false,
+};
 
 interface MarkdownAnchorProps
   extends ComponentPropsWithoutRef<"a">, ExtraProps {
@@ -318,8 +322,7 @@ type MarkdownRehypePlugins = NonNullable<ReactMarkdownOptions["rehypePlugins"]>;
 type MarkdownRemarkPlugins = NonNullable<ReactMarkdownOptions["remarkPlugins"]>;
 
 const MARKDOWN_TABLE_BREAKOUT_LIMIT_VARIABLE = "--md-table-breakout-max";
-const MARKDOWN_PAGE_WIDTH = `(100cqw + var(${PAGE_CONTAINER_INSET_END_VARIABLE}, 0px))`;
-const MARKDOWN_TABLE_BREAKOUT_WIDTH = `max(100%, min(1100px, ${MARKDOWN_PAGE_WIDTH} - 2rem, var(${MARKDOWN_TABLE_BREAKOUT_LIMIT_VARIABLE}, ${MARKDOWN_PAGE_WIDTH})))`;
+const MARKDOWN_TABLE_BREAKOUT_WIDTH = `max(100%, min(1100px, 100cqw - 2rem, var(${MARKDOWN_TABLE_BREAKOUT_LIMIT_VARIABLE}, 100cqw)))`;
 const MARKDOWN_TABLE_BREAKOUT_START_MARGIN = `var(${MARKDOWN_TABLE_START_OFFSET_VARIABLE}, calc((100% - ${MARKDOWN_TABLE_BREAKOUT_WIDTH}) / 2))`;
 const MARKDOWN_CONTENT_WIDTH_VARIABLE = "--md-content-w";
 const MARKDOWN_SOURCE_COLOR_SCHEME_MEDIA_PATTERN =
@@ -334,6 +337,56 @@ function resolveRehypePlugins({
 }): MarkdownRehypePlugins {
   const base = MARKDOWN_PLAIN_REHYPE_PLUGINS;
   return rehypeKatex === null ? base : [...base, rehypeKatex];
+}
+
+const markdownRemarkPluginLists = new Map<string, MarkdownRemarkPlugins>();
+
+function resolveMarkdownRemarkPlugins({
+  breaks,
+  headingIds,
+  messageDirectives,
+  promptMentions,
+  threadMentions,
+}: {
+  breaks: boolean;
+  headingIds: boolean;
+  messageDirectives: boolean;
+  promptMentions: boolean;
+  threadMentions: boolean;
+}): MarkdownRemarkPlugins {
+  const key = [
+    breaks,
+    headingIds,
+    messageDirectives,
+    promptMentions,
+    threadMentions,
+  ].join();
+  const cached = markdownRemarkPluginLists.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const plugins: MarkdownRemarkPlugins = [
+    remarkGfm,
+    [remarkMath, { singleDollarTextMath: false }],
+    remarkInlineDollarMath,
+  ];
+  if (headingIds) {
+    plugins.push(remarkHeadingIds);
+  }
+  if (breaks) {
+    plugins.push(remarkBreaks);
+  }
+  if (threadMentions) {
+    plugins.push(remarkThreadMentions);
+  }
+  if (promptMentions) {
+    plugins.push(remarkPromptMentions);
+  }
+  if (messageDirectives) {
+    plugins.push(remarkDirective);
+  }
+  markdownRemarkPluginLists.set(key, plugins);
+  return plugins;
 }
 
 function areMarkdownAbsoluteLocalFileLinkRoutingsEqual({
@@ -1688,7 +1741,7 @@ function readMarkdownTableBreakoutLimit({
     return { kind: "set", value: `calc(${parentWidth + endRoom}px - 1rem)` };
   }
   const room = Math.min(Math.max(0, parentLeft - clipLeft), endRoom);
-  return { kind: "set", value: `${parentWidth + 2 * room}px` };
+  return { kind: "set", value: `calc(${parentWidth + 2 * room}px - 2rem)` };
 }
 
 function applyMarkdownTableBreakoutLimit({
@@ -1879,34 +1932,15 @@ function MarkdownPreviewComponent({
       threadMentions,
     ],
   );
-  const baseRemarkPlugins = useMemo((): MarkdownRemarkPlugins => {
-    const plugins: MarkdownRemarkPlugins = [
-      remarkGfm,
-      [remarkMath, { singleDollarTextMath: false }],
-      remarkInlineDollarMath,
-    ];
-    if (headingAnchors) {
-      plugins.push(remarkHeadingIds);
-    }
-    if (
+  const baseRemarkPlugins = withShortLineBreakPlugins(threadMentions, resolveMarkdownRemarkPlugins({
+    breaks:
       threadMentions?.preserveSoftBreaks === true ||
-      promptMentions !== undefined
-    ) {
-      plugins.push(remarkBreaks);
-    } else if (keepsShortLineBreaks(threadMentions)) {
-      plugins.push(remarkShortLineBreaks);
-    }
-    if (threadMentions !== undefined) {
-      plugins.push(remarkThreadMentions);
-    }
-    if (promptMentions !== undefined) {
-      plugins.push(remarkPromptMentions);
-    }
-    if (hasMessageDirectives) {
-      plugins.push(remarkDirective);
-    }
-    return plugins;
-  }, [headingAnchors, threadMentions, promptMentions, hasMessageDirectives]);
+      promptMentions !== undefined,
+    headingIds: headingAnchors,
+    messageDirectives: hasMessageDirectives,
+    promptMentions: promptMentions !== undefined,
+    threadMentions: threadMentions !== undefined,
+  }));
   const codeFenceRegistry = useCodeFenceLanguages();
   const remarkPlugins = useMemo((): MarkdownRemarkPlugins => {
     const plugins: MarkdownRemarkPlugins = [...baseRemarkPlugins];

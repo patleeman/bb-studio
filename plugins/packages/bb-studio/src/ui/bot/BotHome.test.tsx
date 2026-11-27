@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -561,7 +561,7 @@ test("Controls: profile and history collapsed until asked, Memory, Skills, and p
   await act(async () => button("Profile changes").click());
   const { openAppPath } = await import("../../kit/app/index");
   await act(async () => click(container.querySelector('[aria-label="Open memory"]')));
-  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/pages/pg_mem");
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/memory/bot_main");
   // Pause and Stop are in Controls too, once, in its state row; the back link goes to the main page.
   expect([...container.querySelectorAll("button")].filter((each) => each.textContent === "Pause")).toHaveLength(1);
   expect(container.querySelector('[data-testid="bot-state-controls"]')?.contains(button("Pause"))).toBe(true);
@@ -1090,19 +1090,17 @@ test("the sidebar has Runners but no Schedule: jobs, BB schedules and done remin
 const loop = (id: string, title: string, extra: Record<string, unknown> = {}) => ({ id, title, why: "", source: null, kind: "do", options: [], owner: "patrick", trigger: { type: "none" }, priority: "normal", push: false, status: "surfaced", due: null, area: null, createdAt: 1, updatedAt: 1, closedAt: null, closedBy: null, ...extra });
 const loopGroups = { needsYouNow: [loop("loop_a", "Pay the property tax")], comingUp: [loop("loop_b", "Call the plumber", { status: "queued", trigger: { type: "place", place: "home", direction: "arrive" } })], agentsOnIt: [], waitingOnOthers: [], done: [] };
 
-test("the Bot page lists no to-dos, and its old Tasks address opens the Strands page", async () => {
+test("the Bot page lists no to-dos, and its old Tasks address opens no Strands page", async () => {
   state.settings = { loopsEnabled: true };
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups, "tasks.list": { tasks: Object.values(loopGroups).flat().map((l) => taskFromLoop(l as never)), threads: [], held: [] }, "strands.overview": { conversations: [], needs: 0, running: 0 } };
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups, "tasks.list": { tasks: Object.values(loopGroups).flat().map((l) => taskFromLoop(l as never)), threads: [], held: [] } };
   await show(<BotPanel />);
   expect(container.querySelector("[role=tablist][aria-label='Bot page']")).toBeNull();
   expect(container.querySelector('[data-need="loop:loop_a"]')).toBeNull();
   expect(container.querySelector("[data-testid=bot-loops]")).toBeNull();
   state.pathname = "/plugins/studio/studio/bot/bot_main/loops";
   await show(<BotPanel />);
-  expect(container.querySelector("[data-testid=strands-page]")).not.toBeNull();
-  expect(container.querySelector("[data-testid=strands-page]")?.textContent).not.toContain("Pay the property tax");
-  expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Strands·Dot");
-  expect(container.querySelector("[data-testid=bot-page]")).toBeNull();
+  expect(container.querySelector("[data-testid=strands-page]")).toBeNull();
+  expect(container.textContent).not.toContain("Pay the property tax");
 });
 
 test("Bot rows draw BB's thread status glyph: working off its hidden chat, unread and needs you off bot_attention", async () => {

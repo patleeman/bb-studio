@@ -5,7 +5,6 @@ import SwiftUI
 enum RoomPlace: String, CaseIterable, Identifiable, Hashable {
     case strands, conversations, memory, library, schedules, archive, theme
 
-    static let menu: [RoomPlace] = [.strands, .conversations, .memory, .library, .schedules]
     /// The places at the foot of the conversation list (the conversation is home).
     static let homeList: [RoomPlace] = [.strands, .memory, .library, .schedules, .theme]
 
@@ -32,130 +31,6 @@ enum RoomPlace: String, CaseIterable, Identifiable, Hashable {
         case .schedules: "Schedules"
         case .archive: "Archive"
         case .theme: "Theme"
-        }
-    }
-}
-
-enum RoomMode: Equatable {
-    case rest, talk, menu
-    case record(locked: Bool)
-
-    var recording: Bool {
-        if case .record = self { return true }
-        return false
-    }
-}
-
-enum RoomEvent: Equatable {
-    case tapInput, openChat, chevron, tapOutside
-    case menuButton, closeMenu
-    case open(RoomPlace), closePlace
-}
-
-@MainActor @Observable
-final class RoomModel {
-    private(set) var mode: RoomMode
-    var place: RoomPlace?
-    private(set) var focusRequests = 0
-    private(set) var closesToRest = false
-    /// The conversation is home (`RoomHome`): it always stands; the menu's places open over it.
-    let home: Bool
-
-    init(home: Bool = RoomHome.enabled) {
-        self.home = home
-        mode = home ? .talk : .rest
-    }
-
-    var standing: Bool { mode == .talk }
-    var showsDay: Bool { mode == .rest || mode.recording }
-    var showsMenu: Bool { mode == .menu }
-
-    enum Effect: Equatable { case none, focus, dismissKeyboard }
-
-    @discardableResult
-    func handle(_ event: RoomEvent) -> Effect {
-        if home { return handleHome(event) }
-        var (next, effect) = Self.transition(mode, event)
-        if case .open(let place) = event, next == .menu {
-            self.place = place
-            closesToRest = false
-        }
-        if event == .closePlace {
-            place = nil
-            if closesToRest { next = .rest }
-            closesToRest = false
-        }
-        if next != .menu { place = nil }
-        if next == .talk, mode != .talk { RoomPerf.standUp() }
-        mode = next
-        if effect == .focus { focusRequests += 1 }
-        return effect
-    }
-
-    /// At home nothing leaves the conversation: places open over it and close back to it.
-    private func handleHome(_ event: RoomEvent) -> Effect {
-        switch event {
-        case .open(let place): self.place = place
-        case .closePlace, .closeMenu: place = nil
-        case .tapInput:
-            focusRequests += 1
-            return .focus
-        case .chevron, .tapOutside: return .dismissKeyboard
-        case .openChat, .menuButton: break
-        }
-        if mode != .talk && !mode.recording { mode = .talk }
-        return .none
-    }
-
-    func focusInput() {
-        focusRequests += 1
-    }
-
-    func sync(talk: HoldToTalk.State) {
-        mode = Self.mode(mode, talk: talk)
-    }
-
-    nonisolated static func mode(_ mode: RoomMode, talk: HoldToTalk.State) -> RoomMode {
-        switch talk {
-        case .recording, .cancelling: return mode == .talk ? .talk : .record(locked: false)
-        case .handsFree: return mode == .talk ? .talk : .record(locked: true)
-        case .idle, .sending, .dictating: return mode.recording ? .rest : mode
-        }
-    }
-
-    nonisolated static func hint(_ talk: HoldToTalk.State) -> String? {
-        switch talk {
-        case .recording: "Release to send · slide left to cancel"
-        case .cancelling: "Release to cancel"
-        case .handsFree: "Tap the mic to send"
-        case .sending: "Sending…"
-        case .idle, .dictating: nil
-        }
-    }
-
-    func show(_ mode: RoomMode, place: RoomPlace? = nil) {
-        self.mode = home && (mode == .rest || mode == .menu) ? .talk : mode
-        self.place = mode == .menu ? place : nil
-        closesToRest = false
-    }
-
-    func showPlace(_ place: RoomPlace) {
-        mode = home ? .talk : .menu
-        self.place = place
-        closesToRest = !home
-    }
-
-    nonisolated static func transition(_ mode: RoomMode, _ event: RoomEvent) -> (RoomMode, Effect) {
-        switch (mode, event) {
-        case (.rest, .tapInput): return (.talk, .focus)
-        case (.rest, .openChat): return (.talk, .none)
-        case (.talk, .tapInput): return (.talk, .focus)
-        case (.talk, .chevron), (.talk, .tapOutside): return (.rest, .dismissKeyboard)
-        case (.rest, .menuButton): return (.menu, .none)
-        case (.menu, .closeMenu), (.menu, .menuButton): return (.rest, .none)
-        case (.menu, .open): return (.menu, .none)
-        case (.menu, .closePlace): return (.menu, .none)
-        default: return (mode, .none)
         }
     }
 }
@@ -188,14 +63,34 @@ enum RoomText {
     static func rows(_ rows: [ThreadTranscriptRow]) -> [ThreadTranscriptRow] {
         rows.compactMap { row in
             guard case .item(.message(let message), let state) = row else { return row }
-            if let event = BotChatEntry.childEvent(message) { return .bot(.child(event, id: message.id), .init()) }
+            if let event = BotChatRows.childEvent(message) { return .child(event, id: message.id) }
             if state.relayed != nil { return row }
-            return BotChatEntry.shows(message) ? row : nil
+            return BotChatRows.shows(message) ? row : nil
         }
     }
 
+    private static let statusTokens: Set<String> = ["pass", "fail", "failed", "done", "ok", "skip", "skipped", "noop"]
+
     static func isStatusToken(_ line: String) -> Bool {
-        line.range(of: #"^[\s`*_~]*\[(pass|fail|failed|done|ok|skip|skipped|noop)\][\s`*_~]*$"#, options: [.regularExpression, .caseInsensitive]) != nil
+        guard !line.isEmpty else { return false }
+        let scalars = line.unicodeScalars
+        var start = scalars.startIndex
+        var end = scalars.endIndex
+        func isTrim(_ s: Unicode.Scalar) -> Bool {
+            s.properties.isWhitespace || s == "`" || s == "*" || s == "_" || s == "~"
+        }
+        while start < end, isTrim(scalars[start]) { scalars.formIndex(after: &start) }
+        while end > start {
+            let prev = scalars.index(before: end)
+            guard isTrim(scalars[prev]) else { break }
+            end = prev
+        }
+        guard start < end, scalars[start] == "[" else { return false }
+        let last = scalars.index(before: end)
+        guard last > start, scalars[last] == "]" else { return false }
+        let inner = scalars[scalars.index(after: start)..<last]
+        guard inner.count <= 8 else { return false }
+        return statusTokens.contains(Substring(inner).lowercased())
     }
 
     static func plain(_ text: String) -> String {
@@ -208,149 +103,6 @@ enum RoomText {
             return line.trimmingCharacters(in: .whitespaces)
         }
         return kept.filter { !$0.isEmpty }.joined(separator: " ")
-    }
-}
-
-enum RoomHeader {
-    static func subline(main: Bool, title: String, rows: [TimelineRow], now: Date = Date(), calendar: Calendar = .current) -> String {
-        guard main else { return role(title) }
-        let date = now.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
-        guard let note = goodToKnow(rows: rows, now: now, calendar: calendar), let weather = weather(note) else { return date }
-        return date + " · " + weather
-    }
-
-    static func role(_ title: String) -> String {
-        let words = title.lowercased().split { !$0.isLetter }
-        if words.contains("lead") { return "Project lead" }
-        if words.contains("worker") { return "Worker" }
-        return "Conversation"
-    }
-
-    static let weatherWords = ["sunny", "sun", "cloudy", "clouds", "overcast", "rain", "rainy", "showers", "snow", "snowy", "fog", "foggy", "windy",
-                               "clear", "storm", "storms", "thunderstorms", "drizzle", "sleet", "hail", "humid", "high", "low", "°"]
-
-    static func weather(_ note: String) -> String? {
-        let lower = note.lowercased()
-        let words = Set(lower.split { !$0.isLetter && $0 != "°" }.map(String.init))
-        guard lower.contains("°") || !words.isDisjoint(with: weatherWords) else { return nil }
-        let clause = note.split(whereSeparator: { ",.;".contains($0) }).first.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? note
-        guard !clause.isEmpty else { return nil }
-        return clause.count > 42 ? String(clause.prefix(41)).trimmingCharacters(in: .whitespaces) + "…" : clause
-    }
-
-    static func goodToKnow(rows: [TimelineRow], now: Date, calendar: Calendar) -> String? {
-        for row in rows.reversed() where row.kind == "conversation" && row.role == "assistant" {
-            guard let text = row.text, LoopDirective.isMorning(LoopDirective.all(in: text)) else { continue }
-            guard let at = row.createdAt, calendar.isDate(Date(timeIntervalSince1970: at / 1000), inSameDayAs: now) else { return nil }
-            let parsed = MorningCard.parse(text)
-            let section = parsed.sections.first { $0.title.lowercased().hasPrefix("good to know") }
-            for line in section?.lines ?? [] {
-                if case .text(let note) = line {
-                    let plain = RoomText.plain(note)
-                    if !plain.isEmpty { return plain }
-                }
-            }
-            return nil
-        }
-        return nil
-    }
-}
-
-struct RoomNow: Equatable {
-    var text: String
-    var since: Date?
-    var last: String?
-    var active: Bool
-
-    static func agentTasks(_ tasks: [TaskItem]) -> [TaskItem] {
-        tasks.filter { !$0.isMine && !$0.isClosed && !$0.isRecurring && $0.automation?.role != "finding" }
-            .sorted { ($0.state == .inProgress ? 0 : 1, $1.updatedAt) < ($1.state == .inProgress ? 0 : 1, $0.updatedAt) }
-    }
-
-    static func yours(_ tasks: [TaskItem]) -> [TaskItem] {
-        tasks.filter { $0.isMine && !$0.isClosed }.sorted { ($0.needsYou ? 0 : 1, $0.createdAt) < ($1.needsYou ? 0 : 1, $1.createdAt) }
-    }
-
-    static func make(threadId: String, main: Bool, running: Bool, tasks: [TaskItem], todos: [Todos.Item], rows: [TimelineRow],
-                     workers: [BotWorker], latest: String?) -> RoomNow {
-        let own = tasks.filter { task in
-            guard !task.isMine, task.automation == nil else { return false }
-            if let owner = task.ownerThreadId { return owner == threadId }
-            return main
-        }
-        let last = lastFinished(tasks: tasks, workers: workers, latest: latest)
-        if running {
-            let doing = todos.first { $0.status == "in_progress" }?.text
-                ?? own.first { $0.state == .inProgress }.map { $0.line ?? $0.title }
-                ?? rows.last { $0.isWorkRow && ["inProgress", "running", "pending"].contains($0.status ?? "") }.flatMap(\.nowTitle)
-                ?? "Writing a reply"
-            let turn = rows.last { $0.role == "user" }.flatMap { $0.createdAt ?? $0.startedAt }
-            return RoomNow(text: sentence(doing), since: turn.map { Date(timeIntervalSince1970: $0 / 1000) }, last: last, active: true)
-        }
-        if let task = own.first(where: { $0.state == .inProgress }) {
-            return RoomNow(text: sentence(task.line ?? task.title), since: task.updatedAt, last: last, active: true)
-        }
-        let busy = workers.filter { $0.status == .running }
-        if !busy.isEmpty {
-            let text = busy.count == 1 ? "Waiting on " + (busy[0].title.isEmpty ? "a worker" : busy[0].title) : "Waiting on \(number(busy.count)) workers"
-            return RoomNow(text: text, since: busy.map(\.updated).min(), last: last, active: true)
-        }
-        return RoomNow(text: "Idle", since: nil, last: last, active: false)
-    }
-
-    static func lastFinished(tasks: [TaskItem], workers: [BotWorker], latest: String?) -> String? {
-        if let done = tasks.filter({ !$0.isMine && $0.state == .done }).max(by: { ($0.closedAt ?? $0.updatedAt) < ($1.closedAt ?? $1.updatedAt) }) {
-            return sentence(done.line ?? done.title)
-        }
-        if let worker = workers.filter({ $0.status == .done }).max(by: { $0.updatedAt < $1.updatedAt }), !worker.title.isEmpty {
-            return "finished " + worker.title
-        }
-        guard let latest else { return nil }
-        let plain = RoomText.plain(latest)
-        return plain.isEmpty ? nil : plain
-    }
-
-    static func sentence(_ text: String) -> String {
-        let plain = RoomText.plain(text)
-        let line = plain.isEmpty ? text : plain
-        return line.count > 90 ? String(line.prefix(89)).trimmingCharacters(in: .whitespaces) + "…" : line
-    }
-
-    static func number(_ n: Int) -> String {
-        let words = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
-        return n < words.count ? words[n] : "\(n)"
-    }
-
-    static func elapsed(_ since: Date, now: Date = Date()) -> String {
-        let minutes = max(0, Int(now.timeIntervalSince(since) / 60))
-        if minutes < 1 { return "just now" }
-        if minutes < 60 { return "\(minutes) min" }
-        let hours = minutes / 60
-        if hours < 24 { return minutes % 60 == 0 || hours >= 6 ? "\(hours) h" : "\(hours) h \(minutes % 60) min" }
-        return "\(hours / 24) d"
-    }
-
-    func small(now: Date = Date()) -> String? {
-        let parts = [since.map { Self.elapsed($0, now: now) }, last.map { "last: " + Self.lowered($0) }].compactMap { $0 }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-
-    static func lowered(_ text: String) -> String {
-        guard let first = text.first, first.isUppercase else { return text }
-        let second = text.dropFirst().first
-        guard second.map({ $0.isLowercase || $0 == " " }) ?? true else { return text }
-        if text.hasPrefix("I ") { return text }
-        return first.lowercased() + text.dropFirst()
-    }
-}
-
-extension TimelineRow {
-    var isWorkRow: Bool { kind == "work" }
-
-    var nowTitle: String? {
-        let raw = title ?? command ?? toolName
-        guard let raw, !raw.isEmpty else { return nil }
-        return raw
     }
 }
 
@@ -410,6 +162,8 @@ struct RoomChat {
     var pages: RoomChatPages? = nil
     /// The unfolded Duo's left screen shows its strands: no box above the composer.
     var strandsBeside = false
+    /// The unfolded Duo: the title shows the Workspace on the right screen instead of a sheet.
+    var showWorkspace: (() -> Void)? = nil
 }
 
 struct RoomChatPages: Equatable {
@@ -458,17 +212,24 @@ enum RoomPager {
 
 @MainActor
 final class RoomSessions: ObservableObject {
+    static let maxCached = 6
     @Published private(set) var shown: String
     private var sessions: [String: RoomSession] = [:]
+    private var recentOrder: [String] = []
 
-    init(main: String) { shown = main }
+    init(main: String) {
+        shown = main
+        recentOrder = [main]
+    }
 
     var current: RoomSession { session(for: shown) }
 
     func session(for threadId: String) -> RoomSession {
+        touch(threadId)
         if let session = sessions[threadId] { return session }
         let session = RoomSession(threadId: threadId)
         sessions[threadId] = session
+        evictIfNeeded()
         return session
     }
 
@@ -478,5 +239,20 @@ final class RoomSessions: ObservableObject {
         leaving.talk.end()
         leaving.stop()
         shown = threadId
+        touch(threadId)
+        evictIfNeeded()
+    }
+
+    private func touch(_ threadId: String) {
+        if let idx = recentOrder.firstIndex(of: threadId) { recentOrder.remove(at: idx) }
+        recentOrder.append(threadId)
+    }
+
+    private func evictIfNeeded() {
+        while sessions.count > Self.maxCached {
+            guard let victim = recentOrder.first(where: { $0 != shown && sessions[$0] != nil }) else { break }
+            sessions.removeValue(forKey: victim)?.stop()
+            if let idx = recentOrder.firstIndex(of: victim) { recentOrder.remove(at: idx) }
+        }
     }
 }

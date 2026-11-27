@@ -1,11 +1,9 @@
 #if DEBUG
 import Foundation
 
-/// Debug builds, with `-qaLoopsDemo`: answers Studio's `tasks.*` and `work.*`
-/// for the presence screen's rows, In flight (the conversation's bar on a
-/// Studio without strands) and the old read-only task cards. `-qaTasksNoBoard`
-/// is a Studio without `tasks.flight` and `tasks.board`: In flight reads
-/// `tasks.inFlight` then. `-qaTaskCards` adds old `::work` cards to the chat.
+/// Debug builds, with `-qaLoopsDemo`: answers Studio's `tasks.*` offline for
+/// the old read-only task cards in messages (`tasks.get`) and the loop push
+/// buttons (`tasks.act`). `-qaTaskCards` adds old `::work` cards to the chat.
 enum TasksDemo {
     static var enabled: Bool { LoopsDemo.enabled }
     static let noBoard = ProcessInfo.processInfo.arguments.contains("-qaTasksNoBoard")

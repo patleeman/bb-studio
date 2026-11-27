@@ -5840,11 +5840,9 @@
                         "skills",
                         "library",
                         "automations",
-                        "todos",
                         "archive",
                         "automation",
                         "todo",
-                        "record",
                         "vscode",
                         "file",
                         "diff",
@@ -5962,11 +5960,9 @@
                         "skills",
                         "library",
                         "automations",
-                        "todos",
                         "archive",
                         "automation",
                         "todo",
-                        "record",
                         "vscode",
                         "file",
                         "diff",
@@ -16821,6 +16817,9 @@
                     "number",
                     "null"
                   ]
+                },
+                "alwaysOn": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -16834,6 +16833,78 @@
         },
         "required": [
           "skills"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_core": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "warnings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "core": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "body",
+                "updatedAt",
+                "warnings"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "chars": {
+            "type": "number"
+          },
+          "cap": {
+            "type": "number"
+          },
+          "over": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "skills",
+          "chars",
+          "cap",
+          "over"
         ],
         "additionalProperties": false
       }
@@ -16862,6 +16933,20 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 20000
+          },
+          "alwaysOn": {
+            "type": "boolean"
+          },
+          "ifBody": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -16899,6 +16984,9 @@
               "number",
               "null"
             ]
+          },
+          "alwaysOn": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -17068,9 +17156,6 @@
           "enabled": {
             "type": "boolean"
           },
-          "interval": {
-            "type": "number"
-          },
           "reviewModel": {
             "type": [
               "string",
@@ -17101,14 +17186,21 @@
           "consolidate": {
             "type": "boolean"
           },
-          "toolTurns": {
-            "type": "number"
-          },
-          "userTurns": {
-            "type": "number"
+          "cadence": {
+            "type": "string",
+            "const": "daily-and-archive"
           },
           "reviewing": {
             "type": "boolean"
+          },
+          "queued": {
+            "type": "number"
+          },
+          "lastSweepAt": {
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "lastReview": {
             "anyOf": [
@@ -17159,14 +17251,14 @@
         },
         "required": [
           "enabled",
-          "interval",
           "reviewModel",
           "defaultModel",
           "models",
           "consolidate",
-          "toolTurns",
-          "userTurns",
+          "cadence",
           "reviewing",
+          "queued",
+          "lastSweepAt",
           "lastReview",
           "lastCurator"
         ],
@@ -17185,11 +17277,6 @@
           },
           "enabled": {
             "type": "boolean"
-          },
-          "interval": {
-            "type": "integer",
-            "minimum": 2,
-            "maximum": 200
           },
           "reviewModel": {
             "anyOf": [
@@ -17214,9 +17301,6 @@
           "enabled": {
             "type": "boolean"
           },
-          "interval": {
-            "type": "number"
-          },
           "reviewModel": {
             "type": [
               "string",
@@ -17247,14 +17331,21 @@
           "consolidate": {
             "type": "boolean"
           },
-          "toolTurns": {
-            "type": "number"
-          },
-          "userTurns": {
-            "type": "number"
+          "cadence": {
+            "type": "string",
+            "const": "daily-and-archive"
           },
           "reviewing": {
             "type": "boolean"
+          },
+          "queued": {
+            "type": "number"
+          },
+          "lastSweepAt": {
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "lastReview": {
             "anyOf": [
@@ -17305,14 +17396,14 @@
         },
         "required": [
           "enabled",
-          "interval",
           "reviewModel",
           "defaultModel",
           "models",
           "consolidate",
-          "toolTurns",
-          "userTurns",
+          "cadence",
           "reviewing",
+          "queued",
+          "lastSweepAt",
           "lastReview",
           "lastCurator"
         ],
@@ -25898,6 +25989,11 @@
                     "string",
                     "null"
                   ]
+                },
+                "tabCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
                 }
               },
               "required": [
@@ -26179,6 +26275,11 @@
                     "string",
                     "null"
                   ]
+                },
+                "tabCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
                 }
               },
               "required": [
@@ -26604,6 +26705,63 @@
           "botId",
           "conversations",
           "workers"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_summaries": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summaries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "archivedAt": {
+                  "type": "number"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "threadId",
+                "title",
+                "archivedAt",
+                "summary"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "botId",
+          "summaries"
         ],
         "additionalProperties": false
       }
@@ -47400,6 +47558,25 @@
                       "url"
                     ],
                     "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "terminal"
+                      },
+                      "terminalId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "terminalId"
+                    ],
+                    "additionalProperties": false
                   }
                 ]
               },
@@ -55722,569 +55899,6 @@
         "additionalProperties": false
       }
     },
-    "areas.list": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {}
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "areas": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "covers": {
-                  "type": "string"
-                },
-                "owner": {
-                  "oneOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "const": "runner"
-                        },
-                        "runnerId": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "thread": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "kind",
-                        "runnerId",
-                        "thread"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "const": "lead"
-                        },
-                        "thread": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": [
-                        "kind",
-                        "thread"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "const": "bot"
-                        },
-                        "botId": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": [
-                        "kind",
-                        "botId"
-                      ],
-                      "additionalProperties": false
-                    }
-                  ]
-                },
-                "ownerName": {
-                  "type": "string"
-                },
-                "cadence": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "ok",
-                    "flagged",
-                    "broken",
-                    "unknown"
-                  ]
-                },
-                "reason": {
-                  "description": "Why the status isn't the latest stated one: a missed run or a broken run",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "now": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "open": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "title": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 200
-                      },
-                      "since": {
-                        "anyOf": [
-                          {
-                            "type": "string",
-                            "maxLength": 40
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "sinceAt": {
-                        "type": [
-                          "number",
-                          "null"
-                        ]
-                      },
-                      "needsUser": {
-                        "type": "boolean"
-                      },
-                      "taskId": {
-                        "type": [
-                          "string",
-                          "null"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "title",
-                      "since",
-                      "sinceAt",
-                      "needsUser",
-                      "taskId"
-                    ],
-                    "additionalProperties": false
-                  }
-                },
-                "runs": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "at": {
-                        "type": "number"
-                      },
-                      "outcome": {
-                        "type": "string",
-                        "enum": [
-                          "ok",
-                          "flagged",
-                          "broken"
-                        ]
-                      },
-                      "line": {
-                        "type": "string",
-                        "maxLength": 300
-                      },
-                      "taskId": {
-                        "type": [
-                          "string",
-                          "null"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "at",
-                      "outcome",
-                      "line",
-                      "taskId"
-                    ],
-                    "additionalProperties": false
-                  },
-                  "description": "Newest first"
-                },
-                "lastRun": {
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "nextRun": {
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "nextLabel": {
-                  "description": "The schedule the next run belongs to, when the area has more than one",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "paused": {
-                  "type": "boolean"
-                },
-                "links": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "statusFile": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "fileError": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "updatedAt": {
-                  "type": "number"
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "covers",
-                "owner",
-                "ownerName",
-                "cadence",
-                "status",
-                "reason",
-                "now",
-                "open",
-                "runs",
-                "lastRun",
-                "nextRun",
-                "nextLabel",
-                "paused",
-                "links",
-                "statusFile",
-                "fileError",
-                "updatedAt"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "areas"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "areas.get": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "area": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "covers": {
-                "type": "string"
-              },
-              "owner": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "kind": {
-                        "type": "string",
-                        "const": "runner"
-                      },
-                      "runnerId": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "thread": {
-                        "type": [
-                          "string",
-                          "null"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "runnerId",
-                      "thread"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "kind": {
-                        "type": "string",
-                        "const": "lead"
-                      },
-                      "thread": {
-                        "type": "string",
-                        "minLength": 1
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "thread"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "kind": {
-                        "type": "string",
-                        "const": "bot"
-                      },
-                      "botId": {
-                        "type": "string",
-                        "minLength": 1
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "botId"
-                    ],
-                    "additionalProperties": false
-                  }
-                ]
-              },
-              "ownerName": {
-                "type": "string"
-              },
-              "cadence": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "ok",
-                  "flagged",
-                  "broken",
-                  "unknown"
-                ]
-              },
-              "reason": {
-                "description": "Why the status isn't the latest stated one: a missed run or a broken run",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "now": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "open": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "title": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 200
-                    },
-                    "since": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "maxLength": 40
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "sinceAt": {
-                      "type": [
-                        "number",
-                        "null"
-                      ]
-                    },
-                    "needsUser": {
-                      "type": "boolean"
-                    },
-                    "taskId": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "title",
-                    "since",
-                    "sinceAt",
-                    "needsUser",
-                    "taskId"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "runs": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "at": {
-                      "type": "number"
-                    },
-                    "outcome": {
-                      "type": "string",
-                      "enum": [
-                        "ok",
-                        "flagged",
-                        "broken"
-                      ]
-                    },
-                    "line": {
-                      "type": "string",
-                      "maxLength": 300
-                    },
-                    "taskId": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "at",
-                    "outcome",
-                    "line",
-                    "taskId"
-                  ],
-                  "additionalProperties": false
-                },
-                "description": "Newest first"
-              },
-              "lastRun": {
-                "type": [
-                  "number",
-                  "null"
-                ]
-              },
-              "nextRun": {
-                "type": [
-                  "number",
-                  "null"
-                ]
-              },
-              "nextLabel": {
-                "description": "The schedule the next run belongs to, when the area has more than one",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "paused": {
-                "type": "boolean"
-              },
-              "links": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "statusFile": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "fileError": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "updatedAt": {
-                "type": "number"
-              }
-            },
-            "required": [
-              "id",
-              "name",
-              "covers",
-              "owner",
-              "ownerName",
-              "cadence",
-              "status",
-              "reason",
-              "now",
-              "open",
-              "runs",
-              "lastRun",
-              "nextRun",
-              "nextLabel",
-              "paused",
-              "links",
-              "statusFile",
-              "fileError",
-              "updatedAt"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "area"
-        ],
-        "additionalProperties": false
-      }
-    },
     "toolGateway.overview": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -56494,7 +56108,8 @@
                           "approval",
                           "gateway",
                           "area",
-                          "flag"
+                          "flag",
+                          "reply"
                         ]
                       },
                       "threadId": {
@@ -56526,6 +56141,13 @@
                             "deny"
                           ]
                         }
+                      },
+                      "seq": {
+                        "default": null,
+                        "type": [
+                          "number",
+                          "null"
+                        ]
                       }
                     },
                     "required": [
@@ -56535,7 +56157,8 @@
                       "label",
                       "details",
                       "turnId",
-                      "decisions"
+                      "decisions",
+                      "seq"
                     ],
                     "additionalProperties": false
                   }
@@ -56628,6 +56251,17 @@
                     "string",
                     "null"
                   ]
+                },
+                "parentId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "trunk": {
+                  "default": false,
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -56648,7 +56282,9 @@
                 "unsure",
                 "pinned",
                 "origin",
-                "taskId"
+                "taskId",
+                "parentId",
+                "trunk"
               ],
               "additionalProperties": false
             }
@@ -56705,7 +56341,8 @@
                           "approval",
                           "gateway",
                           "area",
-                          "flag"
+                          "flag",
+                          "reply"
                         ]
                       },
                       "threadId": {
@@ -56737,6 +56374,13 @@
                             "deny"
                           ]
                         }
+                      },
+                      "seq": {
+                        "default": null,
+                        "type": [
+                          "number",
+                          "null"
+                        ]
                       }
                     },
                     "required": [
@@ -56746,7 +56390,8 @@
                       "label",
                       "details",
                       "turnId",
-                      "decisions"
+                      "decisions",
+                      "seq"
                     ],
                     "additionalProperties": false
                   }
@@ -56839,6 +56484,17 @@
                     "string",
                     "null"
                   ]
+                },
+                "parentId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "trunk": {
+                  "default": false,
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -56859,7 +56515,9 @@
                 "unsure",
                 "pinned",
                 "origin",
-                "taskId"
+                "taskId",
+                "parentId",
+                "trunk"
               ],
               "additionalProperties": false
             }
@@ -57005,7 +56663,8 @@
                                 "approval",
                                 "gateway",
                                 "area",
-                                "flag"
+                                "flag",
+                                "reply"
                               ]
                             },
                             "threadId": {
@@ -57037,6 +56696,13 @@
                                   "deny"
                                 ]
                               }
+                            },
+                            "seq": {
+                              "default": null,
+                              "type": [
+                                "number",
+                                "null"
+                              ]
                             }
                           },
                           "required": [
@@ -57046,7 +56712,8 @@
                             "label",
                             "details",
                             "turnId",
-                            "decisions"
+                            "decisions",
+                            "seq"
                           ],
                           "additionalProperties": false
                         }
@@ -57139,6 +56806,17 @@
                           "string",
                           "null"
                         ]
+                      },
+                      "parentId": {
+                        "default": null,
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "trunk": {
+                        "default": false,
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -57159,7 +56837,9 @@
                       "unsure",
                       "pinned",
                       "origin",
-                      "taskId"
+                      "taskId",
+                      "parentId",
+                      "trunk"
                     ],
                     "additionalProperties": false
                   }
@@ -57226,12 +56906,45 @@
                     "string",
                     "null"
                   ]
+                },
+                "kind": {
+                  "default": "user",
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "report"
+                  ]
+                },
+                "at": {
+                  "default": null,
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "line": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "also": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               },
               "required": [
                 "turnId",
                 "seq",
-                "strandId"
+                "strandId",
+                "kind",
+                "at",
+                "line",
+                "also"
               ],
               "additionalProperties": false
             }
@@ -57246,19 +56959,113 @@
                 },
                 "title": {
                   "type": "string"
+                },
+                "done": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "parentId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "trunk": {
+                  "default": false,
+                  "type": "boolean"
                 }
               },
               "required": [
                 "id",
-                "title"
+                "title",
+                "done",
+                "parentId",
+                "trunk"
               ],
               "additionalProperties": false
             }
+          },
+          "replies": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "turnId": {
+                  "type": "string"
+                },
+                "seq": {
+                  "type": "number"
+                },
+                "tag": {
+                  "type": "string",
+                  "enum": [
+                    "needs-you",
+                    "status"
+                  ]
+                },
+                "ask": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "resolved": {
+                  "type": "boolean"
+                },
+                "line": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "turnId",
+                "seq",
+                "tag",
+                "ask",
+                "resolved",
+                "line"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "opening": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "seq": {
+                    "type": "number"
+                  },
+                  "replySeq": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "seq",
+                  "replySeq"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "tags",
-          "strands"
+          "strands",
+          "replies",
+          "opening"
         ],
         "additionalProperties": false
       }
@@ -57391,6 +57198,12 @@
                 ]
               },
               "targetName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "permissionMode": {
                 "type": [
                   "string",
                   "null"
@@ -57534,6 +57347,833 @@
         ],
         "additionalProperties": false
       }
+    },
+    "threadWorkbenchGet": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "tabs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tabId": {
+                  "type": "string"
+                },
+                "ref": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "conversation",
+                        "worker",
+                        "bot",
+                        "page",
+                        "whiteboard",
+                        "design",
+                        "app",
+                        "artifact",
+                        "recording",
+                        "board",
+                        "memory",
+                        "skills",
+                        "library",
+                        "automations",
+                        "archive",
+                        "automation",
+                        "todo",
+                        "vscode",
+                        "file",
+                        "diff",
+                        "browser",
+                        "terminal",
+                        "workflow",
+                        "plugin"
+                      ]
+                    },
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "path": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "environmentId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "hostId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "url": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "terminalId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pluginId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "tabId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "params": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                },
+                "title": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "openedBy": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "agent"
+                  ]
+                },
+                "openedAt": {
+                  "type": "number"
+                },
+                "mobileSupport": {
+                  "type": "string",
+                  "enum": [
+                    "native",
+                    "web",
+                    "desktopOnly"
+                  ]
+                }
+              },
+              "required": [
+                "tabId",
+                "ref",
+                "title",
+                "position",
+                "openedBy",
+                "openedAt",
+                "mobileSupport"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "activeTabId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "panelOpen": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "threadId",
+          "tabs",
+          "activeTabId",
+          "panelOpen",
+          "version"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "threadWorkbenchMutate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "baseVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "open",
+              "close",
+              "focus",
+              "reorder",
+              "update"
+            ]
+          },
+          "tab": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "conversation",
+                  "worker",
+                  "bot",
+                  "page",
+                  "whiteboard",
+                  "design",
+                  "app",
+                  "artifact",
+                  "recording",
+                  "board",
+                  "memory",
+                  "skills",
+                  "library",
+                  "automations",
+                  "archive",
+                  "automation",
+                  "todo",
+                  "vscode",
+                  "file",
+                  "diff",
+                  "browser",
+                  "terminal",
+                  "workflow",
+                  "plugin"
+                ]
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "path": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "environmentId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "hostId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "terminalId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "pluginId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tabId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "params": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "tabId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500
+          },
+          "focus": {
+            "type": "boolean"
+          },
+          "origin": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId",
+          "baseVersion",
+          "op"
+        ],
+        "$defs": {
+          "__schema0": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "tabs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tabId": {
+                  "type": "string"
+                },
+                "ref": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "conversation",
+                        "worker",
+                        "bot",
+                        "page",
+                        "whiteboard",
+                        "design",
+                        "app",
+                        "artifact",
+                        "recording",
+                        "board",
+                        "memory",
+                        "skills",
+                        "library",
+                        "automations",
+                        "archive",
+                        "automation",
+                        "todo",
+                        "vscode",
+                        "file",
+                        "diff",
+                        "browser",
+                        "terminal",
+                        "workflow",
+                        "plugin"
+                      ]
+                    },
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "path": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "environmentId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "hostId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "url": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "terminalId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pluginId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "tabId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "params": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                },
+                "title": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "openedBy": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "agent"
+                  ]
+                },
+                "openedAt": {
+                  "type": "number"
+                },
+                "mobileSupport": {
+                  "type": "string",
+                  "enum": [
+                    "native",
+                    "web",
+                    "desktopOnly"
+                  ]
+                }
+              },
+              "required": [
+                "tabId",
+                "ref",
+                "title",
+                "position",
+                "openedBy",
+                "openedAt",
+                "mobileSupport"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "activeTabId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "panelOpen": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unchanged",
+              "conflict",
+              "notFound",
+              "refused"
+            ]
+          },
+          "tabId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "tabs",
+          "activeTabId",
+          "panelOpen",
+          "version",
+          "result",
+          "tabId",
+          "message"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "threadWorkbenchShown": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadIds": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "origin": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadIds",
+          "origin"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "events": {
@@ -57563,6 +58203,38 @@
       "required": [
         "botId",
         "changes"
+      ],
+      "additionalProperties": false
+    },
+    "workbench-changed": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "threadId": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "origin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "threadId",
+        "version",
+        "origin",
+        "tabCount"
       ],
       "additionalProperties": false
     }

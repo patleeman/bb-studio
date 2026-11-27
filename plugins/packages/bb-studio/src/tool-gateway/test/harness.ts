@@ -73,7 +73,7 @@ export async function harness(options: { baseEnv?: Record<string, string | undef
       server: { loopbackBaseUrl: "http://127.0.0.1:39999", experimental_dataDir: dataDir },
       sdk: {
         threads: { get: async ({ threadId }: { threadId: string }) => (threads.has(threadId) ? { id: threadId, ...threads.get(threadId) } : null) },
-        providers: { catalog: async () => [{ id: "claude-code", displayName: "Claude Code", enabled: true }, { id: "codex", displayName: "Codex", enabled: true }, { id: "acp-hermes", displayName: "Hermes", enabled: true }] },
+        providers: { catalog: async () => [{ id: "claude-code", displayName: "Claude Code", enabled: true }, { id: "codex", displayName: "Codex", enabled: true }, { id: "acp-hermes", displayName: "Hermes", enabled: true }, { id: "antigravity", displayName: "Google Antigravity", enabled: true, info: { family: "acp" } }] },
         plugins: { list: async () => ({ plugins: (options.plugins ?? []).filter((id) => !removedPlugins.includes(id)).map((id) => ({ id })) }), remove: async ({ pluginId }: { pluginId: string }) => { removedPlugins.push(pluginId); return {}; } },
       },
       log: { info: () => {}, warn: (message: string) => { warnings.push(message); }, error: () => {} },

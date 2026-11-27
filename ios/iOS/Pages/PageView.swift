@@ -55,6 +55,8 @@ final class PageModel: ObservableObject {
         }
     }
 
+    private static let cacheQueue = DispatchQueue(label: "nyc.plee.bbgo.page-cache", qos: .utility)
+
     func load(_ client: BBClient) async {
         guard client.baseURL == serverURL else { return }
         if pageId == "qa-demo", ProcessInfo.processInfo.arguments.contains("-qaPageDemo") {
@@ -62,12 +64,16 @@ final class PageModel: ObservableObject {
             return
         }
         do {
-            let markdown = try await client.pageMarkdown(pageId)
+            async let markdownTask = client.pageMarkdown(pageId)
+            async let commentsTask: Void = loadComments(client)
+            let markdown = try await markdownTask
             if self.markdown != markdown { self.markdown = markdown }
             error = nil
             missing = false
-            DiskCache.save(markdown, as: cacheKey, serverURL: serverURL)
-            await loadComments(client)
+            let key = cacheKey
+            let serverURL = self.serverURL
+            Self.cacheQueue.async { DiskCache.save(markdown, as: key, serverURL: serverURL) }
+            await commentsTask
         } catch where BBClient.isCancellation(error) {
         } catch let failure as BBError where failure.message.localizedCaseInsensitiveContains("not found") {
             missing = true
@@ -176,13 +182,9 @@ struct PageView: View {
             }
         }
         .environment(\.openURL, OpenURLAction { url in
-            if !app.inSpaces, AppLink.handles(url), let id = url.pathComponents.dropFirst().first, ["page", "thread"].contains(url.host() ?? "") {
-                app.push(url.host() == "page" ? .page(id: id) : .thread(id: id))
-                return .handled
-            }
             let text = AppLink.handles(url) && url.host() == "thread" ? "bb://conversation" + url.path(percentEncoded: true) : url.absoluteString
             guard let target = Links.parse(text, origin: app.client.baseURL), case .entity = target else { return .systemAction }
-            app.openLink(target, push: app.inSpaces ? nil : { app.push($0) })
+            app.openLink(target)
             return .handled
         })
         .navigationTitle(meta?.displayTitle ?? "Page")

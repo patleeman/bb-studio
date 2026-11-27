@@ -66,13 +66,13 @@ it("searches the same rows, best match first; a query naming a kind lists that k
     botThreads: async () => [{ row: { threadId: "thr_n", kind: "conversation", title: "Night shift", updatedAt: 50 }, score: 8 }],
     boards: async () => [{ threadId: "thr_board", title: "Election night", updatedAt: 600 }, { threadId: "thr_other", title: "Budget", updatedAt: 900 }],
     bots: () => [{ id: "bot_night", name: "Night owl", updatedAt: 10 }],
-    entries: async () => [{ kind: "todo", id: "loop_1", title: "Book the night train", updatedAt: 5 }, { kind: "automation", id: "bot_night:aut_1", title: "Morning card", updatedAt: 700 }, { kind: "record", id: "mem_1", title: "Travel: sleeps badly at night", updatedAt: 3 }],
+    entries: async () => [{ kind: "todo", id: "loop_1", title: "Book the night train", updatedAt: 5 }, { kind: "automation", id: "bot_night:aut_1", title: "Morning card", updatedAt: 700 }],
   };
   const entries = await newTabSearch(search, { query: "night", threadId: null });
-  expect(entries.map((entry) => entry.title)).toEqual(["Night shift", "Night owl", "Election night", "Night plan", "Book the night train", "Travel: sleeps badly at night"]);
-  expect(entries.slice(4).map((entry) => [entry.kind, entry.ref])).toEqual([["To-do", { kind: "todo", id: "loop_1" }], ["Memory record", { kind: "record", id: "mem_1" }]]);
+  expect(entries.map((entry) => entry.title)).toEqual(["Night shift", "Night owl", "Election night", "Night plan", "Book the night train"]);
+  expect(entries.slice(4).map((entry) => [entry.kind, entry.ref])).toEqual([["To-do", { kind: "todo", id: "loop_1" }]]);
   expect((await newTabSearch(search, { query: "automations", threadId: null })).map((entry) => [entry.title, entry.kind])).toContainEqual(["Morning card", "Automation"]);
-  expect(await newTabSearch(search, { query: "night", threadId: "thr_n" })).toHaveLength(5);
+  expect(await newTabSearch(search, { query: "night", threadId: "thr_n" })).toHaveLength(4);
   expect((await newTabSearch(search, { query: "whiteboards", threadId: null })).map((entry) => [entry.title, entry.kind])).toContainEqual(["Floor plan", "Whiteboard"]);
   expect((await newTabSearch(search, { query: "night", threadId: null })).map((entry) => entry.kind)).not.toContain("Whiteboard");
   expect(await newTabSearch(search, { query: "  ", threadId: null })).toEqual([]);
@@ -123,7 +123,7 @@ it("gives every row the drag payload its kind drops as", async () => {
 it("searches under each kind's plural, with Recent on its own registration", () => {
   expect(STUDIO_NEW_TAB_ITEMS[0]).toMatchObject({ id: "recent" });
   expect(STUDIO_NEW_TAB_ITEMS.slice(1).map((registration) => registration.title)).toEqual([...new Set(TAB_KIND_REGISTRY.filter((entry) => entry.owner !== "bb").map((entry) => entry.plural))]);
-  expect(STUDIO_NEW_TAB_ITEMS.map((registration) => registration.id)).toEqual(expect.arrayContaining(["kind-automations", "kind-todos", "kind-todo", "kind-record"]));
+  expect(STUDIO_NEW_TAB_ITEMS.map((registration) => registration.id)).toEqual(expect.arrayContaining(["kind-automations", "kind-todo"]));
   expect(STUDIO_NEW_TAB_ITEMS.slice(1).every((registration) => !registration.useRecents && registration.search)).toBe(true);
   expect(STUDIO_NEW_TAB_ITEMS.map((registration) => registration.title)).not.toContain("Studio");
   const titles = STUDIO_NEW_TAB_ITEMS.map((registration) => registration.title);

@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from "vitest";
 import { canOpenWorkspaceItem, openWorkspaceItem, registerWorkspaceOpener, registerWorkspaceProvider, publishWorkspaceAnchor, workspaceAnchors } from "./workspace";
 import { openAppPath } from "./nav";

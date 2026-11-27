@@ -138,13 +138,14 @@ async function start(input: { key: string; command: string; args: string[]; cwd:
     void lease.dispose().catch(() => {});
   };
   transport.onerror = (error) => {
+    if (connection.expectedClose || connections.get(input.key) !== connection) return;
     void context.experimental_emitSignal("connectionChanged", { key: input.key, status: "error", error: errorText(error) }).catch(() => {});
   };
   try {
     await abortable(client.connect(transport, { signal: context.signal, timeout: CONNECT_TIMEOUT_MS }), context.signal, () => { void client.close().catch(() => {}); });
     return await refresh(connection, context.signal);
   } catch (error) {
-    connections.delete(input.key);
+    if (connections.get(input.key) === connection) connections.delete(input.key);
     await closeConnection(connection);
     throw new Error(errorText(error));
   }

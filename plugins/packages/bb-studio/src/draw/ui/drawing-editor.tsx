@@ -185,7 +185,7 @@ export function DrawingEditor({
       .catch(async (error) => {
         await drafts;
         if (cancelled) return;
-        toast.error(error instanceof Error ? error.message : "Failed to load");
+        toast.error(errorMessage(error) || "Failed to load");
         setLoading(false);
       });
     return () => {

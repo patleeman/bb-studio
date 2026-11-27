@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { guardStudioCliEnv } from "./studio-cli-env.fork.js";
+import { homedir } from "node:os";
 import { Command, CommanderError } from "commander";
 import { maybeReexecViaBbCli } from "./bb-cli-reexec.js";
 import {
@@ -14,13 +16,14 @@ if (process.env.FORCE_COLOR !== undefined) {
   delete process.env.NO_COLOR;
 }
 
+guardStudioCliEnv(process.env, homedir());
 maybeReexecViaBbCli();
 
 const program = new Command();
 
 program
-  .name("bb")
-  .description("BB CLI - manage your AI coding agents")
+  .name("bbs")
+  .description("BB Studio CLI (bbs, also bb-studio) - manage your AI coding agents")
   .enablePositionalOptions()
   .exitOverride()
   .showSuggestionAfterError(false)
@@ -78,8 +81,8 @@ async function tryPluginCommandProxy(
     );
     if (disabledId !== null) {
       console.error(
-        `bb ${candidate} is provided by the "${disabledId}" plugin, which is disabled — ` +
-          `run \`bb plugin enable ${disabledId}\` or enable it in Plugins.`,
+        `bbs ${candidate} is provided by the "${disabledId}" plugin, which is disabled — ` +
+          `run \`bbs plugin enable ${disabledId}\` or enable it in Plugins.`,
       );
       process.exit(1);
     }
@@ -212,11 +215,22 @@ async function main(): Promise<void> {
     return;
   }
 
-  const [contextEnv, ...registrars] = await Promise.all([
-    import("./context-env.js"),
-    ...groups.map((group) => group.load()),
-  ]);
+  const contextEnv = await import("./context-env.js");
   const deps = createCommandGroupDeps(contextEnv);
+
+  const candidate = pluginProxyCandidate(firstArg, KNOWN_COMMAND_NAMES);
+  if (candidate !== null) {
+    const { TOP_LEVEL_SOFT_ALIASES } = await import("./command-resolution.js");
+    const aliasTarget = TOP_LEVEL_SOFT_ALIASES[candidate];
+    await tryPluginCommandProxy(
+      candidate,
+      deps.getUrl,
+      aliasTarget !== undefined,
+    );
+    if (aliasTarget !== undefined) process.argv[2] = aliasTarget;
+  }
+
+  const registrars = await Promise.all(groups.map((group) => group.load()));
 
   program.addHelpText("after", () => {
     const context = deps.getContext();
@@ -231,10 +245,10 @@ Current context:
   BB_SERVER_URL: ${context.serverUrl}
 
 Quick start:
-  bb status
-  bb project list
-  bb thread show <id>
-  bb thread spawn --project <id> --provider codex --prompt "..."
+  bbs status
+  bbs project list
+  bbs thread show <id>
+  bbs thread spawn --project <id> --provider codex --prompt "..."
 `;
   });
 
@@ -242,18 +256,6 @@ Quick start:
     register(program, deps);
   }
   await addJsonShapeHelp();
-
-  const candidate = pluginProxyCandidate(firstArg, KNOWN_COMMAND_NAMES);
-  if (candidate !== null) {
-    const { TOP_LEVEL_SOFT_ALIASES } = await import("./command-resolution.js");
-    const aliasTarget = TOP_LEVEL_SOFT_ALIASES[candidate];
-    await tryPluginCommandProxy(
-      candidate,
-      deps.getUrl,
-      aliasTarget !== undefined,
-    );
-    if (aliasTarget !== undefined) process.argv[2] = aliasTarget;
-  }
   await rejectHelpForUnknownSubcommand(deps.getUrl);
   await parseProgram(deps.getUrl);
 }

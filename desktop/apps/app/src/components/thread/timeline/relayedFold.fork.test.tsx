@@ -18,7 +18,8 @@ import {
   setPluginSlotRegistrations,
 } from "@/lib/plugin-slots";
 import { ThreadTimelineRows } from "./ThreadTimelineRows";
-import { foldRelayedRows, isAlertRow } from "./relayedFold.fork";
+import { SearchMessageLocationProvider } from "./useScrollToSearchedMessage";
+import { foldRelayedRows, isAlertRow, useRelayedFold, type FoldedRows } from "./relayedFold.fork";
 
 afterEach(() => {
   cleanup();
@@ -106,6 +107,17 @@ describe("foldRelayedRows", () => {
     const fold = foldRelayedRows(rows, null);
     expect(fold.rows.map((row) => row.id)).toEqual(["a_message"]);
     expect([...fold.folded]).toEqual(["a_message"]);
+  });
+
+  it("leaves a group alone when a link points into it", () => {
+    registerStudioLike();
+    const rows = buildTimelineViewRows(
+      exchange("a", { text: LEAD, initiator: "agent" }, "[PASS]"),
+    );
+    const reply = rows.at(-1)!;
+    const fold = foldRelayedRows(rows, null, undefined, false, new Set([reply.id]));
+    expect(fold.rows).toBe(rows);
+    expect(fold.folded.size).toBe(0);
   });
 
   it("keeps the reply when it is real text", () => {
@@ -682,5 +694,39 @@ describe("an automated input sent with a notice", () => {
     const { container } = renderRows(noticeTurn("old", "[PASS]", { by: "user", text: "Watcher Morning card: kettle-ok-09" }));
     expect(container.querySelector("[data-quiet-turn]")).toBeNull();
     expect(rowText(container, "old_alert")).toContain("Message from");
+  });
+
+  it("keeps the same FoldedRows reference across streaming tokens when folds are unchanged", () => {
+    registerStudioLike();
+    const seen: FoldedRows[] = [];
+    const findStreaming = (viewRows: readonly ReturnType<typeof buildTimelineViewRows>[number][]) =>
+      viewRows.find((row) => row.id === "stream_reply")?.id ?? null;
+    function Probe({ text }: { text: string }) {
+      const rows = buildTimelineViewRows([
+        ...noticeTurn("quiet1", "[PASS]"),
+        conversationRow({ id: "u2", role: "user", text: "Explain it", turnId: "t2", sourceSeqStart: 20, sourceSeqEnd: 20 }),
+        conversationRow({ id: "stream_reply", role: "assistant", text, turnId: "t2", sourceSeqStart: 21, sourceSeqEnd: 21 }),
+      ]);
+      const result = useRelayedFold(rows, true, findStreaming);
+      seen.push(result.folded);
+      return null;
+    }
+    const { rerender } = render(
+      <MemoryRouter>
+        <SearchMessageLocationProvider threadId="thr_test">
+          <Probe text="First chunk" />
+        </SearchMessageLocationProvider>
+      </MemoryRouter>,
+    );
+    rerender(
+      <MemoryRouter>
+        <SearchMessageLocationProvider threadId="thr_test">
+          <Probe text="First chunk, second chunk" />
+        </SearchMessageLocationProvider>
+      </MemoryRouter>,
+    );
+    expect(seen).toHaveLength(2);
+    expect(seen[0]!.quiet.size).toBeGreaterThan(0);
+    expect(seen[1]).toBe(seen[0]);
   });
 });

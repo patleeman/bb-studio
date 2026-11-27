@@ -1,6 +1,6 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it } from "vitest";
-import { MIGRATIONS } from "./migrations";
+import { migratedPluginDb } from "./test/migrated-db";
 import { ADOPT_RECENT, agentFork, BotThreads, botNeedsYou, botOwnThread, classifyThread, forkMessageIdOf, latestLine, olderView, repoTag, threadRunning, threadsView, workerStatus, WORKER_FINISHED_SHOWN, type Signals, type ThreadFacts } from "./bot-threads";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -34,8 +34,10 @@ function setup(threads: ThreadFacts[], over: Partial<Signals> = {}) {
     },
   } });
   dispose.push(() => harness.lifecycle.dispose());
-  const db = bb.storage.database();
-  bb.storage.migrate(db, MIGRATIONS);
+  const mem = migratedPluginDb();
+  const db = mem as unknown as ReturnType<typeof bb.storage.database>;
+  bb.storage.database = () => db;
+  dispose.push(async () => { mem.close(); });
   let changes = 0;
   let now = 1_000_000;
   const store = new BotThreads({ db, sdk: bb.sdk, signals: () => signals(over), changed: () => { changes++; }, now: () => now });
@@ -490,8 +492,10 @@ function larkspur(overrides: Record<string, Partial<ThreadFacts>> = {}) {
     },
   } });
   dispose.push(() => harness.lifecycle.dispose());
-  const db = bb.storage.database();
-  bb.storage.migrate(db, MIGRATIONS);
+  const mem = migratedPluginDb();
+  const db = mem as unknown as ReturnType<typeof bb.storage.database>;
+  bb.storage.database = () => db;
+  dispose.push(async () => { mem.close(); });
   const store = new BotThreads({ db, sdk: bb.sdk, signals: () => signals(), changed: () => {} });
   return { store, db, threads, events };
 }

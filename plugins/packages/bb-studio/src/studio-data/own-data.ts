@@ -7,6 +7,8 @@
 //     Bot's Main) and its run;
 //   - at most one page: that Bot's core profile (memory) page, still the
 //     template it was made from, and the item index row for it;
+//   - at most that Bot's always-on core skill, still the template
+//     (src/core-skill.ts), with its version and its move marker;
 //   - rows only in the housekeeping tables below, and in full-text indexes,
 //     which mirror other tables.
 // Every other table must be empty, so a table a later Studio adds counts
@@ -14,8 +16,8 @@
 // table) answers "has data": the check fails closed.
 import type Database from "better-sqlite3";
 import { MEMORY_TEMPLATE } from "../bot";
-import { PROFILE_TEMPLATE } from "../memory/service";
 import { PERSONAL_PROJECT_ID, BOT_RUN_PREFIX } from "../project-lead";
+import { CORE_TEMPLATE } from "../core-skill";
 
 /** Tables whose rows are never something the user made: Studio's own bookkeeping. */
 export const HOUSEKEEPING_TABLES: ReadonlySet<string> = new Set([
@@ -34,6 +36,8 @@ export const HOUSEKEEPING_TABLES: ReadonlySet<string> = new Set([
   "bot_maintenance_settings",
   "bot_maintenance_runs",
   "bot_learning",
+  "bot_skill_review_queue",
+  "bot_skill_review_marks",
   "bot_hidden_threads",
   "bot_nudges",
   "bot_run_dismissals",
@@ -48,7 +52,7 @@ export const HOUSEKEEPING_TABLES: ReadonlySet<string> = new Set([
 ]);
 
 /** Checked one by one below. */
-const RULED = new Set(["bots", "bot_threads", "pages", "items", "memory_profiles", "project_leads", "project_runs"]);
+const RULED = new Set(["bots", "bot_threads", "pages", "items", "memory_profiles", "project_leads", "project_runs", "bot_skills", "bot_skill_versions", "bot_core_skills"]);
 
 export type OwnData = { has: false } | { has: true; reason: string };
 
@@ -56,7 +60,21 @@ const has = (reason: string): OwnData => ({ has: true, reason });
 
 /** Markdown with its spacing and list and heading marks evened out, to compare a page with the template it started from. */
 const plain = (markdown: string) => markdown.replace(/^[\s>*+#-]+/gm, "").replace(/\s+/g, " ").trim();
-const STARTING_PAGES = new Set([plain(PROFILE_TEMPLATE), plain(MEMORY_TEMPLATE)]);
+/** The core profile page a Bot was given before always-on skills (src/core-skill.ts), as made. */
+const OLD_PROFILE_TEMPLATE = `## Who the user is
+
+## How they work
+
+## Hard rules
+
+## People and places
+
+## Check-in
+
+- Anything waiting on the user, or threads I started that finished, failed or stalled?
+- Project leads: anything stuck?
+`;
+const STARTING_PAGES = new Set([plain(OLD_PROFILE_TEMPLATE), plain(MEMORY_TEMPLATE)]);
 
 function count(db: Database.Database, sql: string, ...params: unknown[]): number {
   return (db.prepare(sql).get(...params) as { n: number }).n;
@@ -88,7 +106,9 @@ function check(db: Database.Database): OwnData {
   if (threads.some((row) => row.bot_id !== bot?.id)) return has("it has conversations of another Bot");
   if (threads.filter((row) => row.is_main).length > 1 || threads.filter((row) => !row.is_main).length > 1) return has(`its Bot has ${threads.length} conversations`);
 
-  const profiles = db.prepare("SELECT bot_id, profile_page_id FROM memory_profiles").all() as { bot_id: string; profile_page_id: string }[];
+  // memory_profiles is dropped once every Bot's core profile is in its skill (src/core-skill-migrate.ts).
+  const hasProfiles = !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'memory_profiles'").get();
+  const profiles = (hasProfiles ? db.prepare("SELECT bot_id, profile_page_id FROM memory_profiles").all() : []) as { bot_id: string; profile_page_id: string }[];
   if (profiles.some((row) => row.bot_id !== bot?.id)) return has("it has another Bot's memory");
   const memoryPage = bot?.memory_page_id ?? profiles[0]?.profile_page_id ?? null;
   const pages = db.prepare("SELECT id, markdown FROM pages").all() as { id: string; markdown: string }[];
@@ -97,6 +117,14 @@ function check(db: Database.Database): OwnData {
     if (!STARTING_PAGES.has(plain(page.markdown))) return has("its Bot's core profile page was changed");
   }
   if (count(db, "SELECT COUNT(*) AS n FROM items WHERE NOT (plugin_id = 'pages' AND id IS ?)", memoryPage) > 0) return has("it has pages or apps");
+
+  // The Bot's always-on core skill, as a new Bot gets it; its versions and marker follow the skill.
+  const skills = db.prepare("SELECT bot_id, body, always_on FROM bot_skills").all() as { bot_id: string; body: string; always_on: number }[];
+  if (skills.some((row) => row.bot_id !== bot?.id || !row.always_on)) return has("it has skills");
+  if (skills.length > 1) return has(`its Bot has ${skills.length} skills`);
+  if (skills[0] && plain(skills[0].body) !== plain(CORE_TEMPLATE)) return has("its Bot's always-on skill was changed");
+  if (count(db, "SELECT COUNT(DISTINCT name) AS n FROM bot_skill_versions") > skills.length || count(db, "SELECT COUNT(*) AS n FROM bot_skill_versions") > skills.length) return has("its Bot's skills were edited");
+  if (count(db, "SELECT COUNT(*) AS n FROM bot_core_skills WHERE bot_id IS NOT ?", bot?.id ?? null) > 0) return has("it has another Bot's skills");
 
   const leads = db.prepare("SELECT project_id, lead_thread_id FROM project_leads").all() as { project_id: string; lead_thread_id: string | null }[];
   // The personal project's lead is the primary Bot's Main.

@@ -13,6 +13,7 @@
 // side while each keeps 64 px, the rest folding into a "+N" chip. Paused jobs
 // aren't drawn: they're listed under the week, with Resume.
 import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON } from "../../kit/app/index";
+import { useNow } from "../../kit/app/visible-poll";
 import { Icon, Input, Popover, PopoverAnchor, PopoverContent, Tooltip } from "../../kit/ui/index";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { BotAutomationRunView, BotAutomationView, RunnerView } from "../../contract";
@@ -137,14 +138,13 @@ export function AutomationsCalendar({ botId, botName = "The Bot", automations, o
   const names = page.data?.groupNames ?? {};
   const rename = (key: string, name: string) => void call("bot_calendar_group_rename", { botId, key, name }).then(() => page.refresh(), () => {});
   const [showFrequent, setShowFrequent] = useShowFrequent();
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(timer); }, []);
+  const now = useNow(30_000);
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(720);
   useLayoutEffect(() => {
     const node = box.current;
     if (!node || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(([entry]) => setWidth(entry!.contentRect.width));
+    const observer = new ResizeObserver(([entry]) => { if (entry) setWidth(entry.contentRect.width); });
     observer.observe(node);
     setWidth(node.getBoundingClientRect().width || 720);
     return () => observer.disconnect();

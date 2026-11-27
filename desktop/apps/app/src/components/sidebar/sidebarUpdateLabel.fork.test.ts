@@ -6,6 +6,7 @@ function provider(label: string): SidebarUpdateRow {
   return {
     kind: "provider",
     key: `provider:${label}`,
+    fingerprint: `provider:${label}`,
     provider: "claude-code" as never,
     label,
     detail: "2.1.1 → 2.1.2",
@@ -18,6 +19,7 @@ function plugin(label: string): SidebarUpdateRow {
   return {
     kind: "plugin",
     key: `plugin:${label}`,
+    fingerprint: `plugin:${label}`,
     pluginId: label,
     icon: null,
     label,
@@ -35,10 +37,12 @@ function model(rows: SidebarUpdateRow[], app = false): SidebarUpdateModel {
           currentVersion: "1.0.3",
           installsWhenIdle: false,
           restarting: false,
-          restartLabel: null,
+          canRestart: false,
         }
       : null,
     rows,
+    fingerprints: rows.map((row) => row.fingerprint),
+    visible: true,
     startableCount: rows.length,
     retryOnly: false,
     updating: false,

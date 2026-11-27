@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { expect, it } from "vitest";
 import * as app from "./index";
 import * as workspaceState from "../../ui/workspace-state";

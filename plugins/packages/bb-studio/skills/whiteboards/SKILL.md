@@ -43,7 +43,7 @@ carry `::drawing{id="…"}` cards; those still show.
 
 | Tool | Use it to |
 | --- | --- |
-| `pages_list` (`type: "whiteboard"`) | List whiteboards with ids, names, element counts and the page each is in. |
+| `pages_read (no page)` (`type: "whiteboard"`) | List whiteboards with ids, names, element counts and the page each is in. |
 | `pages_read` (`page: "drw_…"`) | Read a whiteboard's current scene before changing it. |
 | `pages_create` (`type: "whiteboard"`) | Add an empty whiteboard to a page (`title`, optional `pageId`, optional `afterBlockId` from `pages_read`), or without `pageId` make a new page holding just the whiteboard. Returns its id and the page's card. |
 | `whiteboard_update` | Upsert elements, delete elements by id, or patch appState (`whiteboardId`). An upsert of an existing id merges: send `id`, `type` and just the properties to change. |

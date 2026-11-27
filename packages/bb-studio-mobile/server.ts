@@ -11,6 +11,7 @@
 // Once a notified thread is read or answered anywhere, a silent push tells the
 // app to remove its notifications (see clear.ts).
 import { setThreadMuted, stillMuted } from "./mute-levels.js";
+import { studioCliName, studioCliRegistration } from "./cli-name";
 import { readFile } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
@@ -33,7 +34,8 @@ import {
 import { CLEAR_BATCH, clearPayload, keptWorkers, noteNotified, noteWorkers, partition, settled, type Notified, type NotifiedWorkers, type ThreadReadState } from "./clear.js";
 import { DeskHold, holdable } from "./desk.js";
 import { appendJournal, JOURNAL_KEY, journalEntry, journalSummary, type JournalEntry, type JournalOutcome } from "./journal.js";
-import { isQuietCompletion, triggerOf, turnPushAllowed, type TurnTrigger } from "./notifications.js";
+import { redactSecrets } from "./redact.js";
+import { isQuietCompletion, isUserFacingReply, triggerOf, turnPushAllowed, type TurnTrigger } from "./notifications.js";
 import { collapseIdFor, PushWindows, summaryBody, windowKey } from "./push-window.js";
 import { StudioApprovals } from "./studio-approvals.js";
 import { activityTokenSchema, botIdSchema, deviceIdSchema, liveActivityPayload, liveActivityPriority, liveActivityPushSchema, LiveActivityTokens, MOBILE_MIGRATIONS, tokenKindSchema } from "./live-activities.js";
@@ -59,6 +61,11 @@ const NOTIFIED_WORKERS_KEY = "notified-workers";
 const DESK_HOLD_KEY = "desk-hold";
 const deskOutput = z.object({ enabled: z.boolean(), atDesk: z.boolean().nullable(), held: z.number().int().min(0) });
 const STUDIO_PLUGIN_ID = "studio";
+/** A BB reply push already checked against its turn and Studio's tag. Copies ({ ...message }) keep it; JSON (the APNs payload) never carries it. */
+const CHECKED = Symbol("reply-push-checked");
+type CheckedMessage = ExpoMessage & { [CHECKED]?: true };
+/** How long BB's reply push waits for Studio to tag the reply (Jev answers within 15 seconds). */
+const REPLY_TAG_WAIT_MS = 20_000;
 const pushIdsOutput = z.object({ botId: z.string().optional(), conversationId: z.string().optional(), workerId: z.string().optional() }).passthrough();
 /** Reading a thread has no event, so notified threads are checked this often. */
 const CLEAR_INTERVAL_MS = 60_000;
@@ -336,13 +343,47 @@ export default async function plugin(bb: BbPluginApi) {
     }
   }
 
-  /** BB's own push for a finished turn (push-notifications: it has a subscription), checked against the turn it is about. */
-  async function quietTurn(message: ExpoMessage, turns: Map<string, Promise<boolean>>): Promise<boolean> {
+
+  const replyTag = z.object({ decision: z.enum(["push", "quiet", "unknown"]), ask: z.string().nullable() }).passthrough();
+  type ReplyTag = z.infer<typeof replyTag>;
+  type Lookup = { turns: Map<string, Promise<{ trigger: TurnTrigger; reply: string | null } | null>>; tags: Map<string, Promise<ReplyTag | null>> };
+  /** Studio's tag for the thread's newest reply (strands.replyPush); null when Studio doesn't answer. */
+  function studioTag(threadId: string, lookup: Lookup): Promise<ReplyTag | null> {
+    if (!lookup.tags.has(threadId)) {
+      lookup.tags.set(threadId, bb.sdk.plugins.callRpc({
+        pluginId: STUDIO_PLUGIN_ID, method: "strands.replyPush", input: { threadId, waitMs: REPLY_TAG_WAIT_MS } as never, outputSchema: replyTag,
+        signal: AbortSignal.timeout(REPLY_TAG_WAIT_MS + 5_000),
+      }).then((tag) => tag as ReplyTag, () => null));
+    }
+    return lookup.tags.get(threadId)!;
+  }
+
+  /**
+   * BB's own push for a finished turn (push-notifications: it has a
+   * subscription), checked against the turn it is about, then against
+   * Studio's tag for its reply: a status reply is dropped, and one that needs
+   * the user goes out with its ask as the body, even when another thread
+   * started the turn (a worker's notice). When Studio can't tell, the turn's
+   * own rules decide as before. True: drop it.
+   */
+  async function quietTurn(message: ExpoMessage, lookup: Lookup): Promise<boolean> {
     const data = message.data;
     if (data?.kind !== "turn-finished" || typeof data.subscriptionId !== "string" || typeof data.threadId !== "string" || data.botId !== undefined) return false;
+    // Held and sent later (the conversation's window, the desk): decided on its first pass, about its own turn; its "N new" summary stays.
+    if ((message as CheckedMessage)[CHECKED]) return false;
     const threadId = data.threadId;
-    if (!turns.has(threadId)) turns.set(threadId, latestTurn(threadId).then((turn) => turn !== null && !turnPushAllowed(turn)));
-    return turns.get(threadId)!;
+    if (!lookup.turns.has(threadId)) lookup.turns.set(threadId, latestTurn(threadId));
+    const turn = await lookup.turns.get(threadId)!;
+    const allowed = turn === null || turnPushAllowed(turn);
+    // A keepalive, a quiet reply or a turn with nothing to say never pushes; a turn another thread started pushes only for an ask.
+    if (!allowed && !(turn!.trigger === "thread" && isUserFacingReply(turn!.reply))) return true;
+    const tag = await studioTag(threadId, lookup);
+    const drop = tag?.decision === "push" ? false : !allowed || tag?.decision === "quiet";
+    if (!drop) {
+      if (tag?.decision === "push" && tag.ask) message.body = tag.ask;
+      (message as CheckedMessage)[CHECKED] = true;
+    }
+    return drop;
   }
 
   const windows = new PushWindows(async ({ key, messages, shown, held, since }) => {
@@ -386,8 +427,8 @@ export default async function plugin(bb: BbPluginApi) {
     const apnsIndexes: number[] = [];
     const lookups: Lookups = new Map();
     const owners = new Map<string, Promise<boolean>>();
-    const turns = new Map<string, Promise<boolean>>();
-    const studios = await Promise.all(messages.map(async (message) => isQuietCompletion(message) || await quietTurn(message, turns) || await sentByStudio(message, lookups, owners)));
+    const lookup: Lookup = { turns: new Map(), tags: new Map() };
+    const studios = await Promise.all(messages.map(async (message) => isQuietCompletion(message) || await sentByStudio(message, lookups, owners) || await quietTurn(message, lookup)));
     messages.forEach((message, index) => {
       if (studios[index]) {
         tickets[index] = { status: "ok" };
@@ -473,7 +514,8 @@ export default async function plugin(bb: BbPluginApi) {
       const category = outcome === "sent" && message.to.startsWith(APNS_TOKEN_PREFIX) ? notificationCategory(message.data ?? {}) : undefined;
       return journalEntry(message, outcome, now, { ...(category ? { category } : {}), ...(options.later && outcome === "sent" ? { later: options.later } : {}) });
     }));
-    const errors = tickets.flatMap((ticket) => (ticket.status === "error" ? [ticket.message ?? "unknown"] : []));
+    // Expo names the device token in some errors; none is stored, logged or printed.
+    const errors = tickets.flatMap((ticket) => (ticket.status === "error" ? [redactSecrets(ticket.message ?? "unknown")] : []));
     for (const error of new Set(errors)) bb.log.warn(`push delivery failed: ${error}`);
     await bb.storage.kv.set(LAST_DELIVERY_KEY, {
       at: new Date().toISOString(),
@@ -710,7 +752,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (!devices.length) return { ok: false, sent: 0, message: "No phone has received a push yet. Open the BB Studio app and allow notifications." };
       const tickets = await deliver(devices.map((to) => ({ to, title: "BB Studio", body: "Test push from Studio Mobile. Pushes work.", sound: "default", data: {} })));
       const sent = tickets.filter((ticket) => ticket.status === "ok").length;
-      const failed = tickets.flatMap((ticket) => (ticket.status === "error" ? [ticket.message ?? "unknown"] : []));
+      const failed = tickets.flatMap((ticket) => (ticket.status === "error" ? [redactSecrets(ticket.message ?? "unknown")] : []));
       return sent
         ? { ok: true, sent, message: `Sent to ${sent} phone${sent === 1 ? "" : "s"}.` }
         : { ok: false, sent: 0, message: `Apple didn't take it: ${[...new Set(failed)].join("; ") || "unknown error"}` };
@@ -780,7 +822,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
-  bb.cli.register({
+  bb.cli.register(studioCliRegistration({
     name: "mobile",
     summary: "BB Studio push relay status",
     commands: [
@@ -825,22 +867,23 @@ export default async function plugin(bb: BbPluginApi) {
         apnsReady: !("missing" in apns),
         apnsProblem: "missing" in apns ? apns.missing : null,
         environment: "missing" in apns ? null : apns.config.environment,
-        relayPath: "/api/v1/plugins/mobile/http/push?token=<bb plugin token mobile>",
+        relayPath: `/api/v1/plugins/mobile/http/push?token=<${studioCliName()} plugin token mobile>`,
         lastDelivery: last ?? null,
         deskHold: deskStatus(),
       };
-      if (argv.includes("--json")) return { exitCode: 0, stdout: JSON.stringify(status) };
+      // Errors stored before redaction are redacted here.
+      if (argv.includes("--json")) return { exitCode: 0, stdout: redactSecrets(JSON.stringify(status)) };
       return {
         exitCode: 0,
-        stdout: [
+        stdout: redactSecrets([
           `APNs: ${status.apnsReady ? `ready (${status.environment})` : `not ready: ${status.apnsProblem}`}`,
           `Relay: ${status.relayPath}`,
           last
             ? `Last delivery ${last.at}: ${last.apns} APNs, ${last.expo} Expo${last.categories?.length ? ` (categories: ${last.categories.join(", ")})` : ""}${last.errors.length ? `; errors: ${last.errors.join("; ")}` : ""}`
             : "No deliveries yet.",
           `Hold while at the desk: ${status.deskHold.enabled ? "on" : "off"}; at the desk: ${status.deskHold.atDesk === null ? "unknown" : status.deskHold.atDesk ? "yes" : "no"}; held: ${status.deskHold.held}`,
-        ].join("\n"),
+        ].join("\n")),
       };
     },
-  });
+  }));
 }

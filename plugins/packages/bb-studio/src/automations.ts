@@ -242,6 +242,8 @@ export class Automations {
   private readonly remade = new Set<string>();
   /** The last tick failure logged per row, so one reason is logged once. */
   private readonly tickWarned = new Map<string, string>();
+  /** Row+column keys already warned for malformed JSON, so each logs once. */
+  private readonly jsonWarned = new Set<string>();
   private readonly automationsOff: () => Promise<boolean>;
   constructor(private readonly deps: AutomationDeps) {
     this.automationsOff = deps.automationsOff ?? automationsPluginOff(deps.sdk);
@@ -285,8 +287,68 @@ export class Automations {
     return row;
   }
 
+  private warnJsonOnce(rowId: string, column: string, message: string): void {
+    const key = `${rowId}:${column}`;
+    if (this.jsonWarned.has(key)) return;
+    this.jsonWarned.add(key);
+    console.warn(message);
+  }
+
+  private parseJson<T>(
+    rowId: string,
+    column: string,
+    raw: string | null | undefined,
+    valid: (value: unknown) => value is T,
+    detail?: string,
+  ): T | null {
+    if (!raw) return null;
+    const suffix = detail ? ` (${detail})` : "";
+    try {
+      const value: unknown = JSON.parse(raw);
+      if (valid(value)) return value;
+      this.warnJsonOnce(rowId, column, `[studio] Malformed automation ${rowId} ${column}: unexpected JSON shape${suffix}`);
+      return null;
+    } catch (error) {
+      this.warnJsonOnce(rowId, column, `[studio] Malformed automation ${rowId} ${column}: ${plainReason(error)}${suffix}`);
+      return null;
+    }
+  }
+
+  private parseSchedule(row: Row): Schedule | null {
+    return this.parseJson(
+      row.id,
+      "schedule_json",
+      row.schedule_json,
+      (value): value is Schedule => !!value && typeof value === "object" && !Array.isArray(value) && typeof (value as { type?: unknown }).type === "string",
+    );
+  }
+
+  private parseEnv(row: Row): Record<string, string> {
+    return this.parseJson(
+      row.id,
+      "env_json",
+      row.env_json,
+      (value): value is Record<string, string> => !!value && typeof value === "object" && !Array.isArray(value),
+    ) ?? {};
+  }
+
   private resources(row: Row): { id: string; projectId: string }[] {
-    return row.resources ? JSON.parse(row.resources) : (JSON.parse(row.bb_ids) as string[]).map((id) => ({ id, projectId: row.project_id }));
+    if (row.resources) {
+      return this.parseJson(
+        row.id,
+        "resources",
+        row.resources,
+        (value): value is { id: string; projectId: string }[] =>
+          Array.isArray(value) && value.every((each) => !!each && typeof each === "object" && typeof (each as { id?: unknown }).id === "string" && typeof (each as { projectId?: unknown }).projectId === "string"),
+      ) ?? [];
+    }
+    const ids = this.parseJson(
+      row.id,
+      "bb_ids",
+      row.bb_ids,
+      (value): value is string[] => Array.isArray(value) && value.every((each) => typeof each === "string"),
+    ) ?? [];
+    return ids.map((id) => ({ id, projectId: row.project_id }));
   }
 
   private ids(row: Row): string[] { return this.resources(row).map((r) => r.id); }
@@ -357,7 +419,7 @@ export class Automations {
     const storage = join(this.deps.watcherDir ?? join(tmpdir(), "studio-watchers"), row.id);
     const result = await (this.deps.runScript ?? runWatcherScript)({
       body: row.script ?? "", interpreter: row.interpreter ?? "bash", timeoutMs: row.timeout_ms ?? 120_000,
-      env: row.env_json ? JSON.parse(row.env_json) as Record<string, string> : {},
+      env: this.parseEnv(row),
       cwd: dir && dir !== "automation-storage" && dir !== "project" ? dir : storage,
     });
     const status = result.exitCode === 0 ? "succeeded" as const : "failed" as const;
@@ -383,9 +445,10 @@ export class Automations {
 
   private scriptExecution(row: Row) {
     const dir = row.working_dir?.trim();
+    const env = row.env_json ? this.parseEnv(row) : undefined;
     return {
       mode: "script", script: row.script ?? "", interpreter: row.interpreter ?? "bash", timeoutMs: row.timeout_ms ?? 120_000,
-      ...(row.env_json ? { env: JSON.parse(row.env_json) as Record<string, string> } : {}),
+      ...(env && Object.keys(env).length ? { env } : {}),
       workingDirectory: !dir || dir === "automation-storage" ? { type: "automation-storage" } : dir === "project" ? { type: "project" } : { type: "path", path: dir },
     };
   }
@@ -469,7 +532,8 @@ export class Automations {
 
   private async apply(row: Row): Promise<Row> {
     const bot = this.bot(row.bot_id);
-    const schedule = JSON.parse(row.schedule_json) as Schedule;
+    const schedule = this.parseSchedule(row);
+    if (!schedule) throw new Error(`Automation "${row.id}" has a corrupted schedule.`);
     if (row.kind !== "watcher") return this.provisionOwn(row, bot, schedule);
     if (await this.automationsOff()) return this.provisionOwnWatcher(row, bot, schedule);
     // Back on bb's automations: a schedule Studio ran while the plugin was off goes.
@@ -554,7 +618,7 @@ export class Automations {
       const automation = hbAutomation ? bb.get(hbAutomation.id) : undefined;
       views.push({
         id: HEARTBEAT_ID, kind: "checkin", name: HEARTBEAT_NAME, original: true, bbIds: hbAutomation ? [hbAutomation.id] : [],
-        instruction: "What your Memory page's Check-in section says.",
+        instruction: "What the Check-in section of your always-on skill says.",
         schedule: fromHeartbeat(heartbeat), scheduleText: describeSchedule(fromHeartbeat(heartbeat)),
         state: heartbeat.enabled ? "active" : "paused", nextRunAt: heartbeat.enabled ? automation?.nextRunAt ?? null : null, lastRunAt: automation?.lastRunAt ?? null,
         lastOutcome: this.resumedSince(hbAutomation ? [hbAutomation.id] : [], automation?.lastRunAt) ?? automation?.lastRunStatus ?? null, model: null, script: null, target: "main", targetName: bot.name, threadId: bot.threadId,
@@ -577,7 +641,8 @@ export class Automations {
       let state = row.state;
       // A reminder is done once it has run and has nothing left to run.
       if (!row.provision_pending && !row.cleanup_pending && row.kind === "reminder" && state === "active" && automations.length > 0 && automations.every((each) => isScheduleId(each.id) ? each.done === true : !!last && !each.nextRunAt)) { state = "done"; }
-      const schedule = JSON.parse(row.schedule_json) as Schedule;
+      const schedule = this.parseSchedule(row);
+      if (!schedule) continue;
       const runner = row.target !== "main" ? runners.find((each) => each.id === row.target) : null;
       views.push({
         id: row.id, kind: row.kind, name: row.name, original: false, inBb: this.inBb(row.created_at, row.state), bbIds: this.ids(row), instruction: row.instruction,
@@ -585,7 +650,7 @@ export class Automations {
         state, nextRunAt: state === "active" && Number.isFinite(next) ? next : null, lastRunAt: Math.max(last, row.last_fired_at ?? 0) || null,
         lastOutcome: this.pendingOutcome(row) ?? this.resumedSince(this.ids(row), Math.max(last, row.last_fired_at ?? 0)) ?? (row.kind === "watcher" && row.last_fire ? `Woke it: ${row.last_fire.split("\n")[0]!.slice(0, 200)}` : automations.find((each) => each.lastRunAt === last)?.lastRunStatus ?? null),
         model: row.kind === "watcher" ? null : { model: row.model, reasoning: row.reasoning },
-        script: row.kind === "watcher" ? { body: row.script ?? "", interpreter: (row.interpreter ?? "bash") as Interpreter, timeoutMs: row.timeout_ms ?? 120_000, workingDirectory: row.working_dir ?? null, envKeys: row.env_json ? Object.keys(JSON.parse(row.env_json) as object) : [] } : null,
+        script: row.kind === "watcher" ? { body: row.script ?? "", interpreter: (row.interpreter ?? "bash") as Interpreter, timeoutMs: row.timeout_ms ?? 120_000, workingDirectory: row.working_dir ?? null, envKeys: Object.keys(this.parseEnv(row)) } : null,
         target: row.target, targetName: runner?.name ?? bot.name, threadId: runner ? runner.threadId : bot.threadId,
       });
     }
@@ -618,7 +683,7 @@ export class Automations {
       entries.push({
         id: HEARTBEAT_ID, botId: bot.id, kind: "schedule", name: HEARTBEAT_NAME, when: whenText(fromHeartbeat(heartbeat)),
         status: heartbeat.enabled ? "active" : "paused", createdAt: null, bbIds: ref ? [ref] : [], threadId: bot.threadId,
-        lastRunAt: own?.lastRunAt ?? null, lastRun: lastRunMark(own?.lastRunStatus), instruction: "What your Memory page's Check-in section says.", script: null,
+        lastRunAt: own?.lastRunAt ?? null, lastRun: lastRunMark(own?.lastRunStatus), instruction: "What the Check-in section of your always-on skill says.", script: null,
       });
     }
     const maintenance = bot.kind === "external" ? null : this.deps.maintenance?.get(bot.id) ?? null;
@@ -642,7 +707,8 @@ export class Automations {
     return this.rows(bot.id).flatMap((row) => {
       const own = row.kind === "watcher" || row.state === "done" || row.state === "ended" ? undefined : this.ids(row).map((id) => this.own(id)).find((each) => !!each);
       if (!own) return [];
-      const schedule = JSON.parse(row.schedule_json) as Schedule;
+      const schedule = this.parseSchedule(row);
+      if (!schedule) return [];
       return [{ id: own.id, name: `${bot.name} · ${row.name}`, cron: schedule.type === "cron" ? schedule.cron : null, enabled: own.enabled, nextRunAt: own.nextRunAt ?? null }];
     });
   }
@@ -755,7 +821,7 @@ export class Automations {
     if (input.id === HEARTBEAT_ID) {
       const run = this.deps.heartbeat.get(bot.id);
       if (!run) throw new Error("This Bot has no original check-in.");
-      if (input.name && input.name !== HEARTBEAT_NAME) throw new Error("The original check-in keeps its name; its instruction is your Memory page's Check-in section.");
+      if (input.name && input.name !== HEARTBEAT_NAME) throw new Error("The original check-in keeps its name; its instruction is the Check-in section of your always-on skill.");
       if (input.schedule) await this.deps.heartbeat.set(bot.id, { ...run, ...runnerSchedule(input.schedule), enabled: run.enabled });
       return this.one(HEARTBEAT_ID, bot.id);
     }
@@ -791,7 +857,9 @@ export class Automations {
       ...(input.schedule && (row.state === "done" || row.state === "ended") ? { state: "active" as const } : {}),
     };
     if (next.kind !== "watcher" && !next.instruction) throw new Error("Say what it should do.");
-    compileSchedule(JSON.parse(next.schedule_json) as Schedule);
+    const nextSchedule = this.parseSchedule(next);
+    if (!nextSchedule) throw new Error(`Automation "${next.id}" has a corrupted schedule.`);
+    compileSchedule(nextSchedule);
     if (next.kind === "watcher" && !next.script?.trim()) throw new Error("A watcher needs a script.");
     if (next.kind !== "watcher") {
       if (!bot.threadId) throw new Error(`${bot.name} has no Main conversation. Pick one in Bot settings (or start a new one), then try again.`);
@@ -1020,7 +1088,8 @@ export class Automations {
     const rows = this.deps.db.prepare("SELECT * FROM bot_automations WHERE state = 'active' AND cleanup_pending = 0 AND provision_pending = 0").all() as Row[];
     for (const row of rows) {
       try {
-        const schedule = JSON.parse(row.schedule_json) as Schedule;
+        const schedule = this.parseSchedule(row);
+        if (!schedule) continue;
         if (schedule.type !== "once" && schedule.until && now > endOfDay(schedule.until, schedule.timezone || localZone())) {
           await this.setBb(row, false);
           this.save(row.id, { state: "ended" });
@@ -1046,7 +1115,18 @@ export class Automations {
       const current = this.deps.db.prepare("SELECT * FROM bot_automations WHERE id = ?").get(row.id) as Row | undefined;
       if (!current || current.state !== "active") return 0;
       row = current;
-      const seen = new Set<string>(JSON.parse(row.seen_ids));
+      const seenIds = this.parseJson(
+        row.id,
+        "seen_ids",
+        row.seen_ids,
+        (value): value is string[] => Array.isArray(value) && value.every((each) => typeof each === "string"),
+        "skipping watcher for this tick",
+      );
+      if (!seenIds) {
+        if (!row.seen_ids) this.warnJsonOnce(row.id, "seen_ids", `[studio] Malformed automation ${row.id} seen_ids: empty value (skipping watcher for this tick)`);
+        return 0;
+      }
+      const seen = new Set<string>(seenIds);
       const runs: BbRun[] = [];
       for (const { id, projectId } of this.resources(row).filter((resource) => !isScheduleId(resource.id))) {
         let cursor: string | undefined;

@@ -4,6 +4,7 @@
 // enables and removes use BB's plugin SDK; every action also has the CLI
 // command that does the same, for when the SDK call fails.
 import type { HealthSummary, Problem } from "./health-contract";
+import { studioCliName } from "./cli-name";
 import { ADDONS, MARKETPLACE_NAME, MARKETPLACE_SOURCE } from "./setup-addons";
 import type { AddOnEntry, AddOnStatus, RetiredEntry, SetupActionResult, SetupSummary } from "./setup-contract";
 
@@ -39,12 +40,13 @@ export interface SetupSdk {
 const OPTIONAL: Record<string, string> = {
   mobile: "Only needed for the BB Studio iOS app.",
   "studio-visual-chat": "A prototype, off unless you install it: Visual Chat, an agent that answers on a board.",
+  "provider-antigravity": "Only needed if you use Google Antigravity CLI (agy).",
 };
 
-export const installCommand = (id: string) => `bb plugin install ${id}@${MARKETPLACE_NAME} --yes`;
-export const enableCommand = (id: string) => `bb plugin enable ${id}`;
-export const removeCommand = (id: string) => `bb plugin remove ${id}`;
-export const marketplaceCommand = `bb marketplace add ${MARKETPLACE_SOURCE}`;
+export const installCommand = (id: string) => `${studioCliName()} plugin install ${id}@${MARKETPLACE_NAME} --yes`;
+export const enableCommand = (id: string) => `${studioCliName()} plugin enable ${id}`;
+export const removeCommand = (id: string) => `${studioCliName()} plugin remove ${id}`;
+export const marketplaceCommand = `${studioCliName()} marketplace add ${MARKETPLACE_SOURCE}`;
 
 /** The marketplace description's first sentence, without the "Part of BB Studio." lead-in. */
 export function oneLine(description: string): string {
@@ -119,7 +121,7 @@ export const RETIRED: readonly RetiredPlugin[] = [
     // Studio copies the settings on start; removing the plugin first would lose them.
     blocker: async (plugin, ctx) => {
       if (!ctx.settingsCopied || (await ctx.settingsCopied(plugin.id))) return null;
-      return "Studio hasn't copied its settings yet. Run bb plugin reload studio, then check again.";
+      return `Studio hasn't copied its settings yet. Run ${studioCliName()} plugin reload studio, then check again.`;
     },
   },
   {
@@ -181,6 +183,7 @@ export async function buildSetup(sdk: SetupSdk, health: HealthSummary, options: 
     checkedAt: health.checkedAt,
     marketplaceAdded,
     marketplaceCommand,
+    cliName: studioCliName(),
     addOns,
     retired,
     commands: [...(needsMarketplace ? [marketplaceCommand] : []), ...installs, ...enables],

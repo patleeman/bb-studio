@@ -1,7 +1,8 @@
 // A strand's live state, worked out on each read from real signals only
 // (engineering plan, "Live states"); nothing here is guessed or stored.
 //
-//   needs-you   a pending BB question or approval in a turn of the strand, a
+//   needs-you   a reply in the strand that needs the user (src/strands/reply.ts)
+//               and isn't answered yet, a pending BB question or approval in a turn of the strand, a
 //               worker of the strand in needs-you, a Tool Gateway request
 //               from the conversation or one of the strand's workers, or an
 //               area's item that needs the user, on the strand its report sits in,
@@ -39,11 +40,13 @@ export type WorkerStatus = "running" | "needs-you" | "failed" | "done";
 export interface WorkerSignal { threadId: string; title: string; status: WorkerStatus; strandId: string | null; endedAt: number | null }
 export type AskDecision = "allow_once" | "allow_for_session" | "deny";
 /** Something waiting on the user: a BB question or approval (in the conversation or one of its workers), or a Tool Gateway request. */
-export interface AskSignal { id: string; kind: "question" | "approval" | "gateway" | "area" | "flag"; strandId: string | null; label: string; threadId: string; decisions: AskDecision[]; /** An approval's full command, working folder, actions and session grant, in BB's words. */ details: string[]; /** The conversation's turn it waits in (its rows stay in view under any strand filter); null for a worker's. */ turnId?: string | null }
+export interface AskSignal { id: string; kind: "question" | "approval" | "gateway" | "area" | "flag" | "reply"; strandId: string | null; label: string; threadId: string; decisions: AskDecision[]; /** An approval's full command, working folder, actions and session grant, in BB's words. */ details: string[]; /** The conversation's turn it waits in (its rows stay in view under any strand filter); null for a worker's. */ turnId?: string | null; /** A reply that needs the user: its message's seq. */ seq?: number | null }
 export interface TaskSignal { id: string; strandId: string; waitingOn: { kind: string; text: string | null; ref: string | null } | null }
 
 export interface Signals {
   now: number;
+  /** Whether the conversation thread itself is currently busy (reused by list() to avoid a second busy() RPC). */
+  busy?: boolean;
   /** The conversation's running turn, once it is sorted (an unsorted turn names no strand). */
   runningStrandId: string | null;
   workers: readonly WorkerSignal[];
@@ -68,8 +71,11 @@ export function liveState(strand: Strand, signals: Signals): StrandLive {
   const shown = workers.map(({ threadId, title, status, endedAt }) => ({ threadId, title, status, endedAt }));
   const done = (state: StrandState, detail: string | null): StrandLive => ({ state, detail, asks, workers: shown, earlier: false });
   const needs = workers.find((worker) => worker.status === "needs-you");
-  if (asks.length) return done("needs-you", asks[0]!.label);
+  // A reply's ask is told last: a BB ask or a worker waiting on the user says more, and the reply has pushed its own ask.
+  const ask = asks.find((each) => each.kind !== "reply");
+  if (ask) return done("needs-you", ask.label);
   if (needs) return done("needs-you", `${needs.title} needs you`);
+  if (asks.length) return done("needs-you", asks[0]!.label);
   const running = workers.filter((worker) => worker.status === "running");
   if (signals.runningStrandId === strand.id || running.length) return done("running", running.length ? running.map((worker) => worker.title).join(", ") : null);
   const since = Math.max(strand.openedAt ?? 0, signals.now - DONE_SHOWN_MS);

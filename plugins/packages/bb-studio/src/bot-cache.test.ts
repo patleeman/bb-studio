@@ -7,7 +7,6 @@ import {
 import { MODEL_PRICES, priceFor } from "./bot-prices";
 import { rpcContract } from "./contract";
 import { MIGRATIONS } from "./migrations";
-import { tallyTurns } from "./skill-learning";
 
 const MIN = 60_000, HOUR = 60 * MIN;
 const T0 = 1_800_000_000_000;
@@ -130,16 +129,6 @@ describe("pings and user messages", () => {
     // Studio's compaction before expiry sends "/compact" as the user; it isn't the user writing.
     expect(isUserRequest({ ...user, input: [{ type: "text", text: "/compact" }] })).toBe(false);
     expect(isUserRequest({ ...user, input: [{ type: "text", text: "/compact is that a command?" }] })).toBe(true);
-  });
-
-  it("aren't user turns for Learn from work", () => {
-    const tally = tallyTurns([
-      { seq: 1, type: "client/turn/requested", data: user },
-      { seq: 2, type: "turn/completed" },
-      { seq: 3, type: "client/turn/requested", data: ping },
-      { seq: 4, type: "turn/completed" },
-    ]);
-    expect(tally.userTurns).toBe(1);
   });
 });
 

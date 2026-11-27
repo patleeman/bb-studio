@@ -56,7 +56,9 @@ function recordingSession() {
   return requests;
 }
 
-async function relay(options: { threads?: Record<string, Turn[]>; failEvents?: boolean } = {}) {
+type ReplyTag = { decision: "push" | "quiet" | "unknown"; ask: string | null };
+
+async function relay(options: { threads?: Record<string, Turn[]>; failEvents?: boolean; replyTags?: Record<string, ReplyTag>; asked?: string[] } = {}) {
   const requests = recordingSession();
   const threads = new Map(Object.entries(options.threads ?? {}));
   const read = new Map<string, { lastReadAt: number; latestAttentionAt: number }>();
@@ -74,6 +76,15 @@ async function relay(options: { threads?: Record<string, Turn[]>; failEvents?: b
           },
         },
       },
+      plugins: {
+        callRpc: async ({ pluginId, method, input }: { pluginId: string; method: string; input: { threadId: string } }) => {
+          if (pluginId !== "studio" || method !== "strands.replyPush") throw new Error(`no ${method}`);
+          options.asked?.push(input.threadId);
+          const tag = options.replyTags?.[input.threadId];
+          if (!tag) throw new Error("Studio is not running");
+          return tag;
+        },
+      },
     } as never,
   });
   await plugin(host.bb);
@@ -84,6 +95,77 @@ async function relay(options: { threads?: Record<string, Turn[]>; failEvents?: b
   })).json();
   return { ...host, requests, threads, read, push };
 }
+
+describe("BB's push for a finished turn, by the reply's tag (strands)", () => {
+  it("drops a status reply, sends one that needs you with its ask line, and sends as before when Studio can't tell", async () => {
+    const asked: string[] = [];
+    const host = await relay({
+      asked,
+      threads: {
+        thr_status: [{ request: user("how's the disk?"), reply: "Cleared DerivedData: 7.8 GB back." }],
+        thr_needs: [{ request: user("book the furnace"), reply: "Ace has Saturday 9 AM. Please sign in to the Ace portal so I can book it." }],
+        thr_unknown: [{ request: user("ship it"), reply: "Shipped as v1.2." }],
+        thr_down: [{ request: user("and the docs?"), reply: "Docs are updated." }],
+      },
+      replyTags: {
+        thr_status: { decision: "quiet", ask: null },
+        thr_needs: { decision: "push", ask: "Please sign in to the Ace portal so I can book it." },
+        thr_unknown: { decision: "unknown", ask: null },
+      },
+    });
+    try {
+      for (const threadId of ["thr_status", "thr_needs", "thr_unknown", "thr_down"]) expect(await host.push(threadId, "reply")).toEqual({ data: [{ status: "ok" }] });
+      expect(host.requests.map((request) => request.body.threadId)).toEqual(["thr_needs", "thr_unknown", "thr_down"]);
+      expect(host.requests[0]!.body).toMatchObject({ aps: { alert: { body: "Please sign in to the Ace portal so I can book it." } } });
+      expect(host.requests[1]!.body).toMatchObject({ aps: { alert: { body: "reply" } } });
+      expect(asked).toEqual(["thr_status", "thr_needs", "thr_unknown", "thr_down"]);
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
+  it("lets a reply that needs you through when a worker's notice started the turn; a status or untagged one there stays off", async () => {
+    const asked: string[] = [];
+    const host = await relay({
+      asked,
+      threads: {
+        thr_merge: [{ request: system("[bb system]\n\n@thread:thr_w completed:"), reply: "The worker finished and the tests pass. Want me to merge it?" }],
+        thr_done: [{ request: system("[bb system]\n\n@thread:thr_w completed:"), reply: "The worker finished." }],
+        thr_lost: [{ request: system("[bb system]\n\n@thread:thr_w completed:"), reply: "The worker finished." }],
+      },
+      replyTags: { thr_merge: { decision: "push", ask: "Want me to merge it?" }, thr_done: { decision: "quiet", ask: null } },
+    });
+    try {
+      for (const threadId of ["thr_merge", "thr_done", "thr_lost"]) await host.push(threadId, "reply");
+      expect(host.requests.map((request) => request.body.threadId)).toEqual(["thr_merge"]);
+      expect(host.requests[0]!.body).toMatchObject({ aps: { alert: { body: "Want me to merge it?" } } });
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
+  it("decides a held push on its first pass: the window's flush keeps its 'N new' summary and asks Studio no more", async () => {
+    vi.useFakeTimers();
+    const asked: string[] = [];
+    const host = await relay({ asked, threads: { thr_ask: [{ request: user("book it?"), reply: "Want me to book Ace?" }] }, replyTags: { thr_ask: { decision: "push", ask: "Want me to book Ace?" } } });
+    try {
+      await host.push("thr_ask", "first");
+      await host.push("thr_ask", "second");
+      expect(asked).toEqual(["thr_ask", "thr_ask"]);
+      await vi.advanceTimersByTimeAsync(PUSH_WINDOW_MS);
+      expect(host.requests).toHaveLength(2);
+      expect(host.requests[1]!.body).toMatchObject({ aps: { alert: { body: "2 new · Want me to book Ace?" } } });
+      expect(asked).toEqual(["thr_ask", "thr_ask"]);
+      expect(JSON.stringify(host.requests[1]!.body)).not.toContain("checked");
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
+  it("leaves Studio's own pushes and turns nobody needs to hear about alone", async () => {
+    const asked: string[] = [];
+    const host = await relay({ asked, threads: { thr_pass: [{ request: user("Anything new?"), reply: "[PASS]" }] }, replyTags: { thr_pass: { decision: "push", ask: "x" } } });
+    try {
+      await host.push("thr_pass", "[PASS]");
+      expect(host.requests).toEqual([]);
+      expect(asked).toEqual([]);
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+});
 
 describe("BB's push for a finished turn", () => {
   it("is dropped for a [PASS] turn, and for a relayed message folded with [PASS]", async () => {

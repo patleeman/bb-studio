@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
-import { MIGRATIONS } from "../migrations";
+import { migratedSqlFileDb } from "../test/migrated-db";
 import { USER_OWNER, type Task } from "./contract";
 import { isOpenAgentTask, KEEP_STRAND_BACKUPS, MOVED_EVENT, MOVED_LINE, retireAgentTasks } from "./retire";
 import { TaskStore } from "./store";
@@ -14,8 +14,7 @@ let db: Database.Database;
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "studio-retire-"));
-  db = new Database(join(dir, "studio.db"));
-  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
+  db = migratedSqlFileDb(join(dir, "studio.db"));
 });
 afterEach(() => { if (db.open) db.close(); rmSync(dir, { recursive: true, force: true }); });
 

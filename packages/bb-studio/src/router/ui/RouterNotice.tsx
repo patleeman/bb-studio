@@ -6,11 +6,8 @@
 import { useComposer, useRealtime, useRpc, type PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../../kit/ui/index";
+import { errorMessage as errorText } from "../../kit/format";
 import { ROUTER_CHANNEL, type Notice, type routerContract } from "../contract";
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 export function RouterNoticeBanner() {
   const composer = useComposer();
@@ -41,13 +38,21 @@ export function RouterNoticeBanner() {
     setBusy(true);
     setError(null);
     try {
+      // The mode the server narrowed for the target. Left out, the composer fills in its own, which for an
+      // agent without the thread's mode is "full": Hand off would then give the new thread more access.
+      const permissionMode = notice.permissionMode;
+      if (!permissionMode) throw new Error("This notice doesn't say which permission mode to hand off with. Dismiss it and try again.");
       const selection = await composer.setSelection({
         providerId: target.providerId,
         model: target.model,
         ...(target.reasoningLevel ? { reasoningLevel: target.reasoningLevel } : {}),
+        permissionMode: permissionMode as never,
       });
       if (selection.providerId !== target.providerId || selection.model !== target.model) {
         throw new Error(`${notice.targetName ?? target.model} isn't in this composer's model picker.`);
+      }
+      if (selection.permissionMode !== permissionMode) {
+        throw new Error(`The composer would hand off with "${selection.permissionMode ?? "its default"}" access, not "${permissionMode}". Nothing was sent.`);
       }
       await composer.submit();
       void rpc.call("router.handedOff", { threadId }).catch(() => undefined);

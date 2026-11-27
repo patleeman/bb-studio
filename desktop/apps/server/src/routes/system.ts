@@ -1,3 +1,4 @@
+import { operationComplete } from "../services/lib/operation-response.js";
 import { withReportedProviderId } from "../services/system/provider-telemetry.js";
 import { rememberPluginRecommendation } from "../services/plugins/plugin-use-telemetry.js";
 import { createMobileAppReleaseService } from "../services/install/mobile-app-releases.js";
@@ -10,9 +11,10 @@ import {
   replaceMachineEnvironment,
 } from "../services/machines/environment-settings.js";
 import { getGateAuthKind } from "../request-context.js";
-import { serverAccessStatus } from "../services/machines/server-access.js";
+import { serverAccessOverview } from "../services/machines/server-access.js";
 import {
   getAppSettings,
+  listRunningThreads,
   getAppKeybindingOverrides,
   getExperiments,
   getStoredFaviconColor,
@@ -210,9 +212,12 @@ export function registerSystemRoutes(
         ...deps.hub.listDaemonLocalApiPorts(),
       ]),
     ];
+    const access = await serverAccessOverview(deps);
     return {
+      serverId: access.serverId,
+      routes: access.routes,
       generalSettings: compatibleGeneralSettings(),
-      serverAccess: await serverAccessStatus(deps),
+      serverAccess: access.status,
       keybindings: applyAppKeybindingOverrides(
         DEFAULT_APP_KEYBINDINGS,
         keybindingOverrides,
@@ -301,6 +306,14 @@ export function registerSystemRoutes(
     return context.json(await machineEnvironmentView(deps.db));
   });
 
+  get(routes.quitStatus, (context) => {
+    context.header("cache-control", "no-store");
+    return context.json({
+      confirmDesktopQuit: getAppSettings(deps.db).confirmDesktopQuit,
+      runningAgentCount: listRunningThreads(deps.db).length,
+    });
+  });
+
   put(routes.generalSettings, (context, payload) => {
     const { showUnhandledProviderEvents, ...settings } = payload;
     const current = getAppSettings(deps.db);
@@ -326,6 +339,8 @@ export function registerSystemRoutes(
         settings.summarizeShellCommands ?? current.summarizeShellCommands,
       confirmThreadArchive:
         settings.confirmThreadArchive ?? current.confirmThreadArchive,
+      confirmDesktopQuit:
+        settings.confirmDesktopQuit ?? current.confirmDesktopQuit,
       earlyAdopter: settings.earlyAdopter ?? current.earlyAdopter,
       onboardingCompletedAt:
         settings.onboardingCompletedAt === undefined
@@ -361,7 +376,7 @@ export function registerSystemRoutes(
       );
     }
     deps.telemetry.capture(withReportedProviderId(payload));
-    return context.json({ ok: true });
+    return context.json(operationComplete());
   });
 
   put(routes.keyboardSettings, (context, payload) => {
@@ -430,7 +445,7 @@ export function registerSystemRoutes(
       const message = error instanceof Error ? error.message : String(error);
       throw new ApiError(422, "invalid_config", message);
     }
-    return context.json({ ok: true });
+    return context.json(operationComplete());
   });
 
   get(routes.cliSkillsStatus, async (context, query) =>

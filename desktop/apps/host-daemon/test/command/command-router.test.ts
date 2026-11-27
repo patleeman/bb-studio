@@ -126,6 +126,7 @@ function createTurnSubmitCommand(
       providerId: args.providerId ?? "fake",
       providerThreadId: args.providerThreadId ?? "provider-thread-router",
       instructions: "Be a helpful coding agent.",
+      additionalWorkspaceFolders: [],
       dynamicTools: [],
       contributedEnv: [],
       injectedSkillSources: [],
@@ -159,6 +160,7 @@ function createThreadStartCommand(): ThreadStartCommand {
       permissionEscalation: null,
     },
     instructions: "Be a helpful coding agent.",
+    additionalWorkspaceFolders: [],
     dynamicTools: [],
     contributedEnv: [],
     injectedSkillSources: [],
@@ -186,11 +188,9 @@ function textPromptInput(text: string): TextPromptInput {
 function createEnvironmentProvisionCommand(): EnvironmentProvisionCommand {
   return {
     type: "environment.attach",
-    contributedEnv: [],
     environmentId: "env-router",
     initiator: null,
     path: "/tmp/env-router",
-    setupScriptTimeoutMs: null,
   };
 }
 
@@ -261,7 +261,8 @@ describe("CommandRouter", () => {
         requestId: "paths-cancelled",
         command: {
           type: "host.list_paths",
-          path: root,
+          rootPaths: [root],
+          followRootSymlink: false,
           query: "alpha",
           limit: 5,
           includeFiles: true,
@@ -299,7 +300,8 @@ describe("CommandRouter", () => {
         requestId: "paths-kept",
         command: {
           type: "host.list_paths",
-          path: root,
+          rootPaths: [root],
+          followRootSymlink: false,
           query: "alpha",
           limit: 5,
           includeFiles: true,

@@ -4,6 +4,7 @@ import SwiftUI
 /// goes straight into the caller's field when you finish; otherwise it can be
 /// sent, turned into a thread, or copied. The recording stays in Talk either way.
 struct DictationView: View {
+    @Environment(\.look) private var look
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
@@ -55,7 +56,7 @@ struct DictationView: View {
                     if let input = recorder.silentInput {
                         Label("No sound from \(input)", systemImage: "mic.slash")
                             .font(.callout)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(.red)
                             .accessibilityIdentifier("dictationSilent")
                     }
                     if outbox.pending > 0 { Text("\(outbox.pending) segment(s) uploading").font(.caption) }
@@ -188,7 +189,7 @@ struct DictationView: View {
         do {
             let page = try await client.createPage(title: PageTitle.from(markdown), markdown: markdown)
             operation.complete(on: app) { dismiss() }
-            operation.complete(on: app) { app.openPage(page.id) }
+            operation.complete(on: app) { app.open(.studio(kind: nil, .page(id: page.id))) }
         } catch {
             saveError = BBClient.describe(error, server: client.baseURL)
         }

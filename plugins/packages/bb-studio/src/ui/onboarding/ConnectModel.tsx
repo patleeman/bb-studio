@@ -3,7 +3,7 @@ import { OUTLINE_BUTTON } from "../../kit/app/index";
 import { cn } from "../../kit/ui/index";
 import { ReloginFlow, useReloginApi } from "../../auth/ui/ReloginDialog";
 import { useLive } from "../live";
-import { anyReady, canSignIn, useProviderCards, type ProviderCard } from "./providers";
+import { canSignIn, finishesOnboarding, useProviderCards, type ProviderCard } from "./providers";
 
 const STATE_TEXT: Record<string, string> = { ready: "Ready", unauthenticated: "Signed out", expired: "Signed out", not_installed: "Not installed", unsupported_version: "Update needed" };
 const STATE_TONE: Record<string, string> = {
@@ -60,8 +60,10 @@ export function ConnectModelView({ cards, onSkip }: { cards: ProviderCard[] | nu
 export function ConnectModel({ finish }: { finish(): void }) {
   const welcome = useLive("bot_welcome", {}, { pollMs: 3_000 });
   const fresh = welcome.data?.pending === true;
-  const cards = useProviderCards(fresh);
-  const ready = anyReady(cards);
+  // Ready agents with no sign-in (an Ollama-only setup) are listed as usable, but only a provider you sign in to finishes this step:
+  // an ACP agent with no account check reads as ready as soon as it is installed.
+  const cards = useProviderCards(fresh, true);
+  const ready = finishesOnboarding(cards);
   useEffect(() => {
     if (welcome.data && !welcome.data.pending) finish();
   }, [welcome.data, finish]);

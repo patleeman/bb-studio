@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { TAB_KIND_REGISTRY } from "../tab-kinds";
 import { adaptWorkbench, clearSeenMark, PANE_LIMITS, type HostWorkbenchLike, type PanelTab, type WorkbenchLike } from "./exec";
-import { fileTargetIn, localFileIn, NO_ANSWER, OFF_SCREEN, openOp, STACKED, WorkbenchRecords, WorkbenchRouter, workbenchTools, type WorkbenchToolDeps } from "./server";
-import { adaptLayout, NEW_MARK, type OpenSpec, type WorkbenchLayout } from "./shared";
+import Database from "better-sqlite3";
+import { ensureTables } from "../schema-columns";
+import { fileTargetIn, localFileIn, NO_ANSWER, OFF_SCREEN, openOp, STACKED, toolOp, WorkbenchRouter, workbenchTools, type ToolName, type WorkbenchToolDeps } from "./server";
+import { adaptLayout, EMPTY_RECORD, NEW_MARK, type OpenSpec, type WorkbenchLayout, type WorkbenchRecord } from "./shared";
+import { WorkspaceStore } from "./store";
+import { WorkspaceService } from "./workspace-server";
+
+/** A Workspace on an in-memory database. */
+function memoryWorkspace() {
+  const db = new Database(":memory:");
+  ensureTables(db);
+  return new WorkspaceService(new WorkspaceStore(db), () => {});
+}
 import { handleCommand } from "./ui/bridge";
 
 /** A conversation's workbench as BB keeps it: tabs, the selected one, the layout, and whether the user is typing. */
@@ -54,9 +65,9 @@ function harness(onScreen: Record<string, WorkbenchLike> = {}) {
       reply: async (requestId, message, record) => router.reply(requestId, message, record),
     });
   }, { claimMs: 40, resultMs: 1000 });
-  const records = new WorkbenchRecords();
+  const records = new Map<string, WorkbenchRecord>();
   const deps: WorkbenchToolDeps = {
-    router, records,
+    router, workspace: memoryWorkspace(),
     threadTitle: async (id) => (id === "thr_other" ? "Release notes" : null),
     itemTitle: (id) => (id === "pg_plan" ? "Plan" : null),
     botName: (id) => (id === "bot_main" ? "Chief of Staff" : null),
@@ -65,7 +76,16 @@ function harness(onScreen: Record<string, WorkbenchLike> = {}) {
     workspacePath: async (_threadId, path) => path,
   };
   const tools = workbenchTools(deps);
-  const call = (name: string, input: object, threadId = "thr_1") => (tools.find((tool) => tool.name === name)!.execute as (input: object, ctx: { threadId: string }) => Promise<string>)(input, { threadId });
+  // Each call as the window showing the conversation runs it (exec.ts): the path pop_out, arrange and pane opens take.
+  const call = async (name: string, input: object, threadId = "thr_1") => {
+    const op = await toolOp(name as ToolName, input, threadId, deps);
+    if (typeof op === "string") return op;
+    const outcome = await router.call(threadId, op, records.get(threadId) ?? EMPTY_RECORD);
+    if (outcome.status === "off-screen") return OFF_SCREEN;
+    if (outcome.status === "timeout") return NO_ANSWER;
+    records.set(threadId, outcome.record);
+    return outcome.message;
+  };
   return { call, published, records, tools };
 }
 
@@ -232,8 +252,9 @@ it("checks a file only on the machine BB runs on", () => {
 
 it("tells the agent when the window doesn't finish in time", async () => {
   const router = new WorkbenchRouter((command) => { router.claim(command.requestId); }, { claimMs: 1000, resultMs: 20 });
-  const tools = workbenchTools({ router, records: new WorkbenchRecords(), threadTitle: async () => null, itemTitle: () => null, botName: () => null, entryTitle: async () => null, fileTarget: async () => null, workspacePath: async (_t, path) => path });
-  expect(await (tools[0]!.execute as (input: object, ctx: { threadId: string }) => Promise<string>)({}, { threadId: "thr_1" })).toBe(NO_ANSWER);
+  const tools = workbenchTools({ router, workspace: memoryWorkspace(), threadTitle: async () => null, itemTitle: () => null, botName: () => null, entryTitle: async () => null, fileTarget: async () => null, workspacePath: async (_t, path) => path });
+  const arrange = tools.find((tool) => tool.name === "workbench_arrange")!;
+  expect(await (arrange.execute as (input: object, ctx: { threadId: string }) => Promise<string>)({ layout: "panel only" }, { threadId: "thr_1" })).toBe(NO_ANSWER);
 });
 
 /** A workbench with BB's two panes: each pane's tab keys and its share of the workbench. */
@@ -348,7 +369,7 @@ describe("two workbench panes", () => {
   });
 });
 
-describe("workbench_open's types come from the tab kinds registry", () => {
+describe("workbench (op: open)'s types come from the tab kinds registry", () => {
   it("takes every kind the agent may open, and nothing else", () => {
     const { tools } = harness({});
     const open = tools.find((tool) => tool.name === "workbench_open")!;
@@ -367,7 +388,6 @@ describe("workbench_open's types come from the tab kinds registry", () => {
     expect(await spec({ type: "board", id: "thr_b" })).toEqual({ kind: "tab", tab: { id: "board", pluginId: "studio-visual-chat" }, params: { threadId: "thr_b" }, title: "Election night" });
     expect(await spec({ type: "bot", id: "bot_main" })).toEqual({ kind: "tab", tab: { id: "bot" }, params: { botId: "bot_main" }, title: "Chief of Staff" });
     expect(await spec({ type: "archive", id: "bot_main" })).toEqual({ kind: "tab", tab: { id: "archive" }, params: { botId: "bot_main" }, title: "Conversations" });
-    expect(await spec({ type: "todos" })).toEqual({ kind: "tab", tab: { id: "loops" }, title: "Strands" });
     expect(await spec({ type: "vscode" })).toEqual({ kind: "tab", tab: { id: "code" }, title: "VS Code" });
     expect(await spec({ type: "workflow", id: "wfr_0123abcd" })).toEqual({ kind: "tab", tab: { id: "workflow-run", pluginId: "workflows" }, params: { runId: "wfr_0123abcd" }, title: "Workflow run" });
     expect(await spec({ type: "workflow", id: "nope" })).toBe("BB can't open that workflow run as a tab.");
@@ -377,7 +397,7 @@ describe("workbench_open's types come from the tab kinds registry", () => {
     expect(await spec({ link: "bb://automation/bot_main%3Aheartbeat" })).toEqual({ kind: "tab", tab: { id: "automation" }, params: { id: "bot_main:heartbeat" }, title: "Check-in" });
     expect(await spec({ link: "/plugins/studio/studio/todo/loop_1" })).toEqual({ kind: "tab", tab: { id: "todo" }, params: { id: "loop_1" }, title: "Pay the bill" });
     expect(await spec({ type: "todo", id: "loop_gone" })).toBe("No to-do has id loop_gone.");
-    expect(await spec({ type: "record", id: "mem_gone" })).toBe("No memory record has id mem_gone.");
+    expect(await spec({ type: "record", id: "mem_gone" })).toBe("Unknown type record.");
     expect(await spec({ type: "automation" })).toBe("Give the automation's id.");
   });
 
@@ -442,7 +462,7 @@ function windowWorkbench(answer = true) {
 }
 
 describe("a tab in a window of its own", () => {
-  it("workbench_open with pane \"window\" opens it, then pops it out, and the record doesn't count it as closed by the user", async () => {
+  it("workbench (op: open) with pane \"window\" opens it, then pops it out, and the record doesn't count it as closed by the user", async () => {
     const { wb, state, popped } = windowWorkbench();
     const { call } = harness({ thr_1: wb });
     expect(await call("workbench_open", { type: "page", id: "pg_plan", pane: "window" })).toBe('Opened "Plan" in a window of its own. Its Return to workbench button puts it back.');
@@ -468,7 +488,7 @@ describe("a tab in a window of its own", () => {
     );
     for (const key of ["term", "info", "new", "fixed", "web"]) expect(await call("workbench_tab", { action: "pop_out", key })).toMatch(/can't open in a window of its own\. Pages, whiteboards/);
     expect(popped).toEqual([]);
-    expect(await call("workbench_tab", { action: "pop_out", key: "gone" })).toBe('No tab has key "gone". Call workbench_list for the current keys.');
+    expect(await call("workbench_tab", { action: "pop_out", key: "gone" })).toBe('No tab has key "gone". Call workbench (op: list) for the current keys.');
     expect(await call("workbench_tab", { action: "pop_out", key: "board" })).toBe('Opened "Election night" in a window of its own. Its Return to workbench button puts it back.');
     expect(popped).toEqual(["board"]);
   });

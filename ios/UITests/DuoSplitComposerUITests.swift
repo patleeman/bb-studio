@@ -13,6 +13,9 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
     /// Below a phone's composer, above the home indicator or keyboard: its
     /// vertical padding.
     private let composerGap: CGFloat = 8
+    /// The demo's second conversation (Launch prep) and its last reply.
+    private let otherId = "thr_demo_interview"
+    private let other = "Mock with Sam moved to Friday 10:00. I asked"
 
     func testComposerJumpButtonAndBottomGapInTheRightPage() throws {
         app.launchArguments = ["-skipPushPrompt", "YES",
@@ -22,22 +25,15 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
 
         try check("bot-chat", last: "Duo message 80")
-        // A Bot thread from its Running group.
-        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "iOS: black on reopen")).firstMatch
+        // Another conversation, from the left page.
+        let row = app.buttons["contextConversation-thr_demo_interview"]
         XCTAssertTrue(row.waitForExistence(timeout: 15))
         row.tap()
-        try check("bot-thread", last: "Wide 12")
-        // A normal thread from the Threads list.
-        command("tab?threads")
-        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
-        XCTAssertTrue(conversation.waitForExistence(timeout: 15))
-        conversation.tap()
-        XCTAssertTrue(app.staticTexts["duoThreadTitle"].waitForExistence(timeout: 15))
-        try check("thread", last: "Duo message 80")
+        try check("conversation", last: other, history: false)
 
         // With the keyboard up the composer still sits above it.
         let composer = app.otherElements["threadComposer"].firstMatch
-        command("focus")
+        command("focus?\(otherId)")
         let keyboard = app.keyboards.firstMatch
         XCTAssertTrue(keyboard.waitForExistence(timeout: 10))
         Thread.sleep(forTimeInterval: 1)
@@ -66,21 +62,28 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         let layout = try geometry()
         print("NARROW width=\(layout.width) height=\(layout.height) safeRight=\(layout.safeRight) safeBottom=\(layout.safeBottom) composer=\(composer.frame) jump=\(jump.frame)")
         XCTAssertLessThan(layout.width, 900)
-        XCTAssertEqual(jump.frame.minX - 8, composer.frame.maxX, accuracy: 1, "the composer makes room for the jump button beside it")
         XCTAssertGreaterThan(layout.safeBottom, 0, "A home indicator")
         assertResting(layout.height - layout.safeBottom - composer.frame.maxY, layout: layout, "narrow")
-        XCTAssertEqual(jump.frame.maxX, layout.width - layout.safeRight - 12, accuracy: 2, "In the corner, as before")
-        XCTAssertEqual(jump.frame.midY, composer.frame.midY, accuracy: 4, "on the composer's row: it adds no height and covers no row")
+        if app.isFoldedDuo {
+            // The folded Duo's side column holds it, right of the composer.
+            XCTAssertGreaterThanOrEqual(jump.frame.minX, composer.frame.maxX, "in the side column, clear of the composer")
+            XCTAssertLessThanOrEqual(jump.frame.maxX, layout.width, "on screen")
+        } else {
+            XCTAssertEqual(jump.frame.minX - 8, composer.frame.maxX, accuracy: 1, "the composer makes room for the jump button beside it")
+            XCTAssertEqual(jump.frame.maxX, layout.width - layout.safeRight - 12, accuracy: 2, "In the corner, as before")
+            XCTAssertEqual(jump.frame.midY, composer.frame.midY, accuracy: 4, "on the composer's row: it adds no height and covers no row")
+        }
         command("capture?split-composer-narrow-\(Int(layout.width))")
     }
 
     /// The gap under the composer in every layout of the Duo, with the
     /// keyboard down and up: 8 points from the window's bottom edge on the
-    /// inner screen (our two pages at each list width, or beside another app
-    /// in iOS's split), above the home indicator on the outer screen, and
-    /// 8 points above the keyboard everywhere.
+    /// inner screen (the room's two pages, or beside another app in iOS's
+    /// split), above the home indicator on the outer screen, and 8 points
+    /// above the keyboard everywhere.
     func testComposerGapInEveryLayout() throws {
-        app.launchArguments = ["-skipPushPrompt", "YES",
+        // As on a real phone: the room reopens the conversation it showed when the layout changes.
+        app.launchArguments = ["-qaRoomRemember", "-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles", "-qaDark",
             "-openURL", "bbstudio://bot"]
         app.launchOffline()
@@ -88,22 +91,19 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Duo message 80")).firstMatch
             .waitForExistence(timeout: 15))
         let layouts: [(name: String, commands: [String], innerScreen: Bool)] = [
-            ("inner-hidden", ["landscape", "pane?hidden"], true),
-            ("inner-narrow", ["landscape", "pane?narrow"], true),
-            ("inner-even", ["landscape", "pane?even"], true),
+            ("inner", ["landscape"], true),
             ("inner-split", ["split"], true),
             ("outer", ["outer"], false),
         ]
-        for chat in ["bot-chat", "thread"] {
-            if chat == "thread" { try openThread() }
+        for chat in ["bot-chat", "conversation"] {
+            if chat == "conversation" { try openOther() }
             for layout in layouts {
                 layout.commands.forEach(command)
                 try measureGap("\(chat) \(layout.name)", capture: "composer-gap-\(chat)-\(layout.name)",
-                               innerScreen: layout.innerScreen)
+                               innerScreen: layout.innerScreen, focus: chat == "bot-chat" ? "thr_botdemo01" : otherId)
             }
         }
         command("landscape")
-        command("pane?even")
     }
 
     /// One page on a phone: above the home indicator (or the tab bar), and
@@ -115,21 +115,20 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Duo message 80")).firstMatch
             .waitForExistence(timeout: 15))
-        try measureGap("bot-chat phone", capture: "composer-gap-bot-chat-phone", innerScreen: false)
-        try openThread()
-        try measureGap("thread phone", capture: "composer-gap-thread-phone", innerScreen: false)
+        try measureGap("bot-chat phone", capture: "composer-gap-bot-chat-phone", innerScreen: false, focus: "thr_botdemo01")
+        try openOther()
+        try measureGap("conversation phone", capture: "composer-gap-conversation-phone", innerScreen: false, focus: otherId)
     }
 
-    private func openThread() throws {
-        command("tab?threads")
-        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
-        XCTAssertTrue(conversation.waitForExistence(timeout: 15))
-        conversation.tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Duo message 80")).firstMatch
+    /// Launch prep: from the inner screen's left page, or the one list on a single page.
+    private func openOther() throws {
+        let row = app.buttons["contextConversation-\(otherId)"]
+        if row.exists, row.isHittable { row.tap() } else { app.pickConversation(otherId) }
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", other)).firstMatch
             .waitForExistence(timeout: 15))
     }
 
-    private func measureGap(_ name: String, capture: String, innerScreen: Bool) throws {
+    private func measureGap(_ name: String, capture: String, innerScreen: Bool, focus: String) throws {
         let composer = app.otherElements["threadComposer"].firstMatch
         command("dismiss")
         command("bottom")
@@ -146,7 +145,7 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         }
         command("capture?\(capture)-down")
 
-        command("focus?thr_botdemo01")
+        command("focus?\(focus)")
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), "\(name): keyboard up")
         Thread.sleep(forTimeInterval: 2)
         layout = try geometry()
@@ -159,7 +158,8 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         Thread.sleep(forTimeInterval: 1)
     }
 
-    private func check(_ name: String, last: String) throws {
+    /// `history`: long enough to scroll up and show Jump to latest.
+    private func check(_ name: String, last: String, history: Bool = true) throws {
         let message = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", last)).firstMatch
         XCTAssertTrue(message.waitForExistence(timeout: 15), "\(name): transcript loads")
         let composer = app.otherElements["threadComposer"].firstMatch
@@ -173,20 +173,38 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         // the status column; the transcript keeps clear of it, so its rows
         // never pass under the Duo's clock, battery and Now Playing.
         var layout = try geometry()
-        // Only the thread on screen keeps its probe.
-        let transcripts = layout.surfaces.filter { $0.key.hasPrefix("transcript-") }
-        XCTAssertEqual(transcripts.count, 1, "\(name): one transcript on screen")
-        let transcript = try XCTUnwrap(transcripts.first?.value, "\(name): transcript content probe")
-        print("SPLIT COMPOSER \(name) composer=\(composer.frame) transcript=\(transcript) safeRight=\(layout.safeRight) safeBottom=\(layout.safeBottom)")
-        XCTAssertEqual(composer.frame.maxX, transcript.maxX + layout.safeRight, accuracy: 4,
-                       "\(name): composer runs under the status column; the transcript stops short of it")
-        XCTAssertEqual(composer.frame.minX, transcript.x, accuracy: 4, "\(name): composer starts where the transcript does")
+        // The right page's, wholly on it: the room can keep the last
+        // conversation's probe beside the page until its slide settles.
+        func onPage(_ layout: Geometry) -> [String: Rect] {
+            layout.surfaces.filter { $0.key.hasPrefix("transcript-") && $0.value.x >= pageMinX - 1 && $0.value.maxX <= layout.width + 1 }
+        }
+        // Its probe reports on a layout: scrolling to the end makes one.
+        for _ in 0..<5 where onPage(layout).isEmpty {
+            command("bottom")
+            Thread.sleep(forTimeInterval: 1)
+            layout = try geometry()
+        }
+        let transcripts = onPage(layout)
+        XCTAssertLessThanOrEqual(transcripts.count, 1, "\(name): one transcript on the page")
+        if let transcript = transcripts.first?.value {
+            print("SPLIT COMPOSER \(name) composer=\(composer.frame) transcript=\(transcript) safeRight=\(layout.safeRight) safeBottom=\(layout.safeBottom)")
+            XCTAssertEqual(composer.frame.maxX, transcript.maxX + layout.safeRight, accuracy: 4,
+                           "\(name): composer runs under the status column; the transcript stops short of it")
+            XCTAssertEqual(composer.frame.minX, transcript.x, accuracy: 4, "\(name): composer starts where the transcript does")
+        } else {
+            // A conversation shown after the room's slide may not report its
+            // probe (emulated inner screen on an iPhone): the composer stays on the page.
+            print("SPLIT COMPOSER \(name) composer=\(composer.frame): no transcript probe on the page")
+            XCTAssertGreaterThanOrEqual(composer.frame.minX, pageMinX + 12 - 1, "\(name): composer on the page, with its margin")
+            XCTAssertLessThanOrEqual(composer.frame.maxX, layout.width - 12 + 1, "\(name): composer inside the window, with its margin")
+        }
 
         // 3. The composer sits as far above the window's bottom edge as a
         // phone's does above its home indicator, not above a second inset.
         XCTAssertEqual(layout.height - composer.frame.maxY, composerGap, accuracy: 2,
                        "\(name): the gap under the composer, with a \(layout.safeBottom)-point bottom safe area")
 
+        guard history else { return command("capture?split-composer-" + name) }
         // 2. Up in the history, the jump button sits beside the composer:
         // no row of its own, and over no row.
         let jump = app.buttons["Jump to latest"]

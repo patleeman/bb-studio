@@ -14,7 +14,7 @@ describe("the link audit", () => {
         if (cell !== "routes") continue;
         const ref = SAMPLE[kind];
         expect(parseLink(linkFor(ref), "http://127.0.0.1:1")?.type, `${kind} × ${source.id}`).toBe("entity");
-        if (source.id === "card" && kind !== "conversation" && kind !== "todos") expect(directiveFor(ref), kind).not.toBeNull();
+        if (source.id === "card" && kind !== "conversation") expect(directiveFor(ref), kind).not.toBeNull();
         if (source.id === "agent") expect(tabKindEntry(kind).agentType, kind).not.toBeNull();
       }
     }

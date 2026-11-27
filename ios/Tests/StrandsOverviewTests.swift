@@ -106,9 +106,8 @@ final class StrandsOverviewTests: XCTestCase {
         await model.load("bot_1")
         guard case .cards(let overview) = model.shown("bot_1") else { return XCTFail("cards") }
         XCTAssertEqual(overview.conversations.count, 3)
-        XCTAssertEqual(model.needs("bot_1"), 3, "the classic ⋯ menu's count")
+        XCTAssertEqual(model.needs("bot_1"), 3, "the ⋯ menu's count")
         XCTAssertEqual(model.needs(nil), 0)
-        XCTAssertTrue(model.available)
     }
 
     func testNoOpenStrands() async {
@@ -118,21 +117,11 @@ final class StrandsOverviewTests: XCTestCase {
         XCTAssertEqual(StrandOverviewModel.emptyText, "No open strands")
     }
 
-    func testAnOlderStudioAsksToUpdate() async {
-        let model = model { _ in (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
-        await model.load("bot_1")
-        XCTAssertEqual(model.shown("bot_1"), .update)
-        XCTAssertEqual(StrandOverviewModel.updateText, "Update BB Studio on your Mac to see strands.")
-        XCTAssertFalse(model.available, "the classic ⋯ menu hides Strands")
-        await model.poll("bot_1")  // returns at once: nothing to poll on an older Studio
-    }
-
     func testAFailedLoadSaysWhy() async {
         let model = model { _ in (500, Data(#"{"ok":false,"error":{"message":"boom"}}"#.utf8)) }
         await model.load("bot_1")
         guard case .failed(let message) = model.shown("bot_1") else { return XCTFail("failed") }
         XCTAssertFalse(message.isEmpty)
-        XCTAssertTrue(model.available, "a failure isn't an older Studio")
     }
 
     // MARK: Where it's reached
@@ -140,7 +129,6 @@ final class StrandsOverviewTests: XCTestCase {
     func testStrandsIsFirstInTheMenuAndAtTheFootOfTheList() {
         XCTAssertEqual(RoomPlace.strands.title, "Strands")
         XCTAssertEqual(RoomPlace.strands.symbol, "list.bullet.rectangle")
-        XCTAssertEqual(RoomPlace.menu.first, .strands)
         XCTAssertEqual(RoomPlace.homeList, [.strands, .memory, .library, .schedules, .theme])
         XCTAssertNil(RoomPlace(rawValue: "tasks"), "Tasks is gone")
         XCTAssertEqual(BotPage.allCases.first, .strands)
@@ -166,26 +154,13 @@ final class StrandsOverviewTests: XCTestCase {
 
     func testTheLoopsAppLinkOpensStrands() {
         let app = AppModel.shared
-        let saved = (app.tab, app.shellLink, app.botShowsStrands, app.botRoute)
-        defer { (app.tab, app.shellLink, app.botShowsStrands, app.botRoute) = saved }
+        let saved = app.router.tab
+        defer { app.router.tab = saved }
         for link in ["bbstudio://loops", "bbstudio://strands"] {
-            app.shellLink = nil
-            app.botShowsStrands = false
             app.handle(URL(string: link)!)
-            XCTAssertEqual(app.tab, .bot, link)
-            XCTAssertTrue(app.shellLink == .page(.strands, botId: nil) || app.botShowsStrands, link)
+            XCTAssertEqual(app.router.tab, .bot, link)
+            XCTAssertEqual(app.router.pending, .place(.strands, botId: nil), link)
         }
-    }
-
-    func testTheClassicMenuSaysStrands() {
-        XCTAssertEqual(BotStrandsMenu.title(count: 3), "Strands  3")
-        XCTAssertEqual(BotStrandsMenu.title(count: 0), "Strands")
-        XCTAssertEqual(BotStrandsMenu.badge(strandsOn: true, count: 3), 3)
-        XCTAssertEqual(BotStrandsMenu.badge(strandsOn: false, count: 3), 0, "no badge on a Studio without strands")
-        XCTAssertEqual(BotStrandsMenu.badge(strandsOn: true, count: -1), 0)
-        XCTAssertEqual(BotStrandsMenu.accessibilityLabel(name: "Juniper", badge: 0), "Juniper options")
-        XCTAssertEqual(BotStrandsMenu.accessibilityLabel(name: "Juniper", badge: 1), "Juniper options, 1 strand needs you")
-        XCTAssertEqual(BotStrandsMenu.accessibilityLabel(name: "Juniper", badge: 4), "Juniper options, 4 strands need you")
     }
 
     // MARK: The old to-do cards, read-only

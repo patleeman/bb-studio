@@ -10,6 +10,7 @@
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, useState } from "react";
 import type { LibraryItem } from "../../bot-threads-contract";
+import { useNow } from "../../kit/app/visible-poll";
 import { NoDragStyle } from "../../kit/ui/no-drag";
 import { useCurrentBot } from "../conversations/state";
 import { MenuSelect } from "../menu-select";
@@ -40,8 +41,7 @@ export function LibraryPage() {
   const [kind, setKind] = useState<LibraryKindFilter>("all");
   const [appType, setAppType] = useState<LibraryAppType>("all");
   const [groupBy, setGroupBy] = useState<LibraryGroupBy>(readGroup);
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
+  const now = useNow(60_000);
   useEffect(() => { try { localStorage.setItem(GROUP_KEY, groupBy); } catch { /* private mode */ } }, [groupBy]);
   const items = library.data?.items ?? NO_ITEMS;
   const botName = bot?.name;

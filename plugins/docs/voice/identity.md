@@ -31,7 +31,7 @@ building it makes no LLM call.
 | Source | Chief of Staff | Any other thread |
 | --- | --- | --- |
 | Name and role | The Bot's name and role (Studio's Bot record) | The thread's title, and its role from Studio's records: a Bot's role, "Lead of the X project", or a runner's job |
-| Memory | The Bot's Memory page, without its "## Check-in" list, cut to its first ~1,100 characters | — |
+| Memory | The Bot's always-on skills, without their "## Check-in" list, cut to their first ~1,100 characters | — |
 | Latest reply | The latest assistant reply in this chat, made speakable, up to ~1,500 characters | The same, from that thread |
 | Recent context | The chat's last 6 messages (BB's thread timeline), each cut to ~280 characters | The same, from that thread |
 | Open loops | Needs you now (up to 6) and Coming up (up to 4), titles only | — |

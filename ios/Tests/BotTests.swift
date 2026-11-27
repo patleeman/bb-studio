@@ -286,37 +286,12 @@ final class BotTests: XCTestCase {
         XCTAssertEqual(BotSetup.ideas.map(\.label), ["Watch my projects", "Morning brief", "Plan my week", "Triage threads"])
     }
 
-    func testListPreviewIsPlainText() {
-        XCTAssertEqual(BotSummary.plain("**Hi** there\n\n- see [docs](https://x)\n::next{reply=\"a|b\"}"), "Hi there - see docs")
-        let bot = BotInfo(name: "B", avatar: "🤖", state: .active, lead: ThreadLead(threadId: nil))
-        XCTAssertEqual(bot.status(running: true), "Working…")
-        XCTAssertEqual(bot.key, "primary")
-    }
-
-    func testBotLeadFromOptionalBot() {
-        XCTAssertEqual(BotLead(nil), .none)
-        let info = BotInfo(name: "Bot", avatar: "🤖", state: .active, lead: ThreadLead(threadId: "thr_1"))
-        XCTAssertEqual(BotLead(info), .bot(info))
-    }
-
     func testCadenceIdKeepsUnknownValues() {
         XCTAssertEqual(ThreadLead.cadenceId(Studio.BotGetOutputRunCadence.every2hours), "every2hours")
         XCTAssertEqual(ThreadLead.cadenceId(Studio.BotGetOutputRunCadence.unknown("every10minutes")), "every10minutes")
         XCTAssertNil(ThreadLead.cadenceId(Optional<Studio.BotGetOutputRunCadence>.none))
     }
 
-    func testHeartbeatTimeRoundTrips() {
-        let date = HeartbeatFields.date("07:05")
-        XCTAssertEqual(date.map(HeartbeatFields.text), "07:05")
-        XCTAssertNil(HeartbeatFields.date("bad"))
-    }
-
-    @MainActor func testMenuLabelUsesTheBotsName() {
-        let info = BotInfo(name: "Chief of Staff", avatar: "🧭", state: .active, lead: ThreadLead(threadId: "thr_1"))
-        XCTAssertEqual(BotModel.label(info), "🧭 Chief of Staff · your Bot")
-        XCTAssertEqual(BotModel.label(nil), "Bot · your Bot")
-        XCTAssertFalse(BotModel().isBot("thr_x"))
-    }
 }
 
 private final class Calls: @unchecked Sendable {

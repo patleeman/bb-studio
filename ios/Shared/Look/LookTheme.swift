@@ -158,7 +158,8 @@ public struct Look: Hashable, Sendable {
     public var accentText: Color { Color(lookHex: tokens.accentText) }
     public var muted: Color { Color(lookHex: tokens.muted) }
     public var subtle: Color { Color(lookHex: tokens.subtle) }
-    public var needsYou: Color { Color(lookHex: tokens.needsYou) }
+    /// Needs you: the theme's amber, deepened just enough to read as a mark (3:1) on a light canvas.
+    public var needsYou: Color { Color(lookHex: LookContrast.legible(tokens.needsYou, on: tokens.canvas, minimum: 3)) }
     public var warningText: Color { Color(lookHex: tokens.warningText) }
     public var success: Color { Color(lookHex: tokens.successText) }
     public var error: Color { Color(lookHex: tokens.errorText) }

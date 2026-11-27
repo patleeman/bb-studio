@@ -20,7 +20,7 @@ struct BBStudioCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Thread") { AppModel.shared.newThread() }
+            Button("New Conversation") { AppModel.shared.open(.compose("")) }
                 .keyboardShortcut("n")
         }
         CommandMenu("Thread") {

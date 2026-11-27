@@ -51,19 +51,27 @@ export class FakeThread {
   }
 
   /** A turn: the request, the turn's start, `tools` tool items, the reply, and (when done) its end. */
-  turn(text: string, reply: string, options: { at?: number; kind?: "user" | "report" | "ping"; done?: boolean; tools?: number } = {}): { seq: number; turnId: string } {
+  turn(text: string, reply: string, options: { at?: number; kind?: "user" | "report" | "ping"; done?: boolean; tools?: number; pingFirst?: boolean } = {}): { seq: number; turnId: string; requestSeq: number } {
     const at = options.at ?? FIXTURE_AT + this.seq;
     const turnId = `turn_${++this.turns}`;
     const kind = options.kind ?? "user";
     const input = kind === "ping" ? [{ type: "text", text: "[bb ping] keep warm", visibility: "agent-only" }]
       : kind === "report" ? [{ type: "text", text: "Runner report, already shown.", visibility: "agent-only" }, { type: "text", text }]
       : [{ type: "text", text }];
-    const seq = this.push({ type: "client/turn/requested", createdAt: at, scope: { kind: "thread" }, data: { initiator: kind === "user" ? "user" : "system", input, target: { kind: "new-turn" } } });
+    // A keepalive queued ahead of the message: the turn starts with it.
+    const ping = options.pingFirst ? this.push({ type: "client/turn/requested", createdAt: at, scope: { kind: "thread" }, data: { initiator: "system", input: [{ type: "text", text: "[bb ping] keep warm", visibility: "agent-only" }], target: { kind: "new-turn" } } }) : null;
+    const requestSeq = this.push({ type: "client/turn/requested", createdAt: at, scope: { kind: "thread" }, data: { initiator: kind === "user" ? "user" : "system", input, target: { kind: "new-turn" } } });
+    const seq = ping ?? requestSeq;
     this.push({ type: "turn/started", createdAt: at + 1, scope: { kind: "turn", turnId }, data: {} });
     for (let tool = 0; tool < (options.tools ?? 0); tool++) this.push({ type: "item/completed", createdAt: at + 2, scope: { kind: "turn", turnId }, data: { item: { type: "commandExecution", command: "ls" } } });
     if (reply) this.push({ type: "item/completed", createdAt: at + 3, scope: { kind: "turn", turnId }, data: { item: { type: "agentMessage", text: reply } } });
     if (options.done !== false) this.push({ type: "turn/completed", createdAt: at + 4, scope: { kind: "turn", turnId }, data: {} });
-    return { seq, turnId };
+    return { seq, turnId, requestSeq };
+  }
+
+  /** A tool item in a running turn (a worker's spawn names it in its output). */
+  tool(turnId: string, output: string, at = FIXTURE_AT + this.seq): number {
+    return this.push({ type: "item/completed", createdAt: at, scope: { kind: "turn", turnId }, data: { item: { type: "commandExecution", command: "bb thread spawn", aggregatedOutput: output } } });
   }
 
   /** Ends the newest turn. */
@@ -73,9 +81,13 @@ export class FakeThread {
   }
 
   /** BB's events.list: after or before a seq, either order, a page at a time. Rows are in seq order, so pages are slices. */
-  events = async (input: { threadId: string; afterSeq?: number; beforeSeq?: number; order: "asc" | "desc"; limit: number }): Promise<EventRow[]> => {
+  events = async (input: { threadId: string; afterSeq?: number; beforeSeq?: number; order: "asc" | "desc"; limit: number; types?: readonly string[] }): Promise<EventRow[]> => {
     this.pages++;
     if (input.threadId !== this.id) return [];
+    if (input.types) {
+      const rows = this.rows.filter((row) => input.types!.includes(row.type ?? "") && (row.seq ?? 0) > (input.afterSeq ?? 0) && (row.seq ?? 0) < (input.beforeSeq ?? Number.MAX_SAFE_INTEGER));
+      return (input.order === "asc" ? rows : [...rows].reverse()).slice(0, input.limit);
+    }
     // seq n sits at index n - 1.
     if (input.order === "asc") {
       const from = input.afterSeq ?? 0;
@@ -105,7 +117,28 @@ export function fakeJev(calls: { state: unknown; questions: Record<string, unkno
     const state = input.state as { message?: string; strands: Strandish[]; messages?: { id: string; message: string }[] };
     const answers: Record<string, unknown> = {};
     if (state.messages) for (const message of state.messages) answers[message.id] = { type: "choice", probabilities: {}, ...pick(message.message, state.strands) };
-    else answers.strand = { type: "choice", probabilities: {}, ...pick(state.message ?? "", state.strands) };
+    else if (state.strands) answers.strand = { type: "choice", probabilities: {}, ...pick(state.message ?? "", state.strands) };
+    // The reply questions (src/strands/reply.ts). This stand-in for Jev decides by words; the real one reads the reply.
+    const asks = /\?|\bdecide\b|\bsign in\b|\bon your phone\b/i;
+    if (input.questions.reply) {
+      const end = (input.state as { replyEnd?: string }).replyEnd ?? "";
+      answers.reply = asks.test(end) ? { type: "choice", probabilities: {}, choice: "needs-you", confidence: 0.85 } : { type: "choice", probabilities: {}, choice: "status", confidence: 0.9 };
+    }
+    if (input.questions.askSentence) {
+      const sentences = Object.entries((input.state as { sentences?: Record<string, string> }).sentences ?? {});
+      const found = [...sentences].reverse().find(([, sentence]) => asks.test(sentence));
+      answers.askSentence = { type: "choice", probabilities: {}, choice: found?.[0] ?? "none", confidence: 0.8 };
+    }
+    // Clearing: a message answers an ask on its topic, or is a go-ahead for the newest ask; thanks answers none.
+    const open = (input.state as { openAsks?: { id: string; ask: string; strand: string | null }[] }).openAsks ?? [];
+    const message = (input.state as { message?: string }).message ?? "";
+    open.forEach((ask, index) => {
+      const topic = topicOf(message);
+      const both = /\bboth\b/i.test(message);
+      const goAhead = /^\s*(?:ok|okay|yes|sure|go ahead|do it)\b/i.test(message) && !/^\s*(?:thanks|thank you)\b/i.test(message);
+      const hit = (topic !== null && topic === topicOf(`${ask.ask} ${ask.strand ?? ""}`)) || (both && goAhead) || (goAhead && topic === null && index === open.length - 1);
+      answers[`clear_${ask.id}`] = { type: "choice", probabilities: {}, choice: hit ? "answers" : "other", confidence: 0.85 };
+    });
     return { ok: true, answers };
   };
 }

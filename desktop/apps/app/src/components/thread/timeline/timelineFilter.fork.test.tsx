@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 
+import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TimelineRow } from "@bb/server-contract";
@@ -17,11 +19,14 @@ import {
   useTimelineFilterExpandsRow,
 } from "@/lib/fork-timeline-filter";
 import {
+  errorsSinceUserOf,
   filterTimelineRows,
+  latestUserSeqOf,
   needsOlderRows,
   withTimelineFilter,
 } from "./timelineFilter.fork";
 import { useRelayedFold } from "./relayedFold.fork";
+import { SearchMessageLocationProvider } from "./useScrollToSearchedMessage";
 
 afterEach(() => {
   cleanup();
@@ -80,6 +85,125 @@ describe("the timeline filter's rules", () => {
     expect(needsOlderRows(ROWS, { firstSeq: 5 }, false)).toBe(false);
     expect(needsOlderRows(ROWS, { firstSeq: null }, true)).toBe(false);
     expect(needsOlderRows([], { firstSeq: 5 }, true)).toBe(true);
+  });
+});
+
+describe("semantic zoom", () => {
+  function zoomStore() {
+    let level = 0;
+    const listeners = new Set<() => void>();
+    const views: { threadId: string; level: number; anchorSeq: number | null; latestUserSeq: number | null }[] = [];
+    let crash = false;
+    return {
+      views,
+      set(next: number) {
+        level = next;
+        for (const listener of listeners) listener();
+      },
+      crashNext() {
+        crash = true;
+      },
+      crashed(next: boolean) {
+        crash = next;
+      },
+      registration: {
+        id: "strands",
+        get: () => null,
+        subscribe: (listener: () => void) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        zoom: {
+          level: (threadId: string) => (threadId === "thr_1" ? level : 0),
+          View: (props: { threadId: string; level: number; anchorSeq: number | null; latestUserSeq: number | null }) => {
+            if (crash) throw new Error("view broke");
+            views.push(props);
+            return <p data-zoom-view>{`level ${props.level}`}</p>;
+          },
+        },
+      },
+    };
+  }
+  function Drawn(props: SurfaceProps & { leadingContent?: React.ReactNode }) {
+    return <>{props.leadingContent}{props.timelineRows.map((each) => <div key={each.id} data-timeline-row-id={each.id} />)}<p data-status-tail>working</p></>;
+  }
+  const Zoomable = withTimelineFilter(Drawn);
+
+  it("draws the plugin's view in the timeline's place while zoomed out, anchored on the message at the middle", () => {
+    const store = zoomStore();
+    setPluginSlotRegistrations("studio", makePluginRegistrationSet({ timelineFilters: [store.registration] }));
+    const rect = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      const id = (this as HTMLElement).dataset?.timelineRowId;
+      const index = id === undefined ? -1 : ROWS.findIndex((each) => each.id === id);
+      return (index < 0 ? { top: 0, bottom: 400, height: 400 } : { top: index * 100, bottom: index * 100 + 50, height: 50 }) as DOMRect;
+    });
+    const view = render(<Zoomable threadId="thr_1" timelineRows={ROWS} />);
+    expect(view.container.querySelectorAll("[data-timeline-row-id]")).toHaveLength(5);
+    act(() => store.set(1));
+    expect(view.container.querySelector("[data-timeline-row-id]")).toBeNull();
+    expect(view.container.querySelector("[data-zoom-view]")?.textContent).toBe("level 1");
+    expect(store.views.at(-1)).toEqual({ threadId: "thr_1", level: 1, anchorSeq: 14, latestUserSeq: null });
+    // The surface's status tail stays under the View.
+    expect(view.container.querySelector("[data-status-tail]")).not.toBeNull();
+    act(() => store.set(2));
+    expect(store.views.at(-1)).toEqual({ threadId: "thr_1", level: 2, anchorSeq: 14, latestUserSeq: null });
+    act(() => store.set(0));
+    expect(view.container.querySelector("[data-zoom-view]")).toBeNull();
+    expect(view.container.querySelectorAll("[data-timeline-row-id]")).toHaveLength(5);
+    rect.mockRestore();
+  });
+
+  it("tells the View the newest message the user typed, and gives the timeline back when the View crashes", () => {
+    const store = zoomStore();
+    setPluginSlotRegistrations("studio", makePluginRegistrationSet({ timelineFilters: [store.registration] }));
+    const typed = { ...row("u1", "t4", 30), role: "user", initiator: "user" } as unknown as TimelineRow;
+    const rows = [...ROWS, typed];
+    expect(latestUserSeqOf(rows)).toBe(30);
+    expect(latestUserSeqOf(ROWS)).toBeNull();
+    const view = render(<Zoomable threadId="thr_1" timelineRows={rows} />);
+    act(() => store.set(1));
+    expect(store.views.at(-1)?.latestUserSeq).toBe(30);
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    store.crashNext();
+    act(() => store.set(2));
+    expect(view.container.querySelector("[data-zoom-view]")).toBeNull();
+    expect(view.container.querySelectorAll("[data-timeline-row-id]")).toHaveLength(6);
+    // The next zoom-out tries the View again.
+    store.crashed(false);
+    act(() => store.set(0));
+    act(() => store.set(1));
+    expect(view.container.querySelector("[data-zoom-view]")?.textContent).toBe("level 1");
+    error.mockRestore();
+  });
+
+  it("draws a turn's error under the View when the turn fails while zoomed out", () => {
+    const store = zoomStore();
+    setPluginSlotRegistrations("studio", makePluginRegistrationSet({ timelineFilters: [store.registration] }));
+    const typed = { ...row("u1", "t4", 30), role: "user", initiator: "user" } as unknown as TimelineRow;
+    const old = { ...row("e0", null, 12), kind: "system", systemKind: "error" } as unknown as TimelineRow;
+    const failed = { ...row("e1", null, 32), kind: "system", systemKind: "error" } as unknown as TimelineRow;
+    const debug = { ...row("d1", null, 33), kind: "system", systemKind: "debug" } as unknown as TimelineRow;
+    const rows = [...ROWS.slice(0, 1), old, ...ROWS.slice(1), typed, failed, debug];
+    expect(errorsSinceUserOf(rows).map((each) => each.id)).toEqual(["e1"]);
+    const view = render(<Zoomable threadId="thr_1" timelineRows={rows} />);
+    act(() => store.set(1));
+    expect(view.container.querySelector("[data-zoom-view]")).not.toBeNull();
+    expect([...view.container.querySelectorAll("[data-timeline-row-id]")].map((each) => each.getAttribute("data-timeline-row-id"))).toEqual(["e1"]);
+  });
+
+  it("stays at bb's timeline when the level throws, and for other threads", () => {
+    const store = zoomStore();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    setPluginSlotRegistrations("studio", makePluginRegistrationSet({ timelineFilters: [{ ...store.registration, zoom: { ...store.registration.zoom, level: () => { throw new Error("no"); } } }] }));
+    const view = render(<Zoomable threadId="thr_1" timelineRows={ROWS} />);
+    expect(view.container.querySelector("[data-zoom-view]")).toBeNull();
+    cleanup();
+    resetPluginSlotStoreForTest();
+    const other = zoomStore();
+    setPluginSlotRegistrations("studio", makePluginRegistrationSet({ timelineFilters: [other.registration] }));
+    other.set(1);
+    expect(render(<Zoomable threadId="thr_2" timelineRows={ROWS} />).container.querySelector("[data-zoom-view]")).toBeNull();
+    warn.mockRestore();
   });
 });
 
@@ -197,9 +321,10 @@ describe("what a filter opens", () => {
     ] as never[];
     const results: { rows: readonly unknown[]; folded: number }[] = [];
     function Fold() { const fold = useRelayedFold(rows, true, () => null); results.push({ rows: fold.rows, folded: fold.folded.size + fold.folded.quiet.size }); return null; }
-    render(<Fold />);
+    const located = (children: ReactNode) => <MemoryRouter><SearchMessageLocationProvider threadId={undefined}>{children}</SearchMessageLocationProvider></MemoryRouter>;
+    render(located(<Fold />));
     expect(results.at(-1)!.folded).toBeGreaterThan(0);
-    render(<TimelineFilterExpandContext.Provider value><Fold /></TimelineFilterExpandContext.Provider>);
+    render(located(<TimelineFilterExpandContext.Provider value><Fold /></TimelineFilterExpandContext.Provider>));
     expect(results.at(-1)).toEqual({ rows, folded: 0 });
   });
 });

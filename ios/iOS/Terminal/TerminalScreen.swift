@@ -19,6 +19,8 @@ final class TerminalConnection: NSObject, ObservableObject, TerminalViewDelegate
     private var retryDelay: Double = 1
     private var pingTimer: Timer?
     private var pendingSize: (cols: Int, rows: Int)?
+    private let decoder = JSONDecoder()
+    private let encoder = JSONEncoder()
 
     init(terminalId: String, client: BBClient) {
         self.terminalId = terminalId
@@ -49,6 +51,7 @@ final class TerminalConnection: NSObject, ObservableObject, TerminalViewDelegate
         pingTimer = Timer.scheduledTimer(withTimeInterval: 25, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.write(["type": "ping"]) }
         }
+        pingTimer?.tolerance = 5
     }
 
     private func receive(on task: URLSessionWebSocketTask) {
@@ -87,7 +90,7 @@ final class TerminalConnection: NSObject, ObservableObject, TerminalViewDelegate
             case .data(let bytes): bytes
             @unknown default: nil
             }
-        guard let data, let json = try? JSONDecoder().decode(JSONValue.self, from: data) else { return }
+        guard let data, let json = try? decoder.decode(JSONValue.self, from: data) else { return }
         switch json["type"]?.stringValue {
         case "attached":
             connected = true
@@ -118,7 +121,7 @@ final class TerminalConnection: NSObject, ObservableObject, TerminalViewDelegate
     }
 
     private func write(_ value: JSONValue) {
-        guard let task, let data = try? JSONEncoder().encode(value), let text = String(data: data, encoding: .utf8)
+        guard let task, let data = try? encoder.encode(value), let text = String(data: data, encoding: .utf8)
         else { return }
         task.send(.string(text)) { _ in }
     }

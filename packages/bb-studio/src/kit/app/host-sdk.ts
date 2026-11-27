@@ -263,6 +263,8 @@ export interface ThreadHeaderDecoration {
   title?: string;
   /** A small node right after the title, in the same row. */
   after?: ReactNode;
+  /** Controls at the header's right end, first among BB's own (a BB without the fork's `end` ignores it). */
+  end?: ReactNode;
 }
 
 export interface ThreadHeaderRegistration {

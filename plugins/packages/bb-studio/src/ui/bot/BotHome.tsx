@@ -14,7 +14,7 @@ import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, Textarea } from "../../kit/ui/index";
 import { Fragment, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import type { BotActivityView, BotLearningView, BotView, HeartbeatRun } from "../../contract";
-import { pagePath } from "../../pages/constants";
+import { memoryPath } from "../../memory/shared";
 import { useCall, useLive, type Method, type RpcInput } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, botProvider, colorForName, DEFAULT_SHAPE, isBotShape } from "./BotAvatar";
@@ -30,7 +30,7 @@ export { BOT_PATH };
 /** The Bot page's path under the Studio panel. */
 export const BOT_SUBPATH = "bot";
 type Preset = "morning" | "evening" | "working" | "off";
-/** Check-in presets (bot_checkin_preset): one schedule and one line on the Memory page each. */
+/** Check-in presets (bot_checkin_preset): one schedule and one line in the always-on skill's Check-in section each. */
 export const PRESETS: { id: Preset; label: string; hint: string }[] = [
   { id: "morning", label: "Morning brief", hint: "Weekdays 8:00" },
   { id: "evening", label: "Evening wrap-up", hint: "Weekdays 18:00" },
@@ -167,10 +167,8 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
     };
     if (Object.keys(input).length) void run("bot_set", input);
   };
-  const openMemory = async () => {
-    const memory = bot.memoryPageId ? { pageId: bot.memoryPageId } : await run("bot_memory") as { pageId: string | null } | null;
-    if (memory?.pageId) openAppPath(pagePath(memory.pageId));
-  };
+  // Memory is its own page now (Core, Skills, History); the old core profile page isn't the source any more.
+  const openMemory = async () => { openAppPath(memoryPath(bot.id)); };
   const sheets = (
     <>
       {sheet === "checkins" ? (
@@ -468,33 +466,26 @@ function SkillHistory({ botId, onRevert }: { botId: string; onRevert(): void }) 
   );
 }
 
-const LEARN_INTERVALS = [5, 10, 20, 30, 50];
 
 export function modelLabel(value: Pick<BotLearningView, "modelNames">, model: string): string {
   return value.modelNames?.[model] ?? formatModelName(model);
 }
 
-/** Learn from work: the background review's switch, interval and model and the last result. */
+/** Learn from work: the review's switch (daily and on archive), its model and the last result. */
 function LearnSettings({ value, busy, run }: { value: BotLearningView; busy: boolean; run<M extends Extract<Method, `bot_${string}`>>(method: M, input?: RpcInput<M>): Promise<unknown> }) {
-  const intervals = LEARN_INTERVALS.includes(value.interval) ? LEARN_INTERVALS : [...LEARN_INTERVALS, value.interval].sort((a, b) => a - b);
   const status = value.reviewing ? "Reviewing now…" : value.lastReview ? `${value.lastReview.result} · ${relativeTime(value.lastReview.at)}` : "No review yet";
   return (
     <div className="flex flex-col gap-1.5 rounded-md bg-muted/40 p-2 text-xs" aria-label="Learn from work">
       <label className="flex items-center gap-2">
         <input type="checkbox" checked={value.enabled} disabled={busy} aria-label="Learn from work" onChange={(event) => void run("bot_learning_set", { enabled: event.target.checked })} />
         <span className="font-medium text-foreground">Learn from work</span>
-        {value.enabled ? (
-          <span className="flex items-center gap-1 text-muted-foreground">every
-            <select aria-label="Turns between reviews" className="rounded border border-border bg-transparent px-1" value={value.interval} disabled={busy} onChange={(event) => void run("bot_learning_set", { interval: Number(event.target.value) })}>
-              {intervals.map((each) => <option key={each} value={each}>{each}</option>)}
-            </select>turns</span>
-        ) : null}
+        {value.enabled ? <span className="text-muted-foreground">Daily + on archive</span> : null}
       </label>
       {value.enabled ? (
         <>
           <span className="flex items-center gap-1 text-muted-foreground">
             <span className="min-w-0 flex-1 truncate" aria-label="Last review">{status}</span>
-            <button type="button" className={GHOST_BUTTON} disabled={busy || value.reviewing} onClick={() => void run("bot_learning_review")}>Review now</button>
+            <button type="button" className={GHOST_BUTTON} disabled={busy || value.reviewing} onClick={() => void run("bot_learning_review")}>Run now</button>
           </span>
           <label className="flex items-center gap-2 text-muted-foreground">Review model
             <select aria-label="Review model" className="min-w-0 flex-1 rounded border border-border bg-transparent px-1" value={value.reviewModel ?? ""} disabled={busy} onChange={(event) => void run("bot_learning_set", { reviewModel: event.target.value || null })}>

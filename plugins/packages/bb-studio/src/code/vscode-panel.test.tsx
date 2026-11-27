@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // VS Code's nav panel: its root lands on the last workspace or the picker,
 // and the old addresses under the Library go to the same page here.
 import { act } from "react";

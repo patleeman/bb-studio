@@ -8,6 +8,7 @@ import type { PluginAppBuilder, PluginThreadActionRegistration } from "@get-bb/p
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { openAppPath } from "../kit/app/index";
+import { visiblePoll } from "../kit/app/visible-poll";
 import { openThreadTab } from "../kit/app/thread-panel";
 import { openPathIn } from "./studio-open";
 import { untitled } from "../kit/format";
@@ -39,6 +40,8 @@ export function useThreadLookup<T>(threadIds: readonly string[], load: (threadId
     if (!enabled || !key) return;
     let stopped = false;
     const ids = key.split("\n");
+    const active = new Set(ids);
+    for (const id of loaded.current) if (!active.has(id)) loaded.current.delete(id);
     const fetch = (all: boolean) => {
       for (const id of ids) {
         if (!all && loaded.current.has(id)) continue;
@@ -48,8 +51,8 @@ export function useThreadLookup<T>(threadIds: readonly string[], load: (threadId
       }
     };
     fetch(false);
-    const timer = setInterval(() => fetch(true), pollMs);
-    return () => { stopped = true; clearInterval(timer); };
+    const stop = visiblePoll(() => fetch(true), pollMs);
+    return () => { stopped = true; stop(); };
   }, [key, enabled, load, pollMs]);
   return values;
 }

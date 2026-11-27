@@ -369,6 +369,43 @@ describe("slots.experimental_timelineFilter", () => {
     expect(collected.timelineFilters).toEqual([{ id: "strands", get, subscribe }]);
   });
 
+  it("keeps a filter's folds and expandFold, and refuses them when they aren't functions", () => {
+    const get = () => null;
+    const subscribe = () => () => {};
+    const folds = () => [];
+    const expandFold = () => {};
+    const collected = collect((app) => {
+      app.slots.experimental_timelineFilter({ id: "strands", get, subscribe, folds, expandFold });
+    });
+    expect(collected.timelineFilters).toEqual([{ id: "strands", get, subscribe, folds, expandFold }]);
+    expect(() =>
+      collect((app) => {
+        app.slots.experimental_timelineFilter({ id: "a", get, subscribe, folds: [] } as never);
+      }),
+    ).toThrow(/folds must be a function/u);
+  });
+
+  it("keeps a filter's zoom, and refuses one without level or View", () => {
+    const get = () => null;
+    const subscribe = () => () => {};
+    const zoom = { level: () => 0, View: () => null };
+    let host: unknown;
+    const collected = collect((app) => {
+      host = app.slots.experimental_timelineFilter({ id: "strands", get, subscribe, zoom });
+    });
+    // The answer tells the plugin this bb folds and zooms.
+    expect(host).toEqual({ folds: true, zoom: true });
+    expect(collected.timelineFilters).toEqual([{ id: "strands", get, subscribe, zoom }]);
+    expect(collected.timelineFilters[0]!.zoom).not.toBe(zoom);
+    for (const bad of [null, {}, { level: () => 0 }, { View: () => null }, { level: 1, View: () => null }]) {
+      expect(() =>
+        collect((app) => {
+          app.slots.experimental_timelineFilter({ id: "a", get, subscribe, zoom: bad } as never);
+        }),
+      ).toThrow(/zoom must be/u);
+    }
+  });
+
   it("refuses a filter without get or subscribe, and a second one with the same id", () => {
     const get = () => null;
     const subscribe = () => () => {};

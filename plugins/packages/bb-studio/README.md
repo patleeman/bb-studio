@@ -1,6 +1,6 @@
 # Studio
 
-> **Studio** is the core of **BB Studio**: pages (with their whiteboards), recordings, designs and artifacts are built in. See the [suite overview](../../README.md).
+> **Studio** is the core of **BB Studio**: pages (with their whiteboards), recordings, designs and artifacts are built in. See the [suite overview](../../../README.md).
 
 Studio is built around one Bot with many conversations: the sidebar shows
 one Bot at a time, its conversations with you and the workers it runs (see
@@ -9,6 +9,13 @@ Library is the Bot's files. Underneath is the collection: everything you and
 your agents make, including pages, Talk recordings and dictations, drawings,
 designs and saved artifacts, and other plugins' items. Search across all of
 them, filter by kind, project and tag, and hand any of them to an agent.
+
+## Command line
+
+BB Studio's command is `bbs` (`bb-studio` also works). Install it from
+Settings › Command line. In a terminal, `bb` stays stock bb's; in Studio's own
+conversations `bb` runs Studio's command too, so agents can use either. The
+commands in this README use `bbs`.
 
 ## VS Code
 
@@ -48,7 +55,7 @@ row's ⋯ or right-click menu. **Starred**, at the top of the Studio sidebar
 with its count, opens the library on `is:starred`, newest-starred first; the
 **Starred** button above the list does the same in the Studio app and in a
 thread's Studio tab. Stars sync to the iOS app, survive renames and go when
-the item is deleted. `bb studio starred` lists them.
+the item is deleted. `bbs studio starred` lists them.
 
 ### The Studio tab in a thread
 
@@ -180,25 +187,23 @@ Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching
 "offline sync": an HTML artifact and two pages match on their title or
 content, each showing the matching text with the match in bold.
 
-### Strands: the Strands page
+### Strands
 
 Strands are each conversation's lines of work: Studio sorts every turn into
-one by itself (`src/strands`). The Bot's **Strands** page
-(`/plugins/studio/studio/bot/<botId>/strands`; the older `…/loops` address
-opens it too) lists every conversation with open strands, needs you first:
-up to two asks per conversation with their buttons, then a chip per other
-strand. A chip opens the conversation at that strand's newest message. Under
-them are the areas' cards. The page's second tab, **Scheduled**, lists the
-Bot's check-ins, reminders, watchers and runners. The sidebar's **Strands**
-row counts the strands that need you.
+one by itself (`src/strands`). A conversation shows them in its strands box
+above the composer, its **Strands** tab, the tag in each message's footer
+(with **Move to…**) and the folds in its transcript. The desktop has no
+page of every conversation's strands any more; the phone's Strands screen
+still reads them (`strands.overview`).
 
 A strand needs you when a BB question or approval waits in it, one of its
 workers needs you, a Tool Gateway request waits, an area's open item needs
 you (on the strand that holds the area's report), or the conversation is
-flagged with `bot_needs_you`. When a strand turns "needs you", the phone gets
+flagged with `bot_needs_you`, or a reply in it asks you something (see
+"Replies that need you" under Strands). When a strand turns "needs you", the phone gets
 one push (`src/strands/push.ts`), unless BB pushes that ask itself or the ask
-waits in a turn another thread started. Studio Mobile holds it while you are
-at the desk.
+waits in a turn another thread started; a reply that asks you has its own
+push. Studio Mobile holds it while you are at the desk.
 
 Agents have one strands tool, `strand_note`: mark a strand waiting on someone
 or something, done, or renamed. There are no task tools, no work cards and
@@ -211,7 +216,7 @@ areas, and older phone builds reading an old card.
 
 **Settings → Plugins → Studio** starts with Studio's API keys, which BB keeps
 in its secret files: OpenAI (hands-free voice), xAI, and the keys Smart Queue's
-model (Jev) runs on: TypeSafe, Vercel AI Gateway, OpenRouter, OpenCode Zen and
+model (Jev) runs on: OpenCode (billed to an OpenCode Go plan), TypeSafe, Vercel AI Gateway, OpenRouter and
 your own endpoint's. Every other setting is Studio's
 own, in grouped sections below them: **Voice** (dictation and hands-free:
 model, voice, backend model and monthly limit), **Recordings and calls**,
@@ -236,14 +241,14 @@ replies), which the migration carried over. Bot → Controls → Attention:
 
 API keys are in the **API keys** section at the bottom of Studio's settings
 page, kept in BB's secret files. The rest are scriptable
-with `bb studio settings`:
+with `bbs studio settings`:
 
 ```sh
-bb studio settings                    # every setting by section; (default) marks unchanged ones
-bb studio settings get loopDailyBudget
-bb studio settings set loopQuietStart 23
-bb studio settings reset autoTitle    # back to the default
-bb studio settings list --json
+bbs studio settings                    # every setting by section; (default) marks unchanged ones
+bbs studio settings get loopDailyBudget
+bbs studio settings set loopQuietStart 23
+bbs studio settings reset autoTitle    # back to the default
+bbs studio settings list --json
 ```
 
 The keys are the ones BB's settings used. On the first load after this
@@ -263,7 +268,7 @@ environment variable (restart BB after setting one):
 | Talk segment length | 25 seconds | none |
 
 Todos' time zone is a setting again: **Time zone** in Bot settings ▸
-Attention (`todosTimeZone`; `bb studio settings set todosTimeZone
+Attention (`todosTimeZone`; `bbs studio settings set todosTimeZone
 America/Los_Angeles`). The Todos page, todo cards, the pane, snooze times,
 the scheduler's due and quiet hours, and the morning card all read it. Empty
 uses `STUDIO_LOOP_TIME_ZONE` when set, else this computer's zone.
@@ -315,7 +320,7 @@ first line); `source` (`backfill`, `created`, `reconciled` or `user`). Table
    tool made is a **worker** owned by the conversation that owns its source
    (else Main). BB's thread record doesn't say who made a fork, so an
    agent's is told by: a parent or lifecycle owner; `visibility: "hidden"`
-   (`bb thread fork --visibility hidden`; what you start in the app is
+   (`bbs thread fork --visibility hidden`; what you start in the app is
    visible); a source that is a worker, or an agent's thread Studio has no
    row for (an archived chain of such forks, read a few levels up); or a
    source that was in a turn when the fork was made (its last
@@ -432,8 +437,12 @@ conversations and workers are doing. Nothing shows on screen for it.
   fills rows for listed threads that have none from BB's records.
 - **The digest**: on a BB with the fork's per-turn context hook
   (`bb.experimental_hooks.experimental_turnContext`, feature-detected by
-  name; elsewhere nothing is registered), each turn of a conversation gets
-  an agent-only digest with its input, not stored in the thread. It is read
+  name; elsewhere nothing is registered), a conversation gets an agent-only
+  digest with its input, not stored in the thread. bb attaches turn context
+  only to a turn it starts in "start" mode, which in practice is the
+  thread's first turn: later messages (the composer, `bbs thread tell`) go in
+  "auto" mode and carry none. That is kept on purpose: every turn would add
+  up to 1,500 characters to the history each time. It is read
   from Studio's database only (bb waits at most 500 ms for all plugins): one
   line per other conversation of the same Bot that isn't archived and was
   active in the last 24 hours (title, thread id, working / idle / needs the
@@ -453,10 +462,10 @@ conversations and workers are doing. Nothing shows on screen for it.
   Workers:
   - "Fable lead" (lead) running · 5m ago · for this conversation · bb-studio-native
   - "Codex: iOS build" (ios) failed · 2h ago · for "Main" · bb-studio
-  Details: bot_activity_lookup { threadId }; the full list: bot_conversations.
+  Details: bot_info (view: thread) { threadId }; the full list: bot_info (view: conversations).
   ```
 
-- **`bot_activity_lookup { threadId }`** (agent tool, every conversation):
+- **`bot_info (view: thread) { threadId }`** (agent tool, every conversation):
   one of the Bot's own threads in detail: its state, repo, needs-you, the
   conversation it works for or the workers it started, a finished
   conversation's summary, its latest reply and its last 8 tool calls (read
@@ -471,15 +480,14 @@ Finish item. Studio (`src/bot-finish.ts`):
 1. unarchives it for a moment (BB takes no turn in an archived thread) and
    sends one last agent-only turn into the conversation (no user message)
    with the steps: write a summary (**Decisions**, **Left open**,
-   **Made**), save it with `memory_add` (topic: the conversation's title;
-   source `{ kind: "conversation", id, title }`), then call
-   `bot_finish_done { summary }`.
+   **Made**), then call `bot_finish_done { summary }`. The summary stays on
+   the conversation; nothing is saved to memory or a skill.
 2. When `bot_finish_done` arrives, the conversation is marked finished
    (`bot_threads.archived_at`, `finished_summary`; BB archives it again
    once the turn is over), and Main gets an agent-only note with the summary
    that has the Bot reply with the card `::finished{thread="thr_…"}`:
-   "✓ Archived: <title>", its dates, the summary's sections, **Open the
-   conversation** and **See in Memory**, and how many memory records cite it.
+   "✓ Archived: <title>", its dates, the summary's sections and **Open
+   conversation**. The conversation's one skill review pass is queued.
    Neither turn shows a user message. Main's row reads "Archived “<title>”".
    Older `::finished` cards in transcripts render the same card.
 3. If the conversation can't take the turn, the turn ends or fails without
@@ -498,7 +506,7 @@ These conversations are kept indefinitely: nothing cleans them up.
 ### The Bot sidebar
 
 Choose **Bot (Studio)** (`studio/everything`) in Settings → Appearance or
-with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
+with `bbs thread-list`. It shows one Bot at a time (`src/ui/conversations`):
 
 - **Top**, sticky: the Bot's space header (round 7, 7a), a band of its own
   with a bottom border: the avatar (36px), the name (15px, semibold), a
@@ -517,10 +525,8 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   "Bring over BB Studio data" no Bot is in bb: the swap brings a marker
   (`plugins/studio/from-bb.json`) in with bb's files, so every Bot is this
   install's and reads Stopped · Resume. Under it, the Bot's pages as rows:
-  **Memory** (`/plugins/studio/studio/memory/<botId>`), **Library**
-  (`/plugins/studio/studio`) and, for the primary Bot with Todos on, **Todos**
-  (`/plugins/studio/studio/bot/<botId>/loops`) with what needs you now and,
-  under **Scheduled**, what runs when, then **Conversations**
+  **Memory** (`/plugins/studio/studio/memory/<botId>`), **Skills**,
+  **Library** (`/plugins/studio/studio`) and **Conversations**
   (`/plugins/studio/studio/conversations/<botId>`, below). The
   row of the page on screen is selected. The header is clickable in the
   desktop app (no window drag).
@@ -593,7 +599,7 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   mark, the selection) is the theme's, and a Bot with no theme has bb's
   plain look. The old per-Bot sidebar tint (Color, Gradient, System/Light/
   Dark, Grain) is gone, with `bot_set_theme` and the `theme` field of
-  `bot_get`, `bot_list` and `bot_spaces`. The column `bots.theme_json`
+  `bot_info (view: profile)`, `bot_list` and `bot_spaces`. The column `bots.theme_json`
   stays and nothing reads or writes it, so a Bot row that still has a tint
   loads as a Bot with no tint.
 - **At launch**, when the main view is BB's empty new-thread page (`/`), the
@@ -712,13 +718,13 @@ engine that paints the scene and maps the theme onto BB's tokens
   mode. A scene that can't be drawn shows the variant that reads on its
   fallback color. The package's `scene.backdrop.modes` gives each variant
   its own darkest and brightest backdrop, so each variant's glass is
-  checked against the scenes it is shown over. `bb studio theme preview`
+  checked against the scenes it is shown over. `bbs studio theme preview`
   prints the season, the time of day and the variant; `--date` (and
   `--time`) previews a date in local time with fair weather and `--clear`
   goes back to the clock. It is the preview Tonight's Sky reads
   (`theme.sky.preview`), so both scenes show the same moment.
 - **Tonight's Sky shows the real sky.** For the place Forest uses (the
-  city once one is set with `bb studio theme weather --city`, else the
+  city once one is set with `bbs studio theme weather --city`, else the
   time zone's coordinates, else 40° N at the clock's offset) and the
   computer's clock, it draws 2,887 stars to magnitude 5.5 in their colors,
   the 88 constellations' lines and names, the Moon at its phase and
@@ -736,7 +742,7 @@ engine that paints the scene and maps the theme onto BB's tokens
   light once the Sun is above -3.5°, dark once it is below -4.5°, the
   last choice in between; the package declares each variant's backdrop
   (`scene.backdrop.modes`) and denser glass for the light one. The view
-  (`bb studio theme sky --view <follow|south|east|west>`, stored as
+  (`bbs studio theme sky --view <follow|south|east|west>`, stored as
   `theme.sky.view`, default follow) puts the Sun in the open area the
   cards leave while it is above -9°, else the Moon or the brightest
   planet, else faces south; south, east and west face that way whatever
@@ -773,7 +779,7 @@ engine that paints the scene and maps the theme onto BB's tokens
   engine uploads as the `u_layer` texture: a scene driver's `publish` takes
   an optional picture `{ source, version }`, and the engine uploads it when
   the version changes. RPC: `theme.sky { timeZone }` returns the place, the
-  preview time and the view. `bb studio theme sky` prints the Sun's
+  preview time and the view. `bbs studio theme sky` prints the Sun's
   altitude and azimuth, the phase of twilight, the view, the variant and
   what is up; `--date` previews another day or night in the window until
   `--clear` (stored in Studio's KV as `theme.sky.preview`; the window
@@ -879,17 +885,17 @@ engine that paints the scene and maps the theme onto BB's tokens
 - **CLI**:
 
 ```
-bb studio theme list [--json]
-bb studio theme show <id>
-bb studio theme template                      # a working scene package to start from
-bb studio theme check --file <theme.json> [--json]   # runs the checks, saves nothing
-bb studio theme create --file <theme.json>
-bb studio theme update <id> --file <patch.json> [--new-id <id>]
-bb studio theme apply <id|none> [--bot <id|name>] [--intensity 0-1] [--glass 0-1] [--motion 0-1] [--on workers,finished,needsYou,error] [--off …]
-bb studio theme delete <id>
-bb studio theme weather [--city <name> | --clear]   # Forest's place and weather (Open-Meteo); a city, or back to the time zone
-bb studio theme sky [--date <yyyy-mm-dd[Thh:mm]> [--time <hh:mm>] | --clear] [--view <follow|south|east|west>]   # Tonight's Sky: the Sun, the phase of twilight, the view, the variant, the Moon, planets, meteors and events; preview a date (local time), or back to the clock; choose where it looks
-bb studio theme preview [--date <yyyy-mm-dd[Thh:mm]> [--time <hh:mm>] | --clear]   # Kyoto Garden: the season, time of day and variant; the same preview as theme sky
+bbs studio theme list [--json]
+bbs studio theme show <id>
+bbs studio theme template                      # a working scene package to start from
+bbs studio theme check --file <theme.json> [--json]   # runs the checks, saves nothing
+bbs studio theme create --file <theme.json>
+bbs studio theme update <id> --file <patch.json> [--new-id <id>]
+bbs studio theme apply <id|none> [--bot <id|name>] [--intensity 0-1] [--glass 0-1] [--motion 0-1] [--on workers,finished,needsYou,error] [--off …]
+bbs studio theme delete <id>
+bbs studio theme weather [--city <name> | --clear]   # Forest's place and weather (Open-Meteo); a city, or back to the time zone
+bbs studio theme sky [--date <yyyy-mm-dd[Thh:mm]> [--time <hh:mm>] | --clear] [--view <follow|south|east|west>]   # Tonight's Sky: the Sun, the phase of twilight, the view, the variant, the Moon, planets, meteors and events; preview a date (local time), or back to the clock; choose where it looks
+bbs studio theme preview [--date <yyyy-mm-dd[Thh:mm]> [--time <hh:mm>] | --clear]   # Kyoto Garden: the season, time of day and variant; the same preview as theme sky
 ```
 
 ### Presence
@@ -948,7 +954,7 @@ plain JavaScript that declares `function draw(ctx, t, state, palette,
 size)`: `t` is seconds of presence time, `state` is `{ name, workers,
 clock }`, `palette` is three `#rrggbb` strings (amber in the needs
 state), `size` is the picture's side in CSS px.
-`bb studio presence template --guide` prints the full contract.
+`bbs studio presence template --guide` prints the full contract.
 
 The code is untrusted and never runs in the app's own context
 (`sandbox.ts`). Each custom presence is an `<iframe sandbox="allow-scripts">`
@@ -988,14 +994,14 @@ template), `update { id, name?, description?, code?, newId? }`,
 a Bot uses it).
 
 ```bash
-bb studio presence list [--json]
-bb studio presence show <id>
-bb studio presence template [--guide]
-bb studio presence check --file <presence.json> [--code <draw.js>] [--json]
-bb studio presence create --file <presence.json> [--code <draw.js>]
-bb studio presence update <id> [--file <patch.json>] [--code <draw.js>] [--new-id <id>]
-bb studio presence apply <id> [--bot <id|name>] [--color theme|#rrggbb] [--motion 0-2]
-bb studio presence delete <id>
+bbs studio presence list [--json]
+bbs studio presence show <id>
+bbs studio presence template [--guide]
+bbs studio presence check --file <presence.json> [--code <draw.js>] [--json]
+bbs studio presence create --file <presence.json> [--code <draw.js>]
+bbs studio presence update <id> [--file <patch.json>] [--code <draw.js>] [--new-id <id>]
+bbs studio presence apply <id> [--bot <id|name>] [--color theme|#rrggbb] [--motion 0-2]
+bbs studio presence delete <id>
 ```
 
 `node scripts/presence-sandbox.mjs [draw.js]` runs a hostile module
@@ -1081,7 +1087,7 @@ on every page with a toolbar (search, filter pills, the page's menus and
 **New**) and groups of one-line rows (icon and title on the left, a small
 status and meta on the right). The pages are lists: a row opens its
 item as a tab in the workbench beside the page, through the link router
-(`src/ui/bot-page/open-row.ts`): an automation, a todo, a memory record, a
+(`src/ui/bot-page/open-row.ts`): an automation, a todo, a
 Library file, or an archived thread as a conversation tab. ⌘-click opens it
 in the workbench's second pane beside a conversation (beside a page it opens
 a tab, as a click does: a page's workbench has no pane API), Shift-click in
@@ -1135,7 +1141,7 @@ Library, Scheduled (the Todos page), Todos, Conversations; VS Code; and bb's own
 Browser, Terminal and Workflow run. Each kind has its name, icon, the tab that
 shows it, its address, where its recent rows come from and whether it has a
 sidebar row. The New Tab page, Recent, drag and drop, the agent's
-`workbench_open` and links in replies are all made from it.
+`workbench (op: open)` and links in replies are all made from it.
 `docs/tab-kinds-audit.md` is the table of which surface reaches which kind.
 
 **New Tab.** On the fork, the side panel's New Tab page (**+**) lists
@@ -1187,7 +1193,7 @@ workbench's second pane; Shift-click a window of its own; an external http(s)
 link goes to the browser setting (system or in-app). Links in replies (the
 fork's `experimental_linkHandler`, with the click's modifiers), chat cards,
 links in pages and on whiteboards, mini apps' `bb.open`, Cmd+K and the
-launcher's rows, the Bot pages' rows and the agent's `workbench_open` all go
+launcher's rows, the Bot pages' rows and the agent's `workbench (op: open)` all go
 through it. In the
 launcher and any popped-out window the rule runs in bb's main window
 (`window.runInMain { kind: "link" }`). A link to something that is gone
@@ -1198,37 +1204,72 @@ Studio RPC: `links.resolve({ kind, id, threadId })` → `{ found, title, spec
 `docs/link-audit.md` is the table of link source × kind and the tests behind
 each cell.
 
-**Agent tools.** The agent can arrange the workbench of its own
-conversation (`src/workbench-agent`). They need the fork's
-`experimental_workbench` and work only while that conversation is on screen
-in BB: the tool runs on the server, publishes the call on the
-`studio-workbench` realtime channel, the window showing the conversation
-claims it (`workbench.claim`), runs it and answers (`workbench.reply`). No
-claim within 1.5 seconds and the tool says the conversation isn't on screen.
+**The Workspace on the server.** Each conversation's workbench tabs are kept
+by Studio, per conversation, in SQLite (`src/workbench-agent/store.ts`,
+tables `thread_workbench_tabs` and `thread_workbench_state`), so the phone,
+every desktop window and the agent read and change the same tabs. Clients
+use `threadWorkbenchGet({ threadId })` and `threadWorkbenchMutate({ threadId,
+baseVersion, op: open | close | focus | reorder | update, tab?, title?,
+tabId?, position?, focus?, origin? })` (update: a tab now shows something
+else, such as a browser tab that navigated); a change against an older
+`baseVersion` answers `result: "conflict"` with the current state and
+changes nothing. The store refuses refs that aren't safe to show: browser
+tabs other than http(s), paths with "..", absolute paths inside a worktree,
+and files whose worktree or machine doesn't exist; and Workspaces for
+threads BB doesn't have. A deleted thread's Workspace goes with it.
+Each change is announced on the `workbench-changed` realtime channel
+(`{ threadId, version, origin, tabCount }`), and the Bot sidebar's
+conversation rows carry `tabCount`. A tab is a `WorkspaceTabRef` (a kind
+from `src/tab-kinds.ts` with its id, or a file's path and environment, a
+URL, a terminal, another plugin's tab) with `mobileSupport` (native, web or
+desktopOnly, `MOBILE_SUPPORT`). A desktop window follows the Workspace of
+each conversation it shows, both ways, through BB's public
+`experimental_workbench` (`src/workbench-agent/ui/sync.ts`): a three-way
+merge against the last state both agreed on, every second and on each
+change event, skipping its own events by origin and re-reading after a
+conflict. A tab counts as closed by the user only if that window had it at
+the last agreement (so a tab it can't show, or a diff BB shows in its git
+tab, is never closed for the user), fixed tabs stay local, and a browser tab
+that navigates is an update of the same tab. The first time, it brings its stored side panels over
+(`ui/import.ts`, only where the server has nothing yet). Info, New Tab and
+plugin details stay local to the window.
+
+**Agent tools.** The agent works the workbench of its own conversation
+(`src/workbench-agent`). List, open, close and focus act on the Workspace
+on the server, with or without a window on screen. Each window and the
+phone report the conversations they show (`threadWorkbenchShown`, every few
+seconds, with origin `desktop:<window id>` or `phone:<device id>`). When
+only the phone shows the conversation, the answer says "(shown on the
+phone)"; when nothing does, it says the change was saved to the Workspace
+and appears when the conversation is shown. What only a desktop
+window can do (`pop_out`, `arrange`, an open into pane 2 or a window of its
+own) needs the fork's `experimental_workbench` and that conversation on
+screen in BB: the tool publishes the call on the `studio-workbench` realtime
+channel, the window showing the conversation claims it (`workbench.claim`),
+runs it and answers (`workbench.reply`). No claim within 1.5 seconds and the
+tool says the conversation isn't on screen.
 
 | Tool | Input | Does |
 | --- | --- | --- |
-| `workbench_list` | none | The tabs with their keys, the selected one, which the agent opened, the layout, and what the user closed or changed |
-| `workbench_open` | `type`: every kind of the registry the agent may open (conversation, worker, bot, page, whiteboard, design, app, artifact, recording, board, memory, library, automations, todos, archive, automation, todo, record, vscode, file, diff, url, workflow); `id`, `path` (file, diff), `line`/`endLine` (file), `url`; or `link` instead of type and id (`bb://page/pg_…`, a bb address, `::page{id="…"}`, `file:///…`, an http(s) URL); `pane` (1, 2, "new" or "window"), `index`; `focus` (default true); `force` | Opens it as a tab, or selects it if open, in that pane and place; with "window", in a window of its own. URLs need the desktop app's in-app browser |
-| `workbench_tab` | `key`, `action`, `force` | `close` closes a tab; `focus` selects it and shows the panel; `pop_out` opens an open tab in a window of its own, out of the workbench |
-| `workbench_arrange` | `layout`: side by side, panel only, conversation only or stacked; `widthPercent` 20 to 80; `panes` 1 or 2; `paneWidths` (a ratio, such as [2, 1]); `force` | Shows or hides the panel, sets its width, collapses the conversation, makes or merges the second pane |
+| `workbench (op: list)` | none | The tabs with their keys, the selected one, which the agent opened, and what the user closed or changed |
+| `workbench (op: open)` | `type`: every kind of the registry the agent may open (conversation, worker, bot, page, whiteboard, design, app, artifact, recording, board, memory, library, automations, todos, archive, automation, todo, record, vscode, file, diff, url, workflow); `id`, `path` (file, diff), `line`/`endLine` (file), `url`; or `link` instead of type and id (`bb://page/pg_…`, a bb address, `::page{id="…"}`, `file:///…`, an http(s) URL); `pane` (1, 2, "new" or "window"), `index`; `focus` (default true); `force` | Opens it as a tab, or selects it if open, in that pane and place; with "window", in a window of its own. URLs need the desktop app's in-app browser |
+| `workbench (op: tab)` | `key`, `action`, `force` | `close` closes a tab; `focus` selects it and shows the panel; `pop_out` opens an open tab in a window of its own, out of the workbench |
+| `workbench (op: arrange)` | `layout`: side by side, panel only, conversation only or stacked; `widthPercent` 20 to 80; `panes` 1 or 2; `paneWidths` (a ratio, such as [2, 1]); `force` | Shows or hides the panel, sets its width, collapses the conversation, makes or merges the second pane |
 
 The workbench has at most two panes, side by side, and the conversation
-stays on the left; panes don't stack, so `workbench_arrange` answers that
+stays on the left; panes don't stack, so `workbench (op: arrange)` answers that
 **stacked** isn't available. On a BB whose workbench has one pane, `pane` is
 ignored (the answer says so) and `panes` is refused. The rules:
 
-- While the user is typing in the panel, an open goes behind the selected
-  tab, and a Studio tab (thread, page, whiteboard, design) gets a "• " before
-  its title until the user selects it; a focus, closing the selected tab or
-  closing the panel is refused, and no second pane is made.
-- Studio remembers, per conversation, the tabs the agent opened and the
-  layout it set (in memory, until Studio restarts). A tab the agent opened
-  that the user then closed or moved out of the panel isn't reopened, a
-  panel the user closed stays closed (opens go behind), and a layout setting
-  the user changed isn't changed back, unless the call passes
-  `force: true`, which agents pass only when the user asked.
-- A window of its own (`pane: "window"`, `workbench_tab` action `pop_out`) is BB's "Open
+- While the user is typing in the panel, a desktop window doesn't move the
+  selection or close the tab they type in (it goes back to the Workspace as
+  theirs), and no second pane is made.
+- The Workspace keeps which tabs the agent opened and the user's closes, and
+  the layout the agent set, across restarts. A tab the agent opened that the
+  user then closed (on any device) isn't reopened, and a layout setting the
+  user changed isn't changed back, unless the call passes `force: true`,
+  which agents pass only when the user asked.
+- A window of its own (`pane: "window"`, `workbench (op: tab)` action `pop_out`) is BB's "Open
   in new window": pages, whiteboards, designs, apps, conversations and other
   plugin tabs, and files pop out; terminals, browser tabs, Info, Diff, New
   Tab and fixed tabs are refused. While the user types in the panel the tab
@@ -1258,11 +1299,9 @@ title bar layout the traffic lights, back, forward and the sidebar toggle
 stay where BB has them; in the browser layout back and forward move to the
 start of the main view's header and the toggle stays.
 
-**Scheduled**, on the sidebar Bot's **Todos** page, is the one place for what
-runs when; `bb://automations` and a thread's Scheduled tab open it there.
-The Bot sidebar has one row for it, **Todos**. Todos are one list, the
-primary Bot's, so under any other Bot the row and the page are **Scheduled**:
-that Bot's automations alone. Scheduled lists every automation
+**Scheduled** (`studio/automations`, `src/ui/automations/ScheduledPage.tsx`)
+is the one place for what runs when; `bb://automations` opens it, for the
+sidebar's Bot. The Bot sidebar has no row for it. Scheduled lists every automation
 that belongs to the Bot (check-ins, reminders, watchers, runners, bb's own
 automations and maintenance), each with its next run or Paused, and has
 **New** (check-in, reminder, watcher, runner). Timed todos stay in Today,
@@ -1320,7 +1359,7 @@ target.
 
 Studio's RPC (`/api/v1/plugins/studio/rpc/<method>`, the contract in
 `src/bot-threads-contract.ts`), for the desktop app now and the iOS app
-later. The iOS app's existing calls (`bot_get`, `bot_attention`,
+later. The iOS app's existing calls (`bot_info (view: profile)`, `bot_attention`,
 `bot_side_threads`, `bot_side_thread_open` and the rest) are unchanged and
 keep working against Main. Every change publishes Studio's realtime channel
 (`studio-changed`).
@@ -1411,14 +1450,14 @@ once, since signals sent while the socket was down are lost.
   `experimental_NewThreadComposer` submits it (`{ projectId, providerId,
   model, reasoningLevel, permissionMode, serviceTier?,
   executionInputSources, environment, input, sendAt? }`); a client seeds its
-  composer with the Bot's `defaultModel` (`bot_get`). The thread starts on
+  composer with the Bot's `defaultModel` (`bot_info (view: profile)`). The thread starts on
   the request's model and is recorded as that Bot's conversation (its own
   call: no later rule moves it).
 - `bot_set_default_model({ botId, providerId, model, reasoning? })` → `{
   bot, run }`: what the Bot's new conversations start on. It switches no
   thread. Refused for a provider BB doesn't have, and for one of the other
   kind (an external provider for a Studio Bot, or the reverse).
-  `bot_get` and `bot_list` return it as `defaultModel: { providerId, model,
+  `bot_info (view: profile)` and `bot_list` return it as `defaultModel: { providerId, model,
   reasoningLevel, modelName } | null`.
 - `thread_model({ threadId })` → `{ model: { providerId, model,
   reasoningLevel, modelName } | null }`: what a thread runs on now, read off
@@ -1455,19 +1494,19 @@ once, since signals sent while the socket was down are lost.
   sidebar, unarchived in BB; its summary stays.
 - `bot_finished({ threadId })` → `{ finished: { threadId, botId, title,
   summary, startedAt, finishedAt, records, memoryHref, archived } | null }`:
-  what Main's card shows; `records` counts the memory records that cite the
-  conversation, `archived` is false once it was reopened.
+  what Main's card shows; `records` is always 0 now (memory records are
+  retired; kept for the phone), `archived` is false once it was reopened.
 - `bot_library({ botId? })` → `{ botId, items: File[] }`. A `File` is `{
   pluginId, id, title, kind: "page" | "whiteboard" | "design" | "app" |
   "artifact" | "other", type, href, updatedAt, createdAt, madeIn: { threadId,
   title, kind, conversationId, conversationTitle } | null }`, newest first;
   `madeIn` is null for what you made yourself.
 
-Agent tools, in every conversation: `bot_conversations` lists the Bot's
+Agent tools, in every conversation: `bot_info (view: conversations)` lists the Bot's
 conversations (Main first, with fork links, what's working and what needs
 you) and its workers (status, conversation, repo);
 `bot_needs_you({ reason })` marks the conversation it runs in as needing you
-(null clears; a worker is refused); `bot_activity_lookup({ threadId })` gives
+(null clears; a worker is refused); `bot_info (view: thread)({ threadId })` gives
 one conversation or worker in detail (see Awareness); `bot_finish_done({
 summary })` finishes the conversation it runs in (refused in Main and in a
 worker); `conversation_continue_new({ title, handoff, workCards?,
@@ -1615,6 +1654,14 @@ The compact page header at 390 pixels, with **Item actions** open.
   `/` for headings, lists, checklists, toggles, quotes, code, tables, images,
   video, audio, files, and the custom blocks below. Blocks can be dragged,
   nested, and turned into other types. Markdown shortcuts work as you type.
+- **Zoom into images.** Double-click an image, or use the expand button at
+  its top-right, to open it over the page, fitted to the window. A single
+  click still selects it, to resize it or edit its caption. Pinch,
+  Ctrl- or Cmd-scroll, the + and - keys, or a double-click zoom in, up to 8×
+  the fitted size or 4× the image's own pixels, whichever is more. Drag or
+  scroll to pan. 0 or another double-click fits it again. The left and right
+  arrows step through the page's other images. Esc or a click outside the
+  image closes it.
 - **Live collaboration.** Every page is a Yjs document synced over a
   WebSocket. Agents edit the same document from the server, so their
   changes stream into your editor, with cursors, while you keep typing.
@@ -1743,8 +1790,8 @@ The iOS app uses Studio's `notes.*` RPC methods:
 
 ### For agents
 
-Agents get five tools: `pages_list`, `pages_read`, `pages_create`,
-`pages_edit` and `pages_comments` (`op`: `list`, `create`, `reply`,
+Agents get five tools: `pages_read (no page)`, `pages_read`, `pages_create`,
+`pages_edit` and `pages_read (comments)` (`op`: `list`, `create`, `reply`,
 `resolve`). `pages_read` returns Markdown with a block id on the
 line before each block, and `pages_edit` applies small operations against those ids. An
 agent can then change one checklist item or paragraph without overwriting
@@ -1753,10 +1800,10 @@ what you are typing.
 The same actions are available from the CLI (`bb pages …` before the merge):
 
 ```sh
-bb studio pages list [--all]
-bb studio pages show <page-id|title> [--ids]
-bb studio pages create <title> [--global] [--markdown <text>]
-bb studio pages append <page-id|title> <markdown…>
+bbs studio pages list [--all]
+bbs studio pages show <page-id|title> [--ids]
+bbs studio pages create <title> [--global] [--markdown <text>]
+bbs studio pages append <page-id|title> <markdown…>
 ```
 
 [skills/pages/SKILL.md](skills/pages/SKILL.md) documents the tools, the
@@ -1775,7 +1822,7 @@ database in the BB data directory. Uploads are limited to 15 MB each and are
 served back at `/api/v1/plugins/studio/http/pages/files`; a page saved before
 the merge, with `/api/v1/plugins/pages/http/files` addresses in it, shows its
 files from Studio too. When an agent writes a page (`pages_create`,
-`pages_edit`, `bb studio pages create|append`), each Markdown image with a
+`pages_edit`, `bbs studio pages create|append`), each Markdown image with a
 local path inside its thread's workspace or thread storage (PNG, JPEG, GIF or
 WebP, up to 10 MB; not SVG) is copied into the page's files and its src
 rewritten to that address; the tool result names any it left as written. A
@@ -1789,13 +1836,13 @@ first time a page opens, not with Studio; the server loads pdf-lib only for a
 PDF export.
 
 BlockNote's menus and toolbars are styled with Tailwind classes that live in
-`node_modules`, which `bb plugin build` doesn't scan. `blocknote-tailwind.txt`
+`node_modules`, which `bbs plugin build` doesn't scan. `blocknote-tailwind.txt`
 lists them so the build generates them. After upgrading `@blocknote/shadcn`,
 run `pnpm tailwind:blocknote` (and `pnpm css:blocknote` for the stylesheet).
 
 ### Backup
 
-Pages are the `pages` section of `bb studio backup` (see
+Pages are the `pages` section of `bbs studio backup` (see
 [docs/backup.md](../../docs/backup.md)), as they were with the separate
 plugin, so older backups restore into Studio. A backup holds each page's
 content with its comments, the Markdown copy, saved versions and uploaded
@@ -1808,7 +1855,7 @@ again after you close it picks it up.
 
 ## Explore
 
-Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one drafts "💬 Tell me more" about it so the agent explains it in the thread. It ran inside the Studio Pages plugin and moved into Studio with it: Studio keeps the Next row's click log in its own database. The CLI is `bb studio pages explore stats` (`bb pages explore stats` before the merge).
+Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one drafts "💬 Tell me more" about it so the agent explains it in the thread. It ran inside the Studio Pages plugin and moved into Studio with it: Studio keeps the Next row's click log in its own database. The CLI is `bbs studio pages explore stats` (`bbs pages explore stats` before the merge).
 
 Explore's settings are in **Settings → Studio → Agent replies** (keys `explore_next`, `explore_explore`, `explore_quickReplies`, `explore_replyItems`, as before): **Next row** (on), **Things to explore** (on), **Quick replies** (on), and **Your usual quick replies** (`👍 Looks good, 🔁 Try another way, ❓ Explain more`). They apply to agent sessions started after the change. A session's instructions carry one line about the Next row (or Explore): which attributes are on and your usual quick replies; the full rules are in the studio skill's "Agent guide" (`skills/studio/SKILL.md`), which the agent loads before it writes one.
 
@@ -1826,7 +1873,7 @@ The agent writes it as one line, and any group can be left out:
 ::next{reply="👍 Ship it|🧪 Add tests first" btw="🐛 I noticed the new endpoint retries without waiting. If the server is down, it will get hammered." do="📄 Write up the plan as a page"}
 ```
 
-Studio logs each suggestion once when it's shown and counts its clicks. The log keeps the last 180 days (at most 50,000 suggestions). `bb studio pages explore stats [--days 30]` prints how often each kind (reply, do, fix; older logs also have more, for the removed Tell me more, and explore, for the removed Visual explainer) is clicked and the most-clicked labels, so the instructions can be tuned from real use. Older replies with `::explore` or `::reactions` lines, or `explore` items in `::next`, still render.
+Studio logs each suggestion once when it's shown and counts its clicks. The log keeps the last 180 days (at most 50,000 suggestions). `bbs studio pages explore stats [--days 30]` prints how often each kind (reply, do, fix; older logs also have more, for the removed Tell me more, and explore, for the removed Visual explainer) is clicked and the most-clicked labels, so the instructions can be tuned from real use. Older replies with `::explore` or `::reactions` lines, or `explore` items in `::next`, still render.
 
 ## Apps
 
@@ -1863,11 +1910,11 @@ its versions and its addresses, and every older address still opens it:
 - **Item header.** Both views show the app's title and a **Saved** or
   **Interactive** badge; the artifact viewer and the mini app host underneath
   are separate.
-- **Agent tools.** `apps_list`, `apps_read`, `apps_create` (type
-  `"artifact"` or `"mini"`) and `apps_live` (an open mini app or live HTML
+- **Agent tools.** `apps (op: list)`, `apps (op: read)`, `apps (op: create)` (type
+  `"artifact"` or `"mini"`) and `apps (op: live)` (an open mini app or live HTML
   artifact). Each type's own list, read, create and live handlers stay
   inside Studio and aren't given to sessions. Changing an interactive app
-  stays with `minis_update` and `minis_data`.
+  stays with `apps (op: update)` and `minis_data`.
 
 ### Saved apps (artifacts)
 
@@ -1911,23 +1958,23 @@ with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
 - **Live HTML.** An HTML artifact's page gets `window.playground`, the same
   API as BB playgrounds: shared state that persists per artifact and syncs to
   every open copy, theme changes, an event log, actions an agent can run
-  (`apps_live`, or `bb studio artifacts state|watch|actions|do`), and
+  (`apps (op: live)`, or `bbs studio artifacts state|watch|actions|do`), and
   `send(label, data)`, which puts an @artifact pill holding that data in the
   thread's composer. A playground's HTML works unchanged as an artifact.
   In a chat card the page's frame fits its height (120–640 px).
 - **Save from a thread.** The save icon in the thread's **Studio** tab lists the
   files the latest reply created, changed or generated, the thread's storage
   files, and what the thread already saved. Nothing is saved automatically.
-- **Agent tools and skill.** `apps_create` (type `"artifact"`), `apps_list`,
-  `apps_read` and `apps_live`, and the `artifacts` skill. A saved
+- **Agent tools and skill.** `apps (op: create)` (type `"artifact"`), `apps (op: list)`,
+  `apps (op: read)` and `apps (op: live)`, and the `artifacts` skill. A saved
   artifact comes back as `::artifact{id="art_…"}` (`::app{id="art_…"}` with
   **App cards** on), a card with an inline preview that opens the viewer
   beside the chat. `@artifact` mentions give the agent the artifact's
   details and, for text up to 1 MB, its contents.
-- **Commands.** `bb studio artifacts save <path> [--title <title>]
+- **Commands.** `bbs studio artifacts save <path> [--title <title>]
   [--description <text>]`, `list [--thread]`, `show <id>`,
   `export <id> [path] [--force]` and `delete <id>`. A plugin registers one CLI
-  command, so the old `bb artifacts …` moved under `bb studio`.
+  command, so the old `bbs artifacts …` moved under `bbs studio`.
 - **Limits.** 25 MB per file. A version is keyed on its source thread and
   path; unchanged bytes add no version. Saving reads only from the thread's
   workspace or thread storage.
@@ -2035,14 +2082,14 @@ secrets aren't backed up, so a restored app asks again.
 #### Elsewhere in Studio
 
 - **Artifacts:** agents turn a live HTML artifact into a mini app with
-  `apps_create` (type `"mini"`) and `fromArtifactId`: its page becomes the app's
+  `apps (op: create)` (type `"mini"`) and `fromArtifactId`: its page becomes the app's
   `index.html` and its live state carries over.
 
 #### Agents
 
-`apps_create` (type `"mini"`), `apps_read`, `apps_list` and `apps_live`,
-`minis_update` and `minis_data`, the `minis` skill, and
-`bb studio minis list|show|data|state|watch|actions|do`. What an app returns
+`apps (op: create)` (type `"mini"`), `apps (op: read)`, `apps (op: list)` and `apps (op: live)`,
+`apps (op: update)` and `minis_data`, the `minis` skill, and
+`bbs studio minis list|show|data|state|watch|actions|do`. What an app returns
 to an agent is wrapped as data, never instructions.
 
 ## Whiteboards
@@ -2051,7 +2098,7 @@ A whiteboard is an [Excalidraw](https://excalidraw.com) scene that lives in a
 page. There's one way to make one in each place: `/whiteboard` in a page,
 **New → Whiteboard** in Studio (a new page called "Untitled whiteboard"
 holding one 640px whiteboard), `pages_create` with `type: "whiteboard"` for agents and
-`bb studio whiteboards create` on the command line. Each is embedded in its
+`bbs studio whiteboards create` on the command line. Each is embedded in its
 page as `{"kind":"drawing","target":"drw_…"}`, with an optional `"height"`.
 Whiteboards used to be "drawings", the separate Studio Draw plugin
 (`excalidraw`) and then a kind of their own. Items keep that id as their
@@ -2109,7 +2156,7 @@ open. Recapture with
 - **Card in the agent's reply.** When an agent adds or changes a whiteboard,
   its reply links the page (`::page{id="…"}`). Older replies' `::drawing`
   cards still show the picture, name and element count, read-only.
-- **Agent tools and skill.** `pages_list` with `type: "whiteboard"` (each
+- **Agent tools and skill.** `pages_read (no page)` with `type: "whiteboard"` (each
   whiteboard with its page), `pages_read` with a `drw_…` id (elements, app
   state, a text summary, and image files without their data; scenes over
   about 400,000 characters come back as element ids), `pages_create` with
@@ -2125,12 +2172,12 @@ open. Recapture with
   missed), and the agent's next read sees yours. Edits merge per element;
   two edits to the same element resolve by Excalidraw's `version`, higher
   wins. Deletions travel as tombstones (pruned after 30 days).
-- **Commands.** `bb studio whiteboards list`, `create --page <page-id> <name>`,
+- **Commands.** `bbs studio whiteboards list`, `create --page <page-id> <name>`,
   `show <id> [--raw]`, `rename <id> <new-name>`, `delete <id>`,
   `merge <id> <scene-file.json>` (an elements array or a full scene, with its
-  image files) and `remove-elements <id> <element-id…>`. `bb studio drawings …`
+  image files) and `remove-elements <id> <element-id…>`. `bbs studio drawings …`
   is the old name and still works. A plugin registers one CLI command, so the
-  old `bb excalidraw …` moved under `bb studio`.
+  old `bbs excalidraw …` moved under `bbs studio`.
 - **Export.** **Download PNG** in the editor renders in your browser. Studio's
   item menu exports PNG, SVG or the `.excalidraw` JSON, drawn on the server
   with Excalidraw's fonts (resvg's WebAssembly build loads on the first PNG).
@@ -2205,20 +2252,20 @@ The same deck presented with Play and moved on with →: "Why it matters",
 - **Card in the agent's reply** (`::design{id="…"}`) with the newest round's
   first screens. It opens the design in the thread's **Studio** tab beside
   the chat; back from it, the tab lists the thread's items, designs among them.
-- **Questions.** `design_ask` shows a form in the thread (choices, multi,
+- **Questions.** `design_review (op: ask)` shows a form in the thread (choices, multi,
   short answers, 1–5 scales, each with "Decide for me"); the answers return
   as the tool's result.
-- **Reviewer.** `design_ready` starts a reviewer agent in a hidden thread
+- **Reviewer.** `design_review (op: ready)` starts a reviewer agent in a hidden thread
   beside the design's own. It loads each screen at its size with Browser
   Automation, checks layout, errors and the design rules, and reports back
   only when something needs work, in the design's thread. After 3 such
   reviews in a row, automatic review pauses until you edit, comment or ask.
-- **Agent tools and skill.** `pages_list`, `pages_create` and `pages_read`
-  (with `type: "design"` or a `dsn_…` id), `design_rename`, `design_ask`, `design_ready`, `design_write_screen`,
-  `design_edit_screen`, `design_comments`, `design_resolve_comments`,
-  `design_save_style` and `design_styles`, and the `design` skill. `@design`
+- **Agent tools and skill.** `pages_read (no page)`, `pages_create` and `pages_read`
+  (with `type: "design"` or a `dsn_…` id), `design_screen (op: rename)`, `design_review (op: ask)`, `design_review (op: ready)`, `design_screen (op: write)`,
+  `design_screen (op: edit)`, `design_review (op: comments)`, `design_review (op: resolve)`,
+  `design_style (op: save)` and `design_style (op: list)`, and the `design` skill. `@design`
   mentions give the agent the design's rounds and options.
-- **Commands.** `bb studio designs list`, `show <id>` (rounds, screens and
+- **Commands.** `bbs studio designs list`, `show <id>` (rounds, screens and
   open comments as JSON), `html <id> <screen>`, `rename <id> <new-name>` and
   `delete <id>`.
 
@@ -2226,7 +2273,7 @@ Designs, rounds, screens, comments and saved styles are stored in Studio's
 SQLite database. Frames load from
 `GET /api/v1/plugins/studio/http/designs/screen`, whose response carries a
 sandbox CSP, so a screen gets an opaque origin with no access to BB.
-`bb studio backup` includes each design with its rounds, screens and
+`bbs studio backup` includes each design with its rounds, screens and
 comments; saved styles aren't in backups yet.
 
 ## Recordings
@@ -2403,8 +2450,8 @@ The compact recording header at 390 pixels, with **Chat** and **Item actions**.
   and combined; past six parts, the page says the notes cover the first part.
 - **Exports.** Download a finished transcript as Markdown or plain text, or
   download its original audio segments together as a tar archive.
-- **Agent tools.** `talk_list`, `talk_read`, and `talk_search` let agents find
-  and read bounded portions of recordings and summaries. `talk_make_notes`
+- **Agent tools.** `talk (op: list)`, `talk (op: read)`, and `talk (op: search)` let agents find
+  and read bounded portions of recordings and summaries. `talk (op: make_notes)`
   makes or updates a recording's notes page.
 - **Mobile layout.** The pill, recording pages, and composer mic all work in
   the BB mobile app, with larger touch targets on small screens.
@@ -2412,7 +2459,7 @@ The compact recording header at 390 pixels, with **Chat** and **Item actions**.
   recording* and *Talk: Pause or resume* are Studio commands now. A keyboard
   shortcut set on the Talk plugin's command has to be set again on Studio's
   (BB keys custom shortcuts by plugin).
-- **CLI.** `bb studio recordings list [--query <text>] [--json]`,
+- **CLI.** `bbs studio recordings list [--query <text>] [--json]`,
   `show <id> [--json]`, `transcript <id> [--cleaned] [--offset <chars>] [--limit <chars>]`
   and `notes <id> [--json]`. The bundled `talk` skill documents them for
   agents.
@@ -2661,8 +2708,8 @@ reply's message bar shows the four reactions as emoji.
 | Show reactions under your messages | `showInUserBar` | on |
 
 ```sh
-bb studio settings set emojiItems "👍 Agree, 👎 Disagree, ✅ Do it"
-bb studio settings set quotePosition after
+bbs studio settings set emojiItems "👍 Agree, 👎 Disagree, ✅ Do it"
+bbs studio settings set quotePosition after
 ```
 
 Message menus read the settings once when Studio's frontend loads. After a
@@ -2672,7 +2719,7 @@ menus. Other open windows update on their next reload.
 **Moving from Studio Reactions.** On its first start with `emoji-react`
 installed, Studio copies that plugin's settings once (a KV marker records
 it), skipping any you already changed in Studio. Then remove the old plugin
-from **Setup → Retired plugins** or with `bb plugin remove emoji-react`;
+from **Setup → Retired plugins** or with `bbs plugin remove emoji-react`;
 while both are installed, each shows its own buttons.
 
 ## What you get
@@ -2747,21 +2794,21 @@ so it's as you left it when you come back.
 ![A regular staged thread without a workspace: its header shows the Automations count and no VS Code button.](assets/thread-header-automations.png)
 - **For agents**: the `studio_list_items`,
   `studio_tag_items`, `studio_delete_items` and
-  `studio_move_items` tools, the `bb studio` CLI, and a `studio` skill. With
+  `studio_move_items` tools, the `bbs studio` CLI, and a `studio` skill. With
   `studio_workspace`, `studio_open_items` and `studio_close_tabs` an agent sees
   the tabs you have open in the BB window you're using, opens items beside
   them, and closes tabs.
 
 ```sh
-bb studio list [query…] [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]
-bb studio tags
-bb studio starred [--json]
-bb studio move <item-link|plugin:id>… --project <name|id|global>
-bb studio providers
-bb studio health [--json]
-bb studio auth status [--json]
-bb studio auth login <provider-or-account> [--no-wait] [--json]
-bb studio reindex
+bbs studio list [query…] [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]
+bbs studio tags
+bbs studio starred [--json]
+bbs studio move <item-link|plugin:id>… --project <name|id|global>
+bbs studio providers
+bbs studio health [--json]
+bbs studio auth status [--json]
+bbs studio auth login <provider-or-account> [--no-wait] [--json]
+bbs studio reindex
 ```
 
 ## Bot
@@ -2880,7 +2927,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   its replies), and **Earlier conversations** (its
   handoff chain, closed by default). When its automations run is the Bot
   page's week, not the sidebar. A thread another of its threads started
-  nests under that one, at any depth (`bot_activity` returns each thread's
+  nests under that one, at any depth (`bot_info (view: activity)` returns each thread's
   `parentId`). A row opens the thread as a BB thread in the main pane; a
   bot's row opens its chat the same way, and the Bots list stays. On a
   bot's thread the expanded bot is the thread's owner. Each bot's **ⓘ**
@@ -2983,7 +3030,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   just how many, "1") and on the selected Bot's second line
   (`src/ui/bot/rowState.ts`). Most urgent first: **needs you** while its
   chat has a pending question or approval, or a released todo
-  (`bot_activity`'s `attention`, `bot_attention`); the **spinner** while its
+  (`bot_info (view: activity)`'s `attention`, `bot_attention`); the **spinner** while its
   chat, a thread its chat spawned, or (on the selected Bot) a thread in
   progress is working; **failed** when its chat's last turn failed unread;
   the **unread** dot for replies you haven't read. The Bot's chat is a
@@ -3048,7 +3095,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     schedule; have several (Morning brief 8:00, Evening wrap-up 18:00). The
     Bot's original check-in (its project heartbeat) is listed first as
     **Check-in**, schedule unchanged; its instruction stays
-    the Memory page's `## Check-in` section, and it takes one repeating
+    the `## Check-in` section of the Bot's always-on core skill, and it takes one repeating
     cron. Turning it off keeps its schedule.
   - **Reminder**: one message to the Bot's thread at a time; done once it
     ran. **Run now** on a reminder does not use it up.
@@ -3171,9 +3218,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   recent runs with what came of each (Studio's `trigger_runs`; a watcher's
   from BB's `automations_runs`), Pause /
   Resume, Run now, Edit and Delete. A bot with none only wakes when you
-  write. The Bot has `automation_list`, `automation_create`,
-  `automation_update`, `automation_pause`, `automation_resume`,
-  `automation_run_now` and `automation_delete` ("in 2h check the deploy" is
+  write. The Bot has `schedule (op: list)`, `schedule (op: create)`,
+  `schedule (op: update)`, `schedule (op: pause)`, `schedule (op: resume)`,
+  `schedule (op: run_now)` and `schedule (op: delete)` ("in 2h check the deploy" is
   a reminder); `runner_*` still work.
 
   **Turned off by BB** (`src/auto-resume.ts`, table
@@ -3242,22 +3289,22 @@ of Staff", with the same thread and check-ins; rename it from its page.
   a month) shows as "Custom: <cron>".
 
   ![The schedule editor editing the Release watch watcher: its bash script and 30 s timeout, what to do with the output, Wakes: The bot; presets, the Every… mode, every day on, every 15 minutes from 0:00 to 23:59, quiet hours 10:00 PM–7:00 AM, no end date, the America/New_York timezone, and the preview "Every 15 min, every day · quiet 10:00 PM–7:00 AM" with its cron */15 7-21 * * *](assets/bot-schedule-editor.png)
-- **Memory**: a core profile page per Bot, loaded into every conversation
-  and worker, plus memory records the Bot searches; see **Memory** below.
-  The profile's `## Check-in` section is what the Bot looks at on each
-  check-in, and the check-in prompt says: do its `## Check-in`, and stay
-  silent unless something matters.
+- **Memory**: an always-on core skill per Bot, loaded in full into every
+  conversation and worker, its on-demand skills, and its conversation
+  history; see **Memory** below. The core skill's `## Check-in` section is
+  what the Bot looks at on each check-in, and the check-in prompt says: do
+  its `## Check-in`, and stay silent unless something matters.
 - **Skills**: when the Bot learns a reusable procedure it saves a skill with
-  `bot_skill_edit` op `write` (name, one-line description, Markdown steps),
+  `bot_skill (op: edit)` op `write` (name, one-line description, Markdown steps),
   fixes one in place with op `patch` (exact text → new text) and removes one
   with op `delete`. Only the
   Bot's thread has these: they live in Studio's `bot_skills` table. Its
   instructions list up to eight skills (pinned, then most recently used)
   by name and one-line description, and say how many more there are.
-  `bot_skill_list` with a `query` finds the rest on demand: it ranks the Bot's own
+  `bot_skill (op: list)` with a `query` finds the rest on demand: it ranks the Bot's own
   non-archived skills by its words in their names, descriptions and full
   text (BM25, names weigh most) and returns the best with a body snippet.
-  It loads the full skill with `bot_skill_view` (`bot_skill_list` without a
+  It loads the full skill with `bot_skill (op: view)` (`bot_skill (op: list)` without a
   query lists them).
   Writes and patches return advisory notes, never blocking: a body that
   reads like a log of one session (dates, PR numbers, "we tried"), one over
@@ -3266,7 +3313,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   makes at runtime can't be a native per-thread skill. **Skills** (⋯, or
   Bot info → **Manage skills**) has **Share**, which moves the skill to BB's user skills
   (`<BB data dir>/skills/<name>/SKILL.md`, scope `bb-user`; see
-  `bb skill list`), where every agent finds it; it refuses a name that's
+  `bbs skill list`), where every agent finds it; it refuses a name that's
   already there. **Delete** removes it. See "Skills that learn" below.
   Each Bot has a **Skills** page (`skills/<botId>`, `src/ui/skills/`) on
   the Bot-page template, beside Memory: its skills (archived ones apart),
@@ -3284,27 +3331,26 @@ of Staff", with the same thread and check-ins; rename it from its page.
   background review and curator). A Studio bot reviews its own work in the
   background and keeps its skills current. External bots learn on their own
   provider, so none of this runs or shows for them.
-  - **Counting.** When the bot's thread goes idle (`thread.idle`), Studio
-    reads its new events (`threads.events.list` after the last sequence it
-    counted). A `turn/completed` whose turn had any tool item
-    (`commandExecution`, `toolCall`, `mcpToolCall`, `fileChange`, ...)
-    counts as a tool turn; a `client/turn/requested` from the user counts as
-    a user turn. A `bot_skill_edit` call resets the tool count. The first look at a thread only takes a baseline, so old
-    history never trips it.
-  - **Review.** When either count reaches the interval (10 by default) and
-    the bot is active and idle, Studio forks its thread (`threads.fork`,
-    hidden, so no notice reaches the bot), switches the fork to the cheapest
-    model of the same provider (a price in the model's description, else a
-    name like haiku or luna; or the model you pick) and sends it a review
-    prompt: lessons, not logs; one skill per kind of task; merge a repeated
-    lesson into one rule; fix wrong lines in place; your corrections and
-    "remember this" first; facts about you go in memory records. It has
-    only the skill tools plus `pages_read` and `memory_search`,
-    `memory_add` and `memory_update`, and replies
+  - **When.** Never by turn count. A review runs when a conversation is
+    archived (one pass over it), and once a day after 3 AM local: a sweep
+    queues Main and each unarchived conversation with events since its last
+    review (`bot_skill_review_marks`). Queued reviews
+    (`bot_skill_review_queue`) survive a restart and run one at a time per
+    bot from the minute tick. Run now sweeps at once.
+  - **Review.** Studio forks the thread under review (`threads.fork`,
+    hidden, so no notice reaches the bot; an archived conversation can be
+    forked for its archive pass), switches the fork to the cheapest model
+    of the same provider (a price in the model's description, else a name
+    like haiku or luna; or the model you pick) and sends it a review
+    prompt: what goes where and what never to save (the studio skill's
+    "Where information goes"), lessons not logs, one skill per kind of
+    task, fix wrong lines in place, your corrections and "remember this"
+    first. It may patch on-demand skills or the always-on skill within its
+    caps. It has only the skill tools plus `pages_read`, and replies
     `[PASS]` when there's nothing to save. When it goes idle Studio records
     the result ("Saved 1 skill", "Nothing to save") and archives the fork.
-    One review per bot at a time; a new turn in the bot's thread, Pause or
-    Stop stops it, and so do 20 minutes. Review forks stay out of Activity.
+    A new turn in the thread under review, Pause or Stop stops it, and so
+    do 20 minutes. Review forks stay out of Activity.
   - **Curator.** The bot's built-in Maintenance runs skill curation:
     a skill unused for 30 days (not loaded or saved) becomes stale, for 90
     days archived. Archived skills leave the bot's list but are kept;
@@ -3318,7 +3364,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     lint warnings. **Revert** restores a version in one click and appends a new
     version, preserving what it replaced. Deleted skills also stay in history.
     Built-in lint runs on saves. The optional review model can attach quality
-    or safety warnings through `bot_skill_lint`; warnings never block a save.
+    or safety warnings through `bot_skill (op: lint)`; warnings never block a save.
     History and model findings use append-only tables (`bot_skill_versions`
     and `bot_skill_lints`). Upgrade applies pending changes as approved and
     clears the pending list. For one release, `bot_skill_pending_resolve` is a
@@ -3330,7 +3376,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     See [the approval audit](../../docs/approvals.md) for the iOS follow-up.
 
   ![Staged Bot info → Skills with the system-report skill's history expanded and Revert visible. Saves apply immediately; there is no Waiting for approval state.](assets/bot-skills.png)
-- **Recall**: `bot_history_search` searches BB's thread search, keeping
+- **Recall**: `bot_info (view: history)` searches BB's thread search, keeping
   only the Bot's threads (its handoff chain and threads it started). BB's
   search skips hidden threads; the Conversations page's search reads the
   conversations' messages itself.
@@ -3439,8 +3485,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
     the Mobile relay sends no push for `[PASS]`. The send carries
     `pluginSubmission` `{ pluginId: "studio", data: { kind: "cache-keepalive" } }`
     for `message.dispatch` hooks; Smart Queue only holds human sends to busy
-    threads and pings only go to idle ones. Learn from work doesn't count a
-    ping as a user turn, and a ping doesn't stop a running review.
+    threads and pings only go to idle ones. A ping doesn't stop a running
+    skill review.
     Maintenance owns skill curation independently of these pings.
   - **Compaction before expiry**: when warming stops for the idle cutoff
     while the cache is still warm, Studio compacts the chat once, when the
@@ -3509,10 +3555,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - Its thread is an implementation detail. A handoff (`thread_handoff`)
   moves the Bot to the new thread. It is the personal project's lead, so it
   sees every project.
-- RPCs: `bot_list`, `bot_get`, `bot_create`, `bot_set` (name, avatar emoji, shape, color, role),
+- RPCs: `bot_list`, `bot_info (view: profile)`, `bot_create`, `bot_set` (name, avatar emoji, shape, color, role),
   `bot_profile_changes`, `bot_profile_revert` (a change id), `bot_set_thread`,
   `bot_set_run` (check-ins), `bot_pause`, `bot_resume`, `bot_stop`,
-  `bot_activity`, `bot_memory`, `bot_chain` (its thread and the ones it
+  `bot_info (view: activity)`, `bot_memory`, `bot_chain` (its thread and the ones it
   handed off from, oldest first), `bot_checkin_preset` (`morning`,
   `evening`, `working` or `off`), `bot_skills`, `bot_skill_write`, `bot_skill_share`,
   `bot_skill_delete`, `bot_skill_pin`, `bot_skill_restore`, `bot_learning`,
@@ -3520,13 +3566,13 @@ of Staff", with the same thread and check-ins; rename it from its page.
   lists what it would change), `bot_skill_history`, `bot_skill_revert`,
   `bot_skill_pending_resolve` (deprecated for one release), and the runner RPCs below. Each takes an optional
   `botId` (the primary when absent); `bot_create` makes the primary first,
-  then additional bots. Agent tools: `bot_get`, `bot_profile_update`,
-  `bot_state` (`action`: `pause`, `stop` or `resume`; pause and stop work
+  then additional bots. Agent tools: `bot_info (view: profile)`, `bot_profile_update`,
+  `bot_info (view: state)` (`action`: `pause`, `stop` or `resume`; pause and stop work
   only in the Bot's own chat or its handoff chain, where resume is refused;
   threads it started, its runners and other threads are refused pause and
-  stop, and the user uses Studio → Bot) and `bot_activity`; only the Bot's
-  thread also gets `bot_skill_list`, `bot_skill_view`, `bot_skill_edit`,
-  `bot_skill_lint`, `bot_history_search`, `runner_migrate` and the
+  stop, and the user uses Studio → Bot) and `bot_info (view: activity)`; only the Bot's
+  thread also gets `bot_skill (op: list)`, `bot_skill (op: view)`, `bot_skill (op: edit)`,
+  `bot_skill (op: lint)`, `bot_info (view: history)`, `runner_migrate` and the
   `automation_*` tools.
 - **Watchers**, for script authors. Studio creates a BB script automation
   (bash, sh, node or python3; timeout up to 15 minutes; working directory
@@ -3563,9 +3609,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   name, a job (a short instruction), a schedule (on Studio's own scheduler,
   waking its own thread; the heartbeat's cadences and cron), a state (active or
   paused), its last run and its last report. The Bot makes one with
-  `automation_create` (kind `runner`) when a task becomes recurring; its first run starts at
+  `schedule (op: create)` (kind `runner`) when a task becomes recurring; its first run starts at
   once, and each scheduled run's prompt carries the job.
-  - **Machines**: `automation_create` and `automation_update` accept an
+  - **Machines**: `schedule (op: create)` and `schedule (op: update)` accept an
     optional `machine` for a runner (host id or unique host name, with
     `confirm` after preflight warnings), and `runner_migrate` moves one;
     Studio stores the resolved id.
@@ -3673,9 +3719,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
     runner. RPCs: `bot_runners`, `bot_runner_create`, `bot_runner_update`,
     `bot_runner_pause`, `bot_runner_resume`, `bot_runner_run_now`,
     `bot_runner_delete`, `bot_runner_seen`, `bot_runner_adopt`. The Bot's
-    tools: `automation_create` (kind `runner`), `automation_update`,
-    `automation_pause`, `automation_resume`, `automation_delete`,
-    `automation_list`, `automation_run_now` and `runner_migrate`.
+    tools: `schedule (op: create)` (kind `runner`), `schedule (op: update)`,
+    `schedule (op: pause)`, `schedule (op: resume)`, `schedule (op: delete)`,
+    `schedule (op: list)`, `schedule (op: run_now)` and `runner_migrate`.
 - **External bots**: Studio no longer lists the Studio Agents plugin or
   offers Import bot. A bot made earlier on an external agent (Hermes,
   OpenClaw, Grok or Dot) keeps working where that plugin is still
@@ -3684,7 +3730,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `bot_*` tools don't reach it (`bot_external_providers` still reports the
   providers).
 - **Model is the thread's**: a bot follows its current thread, and the
-  provider and model are that thread's (`bot_get` reads them off BB). BB keeps
+  provider and model are that thread's (`bot_info (view: profile)` reads them off BB). BB keeps
   a thread on one provider for life: `threads.update` changes only its model
   and reasoning level, and BB's composer (in the bot's chat too) picks models
   within the thread's provider, with no hook for a plugin to intercept. So
@@ -3721,175 +3767,229 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `chief_of_staff_set` and `chief_of_staff_set_run` remain as deprecated
   aliases for one release.
 
+## Long results in parts
+
+Tools whose results can be long return them in parts (`src/paging.ts`): a
+default budget (about 6,000 characters for a list, 8,000 for a skill's text,
+12,000 for a transcript, an app's source or text and a page, whole screens up
+to 30,000 for a design), the header first and right after it a line such as
+`(Showing 1–30 of 120 recordings. Next: talk { op: "list", after: "WzE3…" }.)`
+with the exact call for the next part under the name the session sees. Most
+lists page by keyset: the cursor (`after`, an opaque string) is the last shown
+item's place in an order that doesn't change while the item lives (creation
+time and id; areas by problems first, name and id; skills pinned first, then
+name), so items that change, arrive or go between parts never make another
+item repeat or go missing. Memory search orders by relevance, which shifts as
+records change, so it pages by `offset` and says to search again after
+changing records; `minis_data` find with an `order` pages by `offset` the
+same way (without `order`, newest created first, by keyset, which keeps a
+migration that patches each part's records whole). A text's cursor is a
+character offset, cut at a line end and never inside a surrogate pair. A
+cursor that can't be read, or an offset past the end, gets a reply with the
+exact call that starts again. A list with a fetch cap (talk, pages search,
+apps) takes the newest created up to the cap, the same order its parts go in,
+so an edit can't move an item into or out of the list; a count that hit the
+cap reads "At least N". Lists show one short line per item (the schedule, areas, skills,
+conversations) and the full item through its own call:
+`schedule { op: "list", id }`, `area { op: "get" }`, `bot_skill { op: "view" }`.
+
+| Tool | Part | Cursor |
+|---|---|---|
+| `memory` search | 10 records, 6,000 characters, most relevant first | `offset` |
+| `schedule` list | short lines, 6,000 characters (`id` for one in full) | `after` item id |
+| `bot_skill` list / view | 6,000 characters of lines / 8,000 of the skill | `after` keyset / `offset` |
+| `bot_info` conversations, activity | 6,000 characters, sections repeated | `after` thread or line id |
+| `area` list | one JSON line per area, 6,000 characters (`area` get for one: its 10 newest runs) | `after` keyset |
+| `talk` list, search / read | 30 recordings, newest first (an excerpt only for those shown) / 12,000 of the transcript | `after` keyset / `offset` |
+| `apps` list / read | 100 apps, newest first, 6,000 characters / 12,000 of a mini's source or an artifact's text | `after` keyset / `offset` |
+| `minis_data` find | 25 records, 6,000 characters | `after` keyset (no order) / `query.offset` (with order) |
+| `pages_read` without page / with `query` / with page / a design | 6,000 characters of the tree / of the hits, newest first / 12,000 of the page / whole screens to 30,000 | `after` page id / `after` keyset / `from` block / `screenIds` left |
+| `code_comments` | whole threads, 6,000 characters | `after` keyset (resolved threads drop out) |
+
+## Tool scope and lean context
+
+Each session loads only the Studio tools its thread kind uses (`src/tool-scope.ts`,
+chosen from a week of tool-call history). The rest stay reachable on demand:
+
+| Kind | Loaded | On demand |
+|---|---|---|
+| Main | pages, strand_note, conversation and Bot tools, schedules, skills, areas, design, code (op: show) | everything else |
+| A Bot conversation (any thread the user starts) | pages, strand_note, conversation tools | everything else |
+| Project lead | pages, strand_note | everything but the Bot's own schedules and skills, themes and presence |
+| Worker | pages_read, pages_create, pages_edit | designs, apps, recordings, whiteboards, pages_read (no page), pages_read (comments) |
+| Runner | runner_report, pages_read, pages_edit | pages, designs, apps, recordings, whiteboards, areas (never the user's screen, strands or the Bot's tools) |
+| Studio Decisions classifier thread | nothing | nothing |
+
+How the on-demand tools reach the agent depends on the provider:
+
+- **Claude Code** gets them all and defers them behind its own tool search.
+- **Codex** gets them with `deferLoading` when BB supports it
+  (`experimental_hooks.experimental_features.deferredAgentTools`): each one's
+  `parameters` override carries `x-bb-defer-loading: "studio"`, and BB puts
+  them in a `studio` namespace (Codex takes deferred tools only inside one).
+- **Pi, ACP agents**, and Codex on a BB without that flag, get
+  `studio_tool_search`, `studio_tool_describe` and `studio_tool_call`
+  (`src/tool-scope-tools.ts`), Tool Gateway's search → describe → call shape.
+  When the thread also has Tool Gateway, the same three reach its MCP tools
+  (ids `tg_…`) and Tool Gateway's own three aren't loaded. Their instruction
+  line says that any Studio tool named in the instructions, a skill or the
+  chat's context that isn't in the tool list goes through `studio_tool_call`
+  with its bare name as the id.
+
+Shown schemas are slimmed (`src/slim-schema.ts`): a union told apart by one
+`const` field (pages_edit's ops) becomes one object with an enum and a
+"Needs:" note per value. BB still checks each call against the tool's own zod
+schema, so the agent gets the same error for bad input.
+
+**Lean context** (Settings › Agent context, `src/context-lean.ts`): per
+provider, Auto, Lean or Full. Lean loads only `strand_note` (Main,
+conversations, leads) or `runner_report` (runners) plus the three search
+tools, lists none of Studio's skills, and its pointers don't send the agent to
+one. Auto is Lean for an ACP agent whose model id names a local endpoint
+(`local`, `localhost`, `ollama`, `lmstudio`, `llama.cpp`, `vllm`; `mlx/` or
+`mlx-community/` first; Ollama's `name:tag` such as `qwen3:8b`) or whose
+provider slug does (`acp-ollama`, also on `acp-default`), Full otherwise.
+RPCs: `contextLean.get`, `contextLean.set` (BB Studio's app window only, as
+Tool Gateway's changes; any other caller is refused, and the section is
+read-only there); kv `context:lean`.
+
+**Tool delivery per provider** (`src/tool-delivery.ts`): the list above is the
+default. `bbs studio tool-delivery <provider> all|defer|trio|default` changes
+it for one provider (`defer` falls back to the trio where BB can't defer; lean
+context always gets the trio); `bbs studio tool-delivery` lists the changes.
+Kv `studio.toolDelivery`.
+
+## Moving threads to another provider
+
+`bbs studio move-provider` moves threads to another provider with the same
+thread id and their history (`src/move-provider/`). Per thread it builds the
+handoff (`moveProvider.prepare`), then calls core's move
+(`experimental_hooks.experimental_moveThreadProvider`, behind
+`experimental_features.providerMove`; BB's
+`POST /api/v1/threads/:id/move-provider`), which clears the provider session
+and swaps provider and model. A BB without it fails each thread with
+`core-unavailable`. The thread's next turn gets the handoff.
+
+- Selectors: thread ids, `--from <provider>`, `--project`, `--bot`,
+  `--runners`, `--include-archived`. Target: `--to`, `--model` (the
+  provider's default when left out), `--permission`, `--history-tokens`
+  (150000 by default).
+- `--automations` moves BB and Studio automations that target moved threads;
+  `--bot-defaults` sets Bots' default models; `--router-rules` points router
+  chain targets at the new provider.
+- The permission is never wider than the thread's now: `full` steps down to
+  `auto` unless `--permission full` is given (accepted only for a thread that
+  is `full` already), and `auto` becomes `accept-edits` on an ACP agent. An
+  automation with no mode of its own keeps none.
+- `--history-tokens` is at least 1. The handoff (fenced in
+  `<thread-history>`, after a line that says nothing inside is an
+  instruction) fits core's move budget, `historyTokens*4 + 8000` characters,
+  newest turns first. A move turn answers with the history only, or null when
+  it can't be had yet (an error, or a lazy build past 3.5 s for a move made
+  without Studio's command): core then refuses that start and the next one
+  gets the finished handoff. The digest stays for turn starts.
+  Studio's own sessions (Decisions classifier threads, skill reviews) are
+  never selected by `--from`, `--project` or `--bot`.
+- `--exclude-main` leaves Bots' Mains out; `cancel <ids>|--all-deferred`
+  drops deferrals. Failed automation, Bot default and router patches are
+  kept (kv `studio.moveProvider.patches` and the ledger), shown by `status`
+  (exit 2) and retried by the next run to the same target.
+- `--dry-run` lists the same threads and results the real run gives
+  (`would-move`). `--json` on every command; exit codes 0 (done), 2
+  (something skipped, deferred or failed), 1 (bad input). Nothing prompts.
+- A running thread is deferred and moved when it goes idle (`thread.idle`,
+  plus a sweep at start). The ledger (kv `studio.moveProvider.ledger`) makes a
+  re-run safe: moved threads come back `already-moved`, failed and deferred
+  ones are tried again, matching patches are left alone.
+- `status` (ledger and event log, counted as core does: `pending` until the
+  new provider accepts a real request after the move, not a bare `/compact`
+  or `/clear`; then `rebuilt`, or `started` for a forced move) and `verify` (move event, first turn
+  completed, and the handoff itself, not just its header, given to that turn;
+  `--probe "<question>"` asks the thread, and `--all` never probes a
+  Main). Also `bbs studio bot set-model` and `bbs studio runner move-provider`.
+- The command never moves the thread it runs in. The runbook for an agent
+  doing a migration is the `move-provider` skill.
+
 ## Memory
 
-Each Studio Bot has one memory, shared by all its conversations and workers
-(`src/memory`). It has two layers:
+A Studio Bot's memory has three layers, all on its Memory page
+(`/plugins/studio/studio/memory/<botId>`, `src/memory/ui/MemoryView.tsx`):
 
-- **Core profile**: a short Studio page you edit: who you are, how you work,
-  hard rules, people and places, and the Bot's `## Check-in` list. It is the
-  Bot's memory page (`memoryPageId` in `bot_get`), so the check-in,
-  Maintenance and the Bot page find it there. Its text is loaded **always**:
-  Studio's agent configuration adds it to the instructions of every
-  conversation of the Bot (its chat, side threads, forks of its chat) and
-  every worker (runners, threads it started or owns) at each session start
-  or resume, right after the Bot's own instructions.
-  Older BB hosts keep at most 4,096 characters of a plugin's instructions
-  (BB since #7050 keeps 32,768), so the profile gets at most 2,500
-  characters (`PROFILE_CAP_CHARS`) and never more than what is left after
-  the Bot's own instructions and the conversation note. After it come only
-  one-line pointers (`src/agent-instructions.ts`): Pages, mini apps, the
-  Next row or Explore, and the kinds routing; their full rules are in the
-  studio skill's "Agent guide", which every session gets and loads on
-  demand. A typical conversation (a role, eight skills, a profile split from an old page)
-  stays within 4,096 characters (`src/agent-instructions.test.ts`). A longer profile is cut
-  at a line break, and the Bot is told the rest is on the page (`pages_read`).
-  The Memory view shows the profile's length against the cap, in amber when
-  it is over. A new Bot's memory
-  page is a core profile from the start.
-- **Memory records**: facts, decisions and notes in Studio's database
-  (`memory_records`, full-text search with SQLite FTS5; the topic weighs
-  double). Each record has a topic, a date, a source (a conversation, a
-  worker, another thread, a page and its section, or you) and, when it
-  corrected another record, a `replaces` pointer. A correction never edits a
-  record: it adds a new one that replaces it, and the old one stays as
-  history, marked replaced. Archive hides a record from the Bot and the list;
-  it is kept and can be restored.
+- **Core: always-on skills** (`src/core-skill.ts`). The Bot's skills with
+  `bot_skills.always_on` set go in full into the instructions of every
+  conversation and worker of the Bot, at each session start
+  (`src/memory/service.ts`, `withMemory`), core first, between
+  `<always-on skill="…">` tags. They share a 2,000-character budget
+  (`ALWAYS_ON_CAP`). The default one, `core-profile`, has three sections:
+  `## Preferences` (at most 25 one-line rules), `## Right now` (at most 10
+  temporary constraints, pruned weekly by Maintenance) and `## Check-in` (the
+  check-in list, which the check-in prompt and the check-in presets use).
+  The caps are advisory lint on each save: nothing is blocked or cut
+  silently. When the skills don't fit what the host's 4,096-character
+  instruction limit leaves, the block is cut at a line break and says which
+  skill to read for the rest. Always-on skills are pinned, so the curator
+  never retires them, and they are left out of the on-demand list.
+- **Skills**: the on-demand skills, listed by name in the Bot's
+  instructions and loaded with `bot_skill (op: view)`. Skill review runs
+  once a day (a sweep over Main and the unarchived conversations with new
+  events) and once when a conversation is archived (`src/skill-learning.ts`).
+  It may patch on-demand skills or the always-on skill, or reply `[PASS]`.
+- **History**: everything that happened stays in the conversations and
+  their archived summaries (`bot_threads.finished_summary`), searched with
+  `bot_info (view: history)`. Archiving a conversation keeps its summary on
+  the conversation and posts the card to Main; nothing is copied elsewhere.
 
-The Bot is told to search records before it relies on what it remembers, to
-save new ones and correct old ones with the tools below, and not to keep
-facts on a page. Skill reviews save facts as records too.
+On the page: Core's sections are edited in place, with a quiet
+"1,420 / 2,000 chars" budget. Skills has + New skill, each skill's editor
+and version history, and one row for Auto-learn (Daily + on archive) with
+Run now. History switches between Summaries (cards, searchable) and Past
+conversations (full-text search).
 
-### Memory tools
+### From the core profile page
 
-Every conversation and worker of a Studio Bot has these. They act for the
-Bot of the calling thread (a thread no Bot owns counts for the primary Bot).
+Before always-on skills, a Bot's core profile was a Studio page
+(`memory_profiles.profile_page_id`, else `bots.memory_page_id`). At plugin
+start, and on first need, each Studio Bot gets its always-on skill once
+(`src/core-skill-migrate.ts`, marked in `bot_core_skills`):
 
-- `memory_search { query, topic?, limit? }` (limit 1–50, default 10): returns
-  `{ total, records: [{ id, topic, date: "2026-11-07", source: { kind, id,
-  title, section?, finished? }, text, replaced, replacedBy?, replaces?,
-  archived? }] }`. Current records come first; an empty query lists the
-  newest.
-- `memory_add { topic, text, source? }`: saves a record. The source defaults
-  to the calling thread, as Studio placed it (`bot_threads`): Main is
-  "Main", another conversation its title, a worker its title (a runner's
-  "Runner: <name>"). A thread Studio hasn't placed yet falls back to the
-  older guesses (the Bot's chat, a side thread, a runner, a thread the Bot
-  started). Give a source to link elsewhere, for example a finished
-  conversation's summary: `{ kind: "conversation", id: "<thread id>",
-  title?: "Launch prep" }` (the title is looked up when left out).
-  `kind` is `conversation`, `worker`, `thread`, `page` or `manual`; every
-  kind but `manual` needs an `id`.
-- `memory_update { id, text, topic? }`: saves a NEW record that replaces
-  `id` (which must be current, not already replaced) and keeps the old one.
+- The page's text is copied whole into `core-profile` (or
+  `core-profile-moved` when the user already has an on-demand skill of that
+  name). Nothing is rewritten or cut. A text over the budget is kept and
+  flagged by the skill's lint, on the Memory page and in Maintenance.
+- A Bot without such a page gets the template (the three sections).
+- A Bot that already has an always-on skill is only marked.
+- The page itself is left as it was. No new core profile pages are made.
+- Then the retired memory tables are dropped (below).
 
-### The Memory view
+### Retired: memory records
 
-`/plugins/studio/studio/memory` shows the Bot last picked in this window (or
-the primary); `/plugins/studio/studio/memory/<botId>` shows one Bot, on the
-Bot pages' template. The header reads "Memory · <Bot>". The toolbar has a
-search field ("Search N records"; `/` focuses it, Esc clears it and a second
-Esc leaves it), topic pills (All, then topics by how many records use them),
-a sort (Newest, Oldest, Topic) and **New** (a record). Then the core profile,
-a folded block with its length ("900 of 2,500 characters", amber when over)
-that opens to the page, edited in place with the page editor. Then the
-records, one line each with its topic and date (an empty list reads "No
-records"), and the replaced ones folded below. A record opens as a tab in the
-workbench beside the page (`bb://record/mem_…`): its text, topic, date, source link ("from Main", "from
-“Launch prep” (finished)", "from Runner: staff sweep") and the "replaces
-“…” (date)" line in amber, with **Edit** (it saves a new record that
-replaces the one you edited) and **Archive** (with Undo).
-
-### Splitting an old Memory page
-
-A Bot made before core profiles has one Memory page that holds everything.
-Studio splits it once, on its own: at plugin start for every Bot that still
-has an old page and no core profile, and on the first load of that Bot's
-memory (`memory.overview`) if it hasn't happened yet. There is no preview
-and nothing to confirm; the Memory view only ever shows the core profile and
-the records. The old page is only read: nothing on it is changed, moved,
-archived or deleted, and the records link to it. Until the split runs, the
-Bot is told to read the old page when it needs it and not to edit it, and
-Maintenance doesn't tidy it.
-
-How the page is split (`src/memory/split.ts`):
-
-- Every heading is a section (`##`, `###`, `####`, below a lone `#` title),
-  so a page with two top sections ("Check-in", "Memory") and many
-  subsections ("How the user works", "Standing rules", "Fork", …) treats each
-  subsection on its own. Text under a heading before its first subheading
-  is a section of its own, named after that heading; an empty one is none.
-  Text above the first heading becomes records (topic "Notes").
-- A section is named by its heading; under a parent that says something
-  ("## Projects" › "### Larkspur") the name is "Projects › Larkspur", under a
-  catch-all one ("Memory", "Notes", "Facts and decisions") just its own
-  heading. The name is the records' default topic and their source section.
-- Only two kinds of section stay in the **core profile**: the check-in list
-  and how the user works, that is a section whose heading, or a heading
-  above it, is "Check-in" or "How <name> works" ("How Sam works", "How
-  they work"; any case). Every other section (who the user is, rules,
-  people, preferences, Systems, Facts and decisions, Fork, …) becomes
-  **records**.
-- The profile must fit the 2,500-character cap (`PROFILE_CAP_CHARS`). When
-  those sections are longer, the longest goes to records, then the next,
-  until the rest fits, so a split profile is never over the cap. A page with
-  neither section gets a profile with the two empty headings.
-- Profile sections are copied word for word, in page order, into a NEW page,
-  "<Bot>'s core profile"; a subsection sits under its profile parent, else
-  under its own `##` heading.
-- In a records section, each top-level bullet (with its nested bullets),
-  paragraph, quote or table row is one record. Its topic is the nearest
-  heading above it, or a short bold label it starts with (`**homelab:** …`). Its
-  date is the first date in its text (`2026-11-07`, `Nov 7`, `7 Nov 2026`,
-  `11/7/2026`; without a year, the latest such date on or before the page's
-  last edit) unless that is after the page's last edit (a due date);
-  otherwise the page's last edit. Its source is the old page, by title and
-  id, with the section heading. A code block joins the record above it.
-
-The split makes the profile page, adds the records, records the split
-(`memory_profiles.split_at`, with the old page's id) and points the Bot's
-memory page at the new profile. That marker keeps it from ever running
-again for the Bot.
+The memory records subsystem is gone: the `memory_search`, `memory_add` and
+`memory_update` tools and the merged `memory` tool, the record tab, the old
+Memory page split, and the Conversations records archiving used to write.
+At start, once every Studio Bot has its core skill (each Bot's marker in
+`bot_core_skills` is written in the same transaction as its skill, so a
+failed copy holds this back), Studio drops `memory_records`, its FTS index
+and triggers, and `memory_profiles` (`dropRetiredMemory` in
+`src/core-skill-migrate.ts`). Later starts find nothing to drop.
 
 ### Memory RPC
 
-All methods are Studio RPC (`studio` plugin) and take an optional `botId`;
-without one they act on the primary Bot. External Bots (Studio Agents) keep
-their own memory, so every method refuses them. Shapes are in
-`src/memory/contract.ts`; `src/public-contract.ts` includes them, so they are
-in `contracts/studio.schema.json` and the iOS app's generated
-`StudioContract.swift` (`Studio.Method.memory_list` and the rest).
+Kept for the phone app's Memory page (`src/memory/register.ts`). All methods
+take an optional `botId` (default: the primary Bot) and refuse an external
+Bot.
 
-A record (`MemoryRecordView`):
+| Method | Response now |
+| --- | --- |
+| `memory.overview` | `{ bot, profile, split: { state: "none", … }, counts: 0, topics: [] }`; `profile` describes the always-on skills: `chars`, `cap`, `over`, `updatedAt`; `pageId` is the old profile page when it still exists, else `""` |
+| `memory.profile` | `{ profile: { …, markdown } }`: the always-on skills' text |
+| `memory.list` | `{ records: [], total: 0 }` |
+| `memory.get` | `{ record: null }` |
+| `memory.add`, `memory.update`, `memory.archive` | refused, saying where things go now |
 
-```ts
-{
-  id: string; botId: string; topic: string; text: string;
-  createdAt: number; updatedAt: number;            // ms; createdAt is the record's date
-  source: { kind: "conversation" | "worker" | "thread" | "page" | "manual"; id: string | null; title: string; section: string | null };
-  sourceState: "live" | "finished" | "missing" | null; // a thread source: archived = finished, gone = missing
-  replacesId: string | null; replaces: { id: string; text: string; createdAt: number } | null;
-  replacedById: string | null; replacedAt: number | null;
-  archived: boolean;
-}
-```
-
-| Method | Request | Response |
-| --- | --- | --- |
-| `memory.overview` | `{ botId? }` (splits the Bot's old Memory page first, if that hasn't happened) | `{ bot: { id, name }, profile: { pageId, title, updatedAt, chars, cap, over } \| null, split: { state: "needed" \| "done" \| "none", legacyPageId, legacyTitle, splitAt }, counts: { current, replaced, archived }, topics: [{ topic, count }] }` |
-| `memory.list` | `{ botId?, query?, topic?, sort?: "relevance" \| "newest" \| "oldest" \| "topic", includeReplaced? = true, includeArchived? = false, limit? = 200 (max 500) }` | `{ records: MemoryRecordView[], total }`; sort defaults to relevance with a query, newest without; current records always come first |
-| `memory.add` | `{ botId?, topic, text, source? }` (no source: "Added by you") | `{ record }` |
-| `memory.update` | `{ botId?, id, text, topic? }` | `{ record, replaced }`: the new record and the one it replaced |
-| `memory.archive` | `{ botId?, id, archived: boolean }` | `{ record }` |
-| `memory.profile` | `{ botId? }` | `{ profile: { pageId, title, updatedAt, chars, cap, over, markdown } \| null }`; edit the page with the Pages RPC |
-
-Every write publishes `studio-changed` on Studio's realtime channel.
-
-### Reminders
-
-A reminder is an automation: `automation_create` with kind `reminder` makes
-one, and it wakes the Bot when it comes due. Older reminders that were copied
-into to-dos (`loop_reminder_<automation id>`) run as their automation again.
+The Memory page's own data comes from `bot_core` (the always-on skills,
+their lint notes and the budget), `bot_skills`, `bot_learning`,
+`bot_summaries` (archived conversations with their whole summaries),
+`bot_conversations_all` and `bot_conversations_search`.
 
 ## Pages and Apps
 
@@ -3942,7 +4042,7 @@ any page type's id. Reply cards (`::page`, `::design`, `::mini`, `::artifact`)
 are unchanged, and `::app{id="…"}` shows either app type (see [Apps](#apps)).
 
 **Filters.** `family:page` and `family:app` filter by family and `type:design`
-by type, in the filter bar, `bb studio list` and `studio_list_items`. `kind:`
+by type, in the filter bar, `bbs studio list` and `studio_list_items`. `kind:`
 means what it did, so a saved `kind:design` or `kind:page` shows what it showed
 before; `type:` also reads the older names (`type:drawing` is whiteboards).
 `searchAll` takes `apps`, `pages`, `doc` and `whiteboard` in `kinds` too.
@@ -3952,23 +4052,23 @@ parameters and its handler; the family tools run those same handlers.
 
 | Family tool | Does |
 | --- | --- |
-| `pages_list` | Docs; with `type: "design"` or `"whiteboard"`, that type's own list |
-| `pages_read` | A doc; given a `dsn_…` or `drw_…` id, that item |
+| `pages_read (no page)` | Docs; with `type: "design"` or `"whiteboard"`, that type's own list |
+| `pages_read` | A doc, in parts of about 12,000 characters cut at a block (the next part: `from` the block id it names; more at once: `limit`); without `page`, the list of pages; with `comments`, the page's comments. Given a `dsn_…` id, the design, with the newest round's HTML only when it is under 12,000 characters (else name `screenIds`); a `drw_…` id, that whiteboard |
 | `pages_create` | A doc; with `type: "design"` or `"whiteboard"`, one of those |
-| `apps_list` | Every app from the index; with `type`, that type's own list |
-| `apps_read` | Any app by id |
-| `apps_create` | `{ type, input }`, where `input` is the fields the mini app or artifact create handler takes |
-| `apps_live` | An open mini app or live HTML artifact by id, with `op` |
+| `apps (op: list)` | Every app from the index; with `type`, that type's own list |
+| `apps (op: read)` | Any app by id |
+| `apps (op: create)` | `{ type, input }`, where `input` is the fields the mini app or artifact create handler takes |
+| `apps (op: live)` | An open mini app or live HTML artifact by id, with `op` |
 
 Each type's own list, read, create and live handlers live in Studio's
 ToolBook (`src/family-tools.ts`) and aren't given to sessions; the family
 tools run them, and their errors name the family tool.
 
-`type` on `pages_list` and `pages_create` is new and optional; every input
+`type` on `pages_read (no page)` and `pages_create` is new and optional; every input
 those tools took before means the same. Editing stays with each type's tools
-(`pages_edit`, `design_write_screen`, `whiteboard_update`, `minis_update`,
-and `apps_create` with an `artifactId` for a new artifact version). A type turned off in **Setup → Kinds** is
-left out of `apps_list` and refused by the family tools.
+(`pages_edit`, `design_screen (op: write)`, `whiteboard_update`, `apps (op: update)`,
+and `apps (op: create)` with an `artifactId` for a new artifact version). A type turned off in **Setup → Kinds** is
+left out of `apps (op: list)` and refused by the family tools.
 
 **Backups** carry no index: restored items index themselves, and the check runs
 after a restore. A backup made before the index restores the same way.
@@ -3987,7 +4087,7 @@ after a restore. A backup made before the index restores the same way.
   [Studio’s internal kit](src/kit), and publish them for RPC discovery.
   Studio finds them with `bb.sdk.plugins.experimental_discoverRpc` and calls
   them with `callRpc`. Any plugin can join the suite this way.
-- Studio keeps an FTS5 index of item titles and `studio_read` text. `studio_changed` updates changed items; `bb studio reindex` rebuilds the index. The `searchAll` RPC returns ranked items and thread matches with snippet ranges.
+- Studio keeps an FTS5 index of item titles and `studio_read` text. `studio_changed` updates changed items; `bbs studio reindex` rebuilds the index. The `searchAll` RPC returns ranked items and thread matches with snippet ranges.
 - An add-on tells Studio when its items change (`studio_changed`); Studio
   relays that over realtime and the open collection refetches.
 - A stopped or failing add-on shows up as unavailable instead of breaking the
@@ -4011,7 +4111,7 @@ off**, **Needs setup** or **Broken**, with its health checks under it.
   skips Studio Mobile, which only the iOS app needs. Each action shows the
   same CLI command with a Copy button, for when it fails.
 - If BB doesn't know the `bb-studio` marketplace yet, the page shows
-  `bb marketplace add git:github.com/patleeman/bb-studio@main` first.
+  `bbs marketplace add git:github.com/patleeman/bb-studio@main` first.
 - **Retired plugins** shows `studio-tables` and `emoji-react` (Studio
   Reactions, built into Studio now) if they're installed: why it is
   retired, what removing it keeps and deletes. **Remove…** asks before it
@@ -4020,7 +4120,7 @@ off**, **Needs setup** or **Broken**, with its health checks under it.
   each; see [Kinds](#kinds).
 - Problems with plugins outside BB Studio are listed at the bottom.
 
-`bb studio setup` prints the same status, the retired plugins and the
+`bbs studio setup` prints the same status, the retired plugins and the
 commands left to run; `--json` prints the whole summary.
 
 ## Kinds
@@ -4056,7 +4156,7 @@ When it applies:
 | Agent tools and instructions | From each thread's next session start or resume; a running session keeps what it has |
 | Thread tabs, composer entries, reply cards, the recorder | After a window reload (Setup offers **Reload window**) |
 
-No `bb plugin reload studio` is needed. Turning recordings off stops the
+No `bbs plugin reload studio` is needed. Turning recordings off stops the
 recorder and dictation in the window after its reload; recordings already
 transcribing finish on the server.
 
@@ -4099,10 +4199,10 @@ measured latency and cost are in [docs/voice/spike.md](../../docs/voice/spike.md
 
 ## Backup and restore
 
-`bb studio backup [--out <file|folder>]` saves every Studio item into one
+`bbs studio backup [--out <file|folder>]` saves every Studio item into one
 `.zip`. That covers pages, recordings with their audio, drawings, artifacts,
 designs, and Studio's tags, project leads, links, comments and
-versions. `bb studio restore <file>` shows what would change, and `--yes`
+versions. `bbs studio restore <file>` shows what would change, and `--yes`
 restores it. Restore matches each item by its original id, so running it
 again changes nothing, and it never overwrites a copy that is newer here.
 Projects are matched by path or name; items whose project isn't on the BB
@@ -4150,7 +4250,7 @@ once those problems are fixed or hidden, or with its close button. Each problem 
 actions: **Fix** opens the place to fix it, **Turn off plugin** disables the
 plugin, and **Hide** hides it until it changes or goes away and comes back.
 **Open plugin setup** goes to the Setup page, which also shows hidden
-problems and what passed. `bb studio health` prints every plugin's problems
+problems and what passed. `bbs studio health` prints every plugin's problems
 and exits 1 when a problem isn't hidden.
 
 ![The Plugin health card open above the sidebar footer on staged stable BB, showing that Studio Decisions has no Jev provider set up, with Add a key, Turn off plugin and Hide](assets/plugin-health.png)
@@ -4160,7 +4260,7 @@ and exits 1 when a problem isn't hidden.
 ## Sign in again
 
 Studio watches the sign-ins BB's agents run on: each Account Pooler login
-(`bb pool account list`: an enabled account in `error`) and each provider's
+(`bbs pool account list`: an enabled account in `error`) and each provider's
 own login on this Mac (BB's provider readiness: `expired`, or
 `unauthenticated` for a provider that was signed in before; and a turn that
 fails with a sign-in error such as "OAuth session expired and could not be
@@ -4187,10 +4287,10 @@ dropped, and error messages have token-like text removed. The pasted Claude
 code goes straight to the pooler or the command and is not kept.
 
 ```sh
-bb studio auth status [--json]
-bb studio auth login <provider-or-account> [--no-wait] [--json]
-printf '%s\n' "$CODE" | bb studio auth complete <session> --code-stdin
-bb studio auth cancel <session>
+bbs studio auth status [--json]
+bbs studio auth login <provider-or-account> [--no-wait] [--json]
+printf '%s\n' "$CODE" | bbs studio auth complete <session> --code-stdin
+bbs studio auth cancel <session>
 ```
 
 `<provider-or-account>` is `codex`, `claude`, a provider id, a pool account's
@@ -4208,12 +4308,12 @@ page's **Needs you**) lists every sign-in BB's agents run on, in three groups:
 | Group | What it lists | Read from |
 | --- | --- | --- |
 | BB Studio | this app's Account Pooler accounts | the pooler's `status.get`, the pooler's refresh-rejection markers (key names only) and whether each login file exists (never its contents) |
-| bb | the Account Pooler of the bb install BB Studio imported from | bb's own server on this Mac (`status.get` on its loopback address from bb's `bb-app-runtime.json`), the same call `bb pool status` makes; no token is needed or read |
-| This Mac | each provider's own login (Claude Code, Codex and any other signed-in provider) and its usage windows | BB's provider readiness and BB's usage limits (`bb settings usage`); a login through the Account Pooler shows the pooler's windows instead |
+| bb | the Account Pooler of the bb install BB Studio imported from | bb's own server on this Mac (`status.get` on its loopback address from bb's `bb-app-runtime.json`), the same call `bbs pool status` makes; no token is needed or read |
+| This Mac | each provider's own login (Claude Code, Codex and any other signed-in provider) and its usage windows | BB's provider readiness and BB's usage limits (`bbs settings usage`); a login through the Account Pooler shows the pooler's windows instead |
 
 Each account shows its status (Ready, Signed out, Error, Limited, Off), its
 5h and 7d windows and per-model limits (Fable, Opus, …) with reset times.
-`bb studio accounts` also lists the threads pinned to each pool account (the
+`bbs studio accounts` also lists the threads pinned to each pool account (the
 pooler's pins used in the last 65 minutes, matched to threads by their
 provider session). The panel has no scroller of its own: the footer's card
 scrolls. An account whose refresh
@@ -4258,11 +4358,11 @@ Studio 1.0.1 (footer-placed sidebar sections); older builds show only the
 cards.
 
 ```sh
-bb studio accounts [status] [--source studio|bb|local] [--json]
-bb studio accounts warnings [--json]
-bb studio accounts dismiss <warning-id>
-bb studio accounts use-other <account>
-bb studio accounts login <account> [--bb] [--no-wait] [--json]
+bbs studio accounts [status] [--source studio|bb|local] [--json]
+bbs studio accounts warnings [--json]
+bbs studio accounts dismiss <warning-id>
+bbs studio accounts use-other <account>
+bbs studio accounts login <account> [--bb] [--no-wait] [--json]
 ```
 
 `<account>` is a key from `status` (`studio:<id>`, `bb:<id>`, `local:<provider>`),
@@ -4276,7 +4376,7 @@ log line carries one.
 ```sh
 pnpm typecheck
 pnpm test
-bb plugin build .
+bbs plugin build .
 ```
 
 Studio owns its contracts, helpers and UI under `src/kit`. Its runtime dependencies
@@ -4369,8 +4469,11 @@ Earlier after 3 more quiet days unless pinned.
   workers keep both. Where Studio replaces the composer (a
   Main mirrored from bb), the box is drawn inside the replacement. Nothing
   open, no box.
-- **Above each message**: a divider with the strand's name where the strand
-  changes, else the name, muted. On hover, **Move to…** moves the message's
+- **In each message's footer row**, after its time: the strand's name, muted
+  (click filters to the strand, again clears), and **Move to…**. Both show
+  with the time, on hover or keyboard focus of the message
+  (`slots.experimental_messageMetadata` with `placement: "actionRow"`);
+  nothing is drawn above the message. **Move to…** moves the message's
   turn to another strand, or **New strand from here** starts one with it and
   the later messages of its strand. Your moves are never re-sorted, and a
   move can be undone for 10 seconds.
@@ -4381,19 +4484,84 @@ Earlier after 3 more quiet days unless pinned.
 - **The overview** (Settings → Strands overview, off by default): a Strands
   page beside Tasks with every conversation's open strands, needs you first.
 
-`bb studio strands [<conversation>|main] [--items <n>] [--sort] [--json]`
+### Replies that need you
+
+Each finished turn's reply is tagged **needs you** (it waits on you: a
+decision, a question, an approval, or something only you can do: run a
+command, sign in, click, test on a device) or **status** (progress, a result,
+an FYI) (`src/strands/reply.ts`). Jev decides every reply, and picks the
+sentence that asks; no keywords or rules do. The questions ride on the Jev
+call that already sorts the turn, so they cost no extra call; a turn sorted
+early (it ran long, or asked something) gets one reply-only call at its end,
+within the same daily caps. A `::next` row's quick replies go to Jev as
+context. With no Jev, or no calls left, the reply stays untagged and pushes
+as it always did. What Jev reads is scrubbed of secrets like the rest of
+strands. Quiet `[PASS]` replies and the backfill's history aren't tagged.
+
+- A needs-you reply has its asking sentence marked in place: a faint amber
+  highlight on that sentence in its newest message, nothing added around it
+  (the reply's last paragraph when Jev named no sentence). **Done** shows
+  beside the sentence on hover or keyboard focus. Status replies look as
+  they always did.
+- Runs of status replies fold: 3 or more consecutive replies Jev tagged
+  status, with no message you typed between them, become one line in the
+  timeline ("6 updates · last: <its newest reply's first sentence>") that
+  opens in place. A reply that needs you, or one with no tag, ends a run;
+  the conversation's newest reply never folds. With a strand picked, nothing
+  folds, and a jump to a folded reply opens its run first. This needs a BB
+  whose timeline folds runs (the fork's `folds` on
+  `slots.experimental_timelineFilter`); an older BB folds nothing. When BB
+  cuts a run short, the line counts only the replies it folds.
+- Semantic zoom: a conversation zooms out in place. **Messages** is the
+  chat; **Strands** shows one line per stretch of one strand: "|\" where a
+  strand starts, "|" where it goes on, a dot where it ends, then its name,
+  how many messages, its key moment (the open ask, in amber; an answered
+  ask; your message; else the newest status line) and the time. Pinch,
+  ⌃⌘− / ⌃⌘= (rebindable) or the header's Messages · Strands · Tree switch
+  move between them; the message in the middle stays in the middle, and a
+  click on a line zooms back in to its key moment. The header also shows
+  "N need you", which goes to the ask. Where BB zooms (the fork's `zoom` on
+  `slots.experimental_timelineFilter`) the strands box above the composer is
+  gone; an older BB keeps the box and has no zoom. **Tree**, one level
+  further out, draws the strands as branches on the same time axis: the
+  trunk on the left, each strand branching where it starts (from its
+  parent once sorting records one in strands.tags' parentId, else the trunk) and ending in a dot when done, with nodes only for your
+  messages (◆), asks (amber ring), results (□) and the open ask (filled
+  amber). Clicking a node zooms in to that message. **Esc Esc** opens
+  keyboard mode on the tree: a search field at its top (typing fades the
+  branches that don't match), ↑↓ through the nodes, ←→ to the nearest node
+  on the neighbouring strand, Enter to zoom in, Esc to leave.
+- It counts as an ask on its strand ("N need you" in the box, the overview,
+  the sidebar), with **Jump to reply** and **Done**; picking the strand opens
+  the reply. Jump to reply lands on the marked sentence and flashes it.
+- It stops counting when Jev says a message of yours answers it or acts on
+  it: the call that sorts your message also asks, for each open ask, whether
+  the message answers it ("ok, do it" after "Should I…?" does; "thanks!" or
+  something unrelated doesn't), in any strand. Done (Studio's app window
+  only), its strand marked done, or a week also clear it. Without Jev it
+  stays open.
+- Phone pushes follow the tag: a status reply doesn't push, and one that
+  needs you pushes with its ask as the body, even when a worker's notice
+  started the turn. Main's push waits for the tag, then checks that you
+  haven't read the reply and haven't muted Main; for other conversations
+  Studio Mobile checks BB's push against `strands.replyPush`, which matches
+  the reply to its own turn. Untagged, or not tagged within 20 seconds, a
+  reply pushes as before. Thread levels still apply: muted and input-only
+  threads push no replies at all.
+
+`bbs studio strands [<conversation>|main] [--items <n>] [--sort] [--json]`
 shows how a conversation was sorted. An agent sees only its own Bot's
 conversations.
 
 ## Model router
 
-Auto in the model pickers, plain-language rules with fallback chains that Jev picks between, and a usage-limit notice with **Hand off**. Settings → Plugins → Studio → Model router. See the [model router guide](../../docs/router.md).
+Auto in the model pickers, plain-language rules with fallback chains that Jev picks between, and a usage-limit notice with **Hand off**, for Claude Code, Codex, Pi and ACP agents (OpenCode, Antigravity, local models). Settings → Plugins → Studio → Model router. See the [model router guide](../../docs/router.md).
 
 ## Decisions in Studio
 
 See the [Decisions guide](../../docs/decisions.md) for provider setup and the plugin RPC.
 
-Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (its keys with the API keys, the rest in the Jev, Threads and Advanced sections; `decisions_` keys, also with `bb studio settings`), or run `bb studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
+Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (its keys with the API keys, the rest in the Jev, Threads and Advanced sections; `decisions_` keys, also with `bbs studio settings`), or run `bbs studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
 
 The Decisions migration is complete. If Setup still lists an old Decisions
 bridge install, it is safe to remove: Studio already has the settings, keys,

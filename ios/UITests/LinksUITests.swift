@@ -31,12 +31,12 @@ final class LinksUITests: ServerIsolatedUITestCase {
         shot("worker-link")
     }
 
-    func testARecordLinkOpensTheRecord() {
+    func testAnOldRecordLinkOpensMemory() {
+        // Memory records are retired: an old record link opens Memory, which shows the always-on skill.
         launch("bbstudio://record/mem_3")
-        XCTAssertTrue(any("memoryRecordText").waitForExistence(timeout: 30), "the record")
-        XCTAssertTrue(any("memoryRecordText").label.contains("Friday 10:00"))
-        app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.waitForRoom(timeout: 15), "Back goes to the room")
+        XCTAssertTrue(app.navigationBars["Memory"].waitForExistence(timeout: 30), "Memory")
+        XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 15))
+        XCTAssertFalse(any("memoryRecordText").exists, "no record screen")
     }
 
     func testAMissingConversationSaysNotFound() {

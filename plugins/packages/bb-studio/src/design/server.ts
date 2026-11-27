@@ -18,6 +18,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
+import { callText, safeEnd } from "../paging";
 import { rpcContract } from "./contract";
 import { printCsp, printPage } from "./server/print";
 import { applyTextEdit } from "./server/text-edit";
@@ -83,7 +84,7 @@ export function commentMessage(design: Pick<DesignRow, "id" | "name">, comment: 
     comment.element_html,
     "```",
     "",
-    "Change only what the comment asks, with design_edit_screen. Then resolve it with design_resolve_comments.",
+    "Change only what the comment asks, with design_screen (op: edit). Then resolve it with design_review (op: resolve).",
   ].join("\n");
 }
 
@@ -139,7 +140,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
   const pausedNote = [
     `That's ${MAX_REVIEWS_IN_A_ROW} reviews in a row that found problems, so automatic review is paused for this design.`,
     "Fix what you can, then tell the user plainly: review paused after " + MAX_REVIEWS_IN_A_ROW + " rounds, and what still needs work.",
-    "Don't call design_ready again until the user edits or comments on the design, or asks for another review (then pass userAsked).",
+    "Don't call design_review (op: ready) again until the user edits or comments on the design, or asks for another review (then pass userAsked).",
   ].join(" ");
   const reviews = new ReviewQueue({
     revision: (designId, screenIds) => JSON.stringify(screenIds.map((id) => store.screen(designId, id)?.updated_at ?? null)),
@@ -153,7 +154,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
       const round = screenIds.length ? Number(screenIds[0]!.slice(0, -1)) : null;
       await bb.sdk.threads.send({
         threadId: row.thread_id ?? requesterThreadId,
-        input: [{ type: "text", mentions: [], text: [markStudioLine(`The reviewer checked ${round ? `round ${round}` : "the screens"} of "${displayName(row)}" and found problems:`), "", findings, "", paused ? pausedNote : "Fix them, then call design_ready again."].join("\n") }],
+        input: [{ type: "text", mentions: [], text: [markStudioLine(`The reviewer checked ${round ? `round ${round}` : "the screens"} of "${displayName(row)}" and found problems:`), "", findings, "", paused ? pausedNote : "Fix them, then call design_review (op: ready) again."].join("\n") }],
         mode: "queue-if-active",
       });
     },
@@ -345,9 +346,13 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
     },
   });
 
+  /** A design read without screenIds inlines the newest round's HTML up to this many characters. */
+  const DEFAULT_HTML_CHARS = 12_000;
+  /** A design read's part with screens named: whole screens up to this many characters. */
+  const SCREENS_PART = 30_000;
   bb.agents.registerTool({
     name: "design_read",
-    description: "Read a design: its rounds, each option's id, caption and frame size, and the HTML of the screens you name (or of the newest round when you name none). Call it before editing so you see the latest version.",
+    description: "Read a design: its rounds, each option's id, caption and frame size, and the HTML of the screens you name (or of the newest round when you name none and it is small). Call it before editing so you see the latest version.",
     presentation: { label: { pending: "Reading a design", completed: "Read a design" } },
     parameters: z.object({
       designId: z.string().min(1),
@@ -356,16 +361,55 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
     execute({ designId, screenIds }) {
       const view = store.view(designId);
       if (!view) return notFound(designId);
-      const wanted = screenIds?.length ? screenIds : view.rounds[0]?.screens.map((screen) => screen.id) ?? [];
+      const asked = !!screenIds?.length;
+      const wanted = asked ? screenIds! : view.rounds[0]?.screens.map((screen) => screen.id) ?? [];
       const html = Object.fromEntries(wanted.flatMap((id) => {
         const screen = store.screen(designId, id);
         return screen ? [[id, screen.html]] : [];
       }));
-      const payload = JSON.stringify({ design: { ...view, name: displayName(view), link: designHref(view.id) }, html }, null, 2);
-      if (payload.length <= MAX_READ_CHARS) return payload;
+      // Without screenIds, the newest round's HTML only when it is small; else the list and how to ask.
+      const htmlSize = Object.values(html).reduce((sum, text) => sum + text.length, 0);
+      if (!asked && htmlSize > DEFAULT_HTML_CHARS) {
+        return [
+          JSON.stringify({ design: { ...view, name: displayName(view), link: designHref(view.id) } }, null, 2),
+          `The newest round's HTML (${wanted.join(", ")}) is ${htmlSize.toLocaleString("en-US")} characters. Read the screens you need with screenIds.`,
+        ].join("\n\n");
+      }
+      const design = { ...view, name: displayName(view), link: designHref(view.id) };
+      const payload = JSON.stringify({ design, html }, null, 2);
+      if (payload.length <= SCREENS_PART) return payload;
+      // In parts (src/paging.ts): whole screens in the order asked, the rest named in the Next call right after the header.
+      const head = JSON.stringify({ design }, null, 2);
+      const room = Math.max(SCREENS_PART - head.length, 4_000);
+      const shown: Record<string, string> = {};
+      let used = 0;
+      const found = wanted.filter((id) => id in html);
+      let cut: string | null = null;
+      // Sizes as the reply carries them: JSON-encoded, with quotes and line breaks escaped.
+      const encoded = (text: string) => JSON.stringify(text).length;
+      const most = MAX_READ_CHARS - head.length - 1_000;
+      for (const id of found) {
+        const size = encoded(html[id]!);
+        if (Object.keys(shown).length && used + size > room) break;
+        if (size > most) {
+          let end = Math.floor(html[id]!.length * most / size);
+          while (end > 0 && encoded(html[id]!.slice(0, end)) > most) end = Math.floor(end * 0.95);
+          shown[id] = html[id]!.slice(0, safeEnd(html[id]!, end));
+          cut = id;
+          used += encoded(shown[id]!);
+          break;
+        }
+        shown[id] = html[id]!;
+        used += size;
+      }
+      const rest = found.filter((id) => !(id in shown));
+      const missing = wanted.filter((id) => !(id in html));
       return [
-        JSON.stringify({ design: { ...view, name: displayName(view), link: designHref(view.id) } }, null, 2),
-        `The HTML of ${wanted.join(", ")} is ${payload.length} characters, too large to inline. Read fewer screens at a time with screenIds.`,
+        head,
+        ...(rest.length ? [`(Screens ${Object.keys(shown).join(", ")} of ${found.join(", ")}. Next: ${callText("pages_read", { page: designId, screenIds: rest })}.)`] : []),
+        ...(cut ? [`(Screen ${cut} is ${html[cut]!.length.toLocaleString("en-US")} characters, more than one reply holds: it is cut after the first ${shown[cut]!.length.toLocaleString("en-US")}.)`] : []),
+        ...(missing.length ? [`(No screen ${missing.join(", ")} in this design.)`] : []),
+        JSON.stringify({ html: shown }, null, 2),
       ].join("\n\n");
     },
   });
@@ -373,7 +417,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
   bb.agents.registerTool({
     name: "design_write_screen",
     description: 'Create or replace one self-contained HTML screen ("1a", "2b"). For slide decks use viewport "slide" with steps; for multi-step prototypes declare `<meta name="bb-design-steps">` (see design skill).',
-    instructions: 'For UI design work (prototypes, screens, flows) and for slides and slide decks, create with pages_create (type "design"), use the design_* tools, and follow the design skill.',
+    instructions: 'For UI design work (prototypes, screens, flows) and for slides and slide decks, create with pages_create (type "design"), use design_screen, design_review and design_style, and follow the design skill.',
     presentation: { label: { pending: "Writing a screen", completed: "Wrote a screen" } },
     parameters: z.object({
       designId: z.string().min(1),
@@ -400,14 +444,14 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
         updatedAt = store.setRound(designId, Number(screenId.slice(0, -1)), { title: roundTitle, intro: roundIntro }, "agent");
       changed(designId, updatedAt, "agent");
       const steps = parseSteps(html);
-      const unnamed = !row.name.trim() ? `\nThis design has no name yet: give it a short, specific one with design_rename.` : "";
+      const unnamed = !row.name.trim() ? `\nThis design has no name yet: give it a short, specific one with design_screen (op: rename).` : "";
       return `${existed ? "Replaced" : "Added"} screen ${screenId} in "${displayName(row)}" (${screenText(html).length} characters of text${steps.length ? `, ${steps.length} steps: ${steps.map((step) => `#${step.id}`).join(", ")}` : ""}). The user's open canvas shows it now.${unnamed}\n${card(designId)}`;
     },
   });
 
   bb.agents.registerTool({
     name: "design_edit_screen",
-    description: "Make a targeted change to one screen: replace an exact snippet of its HTML. The snippet must appear exactly once; include enough surrounding markup to make it unique. Prefer this over design_write_screen for small requests, so nothing else changes.",
+    description: "Make a targeted change to one screen: replace an exact snippet of its HTML. The snippet must appear exactly once; include enough surrounding markup to make it unique. Prefer this over design_screen (op: write) for small requests, so nothing else changes.",
     presentation: { label: { pending: "Editing a screen", completed: "Edited a screen" } },
     parameters: z.object({
       designId: z.string().min(1),
@@ -485,8 +529,8 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
       if (skipReview) return `Marked ready without a review.\n${card(designId)}`;
       if (!ctx.threadId) return fail("A review needs a thread to report back to.");
       const outcome = reviews.request(designId, { screenIds: ids, requesterThreadId: ctx.threadId }, { userAsked });
-      if (outcome === "paused") return `Automatic review is paused for this design: the last ${MAX_REVIEWS_IN_A_ROW} reviews in a row found problems. Tell the user plainly what still needs work. Call design_ready again only after the user edits or comments on the design, or asks for another review (then pass userAsked).`;
-      if (outcome === "disposed") return fail("Studio Design is reloading; call design_ready again in a moment.");
+      if (outcome === "paused") return `Automatic review is paused for this design: the last ${MAX_REVIEWS_IN_A_ROW} reviews in a row found problems. Tell the user plainly what still needs work. Call design_review (op: ready) again only after the user edits or comments on the design, or asks for another review (then pass userAsked).`;
+      if (outcome === "disposed") return fail("Studio Design is reloading; call design_review (op: ready) again in a moment.");
       if (outcome === "queued") return `A review of this design is already running. Once it ends, ${ids.join(", ")} are reviewed again as they are then; findings come back only if something needs fixing.\n${card(designId)}`;
       return `Sent ${ids.join(", ")} for review. The reviewer reports back only if something needs fixing, in the design's own thread (the one that made it, which may not be this one); until then, say the work is out for review, not done. Keep your summary short.\n${card(designId)}`;
     },
@@ -535,7 +579,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
       if (designId && !store.get(designId)) return notFound(designId);
       const existed = store.styles().some((style) => style.name.toLowerCase() === name.toLowerCase());
       const style = store.saveStyle({ name, notes, css, designId, screenId });
-      return `${existed ? "Updated" : "Saved"} the style "${style.name}" (id ${style.id}). Later designs can start from it with design_styles.`;
+      return `${existed ? "Updated" : "Saved"} the style "${style.name}" (id ${style.id}). Later designs can start from it with design_style (op: list).`;
     },
   });
 
@@ -555,7 +599,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
         return [`Style "${style.name}" (id ${style.id})${style.source_design_id ? `, from design ${style.source_design_id}${style.source_screen_id ? ` option ${style.source_screen_id}` : ""}` : ""}.`, "", style.notes, "", "```css", style.css, "```"].join("\n");
       }
       const styles = store.styles();
-      if (!styles.length) return "No saved styles yet. Save one with design_save_style after the user picks a direction.";
+      if (!styles.length) return "No saved styles yet. Save one with design_style (op: save) after the user picks a direction.";
       return `Saved styles:\n${styles.map((style) => `- ${style.name} (id ${style.id}): ${style.notes.split("\n")[0]!.slice(0, 160)}`).join("\n")}\n\nRead one in full with styleId before using it.`;
     },
   });

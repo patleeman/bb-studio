@@ -1,11 +1,25 @@
 import SwiftUI
 
+/// New thread, and a Bot's New conversation: one composer. Who it's with
+/// (any Bot, or no Bot: a plain thread in a project), the project, the
+/// workspace and the model are chips above the field, as on the desktop's
+/// composer. A Bot's conversation starts on the Bot's default model (Auto
+/// when that is its default) in its Main's project; a plain thread on the
+/// project's defaults.
 struct NewThreadView: View {
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
-    @AppStorage(ServerScope.key("newThreadProjectId"), store: AppGroup.defaults) private var projectId = ""
+    /// The project a plain thread last started in; a Bot's conversation starts in its Main's project.
+    @AppStorage(ServerScope.key("newThreadProjectId"), store: AppGroup.defaults) private var savedProjectId = ""
+    @ObservedObject private var spaces = BotSpacesStore.shared
+    @State private var projectId = ""
+    @State private var projects: [Project] = []
+    /// The Bot the conversation is with; empty for a plain thread.
+    @State private var botId: String
+    @State private var botPreset: ExecutionChoice?
+    @State private var projectDefaults: ExecutionChoice?
     @State private var environments: [ThreadEnvironment] = []
     @State private var workspace = "default"
     @State private var baseBranch = ""
@@ -18,30 +32,48 @@ struct NewThreadView: View {
     @State private var focused = false
     @State private var creating = false
     @State private var error: String?
+    /// A Bot's conversation from its list: the room opens it there. Else the app opens what started.
+    private let started: ((String, String?) -> Void)?
 
-    // Execution options. Empty means the project default.
-    @State private var defaults: ExecutionChoice?
+    // Execution options. Empty means the default (the Bot's, else the project's).
     @State private var options: ExecutionOptions?
     @State private var providerId = ""
     @State private var modelId = ""
     @State private var reasoning = ""
     @State private var permissionMode = ""
 
-    init(text: String = "") {
+    init(text: String = "", botId: String? = nil, started: ((String, String?) -> Void)? = nil) {
         _text = State(initialValue: text)
+        _botId = State(initialValue: botId ?? "")
+        self.started = started
+    }
+
+    private var bots: [BotSpace] { spaces.spaces?.bots ?? [] }
+    private var bot: BotSpace? { botId.isEmpty ? nil : bots.first { $0.id == botId } }
+    private var defaults: ExecutionChoice? {
+        NewConversationChoice.defaults(bot: botId.isEmpty ? nil : botPreset, project: projectDefaults)
     }
 
     /// A chat, not a form: an empty conversation with the composer at the
-    /// bottom. Where it runs and which agent are chips above the field, set to
-    /// the project's defaults, so most threads need only a message.
+    /// bottom, saying who it's with. The chips are set to the defaults, so
+    /// most conversations need only a message.
     var body: some View {
         NavigationStack {
-            VStack {
+            VStack(spacing: 8) {
                 Spacer()
-                Text("What should we work on?")
-                    .font(.title2.weight(.semibold))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
+                if let bot {
+                    BotAvatar(BotLook(shape: bot.shape, color: bot.color, emoji: bot.avatar), size: 44)
+                    Text("New conversation with \(bot.name)")
+                        .font(.title2.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .accessibilityIdentifier("newConversationWith")
+                } else {
+                    Text("What should we work on?")
+                        .font(.title2.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("newConversationWith")
+                }
                 Spacer()
             }
             .frame(maxWidth: .infinity)
@@ -49,7 +81,7 @@ struct NewThreadView: View {
             .contentShape(.rect)
             .onTapGesture { focused = false }
             .safeAreaInset(edge: .bottom) { composer }
-            .navigationTitle("New thread")
+            .navigationTitle(bot == nil ? "New thread" : "New conversation")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
@@ -66,15 +98,19 @@ struct NewThreadView: View {
             .onChange(of: talk.error) { _, error in if let error { self.error = error } }
             .task {
                 // Like desktop, a thread needs no project: it starts in the personal one.
-                if projectId.isEmpty { projectId = NewThreadProject.personalId }
+                if botId.isEmpty, projectId.isEmpty { projectId = NewThreadProject.resolve(saved: savedProjectId, projects: []) }
                 guard let loaded = try? await client.projects() else { return }
-                projectId = NewThreadProject.resolve(saved: projectId, projects: loaded)
+                projects = loaded
+                if botId.isEmpty { projectId = NewThreadProject.resolve(saved: projectId, projects: loaded) }
             }
+            .task(id: botId) { await choseBot() }
             .task(id: projectId) {
                 guard !projectId.isEmpty else { return }
                 workspace = "default"
                 environments = (try? await client.threadEnvironments(projectId: projectId)) ?? []
-                defaults = (try? await client.projectDefaults(projectId)) ?? nil
+                projectDefaults = (try? await client.projectDefaults(projectId)) ?? nil
+            }
+            .task(id: defaults?.providerId ?? "") {
                 if providerId.isEmpty { await loadOptions() }
             }
             .task(id: providerId) {
@@ -86,11 +122,36 @@ struct NewThreadView: View {
         }
     }
 
+    /// A Bot: its default model and its Main's project, as the desktop's New conversation seeds its composer. No Bot: the project last used.
+    private func choseBot() async {
+        providerId = ""
+        modelId = ""
+        reasoning = ""
+        permissionMode = ""
+        guard let bot else {
+            botPreset = nil
+            projectId = NewThreadProject.resolve(saved: savedProjectId, projects: projects)
+            return
+        }
+        let id = bot.id
+        if let project = await botProject(bot), botId == id { projectId = project }
+        let preset = try? await client.botDefaultModel(botId: id)
+        if botId == id { botPreset = preset ?? nil }
+    }
+
+    private func botProject(_ bot: BotSpace) async -> String? {
+        if let project = spaces.view(for: bot.id)?.main?.projectId { return project }
+        guard let main = bot.mainThreadId else { return NewThreadProject.personalId }
+        return (try? await client.thread(main).projectId) ?? NewThreadProject.personalId
+    }
+
     private var composer: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
+                    if !bots.isEmpty { withChip }
+                    projectChip
                     workspaceChip
                 }
             }
@@ -106,7 +167,8 @@ struct NewThreadView: View {
             }
             TalkStatusBar(talk: talk)
             ComposerBar(
-                text: $text, focused: $focused, attachments: $attachments, placeholder: "What should the agent do?", maxLines: 10,
+                text: $text, focused: $focused, attachments: $attachments,
+                placeholder: bot.map { "Message \($0.name)" } ?? "What should the agent do?", maxLines: 10,
                 dictate: { talk.startDictation() }, talk: talk, dictation: dictation
             ) {
                 agentMenu
@@ -120,6 +182,7 @@ struct NewThreadView: View {
                 .disabled(!canStart)
                 .keyboardShortcut(.return, modifiers: .command)
                 .accessibilityLabel("Start")
+                .accessibilityIdentifier("newConversationStart")
             }
         }
         .padding(.horizontal)
@@ -130,6 +193,47 @@ struct NewThreadView: View {
     private var canStart: Bool {
         (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty) && !projectId.isEmpty && !creating
             && !dictation.blocksSend
+    }
+
+    /// Who the conversation is with: any of the Bots, or none (a plain thread in a project).
+    private var withChip: some View {
+        Menu {
+            Picker("With", selection: $botId) {
+                ForEach(bots) { each in Text(each.name).tag(each.id) }
+                Text("No Bot: a thread in a project").tag("")
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 5) {
+                if let bot {
+                    BotAvatar(BotLook(shape: bot.shape, color: bot.color, emoji: bot.avatar), size: 18)
+                } else {
+                    Image(systemName: "bubble.left").font(.caption)
+                }
+                Text(bot?.name ?? "No Bot").lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
+            }
+            .font(.subheadline)
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(.fill.tertiary, in: .capsule)
+        }
+        .accessibilityLabel("With \(bot?.name ?? "no Bot")")
+        .accessibilityIdentifier("newConversationBot")
+    }
+
+    private var projectChip: some View {
+        Menu {
+            Picker("Project", selection: $projectId) {
+                Text(NewThreadProject.personalLabel).tag(NewThreadProject.personalId)
+                ForEach(projects) { Text($0.name).tag($0.id) }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            chip(NewThreadProject.label(projectId, projects: projects), systemImage: "folder")
+        }
+        .accessibilityIdentifier("newThreadProject")
     }
 
     private var workspaceChip: some View {
@@ -253,25 +357,32 @@ struct NewThreadView: View {
         guard !dictation.blocksSend else { return }
         creating = true
         defer { creating = false }
+        let botId = bot?.id
+        if botId == nil { savedProjectId = projectId }
         do {
             try await operation.run(currentServer: { app.serverURL }, work: { client in
                 let projectId = self.projectId
-                let text = self.text
+                let text = self.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 let attachments = self.attachments
                 let selectedWorkspace = self.selectedWorkspace
+                let inputs = try await PendingAttachment.upload(attachments, projectId: projectId, client: client)
+                if let botId {
+                    let choice = NewConversationChoice.resolve(
+                        provider: providerId, model: modelId, reasoning: reasoning, permission: permissionMode, defaults: defaults,
+                        shownProvider: options?.providers.first { $0.available != false }?.id, shownModel: selectedModel?.model)
+                    return try await client.startConversation(botId: botId, projectId: projectId, text: text, choice: choice,
+                                                              attachments: inputs, workspace: selectedWorkspace)
+                }
                 let choice = ExecutionChoice(
                     providerId: providerId.isEmpty ? nil : providerId,
                     model: modelId.isEmpty ? nil : modelId,
                     reasoningLevel: reasoning.isEmpty ? nil : reasoning,
                     permissionMode: permissionMode.isEmpty ? nil : permissionMode)
-                let inputs = try await PendingAttachment.upload(attachments, projectId: projectId, client: client)
-                let thread = try await client.createThread(
-                    projectId: projectId, text: text.trimmingCharacters(in: .whitespacesAndNewlines), attachments: inputs,
-                    options: choice, workspace: selectedWorkspace)
-                return thread
-            }, completion: { created in
+                return try await client.createThread(
+                    projectId: projectId, text: text, attachments: inputs, options: choice, workspace: selectedWorkspace).id
+            }, completion: { threadId in
                 dismiss()
-                app.openThread(created.id)
+                if let started { started(threadId, botId) } else { app.open(.conversation(threadId)) }
             })
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)

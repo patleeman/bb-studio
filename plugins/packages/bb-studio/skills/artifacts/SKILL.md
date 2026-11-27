@@ -36,12 +36,12 @@ Give each artifact a short, human title ("Q3 revenue chart", not
 
 | Tool | Use it to |
 | --- | --- |
-| `apps_create` with type `"artifact"` | Save a file by `path` (workspace or thread storage; relative paths are from the workspace root), or short text by `content` plus a file `name`, as its `input`. Pass `title`, optionally `description`, and `artifactId` to add a version to a specific artifact. |
-| `apps_list` with type `"artifact"` | List saved artifacts with ids and links. |
-| `apps_read` | Read an artifact's details and, for text types, its contents. |
-| `apps_live` | Read and drive a live HTML artifact (below). |
+| `apps (op: create)` with type `"artifact"` | Save a file by `path` (workspace or thread storage; relative paths are from the workspace root), or short text by `content` plus a file `name`, as its `input`. Pass `title`, optionally `description`, and `artifactId` to add a version to a specific artifact. |
+| `apps (op: list)` with type `"artifact"` | List saved artifacts with ids and links. |
+| `apps (op: read)` | Read an artifact's details and, for text types, its contents. |
+| `apps (op: live)` | Read and drive a live HTML artifact (below). |
 
-`apps_create` returns the card line to show: `::artifact{id="art_…"}`, or
+`apps (op: create)` returns the card line to show: `::artifact{id="art_…"}`, or
 `::app{id="art_…"}` when your instructions say to write `::app` (Studio's App
 cards setting). Put it on its own line in your reply and the user sees the
 artifact previewed inline, with a button that opens it in a tab beside the
@@ -87,7 +87,7 @@ playgrounds, so a playground's HTML works saved as an artifact unchanged:
 - `send(label, data)`, called from a click, puts an @artifact pill in the
   thread's composer. When the user sends their message, you get the data.
 
-Read and drive one with the `apps_live` tool (`op`: `state`, `set`,
+Read and drive one with the `apps` tool, `op: "live"` (`liveOp`: `state`, `set`,
 `events`, `actions`, `do`) or:
 
 ```sh

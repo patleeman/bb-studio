@@ -2,8 +2,10 @@
 
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MarkdownPreview } from "./markdown-preview";
 import {
+  ASSISTANT_MARKDOWN_THREAD_MENTIONS,
   keepsShortLineBreaks,
   looksHardWrapped,
   withShortLineBreaks,
@@ -63,6 +65,22 @@ describe("assistant messages keep short line breaks", () => {
     const [poem] = paragraphs(container);
     expect(paragraphs(container)).toHaveLength(1);
     expect(poem?.querySelectorAll("br")).toHaveLength(5);
+  });
+
+  it("keeps the breaks of a short assistant paragraph that holds a mention", () => {
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MarkdownPreview
+          content={"Ship it today,\nask @thread:thr_abc first,\nthen rest."}
+          threadMentions={ASSISTANT_MARKDOWN_THREAD_MENTIONS}
+        />
+      </QueryClientProvider>,
+    );
+    const [only] = paragraphs(container);
+    expect(paragraphs(container)).toHaveLength(1);
+    expect(only?.querySelectorAll("br")).toHaveLength(2);
+    expect(only?.textContent).toContain("then rest.");
+    expect(only?.innerHTML).not.toContain("@thread:thr_abc first");
   });
 
   it("keeps breaks inside emphasis and links", () => {

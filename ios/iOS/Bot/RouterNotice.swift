@@ -27,7 +27,7 @@ final class RouterNotices {
     var notices: [String: Studio.RouterNoticeGetOutput] = [:]
     private var client: BBClient { AppModel.shared.client }
 
-    /// Polls one conversation's notice while its screen shows; a Studio without the router stops it.
+    /// Polls one conversation's notice while its screen shows (every 2 min, longer while idle); a Studio without the router stops it.
     func poll(_ threadId: String) async {
         while !Task.isCancelled {
             do {
@@ -37,7 +37,7 @@ final class RouterNotices {
                 notices[threadId] = nil
                 return
             } catch {}
-            await EnergyGate.shared.pollWait(.seconds(30))
+            await EnergyGate.shared.pollWait(.seconds(120))
         }
     }
 }

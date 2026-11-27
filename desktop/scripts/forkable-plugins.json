@@ -11,6 +11,7 @@
     "plugins/conductor",
     "plugins/drafts",
     "plugins/environment-personal-workspace",
+    "plugins/server-switcher",
     "plugins/keep-awake",
     "plugins/navigation",
     "plugins/pdf-preview",

@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from "vitest";
 import type { SideThreadView } from "../../contract";
 import { isChatReply, mountSideThreadRows, sideThreadLabel, threadInPath, type ThreadFooter } from "./reply-in-thread";

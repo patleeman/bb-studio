@@ -24,6 +24,7 @@ export interface BuiltinProvider {
 }
 const CALL_TIMEOUT_MS = 10_000;
 const LIVE_STATES = new Set(["running", "degraded", "starting"]);
+const READ_ONLY_METHODS = new Set<keyof ProviderMethods>(["studio_list", "studio_get", "studio_describe"]);
 
 interface PluginEntry {
   id: string;
@@ -49,6 +50,9 @@ export type HubItem = StudioItem & { pluginId: string };
 export class StudioHub {
   private readonly described = new Map<string, { revision: string; expiresAt: number; info: StudioProviderInfo }>();
   private inventory: Map<string, string> | null = null;
+  private generation = 0;
+  private providersInFlight: { key: string; promise: Promise<ProviderView[]> } | null = null;
+  private overviewInFlight: { key: string; promise: Promise<{ providers: ProviderView[]; items: HubItem[]; truncated: Set<string>; discoveryComplete: boolean }> } | null = null;
 
   private readonly builtins: ReadonlyMap<string, BuiltinProvider>;
 
@@ -65,9 +69,20 @@ export class StudioHub {
       route?(providers: ProviderView[]): ProviderView[];
       /** The family and type of a namespace's indexed items, by id (src/item-index.ts); read once per listing. */
       itemTypes?(pluginId: string): ReadonlyMap<string, { family: ItemFamily; type: ItemType }>;
+      /** Monotonic external change cursor (e.g. ChangeLog.current) so writes invalidate in-flight coalesced reads. */
+      version?(): number;
     } = {},
   ) {
     this.builtins = new Map(builtins.map((builtin) => [builtin.pluginId, builtin]));
+  }
+
+  /** Marks any in-flight coalesced overview/providers fan-out stale so subsequent callers start a fresh read. */
+  invalidate(): void {
+    this.generation += 1;
+  }
+
+  private snapshotKey(): string {
+    return `${this.generation}:${this.options.version?.() ?? 0}`;
   }
 
   /**
@@ -119,26 +134,38 @@ export class StudioHub {
     if (pluginId === STUDIO_PLUGIN_ID) return Promise.reject(new Error("Studio isn't a provider."));
     const builtin = this.builtins.get(pluginId);
     if (builtin && !this.builtinOn(pluginId)) return Promise.reject(new Error(`${builtin.name} are turned off in Studio (Setup → Kinds).`));
+    const mutates = !READ_ONLY_METHODS.has(method);
+    if (mutates) this.invalidate();
+    let result: Promise<z.output<ProviderMethods[M]["output"]>>;
     if (builtin) {
       // The same parsing an RPC call gets, so built-ins and add-ons behave alike.
       const schema = schemas.provider[method];
       const handler = builtin.handlers[method] as (input: unknown) => unknown;
-      return Promise.resolve()
+      result = Promise.resolve()
         .then(() => handler(schema.input.parse(input)))
         .then((output) => this.classifiedOutput(pluginId, schema.output.parse(output)) as z.output<ProviderMethods[M]["output"]>);
+    } else {
+      result = this.sdk.plugins.callRpc({
+        pluginId,
+        method,
+        input: input as never,
+        outputSchema: schemas.provider[method].output as unknown as z.ZodType<z.output<ProviderMethods[M]["output"]>>,
+        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+      });
     }
-    return this.sdk.plugins.callRpc({
-      pluginId,
-      method,
-      input: input as never,
-      outputSchema: schemas.provider[method].output as unknown as z.ZodType<z.output<ProviderMethods[M]["output"]>>,
-      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
-    });
+    return mutates ? result.finally(() => this.invalidate()) : result;
   }
 
-  /** Every installed, enabled provider, ready or not. */
+  /** Every installed, enabled provider, ready or not. Concurrent calls at the same generation coalesce. */
   async providers(): Promise<ProviderView[]> {
-    return (await this.providerSnapshot()).providers;
+    const key = this.snapshotKey();
+    if (this.providersInFlight?.key === key) return this.providersInFlight.promise;
+    // Shared result: callers must not mutate the returned array.
+    const promise = this.providerSnapshot()
+      .then((snapshot) => snapshot.providers)
+      .finally(() => { if (this.providersInFlight?.promise === promise) this.providersInFlight = null; });
+    this.providersInFlight = { key, promise };
+    return promise;
   }
 
   private async providerSnapshot(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; discoveryComplete: boolean; installed: Set<string> }> {
@@ -176,8 +203,22 @@ export class StudioHub {
   /**
    * Providers and every ready provider's items; a provider that fails to list
    * goes offline. `truncated` names the providers that listed only some.
+   * Concurrent unfiltered calls at the same generation coalesce into one fan-out.
    */
   async overview(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; items: HubItem[]; truncated: Set<string>; discoveryComplete: boolean }> {
+    if (!only) {
+      const key = this.snapshotKey();
+      if (this.overviewInFlight?.key === key) return this.overviewInFlight.promise;
+      // Shared result: callers must not mutate the returned arrays or sets.
+      const promise = this.loadOverview()
+        .finally(() => { if (this.overviewInFlight?.promise === promise) this.overviewInFlight = null; });
+      this.overviewInFlight = { key, promise };
+      return promise;
+    }
+    return this.loadOverview(only);
+  }
+
+  private async loadOverview(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; items: HubItem[]; truncated: Set<string>; discoveryComplete: boolean }> {
     const { providers, discoveryComplete } = await this.providerSnapshot(only);
     const lists = await fanOutProviders(
       providers,
