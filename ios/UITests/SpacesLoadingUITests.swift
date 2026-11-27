@@ -18,7 +18,7 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
                                 "-qaSpacesLate", late, "-qaSpacesFallback", String(fallback)] + extra
         app.launchOffline()
         XCTAssertTrue(loading.waitForExistence(timeout: 20), "the app opens on the loading state")
-        XCTAssertFalse(app.tabBars.firstMatch.exists, "no tab bar")
+        XCTAssertFalse(app.tab("Home").exists, "not the room yet")
         shot("1-loading")
     }
 
@@ -64,7 +64,7 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
         app.launchOffline()
         XCTAssertTrue(app.navigationBars["Capture to BB"].waitForExistence(timeout: 30), "the sheet is up")
         XCTAssertFalse(loading.exists, "no loading frame for a known Studio")
-        XCTAssertFalse(app.tabBars.firstMatch.exists)
+        XCTAssertTrue(app.tab("Home").exists, "the room's tabs under the sheet")
     }
 
     func testAThreadLinkForAnExistingUserOpensItInTheRoom() {
@@ -72,6 +72,6 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
                                 "-openURL", "bbstudio://bot"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the link opens the Bot's Main over Home")
-        XCTAssertFalse(app.tabBars.firstMatch.exists)
+        XCTAssertTrue(app.tab("Home").exists, "in the room, on Home's tab")
     }
 }
