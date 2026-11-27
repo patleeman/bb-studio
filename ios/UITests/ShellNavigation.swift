@@ -22,7 +22,9 @@ extension XCUIApplication {
         return composer.exists
     }
 
-    private var home: XCUIElement { descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", "home")).firstMatch }
+    /// Home's list, by its identifier alone: the system labels the Home tab's image "home" too.
+    var homeList: XCUIElement { descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", "home")).firstMatch }
+    private var home: XCUIElement { homeList }
 
     /// A tap, or where the inner screen's stretched window runs past the
     /// simulator's (outer) screen, the control's action as VoiceOver runs it.

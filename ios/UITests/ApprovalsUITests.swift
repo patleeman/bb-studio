@@ -16,7 +16,7 @@ final class ApprovalsUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     /// The worker's row on Home says its state first ("Running", "Waiting").
     private func workerRow() -> XCUIElement {

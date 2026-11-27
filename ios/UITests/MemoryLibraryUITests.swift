@@ -14,10 +14,10 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
     private func launch(_ extra: [String] = []) {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list"] + extra
         app.launchOffline()
-        XCTAssertTrue(any("home").waitForExistence(timeout: 30), "the app opens on Home")
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 30), "the app opens on Home")
     }
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     private func text(_ contains: String) -> XCUIElement {
         app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", contains)).firstMatch

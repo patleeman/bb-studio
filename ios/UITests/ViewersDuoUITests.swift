@@ -6,7 +6,7 @@ import XCTest
 final class ViewersDuoUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     /// The simulator's screen is as wide as the outer one: bring the inner screen's right or left page onto it.
     private func page(_ side: String) {

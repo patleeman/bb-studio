@@ -58,7 +58,7 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
         command("capture?" + name)
     }
 
-    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
+    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     // MARK: The default text size
 
@@ -268,7 +268,7 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
             capture("\(posture)-landscape-\(size.name)")
         }
         app.press(element("BackButton"), id: "BackButton")
-        XCTAssertTrue(element("home").waitForExistence(timeout: 10), "Back is Home, as in vertical")
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 10), "Back is Home, as in vertical")
         capture("flat-landscape-\(size.name)-home")
         command("activate?homeConversation-thr_botdemo01")
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 10))
@@ -288,7 +288,7 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(element("workbenchButton").waitForExistence(timeout: 10), "folded: one column")
         capture("folded-\(size.name)")
         app.press(element("BackButton"), id: "BackButton")
-        XCTAssertTrue(element("home").waitForExistence(timeout: 10))
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 10))
         capture("folded-\(size.name)-home")
     }
 }

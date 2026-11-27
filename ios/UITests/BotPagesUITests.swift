@@ -22,7 +22,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         }
     }
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     /// Back to Home: its tab.
     private func closeMemory() {

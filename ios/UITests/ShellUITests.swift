@@ -46,7 +46,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         sleep(1)
     }
 
-    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
+    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     // MARK: Idle
 
@@ -143,7 +143,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
     func testHomeIsTheRootAndTheTabsHoldThePlaces() throws {
         try XCTSkipIf(isDuo, "the iPhone")
         launch()
-        XCTAssertTrue(element("home").waitForExistence(timeout: 30), "the app opens on Home")
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 30), "the app opens on Home")
         XCTAssertTrue(app.navigationBars["Home"].exists, "a native bar titled Home")
         XCTAssertTrue(app.buttons["homeNew"].exists, "New in the bar")
         for title in ["Home", "Library", "Memory", "Search"] { XCTAssertTrue(app.tab(title).exists, "the \(title) tab") }
@@ -159,7 +159,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(element("library-page").waitForExistence(timeout: 10), "Library is a tab")
         capture("iphone-library")
         app.tab("Home").tap()
-        XCTAssertTrue(element("home").waitForExistence(timeout: 10), "and back to Home")
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 10), "and back to Home")
 
         element("homeConversation-thr_botdemo01").tap()
         app.goBack()
@@ -169,7 +169,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
     func testSearchIsATab() throws {
         try XCTSkipIf(isDuo, "the iPhone")
         launch()
-        XCTAssertTrue(element("home").waitForExistence(timeout: 30))
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 30))
         app.tab("Search").tap()
         let field = app.searchFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10), "the native search field")
@@ -328,7 +328,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
     func testPushedScreensUseTheNativeBar() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launch(["-qaPageDemo", "-qaDesignDemo"])
-        XCTAssertTrue(element("home").waitForExistence(timeout: 30))
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 30))
         for (link, name) in [("page/qa-demo", "page"), ("design/dsn_demo", "design")] {
             XCUIDevice.shared.system.open(URL(string: "bbstudio://" + link)!)
             XCTAssertTrue(app.backButton.waitForExistence(timeout: 15), "\(name): the system's Back")
@@ -419,7 +419,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(element("workbenchTitle").waitForExistence(timeout: 10), "the same flip as the iPhone")
         capture("duo-vertical-workbench")
         activate("BackButton")
-        XCTAssertTrue(element("home").waitForExistence(timeout: 10), "the system's Back is Home")
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 10), "the system's Back is Home")
         capture("duo-vertical-home")
         command("tab?memory")
         XCTAssertTrue(element("memoryLayer").waitForExistence(timeout: 10), "Memory's tab, one page with its layers")

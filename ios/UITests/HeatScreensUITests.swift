@@ -31,7 +31,7 @@ final class HeatScreensUITests: ServerIsolatedUITestCase {
         app.launchOffline()
     }
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     private func mark(_ what: String) {
         guard let out else { return }
@@ -60,7 +60,7 @@ final class HeatScreensUITests: ServerIsolatedUITestCase {
 
     func test1Home() {
         launch([])
-        XCTAssertTrue(any("home").waitForExistence(timeout: 40), "Home")
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 40), "Home")
         hold("home")
     }
 

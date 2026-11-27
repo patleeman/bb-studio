@@ -8,7 +8,7 @@ import XCTest
 final class ComposerChipsUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     func testLastingStatesAreChipsAndTheFallbackIsALine() {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
