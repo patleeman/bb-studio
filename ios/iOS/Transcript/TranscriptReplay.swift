@@ -131,8 +131,9 @@ final class TranscriptReplay {
         let streamID = nextID("stream")
         await step("a reply starts") { set(rows + [Row(id: streamID, kind: .text("", mine: false))]) }
         for token in 0..<60 {
-            await step("token \(token)", quiet: true) { grow(streamID, by: token) }
+            await step("token \(token)", fast: true) { grow(streamID, by: token) }
         }
+        await step("after streaming 60 tokens") {}
         await step("a burst of 40") { set(rows + (0..<40).map { _ in makeRow(index: serial * 7, id: nextID("burst")) }) }
         await step("keyboard up") { setKeyboard(320) }
         await step("a reply with the keyboard up") { set(rows + [Row(id: nextID("kb"), kind: .text(Self.words(30), mine: false))]) }
@@ -169,10 +170,10 @@ final class TranscriptReplay {
         controller.onNearTop = { nearTop = true }
         var page = 0
         while !older.isEmpty, page < 120 {
-            await step("scroll up into unmeasured rows \(page)", expectReading: true, anchorAfterChange: true) { readerScroll(by: -6000) }
+            await step("scroll up into unmeasured rows \(page)", fast: true, expectReading: true, anchorAfterChange: true) { readerScroll(by: -6000) }
             if nearTop {
                 nearTop = false
-                await step("prepend page \(page)", expectReading: true) { prepend(200) }
+                await step("prepend page \(page)", fast: true, expectReading: true) { prepend(200) }
             }
             page += 1
         }
@@ -410,7 +411,7 @@ final class TranscriptReplay {
     /// of the rows it showed.
     /// `fast`: no wait for UIKit's late pass and no check at rest (steps
     /// 100 ms apart).
-    private func step(_ name: String, quiet: Bool = false, fast: Bool = false, expectReading: Bool = false, drift allowed: CGFloat = 1,
+    private func step(_ name: String, fast: Bool = false, expectReading: Bool = false, drift allowed: CGFloat = 1,
                       anchorAfterChange: Bool = false, _ change: () -> Void) async {
         let view = controller.collectionView!
         controller.log?("step: " + name)
@@ -495,7 +496,7 @@ final class TranscriptReplay {
         let result = Step(name: name, mode: controller.atEnd ? "end" : "reading", pastEnd: max(0, past), followGap: followGap, anchorDrift: drift,
             composerGapError: gapError, layouts: work.layouts, offsetWrites: work.offsetWrites, insetWrites: work.insetWrites,
             restLayouts: atRest.layouts, restWrites: atRest.offsetWrites + atRest.insetWrites, failures: failures)
-        if !quiet || !failures.isEmpty { steps.append(result) } else { steps.append(result) }
+        steps.append(result)
     }
 
     private func keyboardHeight(safeBottom: CGFloat, layout: Layout) -> CGFloat {
