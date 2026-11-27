@@ -302,8 +302,10 @@ export default async function plugin(bb: BbPluginApi) {
   const code = registerCode(bb, db);
   // The agent's hands on its conversation's workbench (src/workbench-agent): the tools run here, the window showing the conversation does the work.
   let entryTitle: (kind: "automation" | "todo", id: string) => Promise<string | null> = async () => null;
+  // Talk recordings live in TalkStore, not ItemIndex; assign once registerTalk initializes.
+  let recordingTitle: (id: string) => string | null = () => null;
   const threadWorkspace = registerWorkbenchAgent(bb, db, {
-    itemTitle: (id) => itemIndex.get(id)?.title ?? searchIndex.titleOf(id),
+    itemTitle: (id) => itemIndex.get(id)?.title ?? recordingTitle(id) ?? searchIndex.titleOf(id),
     // `bots` is made further down; a tool is only called once the plugin has loaded.
     botName: (id) => bots.stored(id)?.name ?? null,
     entryTitle: (kind, id) => entryTitle(kind, id),
@@ -381,6 +383,7 @@ export default async function plugin(bb: BbPluginApi) {
   drawings.connectPages(pages.whiteboards);
   await moveOrphanDrawings(bb, drawings, pages.whiteboards).catch((error) => bb.log.warn(`Couldn't move drawings into a Drawings page: ${errorText(error)}`));
   const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle, pages.notes, notifyBuiltin);
+  recordingTitle = (id) => recordings.store.recording(id)?.title ?? null;
   bb.onDispose(() => recordings.dispose());
 
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
