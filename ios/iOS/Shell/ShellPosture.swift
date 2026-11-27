@@ -33,8 +33,8 @@ enum ShellPosture: String, CaseIterable, Equatable {
            abs(max(screen.width, screen.height) - foldedScreen.height) < 1 { return .folded }
         let wide = window.width >= 900 && window.height >= 600 && window.width > window.height
         if wide {
-            // Half open is the Duo's resting posture in the hand; only a
-            // hinge that says it lies flat brings the third pane.
+            // Half open is the Duo's resting posture in the hand. Book and
+            // flat lay out alike (`ShellPanes`); the name is the hinge's.
             return hinge == .fullyOpen ? .flat : .book
         }
         let tall = window.height >= 900 && window.width >= 600 && window.height > window.width

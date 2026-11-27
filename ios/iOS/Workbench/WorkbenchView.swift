@@ -26,7 +26,7 @@ struct WorkbenchView: View {
                 WorkbenchTabContent(tab: tab).modifier(WorkbenchHiddenTab(hidden: tab.id != shown?.id))
             }
             if shown == nil {
-                WorkbenchEmpty(unsupported: store.unsupported) { addingTab = true }
+                WorkbenchEmpty(unsupported: store.unsupported, unshown: tabs.count) { addingTab = true }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -59,16 +59,19 @@ struct WorkbenchHiddenTab: ViewModifier {
 }
 
 /// No tabs open: what the Workbench is, and New tab.
+/// Tabs the phone can't show count as none, as on the Workbench button;
+/// the tab menu still lists them.
 private struct WorkbenchEmpty: View {
     let unsupported: Bool
+    /// Open tabs the phone can't show (shown is nil, so that is all of them).
+    let unshown: Int
     let add: () -> Void
 
     var body: some View {
         ContentUnavailableView {
             Label("No tabs", systemImage: "rectangle.split.2x1")
         } description: {
-            Text(unsupported ? "This server's Studio has no Workbench yet."
-                 : "Pages, designs, files and links the conversation opens show here.")
+            Text(Self.description(unsupported: unsupported, unshown: unshown))
         } actions: {
             if !unsupported {
                 Button("New tab…", action: add)
@@ -77,6 +80,13 @@ private struct WorkbenchEmpty: View {
             }
         }
         .accessibilityIdentifier("workbenchEmpty")
+    }
+
+    static func description(unsupported: Bool, unshown: Int) -> String {
+        if unsupported { return "This server's Studio has no Workbench yet." }
+        let opens = "Pages, designs, files and links the conversation opens show here."
+        guard unshown > 0 else { return opens }
+        return opens + (unshown == 1 ? " The tab menu lists 1 tab the phone can't open." : " The tab menu lists \(unshown) tabs the phone can't open.")
     }
 }
 
@@ -91,18 +101,18 @@ struct WorkbenchTabMenuItems: View {
         let shown = store.selected(threadId)
         Section {
             ForEach(store.tabs(threadId)) { tab in
-                if WorkbenchTabKind(tab).showsOnPhone {
+                if let unshown = WorkbenchTabKind(tab).unshown {
+                    // Listed, never shown: the phone has nothing to put in a pane for it.
+                    Button {} label: {
+                        Label { Text(tab.title); Text(unshown.label) } icon: { Image(systemName: unshown.symbol) }
+                    }
+                    .disabled(true)
+                    .accessibilityIdentifier("workbenchTab-\(tab.id)")
+                } else {
                     Button { store.select(tab.id, in: threadId) } label: {
                         Label(tab.title, systemImage: tab.id == shown?.id ? "checkmark" : Self.symbol(tab.ref.kind))
                     }
                     .accessibilityAddTraits(tab.id == shown?.id ? .isSelected : [])
-                    .accessibilityIdentifier("workbenchTab-\(tab.id)")
-                } else {
-                    // Listed, never shown: the phone has nothing to put in a pane for it.
-                    Button {} label: {
-                        Label { Text(tab.title); Text("On your Mac") } icon: { Image(systemName: "desktopcomputer") }
-                    }
-                    .disabled(true)
                     .accessibilityIdentifier("workbenchTab-\(tab.id)")
                 }
             }
