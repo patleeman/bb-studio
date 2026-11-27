@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // useTaskView: a card far off screen leaves the batched reads and keeps what it showed.
 import { act } from "react";
 import { createRoot } from "react-dom/client";

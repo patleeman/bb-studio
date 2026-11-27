@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, expect, it } from "vitest";
 import { mountActionDecoration } from "./action-decoration";
 import { menuSettings } from "./settings";

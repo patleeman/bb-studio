@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { frameHtml, newNonce, presenceCsp, PRESENCE_SANDBOX, PresenceSandbox, WORKER_BLOCKED, workerSource, type SandboxFrame } from "./sandbox";
 

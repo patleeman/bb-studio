@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from "vitest";
 import type { PanelTab } from "../../workbench-agent/exec";
 import { closeStrandsTabs, retireStrandsTabs, strandsTabsToClose } from "./retire-strands-tabs";

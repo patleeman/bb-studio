@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // The Tool Gateway settings page: read-only without the app window, every
 // change sent with the app token, secrets write-only.
 import { act } from "react";

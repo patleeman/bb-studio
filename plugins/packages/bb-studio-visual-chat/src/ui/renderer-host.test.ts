@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // The board renderer's DOM host (renderer-host.ts, the iOS app's board) and the built bundle: the same frame,
 // messages and embed overlay as the desktop's page-frame.tsx, from the same shared code (renderer.ts).
 import { readFileSync } from "node:fs";

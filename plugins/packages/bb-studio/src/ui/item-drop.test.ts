@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
 import { docDragItem, refDragItem, threadDragItem, type DragItem } from "../kit/app/item-drag";
 import { TAB_KIND_REGISTRY, type TabKindId } from "../tab-kinds";

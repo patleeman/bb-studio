@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // The Pages view and a thread's side panel share one layout: the reading
 // column, the icon and the big title. These tests pin that, so the two can't
 // drift apart again.

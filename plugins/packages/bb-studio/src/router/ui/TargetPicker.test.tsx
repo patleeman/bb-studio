@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // A chain entry's picker reports values on its own when it opens (a fallback
 // for an agent that isn't installed or a retired model). Those must not
 // rewrite the saved entry; only what the person picks does.

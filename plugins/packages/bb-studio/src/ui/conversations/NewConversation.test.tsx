@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // A Bot's + New: BB's composer seeded with the Bot's default model, started
 // as that Bot's conversation on whatever was sent.
 import { act, type ReactNode } from "react";

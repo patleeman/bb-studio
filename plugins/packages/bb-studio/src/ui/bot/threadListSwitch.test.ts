@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AUTOMATIC_PROVIDER as AUTO, BOT_LIST_PROVIDER as BOT, botLanding, botThreadVisit, threadLocator, forgetLastBotThread, readLastBotThread, threadRoute, forgetListMode, isBotPath, isStudioPath, listSwitch, MODE_KEY, NATIVE_LIST_PROVIDER as NATIVE, nextListMode, providerForMode, readListMode, SAVED_KEY, STUDIO_LIST_PROVIDER as STUDIO, syncThreadList, threadIdForPath } from "./threadListSwitch";
 

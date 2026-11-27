@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
 import { LAYOUT_SETTLE_MS, layoutColumn, LayoutWatch, measureLayout, openAreas, openSpot, type LayoutRect, type SceneLayout } from "./layout";
 

@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FAST_TITLE_DELAY_MS, installFastTitles } from "./fast-title";
 

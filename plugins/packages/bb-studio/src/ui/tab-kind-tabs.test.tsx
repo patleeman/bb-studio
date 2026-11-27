@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { expect, it, vi } from "vitest";
 import { NEW_TAB_ACTIONS, tabKindEntry } from "../tab-kinds";
 import { noteOpenedTab, openedTabs } from "./opened-tabs";

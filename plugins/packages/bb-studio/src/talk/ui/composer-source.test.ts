@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, expect, it } from "vitest";
 import { composerPendingKey, composerSource, registerComposerSource } from "./composer-source";
 

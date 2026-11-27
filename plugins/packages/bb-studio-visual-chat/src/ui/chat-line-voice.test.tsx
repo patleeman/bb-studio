@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // The chat line's dictation mic and hands-free button are Studio's, answered
 // from BB's main window. In the plugin's own window they can't work, so they
 // are not drawn there; everywhere else they stay.

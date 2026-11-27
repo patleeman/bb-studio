@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useRpc: () => ({}), useBbNavigate: () => ({}), experimental_useAppPanel: () => ({}), experimental_Icon: () => null }));
