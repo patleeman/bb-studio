@@ -8,7 +8,7 @@ root = pathlib.Path(__file__).resolve().parents[1]
 errors = []
 paths = [path for directory in ("Tests", "UITests")
          for path in sorted((root / directory).rglob("*.swift"))]
-paths += [root / "scripts/test.sh", root / "scripts/share-runtime.sh"]
+paths += [root / "scripts/test.sh", root / "scripts/share-runtime.sh", root / "scripts/test-staged.sh"]
 for path in paths:
     source = path.read_text()
     for number, line in enumerate(source.splitlines(), 1):
