@@ -502,6 +502,24 @@
     {
       "file": "ios/Shared/Designs.swift",
       "plugin": "studio",
+      "method": "designs.addComment",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Designs.swift",
+      "plugin": "studio",
+      "method": "designs.editText",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Designs.swift",
+      "plugin": "studio",
+      "method": "designs.deleteDesign",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Designs.swift",
+      "plugin": "studio",
       "method": "designs.deleteComment",
       "coverage": "generated method"
     },
@@ -599,6 +617,30 @@
       "file": "ios/Shared/Pages.swift",
       "plugin": "studio",
       "method": "pages.update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.remove",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.linkPreview",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "exportItem",
       "coverage": "generated method"
     },
     {
@@ -704,27 +746,9 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
-      "file": "ios/Shared/StrandOverview.swift",
-      "plugin": "studio",
-      "method": "strands.overview",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/Shared/StrandTimeline.swift",
+      "file": "ios/Shared/StrandTags.swift",
       "plugin": "studio",
       "method": "strands.tags",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/Shared/Strands.swift",
-      "plugin": "studio",
-      "method": "strands.list",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/Shared/Strands.swift",
-      "plugin": "studio",
-      "method": "strands.opened",
       "coverage": "generated method"
     },
     {
@@ -848,19 +872,19 @@
       "coverage": "generated method"
     },
     {
-      "file": "ios/Shared/Workspace.swift",
+      "file": "ios/Shared/Workbench.swift",
       "plugin": "studio",
       "method": "threadWorkbenchGet",
       "coverage": "generated method"
     },
     {
-      "file": "ios/Shared/Workspace.swift",
+      "file": "ios/Shared/Workbench.swift",
       "plugin": "studio",
       "method": "threadWorkbenchMutate",
       "coverage": "generated method"
     },
     {
-      "file": "ios/Shared/Workspace.swift",
+      "file": "ios/Shared/Workbench.swift",
       "plugin": "studio",
       "method": "threadWorkbenchShown",
       "coverage": "generated method"
@@ -894,6 +918,12 @@
       "plugin": "studio",
       "method": "bot_reopen",
       "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/BotSpacesDemo.swift",
+      "plugin": "method",
+      "method": "input",
+      "coverage": "dynamic dispatch; runtime validation required"
     },
     {
       "file": "ios/iOS/Bot/MemoryClient.swift",
@@ -992,6 +1022,30 @@
       "coverage": "generated method"
     },
     {
+      "file": "ios/iOS/Home/BotControls.swift",
+      "plugin": "studio",
+      "method": "method",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/Home/BotControls.swift",
+      "plugin": "studio",
+      "method": "bot_make_main",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Home/BotControls.swift",
+      "plugin": "studio",
+      "method": "bot_new_main",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Home/BotThemePicker.swift",
+      "plugin": "studio",
+      "method": "bot_set_appearance",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/iOS/Look/LookWebView.swift",
       "plugin": "method",
       "method": "body",
@@ -1004,28 +1058,10 @@
       "coverage": "generated method"
     },
     {
-      "file": "ios/iOS/Room/BotControls.swift",
-      "plugin": "studio",
-      "method": "method",
+      "file": "ios/iOS/Studio/DesignDemo.swift",
+      "plugin": "_ method: String",
+      "method": "_",
       "coverage": "dynamic dispatch; runtime validation required"
-    },
-    {
-      "file": "ios/iOS/Room/BotControls.swift",
-      "plugin": "studio",
-      "method": "bot_make_main",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Room/BotControls.swift",
-      "plugin": "studio",
-      "method": "bot_new_main",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Room/RoomThemePicker.swift",
-      "plugin": "studio",
-      "method": "bot_set_appearance",
-      "coverage": "generated method"
     },
     {
       "file": "ios/iOS/Studio/MiniAppView.swift",
@@ -1068,18 +1104,6 @@
       "plugin": "studio",
       "method": "method",
       "coverage": "dynamic dispatch; runtime validation required"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "tasks.get",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "tasks.act",
-      "coverage": "generated method"
     },
     {
       "file": "ios/iOS/Thread/InlineVis.swift",
