@@ -159,7 +159,7 @@ run_lifecycle() {
   server_url=$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).serverUrl)' "$installation")
   host_daemon_port=$(sed -n '1p' "$data_dir/host-daemon-port")
   case "$host_daemon_port" in *[!0-9]*|'') fail_step "Refusing an invalid daemon port."; exit 1 ;; esac
-  if [ "$host_daemon_port" -lt 1024 ] || [ "$host_daemon_port" -gt 65535 ] || [ "$host_daemon_port" -eq 38886 ] || [ "$host_daemon_port" -eq 38887 ]; then
+  if [ "$host_daemon_port" -lt 1024 ] || [ "$host_daemon_port" -gt 65535 ] || [ "$host_daemon_port" -eq 38986 ] || [ "$host_daemon_port" -eq 38987 ]; then
     fail_step "Refusing an invalid or default daemon port."
     exit 1
   fi
@@ -676,7 +676,7 @@ report_wait_progress() {
 }
 
 find_available_host_daemon_port() {
-  candidate_port=38888
+  candidate_port=38988
   while [ "$candidate_port" -le 65535 ]; do
     if port_is_available "$candidate_port"; then
       printf '%s\n' "$candidate_port"

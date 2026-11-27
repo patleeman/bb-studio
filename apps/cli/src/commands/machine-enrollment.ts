@@ -140,7 +140,7 @@ export async function enrollMachine(
       ),
   );
   if (
-    dataDir === resolve(home, ".bb") &&
+    dataDir === resolve(home, ".bb-studio") &&
     (await readOptional(join(dataDir, "host-id")))?.trim() !== bootstrap.hostId
   )
     throw new Error(
