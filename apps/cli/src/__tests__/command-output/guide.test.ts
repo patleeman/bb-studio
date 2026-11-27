@@ -36,7 +36,7 @@ describe("bb guide command output", () => {
 
     const output = collectLogLines(vi.mocked(console.log)).join("\n");
     expect(output).toContain(
-      "bb terminal output|read <terminalId>  [--since-seq <n>] [--tail-bytes <n>] [--limit-chunks <n>] [--plain] [--json]\n    Print terminal output",
+      "bbs terminal output|read <terminalId>  [--since-seq <n>] [--tail-bytes <n>] [--limit-chunks <n>] [--plain] [--json]\n    Print terminal output",
     );
     expect(output).not.toContain("bb thread ");
   }, 30_000);
@@ -45,8 +45,8 @@ describe("bb guide command output", () => {
     await runCommand(["guide", "commands"], registerGuideCommand);
 
     const output = collectLogLines(vi.mocked(console.log)).join("\n");
-    expect(output).toContain("bb thread tell|message|send <id> [message]\n");
-    expect(output).toContain("bb guide commands <group>");
+    expect(output).toContain("bbs thread tell|message|send <id> [message]\n");
+    expect(output).toContain("bbs guide commands <group>");
   }, 30_000);
 
   it("bb guide commands rejects a group that does not exist", async () => {

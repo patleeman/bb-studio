@@ -396,8 +396,8 @@ describe("SidebarUpdatesBadge", () => {
     });
 
     const card = await openCard();
-    const bb = within(card).getByRole("region", { name: "bb update" });
-    expect(bb.textContent).toContain("bb 0.49.0");
+    const bb = within(card).getByRole("region", { name: "BB Studio update" });
+    expect(bb.textContent).toContain("BB Studio 0.49.0");
     expect(bb.textContent).toContain("from 0.48.2");
     expect(bb.textContent).toContain("Installs itself when you're idle");
     expect(rowStates(card)).toEqual([
@@ -437,8 +437,8 @@ describe("SidebarUpdatesBadge", () => {
       machines: [machine({ issues: [providerIssue("codex", "Codex")] })],
     });
     const card = await openCard();
-    const bb = within(card).getByRole("region", { name: "bb update" });
-    expect(bb.textContent).toContain("bb 5c1cf4e");
+    const bb = within(card).getByRole("region", { name: "BB Studio update" });
+    expect(bb.textContent).toContain("BB Studio 5c1cf4e");
     expect(bb.textContent).toContain("from 1320c88");
     expect(rowStates(card)).toEqual([["Codex1.0.0 → 1.1.0", "available"]]);
   });
@@ -448,7 +448,7 @@ describe("SidebarUpdatesBadge", () => {
     renderBadge({ appUpdateAvailable: true });
 
     const card = await openCard();
-    expect(card.textContent).toContain("Installs when bb restarts");
+    expect(card.textContent).toContain("Installs when BB Studio restarts");
     expect(within(card).queryByRole("button", { name: /^Update / })).toBe(null);
     expect(updateButton().getAttribute("aria-label")).toBe(
       "1 update available",
@@ -461,7 +461,7 @@ describe("SidebarUpdatesBadge", () => {
 
     const card = await openCard();
     fireEvent.click(
-      within(card).getByRole("button", { name: "Restart into bb 0.49.0 now" }),
+      within(card).getByRole("button", { name: "Restart into BB Studio 0.49.0 now" }),
     );
     expect(applyAppUpdateMock).not.toHaveBeenCalled();
     const dialog = await screen.findByRole("dialog");
@@ -644,7 +644,7 @@ describe("SidebarUpdatesBadge", () => {
     const card = await screen.findByTestId("sidebar-update-card");
     expect(screen.getByTestId("location").textContent).toBe("/");
     expect(onNavigate).not.toHaveBeenCalled();
-    expect(within(card).getByText("bb 0.49.0")).toBeTruthy();
+    expect(within(card).getByText("BB Studio 0.49.0")).toBeTruthy();
 
     fireEvent.click(
       within(card).getByRole("button", { name: "Update 1 agent CLI" }),

@@ -1,6 +1,6 @@
 {
-  "name": "bb",
-  "short_name": "bb",
+  "name": "BB Studio",
+  "short_name": "BB Studio",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

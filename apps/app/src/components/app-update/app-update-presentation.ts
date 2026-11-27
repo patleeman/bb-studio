@@ -120,7 +120,7 @@ export function scheduledAppUpdateCaption(
       : `Updates once no thread has run for ${idle} (${String(count)} running)`;
   }
   return count === 0
-    ? "All threads are idle; updating shortly"
+    ? "All conversations are idle; updating shortly"
     : `Updates when all threads are idle (${String(count)} running)`;
 }
 
