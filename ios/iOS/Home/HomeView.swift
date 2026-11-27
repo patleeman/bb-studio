@@ -162,12 +162,19 @@ struct HomeView: View {
     }
 }
 
-/// Home is an inset list on its own page and a plain one as the flat Duo's narrow column.
+/// Home is an inset list on its own page and a plain one as the open Duo's
+/// column. There a plain list's rows get no trailing margin (its stack is
+/// handed the window's trailing inset, a screen away, and the column
+/// ignores it): times and chevrons would touch the divider.
 private struct HomeListStyle: ViewModifier {
     let column: Bool
 
     func body(content: Content) -> some View {
-        if column { content.listStyle(.plain) } else { content.listStyle(.insetGrouped) }
+        if column {
+            content.listStyle(.plain).safeAreaPadding(.trailing, 12)
+        } else {
+            content.listStyle(.insetGrouped)
+        }
     }
 }
 

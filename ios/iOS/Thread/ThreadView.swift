@@ -70,6 +70,7 @@ struct ThreadView: View {
     @Environment(\.botConversation) private var shell
     @Environment(\.look) private var look
     @Environment(\.shellPosture) private var posture
+    @Environment(\.shellPaneAtRail) private var paneAtRail
     @Environment(\.shellInnerScreen) private var innerScreen
     @ObservedObject private var router = Router.shared
     /// The Workbench over the rows (between the title and the composer); nil shows the chat.
@@ -1830,8 +1831,8 @@ extension ThreadView {
         chrome.rows.margin = Self.margin
         chrome.rows.spacing = 10
         chrome.rows.readableWidth = readableWidth
-        if posture.splitsWorkbench {
-            // The left page of two: its stack still hands the transcript the
+        if posture.splitsWorkbench, !paneAtRail {
+            // A pane left of another: its stack still hands the transcript the
             // window's trailing inset (the status column, a screen away).
             chrome.composerIgnoresTrailingSafeArea = true
             chrome.rowsTrailingClear = 0

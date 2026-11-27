@@ -294,6 +294,9 @@ private struct ShellPages: View {
             }
             conversationColumn
                 .frame(width: panes.conversation)
+                .environment(\.shellPaneAtRail, panes.side == 0)
+                // Under Home, out of VoiceOver's reach where SwiftUI's hiding reaches its UIKit host.
+                .accessibilityHidden(overlaid)
                 .overlay(alignment: .leading) { if panes.home > 0 { Divider() } }
                 .overlay(alignment: .leading) { if panes.home == 0, !overlaid { HomeEdge(fits: panes.homeFits) } }
             if panes.side > 0 {
@@ -361,8 +364,8 @@ private struct ShellPages: View {
 }
 
 /// Home over the conversation, from its leading edge, where it doesn't fit
-/// beside it; a tap beside it (or a pick in it) closes it. Modal to
-/// VoiceOver: the conversation under it is out of reach.
+/// beside it; a tap beside it, a pick in it, the rail's Home or VoiceOver's
+/// escape closes it.
 private struct HomeOverlay<Home: View>: View {
     let width: CGFloat
     @ViewBuilder var home: Home
@@ -376,7 +379,7 @@ private struct HomeOverlay<Home: View>: View {
                 .background(look.canvas)
                 .overlay(alignment: .trailing) { Divider() }
                 .shadow(color: .black.opacity(0.3), radius: 12)
-                .accessibilityAddTraits(.isModal)
+                .accessibilityAction(.escape) { router.homePane.toggle(fits: false) }
             Color.black.opacity(0.25)
                 .contentShape(.rect)
                 .onTapGesture { router.homePane.toggle(fits: false) }

@@ -200,25 +200,28 @@ final class WorkbenchShown {
 
 #if DEBUG
 /// `-qaWorkbenchDemo` (with `-qaPageDemo` for the page tab): a Workbench
-/// offline, two tabs the agent opened and two of yours; open and close
-/// change it here.
+/// offline, two tabs the agent opened and two of yours (one only the Mac
+/// opens); open and close change it here.
 @MainActor
 enum WorkbenchDemo {
     static var on: Bool { ProcessInfo.processInfo.arguments.contains("-qaWorkbenchDemo") }
+    /// `-qaWorkbenchMacOnly`: only a VS Code tab, which the phone can't show.
+    private static var macOnly: Bool { ProcessInfo.processInfo.arguments.contains("-qaWorkbenchMacOnly") }
+    private static let code = WorkbenchTab(id: "tab-code", ref: .init(kind: "vscode", path: "ios/README.md"), title: "README.md",
+                                           position: 3, support: .desktopOnly)
     private static var states: [String: WorkbenchState] = [:]
 
     static func state(_ threadId: String) -> WorkbenchState? {
         guard on else { return nil }
         if let state = states[threadId] { return state }
-        let state = WorkbenchState(threadId: threadId, tabs: [
+        let state = WorkbenchState(threadId: threadId, tabs: macOnly ? [code] : [
             WorkbenchTab(id: "tab-budget", ref: .init(kind: "page", id: "qa-demo"), title: "Lisbon budget", position: 0,
                          openedByAgent: true, support: .native),
             WorkbenchTab(id: "tab-stills", ref: .init(kind: "design", id: "dsn_demo_stills"), title: "Theme stills", position: 1,
                          openedByAgent: true, support: .native),
             WorkbenchTab(id: "tab-site", ref: .init(kind: "browser", url: "https://example.com"), title: "example.com", position: 2,
                          support: .web),
-            WorkbenchTab(id: "tab-code", ref: .init(kind: "vscode", path: "ios/README.md"), title: "README.md", position: 3,
-                         support: .desktopOnly),
+            code,
         ], activeTabId: nil, version: 1)
         states[threadId] = state
         return state

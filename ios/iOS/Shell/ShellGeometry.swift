@@ -34,6 +34,9 @@ extension EnvironmentValues {
     @Entry var shellPosture: ShellPosture = .phone
     /// The column the system reserves at the window's trailing edge, which the rail fills.
     @Entry var shellReservedColumn: CGFloat = 0
+    /// A pane beside others whose trailing edge is the rail's (`ShellPages`):
+    /// the window's trailing inset is really its own there.
+    @Entry var shellPaneAtRail = false
     /// The window is on the Duo's inner screen (see `ShellGeometry.innerScreen`).
     @Entry var shellInnerScreen = false
 }
