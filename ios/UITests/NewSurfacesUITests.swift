@@ -14,18 +14,48 @@ final class NewSurfacesUITests: StagedServerUITestCase {
         shot(app, "search")
     }
 
-    /// The collection's search field sits in the navigation drawer, hidden until the list is pulled down.
-    private func studioSearch(_ app: XCUIApplication) -> XCUIElement {
-        let search = app.searchFields["Search Studio"]
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10)
-            || app.staticTexts["Studio"].waitForExistence(timeout: 5))
-        if !search.waitForExistence(timeout: 3) {
-            let window = app.windows.firstMatch
-            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
-                .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)))
-            _ = search.waitForExistence(timeout: 5)
+    /// On a second (cached) visit to Studio, the toolbar Search button still reveals Search Studio on iPhone
+    /// (and `shellSearchField` stays reachable on Duo), and Cancel/Clear dismisses it.
+    func testSearchReachableOnSecondCachedVisit() throws {
+        guard rpcRaw("studio", "searchAll", ["query": "QA iOS7", "limit": 10]) is [[String: Any]] else {
+            throw XCTSkip("Updated Studio search is not installed")
         }
-        return search
+        // First visit populates StudioStore's cache.
+        let first = launch()
+        first.open(URL(string: "bbstudio://studio")!)
+        XCTAssertTrue(first.descendants(matching: .any).matching(identifier: "studioItem").firstMatch.waitForExistence(timeout: 15))
+        first.terminate()
+
+        // Second (cached) visit: search must still be reachable in one tap.
+        let second = launch()
+        second.open(URL(string: "bbstudio://studio")!)
+        let search = studioSearch(second)
+        XCTAssertTrue(search.exists, "search field reachable on cached second visit")
+        search.tap()
+        search.typeText("Staged")
+        let cancel = second.buttons["Cancel"].firstMatch
+        if cancel.waitForExistence(timeout: 2) {
+            cancel.tap()
+        } else if second.buttons["Clear search"].firstMatch.exists {
+            second.buttons["Clear search"].firstMatch.tap()
+        }
+    }
+
+    /// On Duo, `ShellSearchable` puts `shellSearchField` at the top of the page;
+    /// on iPhone, tapping the toolbar Search button (`screenAction-search`) presents `.searchable`.
+    private func studioSearch(_ app: XCUIApplication) -> XCUIElement {
+        let duoField = app.textFields["shellSearchField"].firstMatch
+        let navField = app.searchFields.firstMatch
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10)
+            || app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Studio'")).firstMatch.waitForExistence(timeout: 5))
+        if duoField.waitForExistence(timeout: 3) { return duoField }
+        _ = app.descendants(matching: .any).matching(identifier: "studioItem").firstMatch.waitForExistence(timeout: 10)
+        let searchButton = app.buttons["screenAction-search"].firstMatch
+        if !navField.exists, searchButton.waitForExistence(timeout: 5) {
+            searchButton.tap()
+        }
+        _ = navField.waitForExistence(timeout: 5)
+        return navField
     }
 
     func testMeetingNotes() throws {

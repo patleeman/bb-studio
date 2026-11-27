@@ -79,6 +79,7 @@ extension Route {
         case .artifact, .mini: "App"
         case .recording: "Recording"
         case .automations, .automation: "Automations"
+        case .botAutomation(_, let automation, _): automation.name
         case .usage: "Usage"
         case .archived: "Archived threads"
         case .terminals(_, let title): title

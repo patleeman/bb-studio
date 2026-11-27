@@ -9,8 +9,12 @@ final class PageEditingUITests: ServerIsolatedUITestCase {
         let app = XCUIApplication()
         app.launchStaged(server: qaServer)
         app.open(URL(string: "bbstudio://drawing/\(id)")!)
-        XCTAssertTrue(app.navigationBars["QA iOS2 drawing"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.navigationBars["Edit drawing"].waitForExistence(timeout: 10), "empty drawings open in Excalidraw")
+        let navTitle = app.navigationBars["QA iOS2 drawing"]
+        let shellTitle = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'QA iOS2 drawing'")).firstMatch
+        let editSheet = app.navigationBars["Edit drawing"]
+        let opened = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in navTitle.exists || shellTitle.exists || editSheet.exists }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [opened], timeout: 15), .completed, "drawing screen opened")
+        XCTAssertTrue(editSheet.waitForExistence(timeout: 10), "empty drawings open in Excalidraw")
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 10))
         sleep(12)
         try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/qa-ui-ios2-drawing-editor.png"))

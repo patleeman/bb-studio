@@ -210,6 +210,39 @@ async function start() {
   const project = await bb("project", "create", "--name", "Staged QA", "--root", projDir, "--machine", machine.id);
   const thread = await bb("thread", "spawn", "--project", project.id, "--title", "Staged QA Thread", "--prompt", "Staged QA sample thread.", "--send-at", "30d");
 
+  // Seed a second thread with a real sent user message (not scheduled) on a project-checkout
+  // environment so message-menu tests, Files & changes, and New Thread workspace choices all work.
+  let sentThreadId = "";
+  try {
+    const res = await fetch(`${serverUrl}/api/v1/threads`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: project.id,
+        origin: "app",
+        title: "Staged QA Sent Thread",
+        environment: {
+          type: "provider",
+          environmentProviderId: "project-checkout",
+          machine: { type: "existing", hostId: machine.id },
+          inputs: {},
+        },
+        input: [{ type: "text", text: "Staged QA sent message with enough text to inspect sent time.", mentions: [] }],
+      }),
+    });
+    const sent = await res.json();
+    sentThreadId = sent?.id || sent?.thread?.id || "";
+    // Wait briefly for the project-checkout environment to reach status "ready".
+    const envDeadline = Date.now() + 15_000;
+    while (Date.now() < envDeadline) {
+      const envs = await (await fetch(`${serverUrl}/api/v1/environments?projectId=${encodeURIComponent(project.id)}`)).json();
+      if (Array.isArray(envs) && envs.some((e) => e.environmentProviderId === "project-checkout" && e.status === "ready")) break;
+      await sleep(300);
+    }
+  } catch (err) {
+    process.stderr.write(`Warning: could not seed sent thread: ${err?.message || err}\n`);
+  }
+
   let botId = "";
   if (process.env.BB_STAGED_SKIP_BOT !== "1") {
     try {
@@ -228,9 +261,76 @@ async function start() {
       projectId: null,
       parentId: null,
       title: "Staged QA Page",
+      markdown: "# Staged QA Page\n\nShip it",
     });
     pageId = created?.page?.id || created?.id || "";
+    if (pageId) {
+      const blocksRes = await rpc(serverUrl, "studio", "pages.commentBlocks", { id: pageId });
+      const blockId = blocksRes?.blocks?.[0]?.id;
+      if (blockId) {
+        await rpc(serverUrl, "studio", "pages.commentCreate", {
+          id: pageId,
+          block: blockId,
+          text: "Is this final?",
+        });
+      }
+    }
   } catch {}
+
+  // Seed a playable 2-segment (2 × 35s) M4A recording for playback, Studio paging, and embeds tests.
+  let recordingId = "";
+  try {
+    const wavPath = join(stagedDir, "qa-silence.wav");
+    const m4aPath = join(stagedDir, "qa-silence.m4a");
+    await run("python3", ["-c", `import wave, sys; w = wave.open(sys.argv[1], "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000); w.writeframes(b"\\x00\\x00" * 8000 * 35); w.close()`, wavPath], { quiet: true });
+    await run("afconvert", ["-f", "m4af", "-d", "aac", wavPath, m4aPath], { quiet: true });
+    const audioBase64 = readFileSync(m4aPath).toString("base64");
+    const rec = await rpc(serverUrl, "studio", "recordings.recording_create", { kind: "recording", projectId: project.id, threadId: null });
+    recordingId = rec?.id || "";
+    if (recordingId) {
+      await rpc(serverUrl, "studio", "recordings.recording_rename", { id: recordingId, title: "Staged QA Recording" });
+      const now = Date.now();
+      for (let i = 0; i < 2; i++) {
+        await rpc(serverUrl, "studio", "recordings.segment_put", {
+          recordingId,
+          sessionId: "qasess01",
+          index: i,
+          startedAt: now - (2 - i) * 35_000,
+          durationMs: 35_000,
+          mimeType: "audio/mp4",
+          audioBase64,
+        });
+      }
+      // Use "paused" rather than "finishing" so silent audio isn't discarded as an empty recording.
+      await rpc(serverUrl, "studio", "recordings.recording_state", { id: recordingId, status: "paused" });
+    }
+  } catch (err) {
+    process.stderr.write(`Warning: could not seed staged recording: ${err?.message || err}\n`);
+  }
+
+  // Seed a "Daily" automation for Automations UI tests.
+  let automationId = "";
+  try {
+    const auto = await rpc(serverUrl, "automations", "automations_create", {
+      projectId: project.id,
+      name: "Daily",
+      enabled: true,
+      trigger: { triggerType: "schedule", cron: "0 9 * * *", timezone: "UTC" },
+      origin: "app",
+      execution: {
+        mode: "agent",
+        prompt: "Staged QA daily check.",
+        providerId: "codex",
+        model: "gpt-5.4",
+        reasoningLevel: "medium",
+        permissionMode: "auto",
+        environment: { type: "project-default" },
+      },
+    });
+    automationId = auto?.id || auto?.automation?.id || "";
+  } catch (err) {
+    process.stderr.write(`Warning: could not seed staged automation: ${err?.message || err}\n`);
+  }
 
   let miniIds = "";
   try {
@@ -245,13 +345,15 @@ async function start() {
       `export BB_DATA_DIR="${dataDir}"`,
       `export TEST_RUNNER_BBGO_QA_SERVER=${serverUrl}`,
       `export TEST_RUNNER_BBGO_QA_THREAD=${thread.id}`,
+      sentThreadId ? `export TEST_RUNNER_BBGO_QA_SENT_THREAD=${sentThreadId}` : "",
       botId ? `export TEST_RUNNER_BBGO_QA_BOT=${botId}` : "",
       pageId ? `export TEST_RUNNER_BBGO_QA_PAGE=${pageId}` : "",
+      recordingId ? `export TEST_RUNNER_BBGO_QA_RECORDING=${recordingId}` : "",
       miniIds ? `export TEST_RUNNER_BBGO_QA_MINI_IDS=${miniIds}` : "",
       firstMini ? `export TEST_RUNNER_BBGO_QA_MINI=${firstMini}` : "",
     ].filter(Boolean).join("\n") + "\n",
   );
-  process.stdout.write(`Staged BB ready at ${serverUrl} (bot=${botId || "none"}, thread=${thread.id}, page=${pageId || "none"}, minis=${miniIds || "none"})\n`);
+  process.stdout.write(`Staged BB ready at ${serverUrl} (bot=${botId || "none"}, thread=${thread.id}, sent=${sentThreadId || "none"}, page=${pageId || "none"}, rec=${recordingId || "none"}, auto=${automationId || "none"}, minis=${miniIds || "none"})\n`);
 }
 
 const cmd = process.argv[2];

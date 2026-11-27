@@ -112,7 +112,9 @@ PY
   mini_ids="${mini_ids:-${TEST_RUNNER_BBGO_QA_MINI_IDS:-}}"
   qa_mini="${TEST_RUNNER_BBGO_QA_MINI:-}"
   qa_thread="${TEST_RUNNER_BBGO_QA_THREAD:-}"
+  qa_sent_thread="${TEST_RUNNER_BBGO_QA_SENT_THREAD:-}"
   qa_page="${TEST_RUNNER_BBGO_QA_PAGE:-}"
+  qa_recording="${TEST_RUNNER_BBGO_QA_RECORDING:-}"
 fi
 
 validate_server_url "$server"
@@ -172,7 +174,9 @@ env TEST_RUNNER_BBGO_QA_SERVER="$server" \
     TEST_RUNNER_BBGO_QA_MINI_IDS="$mini_ids" \
     TEST_RUNNER_BBGO_QA_MINI="${qa_mini:-${TEST_RUNNER_BBGO_QA_MINI:-}}" \
     TEST_RUNNER_BBGO_QA_THREAD="${qa_thread:-${TEST_RUNNER_BBGO_QA_THREAD:-}}" \
+    TEST_RUNNER_BBGO_QA_SENT_THREAD="${qa_sent_thread:-${TEST_RUNNER_BBGO_QA_SENT_THREAD:-}}" \
     TEST_RUNNER_BBGO_QA_PAGE="${qa_page:-${TEST_RUNNER_BBGO_QA_PAGE:-}}" \
+    TEST_RUNNER_BBGO_QA_RECORDING="${qa_recording:-${TEST_RUNNER_BBGO_QA_RECORDING:-}}" \
     xcodebuild test-without-building -scheme BBStudio -destination "id=$device_id" \
     -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO \
     -resultBundlePath "$result_bundle" \
