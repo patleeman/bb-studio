@@ -286,61 +286,59 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertFalse(app.navigationBars.firstMatch.exists, "no bar of its own")
     }
 
-    /// Review B1: in book, a place opened from Home's column shows on the left
-    /// page (Home gives it the page), its companion on the right.
+    /// Review B1: in book, a place opened from Home over the conversation
+    /// shows in the conversation's column (Home closes), its companion beside it.
     func testBookShowsAPlaceOpenedFromHome() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launchConversation(["-qaPosture", "book"])
         resize("landscape", CGSize(width: 951, height: 669))
         activate("rail-home")
-        XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home on the left page")
+        XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home over the conversation")
         activate("homeMemory")
         XCTAssertTrue(element("memory-page").waitForExistence(timeout: 10), "Memory shows")
-        XCTAssertFalse(element("homeColumn").exists, "Home gave the page back")
+        XCTAssertFalse(element("homeColumn").exists, "Home closed")
         capture("duo-book-memory")
         command("outer")
     }
 
+    /// Book and flat share the width rule (`ShellPanesUITests` covers the sizes).
     func testBookShowsConversationAndWorkbenchAndHomeOnRequest() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launchConversation(["-qaPosture", "book"])
         resize("landscape", CGSize(width: 951, height: 669))
-        XCTAssertTrue(element("conversationColumn").waitForExistence(timeout: 10), "the conversation on the left page")
-        XCTAssertTrue(element("workbenchPage").exists, "its Workbench on the right page")
-        XCTAssertFalse(element("homeColumn").exists, "Home hidden")
-        XCTAssertTrue(element("rail-tabs").exists && element("rail-home").exists && element("rail-more").exists, "Tabs, Home, More")
+        XCTAssertTrue(element("conversationColumn").waitForExistence(timeout: 10), "the conversation")
+        XCTAssertTrue(element("workbenchPage").exists, "its Workbench beside it")
+        XCTAssertFalse(element("homeColumn").exists, "Home doesn't fit beside both")
+        XCTAssertTrue(element("rail-tabs").exists && element("rail-home").exists && element("rail-new").exists && element("rail-more").exists,
+                      "Tabs, Home, New, More")
         capture("duo-book")
 
         command("counts?reset")
         activate("rail-home")
-        XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home takes the left page")
-        XCTAssertFalse(app.textViews["Message"].exists, "Home replaces the conversation (out of VoiceOver's way)")
+        XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home over the conversation")
         // Review S3: the conversation stays mounted under Home; its thread keeps running.
         command("counts")
         let counts = (try? JSONDecoder().decode([String: Int].self, from: Data((app.windows.firstMatch.value as? String ?? "").utf8))) ?? [:]
         XCTAssertNil(counts["session.detach"], "opening Home detached the conversation: \(counts)")
-        XCTAssertTrue(element("rail-new").exists, "More becomes New")
         capture("duo-book-home")
         activate("homeConversation-thr_botdemo01")
-        XCTAssertTrue(element("conversationColumn").waitForExistence(timeout: 10), "picking a conversation gives the page back")
+        XCTAssertTrue(element("homeColumn").waitForNonExistence(timeout: 10), "picking a conversation closes Home")
         command("outer")
     }
 
-    func testFlatShowsThreePanes() throws {
+    func testFlatShowsTheConversationAndItsWorkbench() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launchConversation(["-qaPosture", "flat"])
         resize("landscape", CGSize(width: 951, height: 669))
-        XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home")
-        XCTAssertTrue(element("conversationColumn").exists, "the conversation")
+        XCTAssertTrue(element("conversationColumn").waitForExistence(timeout: 10), "the conversation")
         XCTAssertTrue(element("workbenchPage").exists, "the Workbench")
         XCTAssertTrue(element("rail-new").exists && element("rail-more").exists, "Tabs, Home, New, More")
         capture("duo-flat")
-        activate("homeMemory")
-        sleep(2)
-        capture("duo-flat-memory")
         activate("rail-home")
-        XCTAssertTrue(element("homeColumn").waitForNonExistence(timeout: 10), "Home in the rail hides Home")
-        capture("duo-flat-home-hidden")
+        XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home over the conversation")
+        activate("homeMemory")
+        XCTAssertTrue(element("homeColumn").waitForNonExistence(timeout: 10), "Memory closes Home")
+        capture("duo-flat-memory")
         command("outer")
     }
 

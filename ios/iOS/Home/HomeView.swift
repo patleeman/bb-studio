@@ -162,12 +162,19 @@ struct HomeView: View {
     }
 }
 
-/// Home is an inset list on its own page and a plain one as the flat Duo's narrow column.
+/// Home is an inset list on its own page and a plain one as the open Duo's
+/// column. There a plain list's rows get no trailing margin (its stack is
+/// handed the window's trailing inset, a screen away, and the column
+/// ignores it): times and chevrons would touch the divider.
 private struct HomeListStyle: ViewModifier {
     let column: Bool
 
     func body(content: Content) -> some View {
-        if column { content.listStyle(.plain) } else { content.listStyle(.insetGrouped) }
+        if column {
+            content.listStyle(.plain).safeAreaPadding(.trailing, 12)
+        } else {
+            content.listStyle(.insetGrouped)
+        }
     }
 }
 
@@ -243,7 +250,7 @@ struct HomeBotHeader: View {
 }
 
 /// A conversation (8a): its title and time, one line of preview, its
-/// workers on a thin guide line under it. Running shows a spinner and the word.
+/// workers on a thin guide line under it. Running adds a glyph before the time.
 struct HomeConversationRow: View {
     let line: BotConversationLine
     let nest: BotWorkerNest?
@@ -254,14 +261,9 @@ struct HomeConversationRow: View {
         Button { open(.conversation(line.threadId)) } label: {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(line.title).font(.body.weight(.semibold)).lineLimit(1)
+                    Text(line.title).font(.body.weight(.semibold)).lineLimit(1).layoutPriority(1)
                     Spacer(minLength: 4)
-                    if line.running {
-                        HStack(spacing: 5) { RunningGlyph().accessibilityHidden(true); Text("Working") }
-                            .font(.footnote).foregroundStyle(.secondary)
-                    } else {
-                        Text(BotShell.shortAge(line.updatedAt)).font(.footnote).monospacedDigit().foregroundStyle(.secondary)
-                    }
+                    HomeRowStatus(running: line.running, age: BotShell.shortAge(line.updatedAt))
                 }
                 if !line.text.isEmpty {
                     Text(line.text).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
@@ -540,6 +542,26 @@ final class HomeProjects: ObservableObject {
 /// background work): the design's ◌, still. A spinner here would animate for
 /// hours, keeping the render server busy and the phone warm, and the app
 /// never idle.
+/// A row's trailing status: a glyph while it runs, then the time. Never a
+/// word that could wrap: the title has the room (Patrick, round 7 Duo).
+struct HomeRowStatus: View {
+    let running: Bool
+    let age: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if running { RunningGlyph() }
+            Text(age).monospacedDigit()
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(running ? "Working, \(age)" : age)
+    }
+}
+
 struct RunningGlyph: View {
     var body: some View {
         Image(systemName: "circle.dotted")

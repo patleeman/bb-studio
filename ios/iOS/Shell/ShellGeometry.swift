@@ -15,6 +15,9 @@ struct ShellGeometry: Equatable {
         ShellPosture.resolve(window: window, screen: screen, phone: phone, hinge: hinge, forced: ShellQA.posture)
     }
 
+    /// The room left of the rail, for the panes (`ShellPanes`).
+    var paneWidth: CGFloat { max(0, window.width - max(ShellPosture.railWidth, trailingInset)) }
+
     /// On the Duo's inner screen, whatever the window: it draws no home
     /// indicator, though iOS reports one (also beside another app).
     var innerScreen: Bool { Self.isInnerScreen(screen, phone: phone) }
@@ -31,6 +34,9 @@ extension EnvironmentValues {
     @Entry var shellPosture: ShellPosture = .phone
     /// The column the system reserves at the window's trailing edge, which the rail fills.
     @Entry var shellReservedColumn: CGFloat = 0
+    /// A pane beside others whose trailing edge is the rail's (`ShellPages`):
+    /// the window's trailing inset is really its own there.
+    @Entry var shellPaneAtRail = false
     /// The window is on the Duo's inner screen (see `ShellGeometry.innerScreen`).
     @Entry var shellInnerScreen = false
 }

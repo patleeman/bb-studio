@@ -20,6 +20,7 @@ struct ConversationScreen: View {
     @State private var addingTab = false
     @Environment(\.shellPosture) private var posture
     @Environment(\.botConversation) private var shell
+    @Environment(\.shellPaneAtRail) private var atRail
     @EnvironmentObject private var app: AppModel
 
     init(threadId: String, pane: Bool = false) {
@@ -43,7 +44,7 @@ struct ConversationScreen: View {
             ThreadView(session: session, workbench: showsWorkbench ? { AnyView(workbenchView) } : nil, flips: !pane)
                 .id(threadId)
         }
-        .modifier(ConversationChrome(posture: posture, pane: pane, title: title, phoneTitle: AnyView(phoneTitle),
+        .modifier(ConversationChrome(posture: posture, pane: pane, atRail: atRail, title: title, phoneTitle: AnyView(phoneTitle),
                                      trailing: AnyView(phoneButtons), slots: slots, actions: railActions))
         .sensoryFeedback(.selection, trigger: session.showsWorkbench)
         .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
@@ -155,6 +156,8 @@ struct ConversationScreen: View {
 private struct ConversationChrome: ViewModifier {
     let posture: ShellPosture
     let pane: Bool
+    /// The last pane, beside the rail: the trailing inset is its own.
+    let atRail: Bool
     let title: String
     let phoneTitle: AnyView
     let trailing: AnyView
@@ -163,10 +166,10 @@ private struct ConversationChrome: ViewModifier {
 
     func body(content: Content) -> some View {
         if pane {
-            // The left page of two: its stack still hands it the window's
+            // A pane left of another: its stack still hands it the window's
             // trailing inset (the status column, a screen away), which it never reaches.
             content
-                .ignoresSafeArea(.container, edges: .trailing)
+                .ignoresSafeArea(.container, edges: atRail ? [] : .trailing)
                 .toolbar(.hidden, for: .navigationBar)
         } else if posture.usesRail {
             content

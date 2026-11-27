@@ -9,8 +9,8 @@ extension EnvironmentValues {
 
 /// One Workbench tab's content, by the desktop's tab kind (`tab-kinds.ts`).
 /// Native where the phone has a view, even when Studio marks the kind `web`
-/// (recordings); the in-app web view for the rest; a card for what only the
-/// desktop opens. The Workbench container (tabs, bar, rail) is the shell's:
+/// (recordings); the in-app web view for the rest. What only the desktop
+/// opens is never shown (`showsOnPhone`). The Workbench container (tabs, bar, rail) is the shell's:
 /// it puts this under its bar.
 struct WorkbenchTabBody: View {
     let tab: WorkbenchTab
@@ -40,13 +40,8 @@ struct WorkbenchTabBody: View {
             WorkbenchTabCard(title: tab.title, detail: worker ? "A worker's transcript." : "A conversation.",
                              systemImage: "bubble.left.and.text.bubble.right", action: ("Open", { openThread(id) }))
         case .web: WorkbenchWebFallback(webURL: webURL)
-        case .unsafeLink:
-            WorkbenchTabCard(title: "Not opened", detail: "Only http and https links open on the phone.", systemImage: "exclamationmark.shield")
-        case .desktopOnly:
-            WorkbenchTabCard(title: "Open on the desktop", detail: "\(tab.title) opens in BB Studio on your Mac.", systemImage: "desktopcomputer")
-        case .incomplete:
-            WorkbenchTabCard(title: "Can't open this tab", detail: "Studio sent it without what the phone needs to show it.",
-                             systemImage: "questionmark.square.dashed")
+        // Never selected (`showsOnPhone`): they stay in the tab menu.
+        case .desktopOnly, .unsafeLink, .incomplete: EmptyView()
         }
     }
 }
@@ -68,6 +63,15 @@ enum WorkbenchTabKind: Equatable {
     case unsafeLink
     case desktopOnly
     case incomplete
+
+    /// The phone has something to show for it. The rest (a Mac-only kind,
+    /// a link it won't open, a tab sent without its id) never take a pane.
+    var showsOnPhone: Bool {
+        switch self {
+        case .desktopOnly, .unsafeLink, .incomplete: false
+        default: true
+        }
+    }
 
     init(_ tab: WorkbenchTab) {
         let ref = tab.ref

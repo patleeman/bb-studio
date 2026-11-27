@@ -6,10 +6,11 @@ import Foundation
 /// - `phone`: an iPhone (or a narrow window): one column, one 44 pt bar.
 /// - `folded`: the Duo closed, its 466 × 678 outer screen: one column, a
 ///   title line on top and every control in the right rail (9c).
-/// - `book`: the Duo half open, hinge vertical: conversation | Workbench,
-///   Home hidden until asked for (9d).
-/// - `flat`: the Duo opened flat (or a wide iPad): Home | conversation |
-///   Workbench (9e).
+/// - `book`: the Duo half open, hinge vertical, and `flat`: opened flat
+///   (or a wide iPad). Both lay out the same: panes by width and text size
+///   (`ShellPanes`): the conversation, the Workbench when it has a tab the
+///   phone can show, Home when it fits (9d, 9e). Where two panes can't both
+///   be readable they lay out as `vertical` (`laidOut`).
 /// - `vertical`: the Duo open with the hinge across: a big iPhone, one
 ///   column over both screens, the controls in the rail (9f).
 enum ShellPosture: String, CaseIterable, Equatable {
@@ -47,8 +48,14 @@ enum ShellPosture: String, CaseIterable, Equatable {
     /// The conversation and its Workbench side by side.
     var splitsWorkbench: Bool { self == .book || self == .flat }
 
-    /// One column with pushed screens (the iPhone's flow).
-    var singleColumn: Bool { !splitsWorkbench }
+    /// The posture as laid out in `width` (the room left of the rail) at a
+    /// body text size: book and flat split only when the conversation and a
+    /// side pane are both readable (`ShellPanes`); else they are one big
+    /// column, as vertical is (9f), whose width never fits two.
+    func laidOut(width: CGFloat, body: CGFloat) -> ShellPosture {
+        guard splitsWorkbench, !ShellPanes.splits(width: width, body: body) else { return self }
+        return .vertical
+    }
 
     /// Body text a step up, on the big one-column screen (9f: 18 pt).
     var largeType: Bool { self == .vertical }
@@ -180,10 +187,8 @@ enum RailLayout {
         switch posture {
         case .phone:
             return []
-        case .book:
-            // Both panes show: no Chat/Workbench switch; Tabs is lowest (9d).
-            return homeShown ? [.tabs, .home(lit: true), .new] : [.tabs, .home(lit: false), .more]
-        case .flat:
+        case .book, .flat:
+            // Side by side: no Chat/Workbench switch; Tabs is lowest (9d, 9e).
             return [.tabs, .home(lit: homeShown), .new, .more]
         case .folded, .vertical:
             switch screen {
@@ -194,42 +199,5 @@ enum RailLayout {
             case .pushed(let actions, let depth): return pushed(actions, depth: depth)
             }
         }
-    }
-}
-
-/// Whether Home shows beside the conversation. Flat shows it unless you hid
-/// it; book hides it unless you brought it back (9d, 9e). A flip between
-/// the two forgets a book's request but keeps a hide in flat.
-struct ShellHomePane: Equatable {
-    /// Home hidden by hand in flat: stays hidden there.
-    var hiddenInFlat = false
-    /// Home brought back by hand in book, until a conversation is picked.
-    var shownInBook = false
-
-    func shown(_ posture: ShellPosture) -> Bool {
-        switch posture {
-        case .flat: !hiddenInFlat
-        case .book: shownInBook
-        default: false
-        }
-    }
-
-    /// The rail's Home: shows or hides the pane.
-    mutating func toggle(_ posture: ShellPosture) {
-        switch posture {
-        case .flat: hiddenInFlat.toggle()
-        case .book: shownInBook.toggle()
-        default: break
-        }
-    }
-
-    /// Anything pushed (a conversation, Memory, a worker, a page…): book
-    /// gives the left page back to it. `Router.path` calls this on every push.
-    mutating func pushed() {
-        shownInBook = false
-    }
-
-    mutating func postureChanged(from old: ShellPosture, to new: ShellPosture) {
-        if old != new, new == .book || old == .book { shownInBook = false }
     }
 }
