@@ -10,14 +10,18 @@ final class WorkflowUITests: StagedServerUITestCase {
     }
 
     func testPluginStatusAndWorkspaceChoices() {
-        app.buttons["Settings"].tap()
-        app.buttons["Plugins"].tap()
-        XCTAssertTrue(app.navigationBars["Plugins"].waitForExistence(timeout: 10))
+        app.open(URL(string: "bbstudio://settings")!)
+        let plugins = app.buttons["Plugins"].firstMatch
+        XCTAssertTrue(plugins.waitForExistence(timeout: 10))
+        plugins.tap()
+        XCTAssertTrue(app.navigationBars["Plugins"].waitForExistence(timeout: 10)
+            || app.staticTexts["Plugins"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'running'")).firstMatch.waitForExistence(timeout: 10))
         screenshot("plugins")
 
         app.open(URL(string: "bbstudio://new")!)
-        XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 10)
+            || app.staticTexts["New conversation"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["newThreadProject"].exists, "no project picker")
         XCTAssertTrue(app.buttons["newThreadAgent"].exists)
         app.buttons["newThreadWorkspace"].tap()
@@ -34,8 +38,16 @@ final class WorkflowUITests: StagedServerUITestCase {
 
     func testAutomationEditor() {
         app.open(URL(string: "bbstudio://automations")!)
-        XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10))
-        app.buttons["workflowNewAutomation"].tap()
+        XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10)
+            || app.staticTexts["Automations"].waitForExistence(timeout: 5))
+        let newBtn = app.buttons["workflowNewAutomation"].firstMatch
+        if newBtn.waitForExistence(timeout: 5) {
+            newBtn.tap()
+        } else {
+            let fallback = app.buttons["New automation"].firstMatch
+            XCTAssertTrue(fallback.waitForExistence(timeout: 5))
+            fallback.tap()
+        }
         XCTAssertTrue(app.navigationBars["New automation"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.textFields["workflowAutomationName"].exists)
         XCTAssertTrue(app.textFields["workflowAutomationPrompt"].exists)

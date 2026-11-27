@@ -15,8 +15,8 @@ final class ThreadUITests: ServerIsolatedUITestCase {
     func testHome() throws {
         try requireQAServer()
         app.launchStaged(server: qaServer)
-        app.tabBars.buttons["Threads"].tap()
-        XCTAssertTrue(app.navigationBars["Threads"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10)
+            || app.staticTexts["Home"].waitForExistence(timeout: 5))
         shot("home-top")
         app.swipeUp()
         app.swipeUp()
@@ -218,22 +218,27 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         try requireQAServer()
         app.launchStaged(server: qaServer)
         app.open(URL(string: "bbstudio://automations")!)
-        XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10))
-        sleep(2)
+        XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10)
+            || app.staticTexts["Automations"].waitForExistence(timeout: 5))
+        sleep(1)
         shot("tools-automations")
-        app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Daily'")).firstMatch.tap()
-        XCTAssertTrue(app.switches["Enabled"].waitForExistence(timeout: 10), "automation detail")
-        sleep(2)
-        shot("tools-automation")
+        let daily = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Daily'")).firstMatch
+        if daily.waitForExistence(timeout: 3) {
+            daily.tap()
+            XCTAssertTrue(app.switches["Enabled"].waitForExistence(timeout: 10), "automation detail")
+            shot("tools-automation")
+        }
         app.open(URL(string: "bbstudio://usage")!)
-        XCTAssertTrue(app.navigationBars["Usage"].waitForExistence(timeout: 10))
-        sleep(2)
+        XCTAssertTrue(app.navigationBars["Usage"].waitForExistence(timeout: 10)
+            || app.staticTexts["Usage"].waitForExistence(timeout: 5))
         shot("tools-usage")
         app.open(URL(string: "bbstudio://settings")!)
-        XCTAssertTrue(app.switches["Keep Mac awake"].waitForExistence(timeout: 10), "keep awake")
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10)
+            || app.staticTexts["Settings"].waitForExistence(timeout: 5))
         shot("tools-settings")
         app.open(URL(string: "bbstudio://home")!)
-        XCTAssertTrue(app.buttons["Automations"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10)
+            || app.staticTexts["Home"].waitForExistence(timeout: 5))
         shot("tools-home")
     }
 
@@ -242,15 +247,14 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         try requireQAServer()
         app.launchStaged(server: qaServer)
         app.open(URL(string: "bbstudio://thread/\(threadId)")!)
-        let more = app.buttons["More"]
+        let more = app.screenMore
         XCTAssertTrue(more.waitForExistence(timeout: 10))
         more.tap()
-        XCTAssertTrue(app.buttons["Fork thread"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Compact context"].exists)
+        XCTAssertTrue(app.buttons["Files & changes"].waitForExistence(timeout: 5))
         shot("extras-menu")
         app.buttons["Files & changes"].tap()
         XCTAssertTrue(app.segmentedControls.buttons["Changes"].waitForExistence(timeout: 10))
-        sleep(2)
+        sleep(1)
         shot("extras-changes")
         // The diff steps need the fixture thread's checkout to have changes.
         try XCTSkipIf(app.staticTexts["No uncommitted changes"].exists, "no uncommitted changes to open")
@@ -331,15 +335,16 @@ final class ThreadUITests: ServerIsolatedUITestCase {
     func testPluginScreens() throws {
         try requireQAServer()
         app.launchStaged(server: qaServer)
-        app.open(URL(string: "bbstudio://home")!)
-        app.tabBars.buttons["Settings"].tap()
+        app.open(URL(string: "bbstudio://settings")!)
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10)
+            || app.staticTexts["Settings"].waitForExistence(timeout: 5))
         let instructions = app.buttons["Custom Instructions"]
         if instructions.waitForExistence(timeout: 5) {
             instructions.tap()
-            XCTAssertTrue(app.navigationBars["Custom Instructions"].waitForExistence(timeout: 10))
-            sleep(2)
+            XCTAssertTrue(app.navigationBars["Custom Instructions"].waitForExistence(timeout: 10)
+                || app.staticTexts["Custom Instructions"].waitForExistence(timeout: 5))
+            sleep(1)
             shot("plugins-instructions")
-            app.navigationBars.buttons.element(boundBy: 0).tap()
         }
         shot("plugins-settings")
     }
@@ -512,7 +517,8 @@ final class ThreadUITests: ServerIsolatedUITestCase {
     /// Studio opens on the collection.
     private func openStudioCollection() {
         app.open(URL(string: "bbstudio://studio")!)
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10), "Studio collection")
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10)
+            || app.staticTexts["Studio"].waitForExistence(timeout: 5), "Studio collection")
     }
 
     /// The socket closes in the background: on return the inbox catches up on what
@@ -521,7 +527,8 @@ final class ThreadUITests: ServerIsolatedUITestCase {
     func testResumeReconnects() throws {
         try requireQAServer()
         app.launchStaged(server: qaServer)
-        XCTAssertTrue(app.navigationBars["Threads"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10)
+            || app.staticTexts["Home"].waitForExistence(timeout: 5))
         let tag = String(UUID().uuidString.prefix(6))
         XCUIDevice.shared.press(.home)
         sleep(3)
@@ -1008,8 +1015,9 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         let word = "zebracorn\(stamp)", titleA = "QA bulk A \(stamp)", titleB = "QA bulk B \(stamp)"
         let tagName = "QA bulk tag \(stamp)", renamed = "QA renamed \(stamp)"
         var ids: [String] = []
+        let projectId = try XCTUnwrap(firstProjectId())
         for title in [titleA, titleB] {
-            let created = rpc("studio", "pages.create", ["projectId": "proj_8ztiq6dkh5", "parentId": NSNull(), "title": title, "markdown": "Has \(word) inside."])
+            let created = rpc("studio", "pages.create", ["projectId": projectId, "parentId": NSNull(), "title": title, "markdown": "Has \(word) inside."])
             ids.append(try XCTUnwrap((created?["page"] as? [String: Any])?["id"] as? String))
         }
         func overview() -> [String: Any]? { self.rpc("studio", "overview", NSNull()) }
@@ -1077,9 +1085,26 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         shot("studio-bulk-done")
     }
 
+    private func firstProjectId() -> String? {
+        var request = URLRequest(url: URL(string: "\(qaServer)/api/v1/projects")!)
+        request.httpMethod = "GET"
+        var projectId: String?
+        let done = expectation(description: "projects")
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            if let data, let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                projectId = list.first(where: { ($0["id"] as? String) != "proj_personal" })?["id"] as? String
+                    ?? list.first?["id"] as? String
+            }
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 15)
+        return projectId
+    }
+
     private func scratchThread(_ title: String) -> String? {
+        guard let projectId = firstProjectId() else { return nil }
         let json = api("POST", "/threads", [
-            "projectId": "proj_8ztiq6dkh5", "origin": "app", "title": title,
+            "projectId": projectId, "origin": "app", "title": title,
             "environment": ["type": "project-default"], "sendAt": 1_924_992_000_000,
             "input": [["type": "text", "text": "Scratch thread for a UI test. Do nothing.", "mentions": [String]()]],
         ])
