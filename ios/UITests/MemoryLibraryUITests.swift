@@ -121,7 +121,7 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("skillBody").label.contains("Weekly review"))
         XCTAssertTrue(any("skillVersion-2").exists, "with its versions")
         // Every posture: the skill's own native bar, with Back and Edit.
-        XCTAssertTrue(app.navigationBars.buttons["BackButton"].exists && control("skillEdit").exists, "Back and Edit in the skill's bar")
+        XCTAssertTrue(app.backButton.exists && control("skillEdit").exists, "Back and Edit in the skill's bar")
         shot("skill")
         control("skillEdit").tap()
         let body = field("skillBodyField")

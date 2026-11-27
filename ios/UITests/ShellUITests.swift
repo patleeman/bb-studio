@@ -42,7 +42,8 @@ final class ShellUITests: ServerIsolatedUITestCase {
 
     /// The inner screen is wider than the simulator's: controls off it are activated as VoiceOver does.
     private func activate(_ id: String) {
-        command("activate?" + id)
+        app.press(element(id), id: id)
+        sleep(1)
     }
 
     private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id] }
@@ -192,7 +193,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(button.exists, "the Workbench button")
         XCTAssertEqual(button.label, "Workbench, 3 tabs", "the tabs the phone can show (not the VS Code one)")
         XCTAssertTrue(app.buttons["conversationMore"].exists, "and ⋯")
-        XCTAssertTrue(app.navigationBars.buttons["BackButton"].exists, "the system's Back")
+        XCTAssertTrue(app.backButton.exists, "the system's Back")
         XCTAssertFalse(element("conversationHandsFree").exists, "no Live button in the chrome")
         capture("iphone-chat")
 
@@ -270,7 +271,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
     func testFoldedUsesTheNativeBarAndTabBar() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launchConversation()
-        let back = app.navigationBars.buttons["BackButton"], workbench = app.buttons["workbenchButton"], more = app.buttons["conversationMore"]
+        let back = app.backButton, workbench = app.buttons["workbenchButton"], more = app.buttons["conversationMore"]
         XCTAssertTrue(back.exists && workbench.exists && more.exists, "Back, Workbench and ⋯ in the native bar")
         XCTAssertEqual(workbench.label, "Workbench, 3 tabs")
         XCTAssertGreaterThan(workbench.frame.minX, 466 - 100, "the system puts them in the right column")
@@ -312,7 +313,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(element("home").waitForExistence(timeout: 30))
         for (link, name) in [("page/qa-demo", "page"), ("design/dsn_demo", "design")] {
             XCUIDevice.shared.system.open(URL(string: "bbstudio://" + link)!)
-            XCTAssertTrue(app.navigationBars.buttons["BackButton"].waitForExistence(timeout: 15), "\(name): the system's Back")
+            XCTAssertTrue(app.backButton.waitForExistence(timeout: 15), "\(name): the system's Back")
             sleep(2)
             capture("duo-folded-\(name)")
             app.goHome()
@@ -322,7 +323,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         let newPage = app.buttons["libraryNewPage"]
         XCTAssertTrue(newPage.waitForExistence(timeout: 10), "New page in Library's bar")
         newPage.tap()
-        XCTAssertTrue(app.navigationBars.buttons["BackButton"].waitForExistence(timeout: 15), "the new page, pushed on Library's tab")
+        XCTAssertTrue(app.backButton.waitForExistence(timeout: 15), "the new page, pushed on Library's tab")
         app.goBack()
         XCTAssertTrue(element("library-page").waitForExistence(timeout: 10), "Back is Library")
     }
@@ -338,7 +339,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertFalse(element("homeColumn").exists, "Home doesn't fit beside both")
         XCTAssertTrue(element("homePane").exists && element("conversationMore").exists && element("workbenchTitle").exists,
                       "Home and ⋯ in the conversation's bar, the tab menu as the Workbench's title")
-        XCTAssertFalse(app.navigationBars.buttons["BackButton"].exists, "the conversation is its page's root: no Back")
+        XCTAssertFalse(app.backButton.exists, "the conversation is its page's root: no Back")
         capture("duo-book")
 
         command("counts?reset")

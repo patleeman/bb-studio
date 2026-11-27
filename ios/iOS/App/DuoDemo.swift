@@ -388,7 +388,9 @@ enum DuoDemo {
                 input.becomeFirstResponder()
                 return true
             }
-            _ = find(window)?.accessibilityActivate()
+            // The system's bars can sit in a window of their own (the Duo's right column).
+            let windows = [window] + (window.windowScene?.windows ?? []).filter { $0 !== window }
+            _ = windows.lazy.compactMap(find).first?.accessibilityActivate()
             return true
         default: return false
         }

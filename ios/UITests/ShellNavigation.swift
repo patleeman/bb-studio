@@ -26,10 +26,11 @@ extension XCUIApplication {
 
     /// A tap, or where the inner screen's stretched window runs past the
     /// simulator's (outer) screen, the control's action as VoiceOver runs it.
+    /// The system's bar buttons stay in the outer screen's right column, so
+    /// they're tapped wherever the window is.
     func press(_ element: XCUIElement, id: String) {
-        // The inner screen (951 wide) is wider than any simulator's: XCUITest
-        // can call a control hittable there and still miss it.
-        if element.isHittable, windows.firstMatch.frame.width < 900 { return element.tap() }
+        // The simulator's screen is the Duo's outer one, 466 wide: past it, a tap misses.
+        if element.exists, element.isHittable, windows.firstMatch.frame.width < 900 || element.frame.maxX <= 466 { return element.tap() }
         XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/activate?" + id)!)
         sleep(1)
     }
@@ -38,14 +39,19 @@ extension XCUIApplication {
     /// A list never counts as hittable, so not that.
     var homeOnTop: Bool { home.exists && homeNew.exists }
 
-    /// A tab bar's tab, by its title (Home, Library, Memory, Search).
-    func tab(_ title: String) -> XCUIElement { tabBars.buttons[title].firstMatch }
+    /// A tab, by its title (Home, Library, Memory, Search): in the tab bar, or
+    /// on the folded Duo, in the system's right column (a toolbar to XCUITest).
+    func tab(_ title: String) -> XCUIElement {
+        tabBars.buttons[title].exists ? tabBars.buttons[title].firstMatch : toolbars.buttons[title].firstMatch
+    }
+
+    /// The system's Back: in the bar, or on the folded Duo in its right column.
+    var backButton: XCUIElement { buttons["BackButton"].firstMatch }
 
     /// Home, from wherever: its tab (a tap on the shown tab pops its stack), else Back.
     func goHome(file: StaticString = #filePath, line: UInt = #line) {
         for _ in 0..<4 where !homeOnTop {
-            let barBack = navigationBars.buttons["BackButton"]
-            if tab("Home").exists { tab("Home").tap() } else if barBack.exists { barBack.tap() }
+            if tab("Home").exists { tab("Home").tap() } else if backButton.exists { backButton.tap() }
             _ = homeNew.waitForExistence(timeout: 3)
         }
         XCTAssertTrue(homeOnTop, "Home", file: file, line: line)
@@ -106,7 +112,7 @@ extension XCUIApplication {
 
     /// Back from a pushed screen: the system's Back in the bar.
     func goBack(timeout: TimeInterval = 20, file: StaticString = #filePath, line: UInt = #line) {
-        let back = navigationBars.buttons["BackButton"].firstMatch
+        let back = backButton
         XCTAssertTrue(back.waitForExistence(timeout: timeout), "a way back", file: file, line: line)
         back.tap()
     }

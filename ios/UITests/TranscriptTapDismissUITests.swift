@@ -138,7 +138,7 @@ final class TranscriptTapDismissUITests: ServerIsolatedUITestCase {
         // Its thread (here a worker: read-only, titled with its name) opens over the conversation.
         let title = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'conversationTitle' AND label CONTAINS %@",
                                                                          "Review open PRs")).firstMatch
-        let back = app.navigationBars.buttons["BackButton"].firstMatch
+        let back = app.backButton.firstMatch
         let opened = NSPredicate { _, _ in title.exists || (back.exists && !self.app.links["Review open PRs"].exists) }
         if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: opened, object: nil)], timeout: 10) != .completed {
             XCTFail("The thread link opened its thread on the first tap\n\(app.debugDescription)")

@@ -48,7 +48,7 @@ final class ReviewPerformanceUITests: StagedServerUITestCase {
                 XCTAssertTrue(app.staticTexts["Navigation fixture"].waitForExistence(timeout: 10), "Wait for page content, not only its navigation title")
                 app.swipeUp()
                 XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Paragraph")).firstMatch.exists)
-                app.navigationBars.buttons["BackButton"].tap()
+                app.backButton.tap()
                 XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
                 // Return toward the previous list position so repeated samples remain bounded.
                 app.swipeDown()
