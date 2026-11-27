@@ -18,7 +18,7 @@ struct ShellSearchable: ViewModifier {
                 content
             }
         } else {
-            content.searchable(text: $text, placement: .navigationBarDrawer(displayMode: .automatic), prompt: prompt)
+            content.searchable(text: $text, placement: .navigationBarDrawer(displayMode: .always), prompt: prompt)
         }
     }
 }
