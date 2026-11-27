@@ -84,7 +84,8 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home over the conversation")
         XCTAssertLessThan(element("homeColumn").frame.width, landscape.width / 2)
         capture("flat-landscape-default-home-over")
-        command("activate?rail-home")
+        // Modal to VoiceOver: its way out is the dimming (Close Home) or escape, not the rail outside it.
+        command("activate?homeOverlayScrim")
         XCTAssertTrue(element("homeColumn").waitForNonExistence(timeout: 10))
         portraitAndFolded(.large)
     }
