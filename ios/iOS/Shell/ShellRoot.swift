@@ -7,7 +7,7 @@ enum ShellBotState: Equatable {
     case empty
     case ready(BotSpace)
 
-    static func resolve(spaces: BotSpacesResponse?, bot: BotSpace?, error: String?) -> ShellBotState {
+    static func resolve(spaces: BotSpaces?, bot: BotSpace?, error: String?) -> ShellBotState {
         if let bot { return .ready(bot) }
         if spaces != nil { return .empty }
         if let error, !error.isEmpty { return .failed(error) }

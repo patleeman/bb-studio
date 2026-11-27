@@ -19,8 +19,8 @@ final class ZeroBotsDeepLinkUITests: StagedServerUITestCase {
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10)
             || app.staticTexts["Settings"].waitForExistence(timeout: 5), "deep link to Settings pushes over empty Home")
 
-        app.open(URL(string: "bbstudio://automations")!)
-        XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10)
-            || app.staticTexts["Automations"].waitForExistence(timeout: 5), "deep link to Automations pushes over empty Home")
+        app.open(URL(string: "bbstudio://studio")!)
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10)
+            || app.staticTexts["Studio"].waitForExistence(timeout: 5), "deep link to Studio pushes over empty Home")
     }
 }
