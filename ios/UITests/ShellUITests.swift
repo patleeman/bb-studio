@@ -57,6 +57,10 @@ final class ShellUITests: ServerIsolatedUITestCase {
     /// work): still marks, not spinners that would run for hours.
     func testAWorkingBotGoesIdle() { expectIdle(["-qaShelfDemo", "-openURL", "bbstudio://bot"], bot: "working") }
     func testHomeWithARunningWorkerGoesIdle() { expectIdle([], home: true) }
+    /// A long chat with a question waiting (TranscriptHang's): settles too.
+    func testALongChatWithAQuestionGoesIdle() {
+        expectIdle(["-qaDemoQuestion", "-qaDemoMessages", "1000", "-qaDark", "-openURL", "bbstudio://bot"])
+    }
     /// A conversation closed while it scrolls to its end (just opened): its
     /// scroll's display link stops too. One left ticking kept the app awake
     /// and never idle for the rest of the launch.
@@ -111,6 +115,16 @@ final class ShellUITests: ServerIsolatedUITestCase {
         let running = (app.windows.firstMatch.value as? String ?? "").split(separator: "\n").map(String.init)
         print("IDLE \(variant): \(running.count)\n" + running.joined(separator: "\n"))
         XCTAssertEqual(Self.forever(running), [], "repeating animations at rest", file: file, line: line)
+        // And no short animation started over and over (one a second keeps the app from idling too).
+        var seen: [String] = []
+        for _ in 0..<20 {
+            XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/animations")!)
+            Thread.sleep(forTimeInterval: 0.3)
+            seen += (app.windows.firstMatch.value as? String ?? "").split(separator: "\n").map(String.init)
+                .filter { !$0.contains("UITextSelectionView") && !$0.contains("Caret") && $0.hasPrefix("webview") == false }
+        }
+        print("IDLE-SAMPLES \(variant): \(seen.count)\n" + Array(Set(seen)).joined(separator: "\n"))
+        XCTAssertLessThanOrEqual(seen.count, 2, "animations keep starting at rest: \(Array(Set(seen)).prefix(3))", file: file, line: line)
     }
 
     // MARK: iPhone
