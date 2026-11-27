@@ -10,6 +10,7 @@ const out = (el: Element, to: Element | null = document.body) =>
 describe("fast titles", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    installFastTitles(document, { replace: true });
     document.body.innerHTML = `
       <div data-bb-plugin-root>
         <button id="a" title="Reload"><span id="a-icon"></span></button>

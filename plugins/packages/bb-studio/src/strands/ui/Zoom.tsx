@@ -57,6 +57,13 @@ const middles = new Map<string, () => number | null>();
 /** Between Strands and Tree, the message that was in the middle (BB gives the anchor only when leaving the messages). */
 const levelAnchors = new Map<string, number | null>();
 
+export function resetZoomForTests(): void {
+  actions.clear();
+  middles.clear();
+  levelAnchors.clear();
+  returnFocus.clear();
+}
+
 /** The line nearest the middle of `list`'s scroll viewport, as the message to land on. */
 function middleOfList(list: HTMLElement | null): number | null {
   const lines = [...(list?.querySelectorAll<HTMLElement>("[data-zoom-line],[data-zoom-node]") ?? [])];

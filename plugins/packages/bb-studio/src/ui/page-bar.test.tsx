@@ -7,20 +7,20 @@ import { botPageTitle, noteBotName, PageBar, useStudioPageTitle } from "./page-b
 const tab = vi.hoisted(() => ({ window: null as null | { title: string; toolbar: HTMLElement | null } }));
 vi.mock("../kit/app/host-sdk", async (original) => ({ ...await original<typeof import("../kit/app/host-sdk")>(), useHostTabWindow: () => tab.window }));
 
-let root: Root;
+let root: Root | null = null;
 let pane: HTMLDivElement;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   pane = document.createElement("div");
   document.body.append(pane);
 });
-afterEach(() => { act(() => root.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); tab.window = null; });
+afterEach(() => { if (root) { act(() => root!.unmount()); root = null; } document.body.innerHTML = ""; vi.unstubAllGlobals(); tab.window = null; });
 
 it("puts the page's title row in BB's title bar, so the page shows one header row", async () => {
   // BB's plugin page: its title row (the panel's label, then the slot Studio's headerContent draws), then the page.
   pane.innerHTML = '<header data-testid="app-page-header-content-row"><div id="history"></div><div id="label">Library / Memory</div><div><div data-bb-plugin-root=""><div data-studio-bar-slot=""></div></div></div></header><div id="body"></div>';
   root = createRoot(pane.querySelector("#body")!);
-  await act(async () => { root.render(<PageBar icon="◈" title="Memory" detail="Chief of Staff" actions={<button type="button">＋ Add a record</button>} />); });
+  await act(async () => { root!.render(<PageBar icon="◈" title="Memory" detail="Chief of Staff" actions={<button type="button">＋ Add a record</button>} />); });
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
   const bar = pane.querySelector('header [data-testid="page-bar"]');
   expect(bar?.textContent).toBe("◈Memory·Chief of Staff＋ Add a record");
@@ -33,7 +33,7 @@ it("puts the page's title row in BB's title bar, so the page shows one header ro
 
 it("where BB lends no title bar, the same single row sits at the top of the page", async () => {
   root = createRoot(pane);
-  await act(async () => { root.render(<PageBar title="Library" detail="Chief of Staff's files · made by the Bot and its workers" />); });
+  await act(async () => { root!.render(<PageBar title="Library" detail="Chief of Staff's files · made by the Bot and its workers" />); });
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
   expect(pane.querySelectorAll('[data-testid="page-bar"]')).toHaveLength(1);
   expect(pane.querySelector('[data-testid="page-bar-title"]')?.textContent).toBe("Library");
@@ -44,12 +44,12 @@ it("in a tab's own window, the window bar has the title: the page draws no title
   document.body.append(toolbar);
   tab.window = { title: "Memory", toolbar };
   root = createRoot(pane);
-  await act(async () => { root.render(<PageBar title="Memory" detail="Chief of Staff" actions={<button type="button">New</button>} />); });
+  await act(async () => { root!.render(<PageBar title="Memory" detail="Chief of Staff" actions={<button type="button">New</button>} />); });
   expect(pane.textContent).toBe("");
   expect(document.querySelector('[data-testid="page-bar-title"]')).toBeNull();
   expect(toolbar.querySelector('[data-testid="page-bar"]')?.textContent).toBe("New");
   expect(toolbar.querySelector('[data-testid="page-bar"]')?.hasAttribute("data-bb-plugin-root")).toBe(true);
-  await act(async () => { root.render(<PageBar title="Memory" detail="Chief of Staff" />); });
+  await act(async () => { root!.render(<PageBar title="Memory" detail="Chief of Staff" />); });
   expect(toolbar.textContent).toBe("");
   expect(pane.textContent).toBe("");
 });

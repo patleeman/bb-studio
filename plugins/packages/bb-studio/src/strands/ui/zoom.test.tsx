@@ -180,7 +180,7 @@ vi.mock("../../kit/composer", () => ({ useComposerThread: () => "thr_main" }));
 vi.mock("../../kit/app/thread-panel", () => ({ openThreadTab: state.openTab }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
 
-const { ZoomSwitch, ZoomView, canZoom, zoomBlocked, zoomThreadBy } = await import("./Zoom");
+const { ZoomSwitch, ZoomView, canZoom, resetZoomForTests, zoomBlocked, zoomThreadBy } = await import("./Zoom");
 const { holdZoomable, keyboardModeOf, registerTimelineFilter, resetSelectionForTests, select, selectionOf, setKeyboardMode, setZoom, zoomInHost, zoomOf } = await import("./selection");
 const { StrandsBoxFor, useStrandFilter } = await import("./Strip");
 const { promptStackSource, resetPromptStackForTests } = await import("./prompt-stack");
@@ -199,7 +199,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
 });
-afterEach(() => { act(() => root.unmount()); container.remove(); resetSelectionForTests(); resetPromptStackForTests(); vi.unstubAllGlobals(); });
+afterEach(() => { act(() => root.unmount()); container.remove(); resetZoomForTests(); resetSelectionForTests(); resetPromptStackForTests(); vi.unstubAllGlobals(); });
 const render = (node: React.ReactNode) => act(() => root.render(node));
 const click = (element: Element | null | undefined) => act(() => { (element as HTMLElement).click(); });
 
