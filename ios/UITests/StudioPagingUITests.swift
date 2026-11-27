@@ -39,8 +39,7 @@ final class StudioPagingUITests: StagedServerUITestCase {
         screenshot("kind-paged")
         let next = selectedKind
         XCTAssertNotEqual(next, "All", "a swipe left moves to the next kind")
-        let studioTitle = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Studio'")).firstMatch
-        XCTAssertTrue(app.navigationBars["Studio"].exists || studioTitle.exists)
+        XCTAssertTrue(app.navigationBars["Studio"].exists)
         let back = app.staticTexts.matching(NSPredicate(format: "label IN %@", ["Today", "Yesterday", "Previous 7 Days"]))
             .allElementsBoundByIndex.first { $0.isHittable }
         try XCTUnwrap(back).swipeRight()

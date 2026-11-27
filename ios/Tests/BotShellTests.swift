@@ -156,7 +156,10 @@ final class BotShellTests: XCTestCase {
         shell.follow(.settings, store: store)
         XCTAssertEqual(shell.path, [.settings], "Settings is pushed, not a sheet")
         shell.follow(.place(.memory, botId: nil), store: store)
-        XCTAssertEqual(shell.path, [.place(.memory)])
+        XCTAssertEqual(shell.tab, .memory, "Memory is a tab")
+        shell.follow(.place(.archive, botId: nil), store: store)
+        XCTAssertEqual(shell.tab, .home)
+        XCTAssertEqual(shell.path, [.place(.archive)], "Archive is pushed on Home")
     }
 
     func testShortAge() {

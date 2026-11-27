@@ -6,15 +6,15 @@ import XCTest
 final class MemoryLibraryUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
-    /// A screen's control: in the iPhone's bar, or the Duo's rail (Review S7).
+    /// A screen's control, in its bar.
     private func control(_ id: String) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "identifier IN %@", [id, "screenAction-" + id, "rail-action-" + id])).firstMatch
+        app.buttons.matching(NSPredicate(format: "identifier IN %@", [id, "screenAction-" + id])).firstMatch
     }
 
     private func launch(_ extra: [String] = []) {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list"] + extra
         app.launchOffline()
-        XCTAssertTrue(any("home").waitForExistence(timeout: 30), "the app opens on Home")
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 30), "the app opens on Home")
     }
 
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
@@ -23,16 +23,14 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
         app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", contains)).firstMatch
     }
 
-    /// A place pushed from Home (Memory and Library are its rows).
+    /// A place's tab (Memory and Library are tabs).
     private func open(_ place: String, shows id: String) {
         app.openRoomPlace(place)
         XCTAssertTrue(any(id).waitForExistence(timeout: 15), place)
     }
 
-    /// Search: in the iPhone's bar, or in the Duo's rail.
-    private var searchButton: XCUIElement {
-        app.buttons.matching(NSPredicate(format: "identifier IN %@", ["memorySearch", "rail-action-memorySearch"])).firstMatch
-    }
+    /// Search, in Memory's bar.
+    private var searchButton: XCUIElement { app.buttons["memorySearch"].firstMatch }
 
     private func openMemory() {
         open("memory", shows: "memory-page")
@@ -122,11 +120,8 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("skillBody").waitForExistence(timeout: 10), "the skill opens pushed")
         XCTAssertTrue(any("skillBody").label.contains("Weekly review"))
         XCTAssertTrue(any("skillVersion-2").exists, "with its versions")
-        if app.isFoldedDuo {
-            // Review S7: the Duo's one rail, no bar of its own.
-            XCTAssertTrue(app.buttons["rail-back"].exists && app.buttons["rail-action-skillEdit"].exists, "Back and Edit in the rail")
-            XCTAssertFalse(app.navigationBars.firstMatch.exists, "no bar on the skill")
-        }
+        // Every posture: the skill's own native bar, with Back and Edit.
+        XCTAssertTrue(app.backButton.exists && control("skillEdit").exists, "Back and Edit in the skill's bar")
         shot("skill")
         control("skillEdit").tap()
         let body = field("skillBodyField")
@@ -207,8 +202,8 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
         launch(["-qaPosture", "flat"])
         XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/landscape")!)
         sleep(3)
-        // Flat: Home's column is on the left page, on the simulator's screen.
-        any("homeMemory").tap()
+        // The tab bar may run past the simulator's screen: switch tabs by command.
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/tab?memory")!)
         XCTAssertTrue(any("memoryBudget").waitForExistence(timeout: 15), "Core on the left page")
         XCTAssertTrue(any("memory-browse").waitForExistence(timeout: 15), "Skills | History on the right")
         XCTAssertTrue(app.buttons["memorySkill-weekly-review"].waitForExistence(timeout: 15), "Skills first")

@@ -47,9 +47,9 @@ are unchanged, and old `bbgo://` links still open.
 | A Bot's workers open read-only, from the list's Workers (and its "N done") or the "N workers from here" line: the worker's transcript with no composer, its title and status in the header with the list's glyph (Running, Waiting for your approval, Waiting on an answer, Failed or Done, and how long ago), and over where the composer was its Bot, the conversation it works for (opens it) and its branch. "Ask the Bot about this worker…" sends the question with dictation to the Bot in that conversation (Main when it has none; `bot_worker_ask`) and goes there, back down the stack when it was open under the worker. A worker waiting on a question offers Answer it here; one waiting on an approval shows what it waits on with a link to the conversation that has its card ("Push to origin · Main ›"), and isn't resolved there. No Stop, edit or side chat on a worker. Status comes from `bot_threads_view` and `bot_thread_info` | `iOS/Bot/BotConversationChrome.swift`, `Shared/BotWorkers.swift`, `ThreadView` |
 | Home (round 7, design 8a): the root page, the desktop's sidebar on one screen. Search as its first row (conversations, workers, Memory, Library, Studio's items, project threads), the Bot (its still, its name as a menu: switch Bot, Schedules, Theme, Settings; one status line, "2 running"), Memory and Library rows, the conversations (title and time, one line of preview, Working with a spinner) with their workers on a thin guide line under them ("N done" folded), Projects, and Archive. The app opens here; everything else is pushed over it, no sheets for places | `iOS/Home/HomeView.swift`, `iOS/Shell/ShellRoot.swift` |
 | One bar on the iPhone (round 7, option A, 9b): back to Home, the title, a Workbench button with the tab count, and ⋯. In the Workbench the title is the shown tab ("Tab ▾", the conversation under it) and opens the tab menu: the tabs with a check, New tab…, Close. A sideways swipe flips Chat and Workbench; the composer stays under both | `iOS/Shell/ConversationScreen.swift`, `iOS/Workbench/WorkbenchView.swift` |
-| The Duo by posture (round 7, 9c–9f), from the window, the screen and the hinge (`UIHingeInteraction`, iOS 27.1; `ShellPosture`): folded, one column with a title line and every control in the rail, the 84 pt column the system reserves (lowest first: Workbench or Chat, Home, Tabs, More); book (half open) and flat lay out the same way, by width and text size (`ShellPanes`): each pane has a minimum readable width that scales with Dynamic Type (the conversation about 60 characters a line, Home a name and its time, the Workbench a page at an iPhone's width); the Workbench pane shows only when the conversation has a tab the phone can show (a tab it can't show stays in the tab menu, marked "On your Mac" or why, and the Workbench button counts only the tabs it can show), with the conversation keeping about 58%; Home shows beside them only when all meet their minimums, else Home in the rail (or a swipe in from the screen's left edge, not while a screen is pushed) brings it over the conversation, modal to VoiceOver, taking the keyboard, and closed again when Home starts or stops fitting; where the conversation and a Workbench can't both be readable (xLarge text and up on the Duo, 3 pt short at xLarge), it is one big column, as vertical is; vertical, one column across both screens with type a step larger and the rail's buttons at the bottom-right, above the keyboard. `-qaPosture` and `bbstudio://qa-duo/posture?<name>` force one in the simulator | `iOS/Shell/ShellPosture.swift`, `iOS/Shell/ShellGeometry.swift`, `iOS/Shell/ShellRail.swift` |
+| Native navigation (round 8, as Kensico): SwiftUI's `TabView` with `.tabViewStyle(.tabBarOnly)` and four tabs: Home (the Bot and its conversations), Library, Memory and Search (`role: .search`, native `.searchable`). Each tab has its own `NavigationStack` (`Router`: one path per tab) with native bars: large titles on the tab roots, inline on pushed screens, the system's Back, and screen actions as toolbar items (`ScreenAction` is the data model; `.screenToolbar` renders it). The system places the chrome: on the folded Duo the bar's buttons and the tab bar's capsule go to the right column it reserves. A conversation's bar: its title, the Workbench button (Chat ⇄ Workbench, also a sideways swipe; the tab count is in its label, since SwiftUI's toolbar items take no badge) and ⋯; in the Workbench the title is the tab and opens the tab menu. The Duo by posture, from the window, the screen and the hinge (`UIHingeInteraction`, iOS 27.1; `ShellPosture`): folded and vertical are one column (vertical with type a step larger); book (half open) and flat lay out Home's tab by width and text size (`ShellPanes`): each pane has a minimum readable width that scales with Dynamic Type (the conversation about 60 characters a line, Home a name and its time, the Workbench a page at an iPhone's width); the Workbench pane shows only when the conversation has a tab the phone can show (a tab it can't show stays in the tab menu, marked "On your Mac" or why, and the Workbench button counts only the tabs it can show), with the conversation keeping about 58%; the conversation is its page's root (Kensico's detail page: no Back to an empty page); Home shows beside them only when all meet their minimums, else the Home button in the conversation's bar (or a swipe in from the screen's left edge, not while a screen is pushed) brings it over the conversation, modal to VoiceOver, taking the keyboard, and closed again when Home starts or stops fitting; where the conversation and a Workbench can't both be readable (xxLarge text and up on the Duo, 3 pt short at xxLarge), it is one big column. Memory's tab on two pages is Core | Skills and History, page two with its own stack (`Router.detail`). `-qaPosture` and `bbstudio://qa-duo/posture?<name>` force one in the simulator; `qa-duo/tab?bot|library|memory|search` picks a tab | `iOS/Shell/ShellRoot.swift`, `iOS/App/Router.swift`, `iOS/Shell/ShellPosture.swift`, `iOS/Shell/ShellGeometry.swift`, `iOS/Shell/ConversationScreen.swift` |
 | The Workbench (round 7): a conversation's tabs from Studio (`threadWorkbenchGet`, `threadWorkbenchMutate`, refetched on `workbench-changed`), shown one at a time under the bar; New tab finds a Studio item. Each tab's content is `WorkbenchTabContent(tab:)`; a tab's or pushed screen's actions (`.screenActions`) go in More | `iOS/Workbench/` |
-| A clean conversation (round 7): the conversation's menu (⋯ or the rail's More) holds Find, Rename, Model, Files, Terminals, Recent prompts, Save files, the source page, Context, Mute, Open in BB web, Share, Copy ID, Archive and Delete. Workers' approvals sit inline at the end of the transcript; the running time and the queue are one line inside the composer ("Working · 1m 12s … 2 queued"); a strand shows only as a small tag in a reply's footer (`strands.tags`). Live mode is in the composer's + menu | `iOS/Shell/ConversationMenu.swift`, `iOS/Thread/ThreadView.swift`, `iOS/Thread/ComposerChips.swift`, `iOS/Thread/Messages.swift` |
+| A clean conversation (round 7): the conversation's menu (⋯) holds Find, Rename, Model, Files, Terminals, Recent prompts, Save files, the source page, Context, Mute, Open in BB web, Share, Copy ID, Archive and Delete. Workers' approvals sit inline at the end of the transcript; the running time and the queue are one line inside the composer ("Working · 1m 12s … 2 queued"); a strand shows only as a small tag in a reply's footer (`strands.tags`). Live mode is in the composer's + menu | `iOS/Shell/ConversationMenu.swift`, `iOS/Thread/ThreadView.swift`, `iOS/Thread/ComposerChips.swift`, `iOS/Thread/Messages.swift` |
 | One way in (`Router`): pushes, Spotlight, links (`bbstudio://`, `bb://`), widgets, the Watch, Siri, Home Screen quick actions and the app's own buttons all call `Router.open` with a `Destination` (a conversation, a worker, a Bot's place, a pushed screen, the list, New conversation, a Bot, Studio, Settings or a sheet). A destination that comes before Studio's Bots load waits in the router and opens once they have. The router is the app's one navigation model: what shows over the room, the shown Bot and conversation, what's pushed over it, and the room's open place | `iOS/App/Router.swift`, `iOS/App/AppModel.swift` |
 | The Bot's controls (desktop's header and Bot settings): ⋯ beside the Bot on Home has Pause or Resume, Stop… (asks first: it also stops the threads the Bot started and turns off its schedules; nothing is deleted), the Main conversation picker (`bot_make_main`) and New Main (`bot_new_main`, asks first). `bot_spaces` says whether the Bot is paused or stopped: the header reads Paused or Stopped, and every conversation shows a line above the composer with Resume. A conversation's ⋯ has Make this the Main. The demo answers all of them offline (`-qaSpacesDemo`) | `iOS/Home/BotControls.swift`, `ThreadView` |
 | The model router's notice and the Tool Gateway: in a Bot conversation, while the router has a usage-limit or sign-in notice (`router.notice.get`, every 2 min, longer while idle), a line above the composer says so with Hand off to <model> (`router.handoff`: a new thread on the router's next model continues this one, and the phone opens it) and ✕ (`router.notice.dismiss`). Settings ▸ Tool Gateway shows Studio's MCP servers (status, on or off, tool count) and the requests waiting for approval, view-only (`toolGateway.overview`): adding, approving and signing in happen on the desktop. A Studio without them answers "unknown method" and nothing shows. `-qaRouterDemo` answers the notice offline; the spaces demo answers the gateway | `iOS/Bot/RouterNotice.swift`, `iOS/Tools/ToolGatewayView.swift` |
@@ -171,10 +171,7 @@ the composer also took or gave up focus on the next run loop whatever the
 window was doing. Now the size class is set only when it changes, after the
 layout pass, and with the keyboard up only once the window has kept its size
 for 0.4 s (`ResizeSettling`); the composer's focus changes and the
-transcript's tap-to-close wait the same way. `KeyboardFoldUITests` folds,
-unfolds, splits and backgrounds the Duo with the keyboard up and coming up,
-and fails on any unsatisfiable-constraint report (read from the app's own
-log, `qa-duo/constraints`) or a keyboard reload mid-resize.
+transcript's tap-to-close wait the same way.
 
 **Crash breadcrumbs.** The last 200 keyboard, window, pane, focus and scene
 events (frames, sizes and ids, never message text) are kept in memory and
@@ -402,20 +399,22 @@ Headless simulator runs: `-skipPushPrompt YES -openURL bbstudio://thread/<id>`.
 
 ### Testing
 
-`ShellUITests` checks the app shell offline (`-qaSpacesDemo list -qaBotDemo
-chat -qaWorkbenchDemo`): on the iPhone, Home as the root with Memory pushed
-over it, the conversation's one bar (the Workbench button with its tab count,
-⋯, no Live and no rail), the flip by button and by a sideways swipe with the
-composer kept, the tab menu (pick, Close), and the More menu; on the iPhone
-Duo simulator, the folded rail lowest first, Tabs and Home in it, book
-(conversation | Workbench, Home on request), flat (three panes, Home hides) and
-vertical (one column, the rail's buttons at the bottom). With
-`TEST_RUNNER_SHELL_CAPTURE=1`, `qa-duo/capture` keeps each posture's window
-PNG in the app's Documents.
+Every UI test has a five-minute limit (`ServerIsolatedUITestCase.timeLimit`,
+XCTest's `executionTimeAllowance`); the scripts run with
+`-test-timeouts-enabled YES`, and a direct `xcodebuild` run should too.
 
-The folded Duo (466 × 678) has no navigation bar: a conversation's title is
-one 40 pt line at the top, and its controls are in the rail in the right
-column the system reserves (`iOS/Shell/ShellRail.swift`).
+`ShellUITests` checks the app shell offline (`-qaSpacesDemo list -qaBotDemo
+chat -qaWorkbenchDemo`): on the iPhone, Home as the root with the tab bar
+(Home, Library, Memory, Search), the Search tab, the conversation's native bar
+(the system's Back, the Workbench button with its tab count, ⋯, no Live), the
+flip by button and by a sideways swipe with the composer kept, the tab menu
+(pick, Close), and the More menu; on the iPhone Duo simulator, folded (the
+bar's buttons and the tab bar in the right column the system reserves, every
+tab), pushed pages and designs under their native bars, book (conversation |
+Workbench, Home on request), flat (Memory's two pages) and vertical (one
+column). With `TEST_RUNNER_SHELL_CAPTURE=1`, `qa-duo/capture` keeps each
+posture's window PNG in the app's Documents.
+
 Rows are tighter on every phone: 10 pt apart, 20 pt Worked rows, a sent
 photo 160 pt, and a 120 × 72 tile while it loads (one shared download per
 photo, a thumbnail at the size shown, a retry after 30 s). Offline,
@@ -516,7 +515,7 @@ its PNGs.
 workspace and model chips, starting on a picked model, another Bot on its Auto
 default, No Bot as a plain thread in a project, and the Bot switcher on the
 list's header; with `TEST_RUNNER_ROUND2_DUO=1` on the iPhone Duo simulator,
-the folded Duo's ↓ on the rail and the unfolded Duo's left side.
+the folded Duo's ↓ and the unfolded Duo's left side.
 `TEST_RUNNER_ROUND2_OUT` keeps PNGs.
 
 `DesignZoomUITests` checks a design's player offline (`-qaDesignDemo`: one
@@ -542,7 +541,7 @@ the composer, attachments, a worker and a Library item through folded,
 landscape, the right page, portrait and folded again. At each step it writes
 `<dir>/req/<name>` and waits for `<dir>/done/<name>`, so a script outside the
 simulator can take a real `simctl io … screenshot --display=primary` (with the
-rail) into `<dir>/out`. `ConversationRemoveUITests` covers Archive, Delete,
+system's right column) into `<dir>/out`. `ConversationRemoveUITests` covers Archive, Delete,
 Restore and the Main and working-conversation guards offline.
 
 `BotPagesUITests` opens each Bot page from the room's menu offline

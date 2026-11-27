@@ -104,7 +104,8 @@ final class PageModel: ObservableObject {
         }
     }
 
-    private static let cacheQueue = DispatchQueue(label: "nyc.plee.bbgo.page-cache", qos: .utility)
+    /// Writes the cache off the main thread; tests wait on it (`sync {}`) before reading the cache.
+    static let cacheQueue = DispatchQueue(label: "nyc.plee.bbgo.page-cache", qos: .utility)
 
     func load(_ client: BBClient) async {
         if demo {

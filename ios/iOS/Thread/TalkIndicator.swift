@@ -159,7 +159,8 @@ final class VoiceClock {
     private var active = true
     private var observers: [NSObjectProtocol] = []
 
-    private init() {
+    /// `active`: whether the app is active now (the shared clock asks UIKit); after that, its notifications say.
+    init(active: Bool = UIApplication.shared.applicationState == .active) {
         let center = NotificationCenter.default
         observers = [
             center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
@@ -169,7 +170,7 @@ final class VoiceClock {
                 MainActor.assumeIsolated { self?.setActive(true) }
             },
         ]
-        active = UIApplication.shared.applicationState == .active
+        self.active = active
     }
 
     var isRunning: Bool { task != nil }

@@ -36,10 +36,15 @@ final class BotSpacesStore: ObservableObject {
     private var retryTask: Task<Void, Never>?
     private(set) var retries = 0
 
-    init(serverURL: URL = ServerScope.selectedURL) {
+    /// What paces change signals' refreshes while the phone is idle.
+    private let gate: EnergyGate
+
+    /// `gate`: the app's, unless a test brings one that isn't idle from what ran before.
+    init(serverURL: URL = ServerScope.selectedURL, gate: EnergyGate = .shared) {
         self.serverURL = serverURL
+        self.gate = gate
         support = BotSpacesSupport.stored(serverURL: serverURL)
-        idleWatch = EnergyGate.shared.$idle.removeDuplicates().sink { [weak self] idle in
+        idleWatch = gate.$idle.removeDuplicates().sink { [weak self] idle in
             if !idle { self?.wakePacedWait() }
         }
     }
@@ -157,7 +162,7 @@ final class BotSpacesStore: ObservableObject {
             // at rest) with zero timer wakeups, waking immediately on a touch
             // (EnergyGate.$idle -> false) or an unpaced request.
             while let self, !Task.isCancelled, !self.unpaced {
-                let wait = self.lastFlush + EnergyGate.shared.changeGap(.zero) - ContinuousClock.now
+                let wait = self.lastFlush + self.gate.changeGap(.zero) - ContinuousClock.now
                 if wait <= .zero { break }
                 let sleeper = Task<Void, Never> { _ = try? await Task.sleep(for: wait) }
                 self.waitTask = sleeper

@@ -61,15 +61,15 @@ struct SettingsView: View {
                 }
             }
             Section {
-                NavigationLink { PluginStatusView().modifier(PushedChrome(title: "Plugins")) } label: {
+                NavigationLink { PluginStatusView() } label: {
                     Label("Plugins", systemImage: "puzzlepiece.extension")
                 }
-                NavigationLink { ToolGatewayView().modifier(PushedChrome(title: "Tool Gateway")) } label: {
+                NavigationLink { ToolGatewayView() } label: {
                     Label("Tool Gateway", systemImage: "point.3.connected.trianglepath.dotted")
                 }
                 .accessibilityIdentifier("settingsToolGateway")
                 if runningPlugins.split(separator: ",").contains("account-pool") {
-                    NavigationLink { UsageView().modifier(PushedChrome(title: "Usage")) } label: {
+                    NavigationLink { UsageView() } label: {
                         Label("Usage", systemImage: "gauge.with.dots.needle.33percent")
                     }
                 }
@@ -80,13 +80,13 @@ struct SettingsView: View {
             // place: Home's Quick Open (search "archive") opens it.
             if runningPlugins.split(separator: ",").contains("custom-instructions") {
                 Section("Agents") {
-                    NavigationLink { CustomInstructionsView().modifier(PushedChrome(title: "Custom Instructions")) } label: {
+                    NavigationLink { CustomInstructionsView() } label: {
                         Label("Custom Instructions", systemImage: "text.quote")
                     }
                 }
             }
             Section {
-                NavigationLink { LookSettingsView().modifier(PushedChrome(title: "Look")) } label: {
+                NavigationLink { LookSettingsView() } label: {
                     LabeledContent {
                         Text(LookStore.shared.theme(for: nil).name)
                     } label: {

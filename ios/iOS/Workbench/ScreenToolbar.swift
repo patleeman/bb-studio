@@ -1,10 +1,8 @@
 import SwiftUI
 
-/// A viewer's bar from its one action list, the way the Duo rail lays it out:
-/// the first two actions as buttons, the rest under ⋯. On the iPhone that is
-/// its navigation bar; the title and the list also go to the shell
-/// (`.screenTitle`, `.screenActions`), which on the Duo hides the bar and puts
-/// them in the title line and the rail.
+/// A pushed screen's native bar from its one action list: the title, the
+/// first two actions as toolbar buttons, the rest under ⋯. The system places
+/// them (on the folded Duo, in the reserved right column).
 struct ScreenToolbar: ViewModifier {
     let title: String
     let actions: [ScreenAction]
@@ -15,8 +13,6 @@ struct ScreenToolbar: ViewModifier {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(displayMode)
             .toolbar { ToolbarItemGroup(placement: .topBarTrailing) { ScreenToolbarButtons(actions: actions) } }
-            .screenTitle(title)
-            .screenActions(actions)
     }
 }
 

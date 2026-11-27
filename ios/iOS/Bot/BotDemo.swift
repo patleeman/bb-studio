@@ -118,6 +118,11 @@ enum BotDemo {
             observers[ObjectIdentifier(owner)] = changed
         }
 
+        /// A view of the thread detached: as BB's realtime, it hears nothing more.
+        @MainActor func unobserve(_ owner: AnyObject) {
+            observers[ObjectIdentifier(owner)] = nil
+        }
+
         static let pageSize = 24
 
         func client(_ baseURL: URL) -> BBClient {

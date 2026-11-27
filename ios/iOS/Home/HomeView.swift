@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// Home (8a): the root page, the desktop's sidebar on one screen. The Bot,
-/// its pages (Memory, Library), then its conversations with their workers
-/// nested under them, BB's other threads by project, and Archive. Search
-/// finds conversations, workers, Studio's items and the places. Everything
-/// opens pushed over it.
+/// Home (8a): the Home tab's root, the desktop's sidebar on one screen. The
+/// Bot, then its conversations with their workers nested under them, BB's
+/// other threads by project, and Archive. Everything opens pushed over it;
+/// Memory and Library are tabs of their own, and Search is the Search tab.
 struct HomeView: View {
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
@@ -12,37 +11,22 @@ struct HomeView: View {
     var column = false
     @ObservedObject private var router = Router.shared
     @EnvironmentObject private var app: AppModel
-    @State private var query = ""
-    @FocusState private var searchFocused: Bool
     @State private var removed: Set<String> = []
     @State private var deleting: BotConversation?
     @StateObject private var projects = HomeProjects()
     @State private var projectsOpen = false
-    @State private var studioMatches: [Studio.SearchAllOutputItem] = []
     @Environment(\.look) private var look
 
     private var view: BotThreadsView? { store.view(for: bot.id) }
-    private var searching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
         List {
+            Section { HomeBotHeader(bot: bot, view: view, compact: column, refresh: { await store.refresh() }) }
+                .listRowBackground(Color.clear)
+            conversations
+            HomeProjectsSection(projects: projects, open: $projectsOpen, openThread: { router.path = [.thread(id: $0)] })
             Section {
-                ShellSearchField(text: $query, prompt: "Search conversations, Memory and Library", id: "homeSearch", focused: $searchFocused)
-            }
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
-            if searching {
-                HomeSearchResults(bot: bot, view: view, query: query, studio: studioMatches, projects: projects.groups(query: query),
-                                  open: open)
-            } else {
-                Section { HomeBotHeader(bot: bot, view: view, compact: column, refresh: { await store.refresh() }) }
-                    .listRowBackground(Color.clear)
-                Section { places }
-                conversations
-                HomeProjectsSection(projects: projects, open: $projectsOpen, openThread: { router.path = [.thread(id: $0)] })
-                Section {
-                    row("Archive", "archivebox", id: "homeArchive") { router.path = [.place(.archive)] }
-                }
+                row("Archive", "archivebox", id: "homeArchive") { router.path = [.place(.archive)] }
             }
         }
         .modifier(HomeListStyle(column: column))
@@ -52,11 +36,9 @@ struct HomeView: View {
             await store.refresh()
             if projects.loaded { await loadProjects() }
         }
-        .task(id: query) { await searchStudio() }
-        .task(id: projectsOpen || searching) {
-            if (projectsOpen || searching) && !projects.loaded { await loadProjects() }
+        .task(id: projectsOpen) {
+            if projectsOpen && !projects.loaded { await loadProjects() }
         }
-        .onChange(of: router.searchRequests) { _, _ in searchFocused = true }
         .onChange(of: view?.conversations.map(\.threadId)) { _, ids in removed.formIntersection(ids ?? []) }
         .alert(ConversationFinish.deleteTitle(deleting?.title ?? ""),
                isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { conversation in
@@ -67,13 +49,6 @@ struct HomeView: View {
             Text(ConversationFinish.deleteMessage)
         }
         .accessibilityIdentifier("home")
-    }
-
-    private var places: some View {
-        Group {
-            row("Memory", BotPage.memory.symbol, id: "homeMemory") { router.path = [.place(.memory)] }
-            row("Library", BotPage.library.symbol, id: "homeLibrary") { router.path = [.place(.library)] }
-        }
     }
 
     @ViewBuilder private var conversations: some View {
@@ -113,7 +88,6 @@ struct HomeView: View {
     }
 
     private func open(_ item: BotShellItem) {
-        searchFocused = false
         router.open(item: item)
     }
 
@@ -149,17 +123,6 @@ struct HomeView: View {
     private func loadProjects() async {
         await projects.load(client: app.client, bots: store.spaces?.bots ?? [bot])
     }
-
-    private func searchStudio() async {
-        let trimmed = query.trimmingCharacters(in: .whitespaces)
-        guard trimmed.count >= 2 else {
-            if !studioMatches.isEmpty { studioMatches = [] }
-            return
-        }
-        try? await Task.sleep(for: .milliseconds(300))
-        guard !Task.isCancelled, let found = try? await app.client.studioSearchAll(trimmed), !Task.isCancelled else { return }
-        studioMatches = Array(found.prefix(12))
-    }
 }
 
 /// Home is an inset list on its own page and a plain one as the open Duo's
@@ -177,8 +140,6 @@ private struct HomeListStyle: ViewModifier {
         }
     }
 }
-
-/// Search, as Home's first row (9d: not a bar button).
 
 /// The Bot (8a): its still, its name (a menu: switch Bot, Schedules, Theme,
 /// Settings) and the one status line.
@@ -361,72 +322,6 @@ struct BotWorkerGlyph: View {
     }
 }
 
-/// What a search finds: conversations, workers, places, Studio's items and project threads.
-private struct HomeSearchResults: View {
-    let bot: BotSpace
-    let view: BotThreadsView?
-    let query: String
-    let studio: [Studio.SearchAllOutputItem]
-    let projects: [ProjectThreads.Group]
-    let open: (BotShellItem) -> Void
-    @ObservedObject private var router = Router.shared
-
-    var body: some View {
-        let trimmed = query.trimmingCharacters(in: .whitespaces)
-        let lines = BotShell.lines(view).filter { $0.title.localizedCaseInsensitiveContains(trimmed) }
-        let workers = (view?.workers ?? []).filter { $0.title.localizedCaseInsensitiveContains(trimmed) }
-        let places = [BotPage.memory, .library, .automations, .archive].filter { $0.title.localizedCaseInsensitiveContains(trimmed) }
-        if !lines.isEmpty {
-            Section("Conversations") {
-                ForEach(lines) { HomeConversationRow(line: $0, nest: nil, current: false, open: open) }
-            }
-        }
-        if !workers.isEmpty {
-            Section("Workers") {
-                ForEach(workers, id: \.threadId) { HomeWorkerRow(worker: $0, depth: 0, open: open) }
-            }
-        }
-        if !places.isEmpty {
-            Section("Places") {
-                ForEach(places) { page in
-                    Button { router.path = [.place(page)] } label: { Label(page.title, systemImage: page.symbol) }
-                        .accessibilityIdentifier("homePlace-\(page.rawValue)")
-                }
-            }
-        }
-        let items = studio.compactMap { item -> (Studio.SearchAllOutputItem, Route)? in
-            guard item.kind != "thread", let href = item.href, let route = Route(href: href) else { return nil }
-            return (item, route)
-        }
-        if !items.isEmpty {
-            Section("Studio") {
-                ForEach(items.indices, id: \.self) { index in
-                    let (item, route) = items[index]
-                    Button { router.path = [route] } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.title ?? "Untitled").lineLimit(1)
-                            if let text = item.snippet?.text, !text.isEmpty {
-                                Text(text).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
-                            }
-                        }
-                    }
-                    .tint(.primary)
-                    .accessibilityIdentifier("homeStudioItem-\(index)")
-                }
-            }
-        }
-        if !projects.isEmpty {
-            Section("Projects") {
-                ForEach(projects) { group in
-                    ForEach(group.lines) { line in
-                        HomeProjectThread(line: line, project: group.name) { router.path = [.thread(id: line.thread.id)] }
-                    }
-                }
-            }
-        }
-    }
-}
-
 /// BB's threads that belong to no Bot, by project: closed until opened, each project too.
 private struct HomeProjectsSection: View {
     @ObservedObject var projects: HomeProjects
@@ -482,7 +377,7 @@ private struct HomeProjectsSection: View {
     }
 }
 
-private struct HomeProjectThread: View {
+struct HomeProjectThread: View {
     let line: ProjectThreads.Line
     let project: String?
     let open: () -> Void

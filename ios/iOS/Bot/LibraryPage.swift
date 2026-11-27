@@ -27,13 +27,9 @@ struct LibraryPageView: View {
         .listStyle(.plain)
         .overlay { LibraryLoadState(load: load) }
         .navigationTitle("Library")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .shellSearchable(text: $query, prompt: "Search library")
         .toolbar { LibraryNewPageButton(making: making) { Task { await makePage() } } }
-        // The Duo hides the bar: + New page is in the shell's rail.
-        .screenActions([ScreenAction(id: "libraryNewPage", title: "New page", systemImage: "plus", disabled: making) {
-            Task { await makePage() }
-        }])
         .refreshable {
             await load.reload()
             refreshed += 1
@@ -49,6 +45,9 @@ struct LibraryPageView: View {
     }
 
     private func start() {
+        #if DEBUG
+        RenderCount.bump("library.open")
+        #endif
         let (client, botId) = (app.client, botId)
         load.describe = { BBClient.describe($0, server: client.baseURL) }
         load.run(key: scope) { try await client.botLibrary(botId: botId) }
@@ -60,7 +59,6 @@ struct LibraryPageView: View {
         defer { making = false }
         do {
             let page = try await app.client.createPage(title: "Untitled", markdown: "")
-            // On the shell's stack, so it has the title line and rail (Review S6).
             Router.shared.push(.page(id: page.id))
         } catch {
             app.flash("The page wasn't made: " + BBClient.describe(error, server: app.client.baseURL))
@@ -124,7 +122,7 @@ private struct LibraryRowLabel: View {
     }
 }
 
-/// + New page in the iPhone's bar.
+/// + New page in Library's bar.
 private struct LibraryNewPageButton: ToolbarContent {
     let making: Bool
     let make: () -> Void
