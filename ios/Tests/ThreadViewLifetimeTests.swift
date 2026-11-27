@@ -13,7 +13,8 @@ final class ThreadViewLifetimeTests: XCTestCase {
 
     private func held(_ threadId: String) -> Holder {
         let lifetime = ThreadViewLifetime()
-        lifetime.hold(ConversationSession(threadId: threadId), notes: ThreadNotes(threadId: threadId), app: AppModel.shared)
+        // From the app's cache, which keeps the session (its deferred detach holds it weakly).
+        lifetime.hold(ConversationSessions.shared.session(threadId), notes: ThreadNotes(threadId: threadId), app: AppModel.shared)
         return Holder(lifetime)
     }
 
