@@ -358,7 +358,7 @@
   "80b2624854d6dba8a0602d62": "{\"n1\":{\"title\":\"Offline map tiles\",\"summary\":\"Estimating storage requirements for a region’s offline map tiles.\"}}",
   "a3c24afd60dfff9375d786b5": "{\"n1\":{\"title\":\"Resumable photo uploads\",\"summary\":\"Exploring whether photo uploads can resume after slow connections interrupt them.\"}}",
   "f8f2b7489bf7aa4de16a6f5e": "{\"n1\":{\"title\":\"Beta invite codes\",\"summary\":\"Switching beta access from open signup to invite codes.\"}}",
-  "2076d930dee7d155b9ecc32f": "{\"n1\":{\"same\":\"s1\"}}",
+  "6e13d6249a8ae83636c47f1f": "{\"n1\":{\"same\":\"s1\"}}",
   "aa1b528decf05f547fc9c56f": "{\"n1\":{\"title\":\"Tester trail emails\",\"summary\":\"Planning weekly nearby-trail emails for testers and whether they can reuse the invite list.\"}}",
   "f0b15c17ae8878798f096c62": "{\"n1\":{\"title\":\"App store listing\",\"summary\":\"Preparing screenshots and a short description for the app store listing.\"}}",
   "b2c32e05899db89dacd59eec": "{\"n1\":{\"title\":\"Trail and photo backup\",\"summary\":\"The nightly backup finished.\"}}",

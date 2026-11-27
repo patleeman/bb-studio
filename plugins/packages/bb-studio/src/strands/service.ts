@@ -7,7 +7,7 @@
 // the most recently active first.
 import type Database from "better-sqlite3";
 import { type OverviewConversation, type ReplyTagView, type StrandItemView, type StrandList, type StrandView } from "./contract";
-import { firstLineTitle } from "./naming";
+import { firstLineTitle, looksLikeEnvelope } from "./naming";
 import { JEV_DAILY_CAP, StrandDetector, type DetectorDeps, type OpenTask } from "./detector";
 import { approvalDecisions, approvalLines, isWorkerApproval, shortApproval, type Interaction } from "../worker-approvals";
 import { byState, liveState, strayWorkersOf, type AskSignal, type Signals, type TaskSignal, type WorkerSignal, type WorkerStatus } from "./states";
@@ -90,6 +90,9 @@ export class StrandService {
 
   constructor(private readonly deps: StrandServiceDeps) {
     this.store = new StrandStore(deps.db, deps.now);
+    // Strands titled with envelope text before the namer ignored envelopes: re-titled once (a no-op after).
+    const repaired = this.store.repairEnvelopeTitles();
+    if (repaired) deps.log(`Strands: re-titled ${repaired} strand${repaired === 1 ? "" : "s"} named from a message envelope.`);
     this.detector = new StrandDetector({
       ...deps, store: this.store, openTasks: (threadId) => openAgentTasks(deps.db, threadId),
       workerStrand: async (threadId, workerThreadId) => {
@@ -436,7 +439,7 @@ export class StrandService {
   rename(strandId: string, title: string): boolean {
     const strand = this.own(strandId);
     const name = title.replace(/\s+/g, " ").trim().slice(0, 80);
-    if (!strand || !name) return false;
+    if (!strand || !name || looksLikeEnvelope(name)) return false;
     this.store.rename(strand.id, name);
     this.deps.changed(strand.threadId);
     return true;
@@ -472,6 +475,7 @@ export class StrandService {
     if (input.title !== undefined) {
       const name = input.title.replace(/\s+/g, " ").trim().slice(0, 80);
       if (!name) throw new Error("title is empty.");
+      if (looksLikeEnvelope(name)) throw new Error(`${JSON.stringify(name)} is a message header, not a name: name the work itself.`);
       if (this.store.titles(conversation, strand.id).some((each) => each.toLowerCase() === name.toLowerCase())) throw new Error(`Another strand here is called ${JSON.stringify(name)}.`);
       this.store.rename(strand.id, name);
       did.push(`renamed to ${JSON.stringify(name)}`);
