@@ -24,7 +24,7 @@
 // quoted text came from, and whose reports the message carries. On the same
 // call it may pick the whole-conversation strand (roundups), a second strand
 // the turn is also about, and what a new strand grew out of.
-import { checkName, firstLineTitle } from "./naming";
+import { checkName, firstLineTitle, stripEnvelopes } from "./naming";
 import {
   BATCH, batchQuestions, jsonIn, MAX_OPEN, namingPrompt, proposePrompt, readAnswer, readExtras, readNaming, readProposal, readSort, sortPrompt, STRAND_LINES, taskTitle, turnQuestion,
   type Choice, type Message, type OpenStrand, type TurnContext,
@@ -725,7 +725,7 @@ export class StrandDetector {
     const taken: string[] = [];
     if (done.length || tasks.length) {
       const keys = tasks.map((_, index) => `t${index + 1}`);
-      const result = await this.askModel(threadId, `${threadId} backfill`, proposePrompt(done.map((turn) => turn.text.split("\n").find((line) => line.trim()) ?? turn.text), tasks.map((task, index) => ({ key: keys[index]!, title: task.title }))))
+      const result = await this.askModel(threadId, `${threadId} backfill`, proposePrompt(done.map((turn) => stripEnvelopes(turn.text).split("\n").find((line) => line.trim()) ?? "").filter(Boolean), tasks.map((task, index) => ({ key: keys[index]!, title: task.title }))))
         ?? { ok: false as const, unavailable: true, error: "daily cap" };
       if (this.disposed) return null;
       report.modelCalls++;
