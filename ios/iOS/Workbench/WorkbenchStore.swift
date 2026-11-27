@@ -26,13 +26,18 @@ final class WorkbenchStore {
     func tabs(_ threadId: String) -> [WorkbenchTab] { states[threadId]?.tabs ?? [] }
     func count(_ threadId: String) -> Int { tabs(threadId).count }
 
-    /// The tab shown: picked here, else Studio's active one, else the first.
+    /// The tab shown: picked here, else Studio's active one, else the first,
+    /// among the tabs the phone can show. Nil: nothing to show, and the
+    /// Workbench claims no pane.
     func selected(_ threadId: String) -> WorkbenchTab? {
         Self.selected(tabs(threadId), picked: picked[threadId], active: states[threadId]?.activeTabId)
     }
 
+    /// A tab only the Mac opens (VS Code…) is never shown, picked or not: it
+    /// stays in the tab menu, marked "On your Mac".
     nonisolated static func selected(_ tabs: [WorkbenchTab], picked: String?, active: String?) -> WorkbenchTab? {
-        tabs.first { $0.id == picked } ?? tabs.first { $0.id == active } ?? tabs.first
+        let shown = tabs.filter { WorkbenchTabKind($0).showsOnPhone }
+        return shown.first { $0.id == picked } ?? shown.first { $0.id == active } ?? shown.first
     }
 
     func attach(_ realtime: BBRealtime) {
@@ -82,7 +87,7 @@ final class WorkbenchStore {
 
     /// Shows a tab; a heavy one joins the loaded views, pushing out the oldest.
     func select(_ id: String, in threadId: String) {
-        guard let tab = tabs(threadId).first(where: { $0.id == id }) else { return }
+        guard let tab = tabs(threadId).first(where: { $0.id == id }), WorkbenchTabKind(tab).showsOnPhone else { return }
         picked[threadId] = id
         mounted = WorkbenchMounted.touch(mounted, id, heavy: tab.heavy)
         Task { await mutate(threadId, op: "focus", tabId: id) }
