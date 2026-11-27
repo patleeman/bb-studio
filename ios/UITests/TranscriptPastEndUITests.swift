@@ -35,7 +35,7 @@ final class TranscriptPastEndUITests: ServerIsolatedUITestCase {
         finish()
     }
 
-    /// Patrick, Oct 24 10:22 PM: black right after sending with the keyboard
+    /// A user, Oct 24 10:22 PM: black right after sending with the keyboard
     /// open. Send with the keyboard up; the user row goes in, the reply
     /// streams in over several updates, then the keyboard closes. Throughout,
     /// the chat's end stays at the bottom of what the reader sees: never
@@ -91,7 +91,7 @@ final class TranscriptPastEndUITests: ServerIsolatedUITestCase {
         finish()
     }
 
-    /// Patrick: back from the Bot chat to the Bots list, tap the Bot again,
+    /// A user: back from the Bot chat to the Bots list, tap the Bot again,
     /// and the chat opens scrolled into black. Reopen several times, also
     /// after rows came in while away (a short reply, a streamed one, and more
     /// than a page), and the chat must open at its newest row.
@@ -114,7 +114,7 @@ final class TranscriptPastEndUITests: ServerIsolatedUITestCase {
         finish()
     }
 
-    /// Patrick, Oct 25, on the Duo's outer screen: send, the reply streams
+    /// A user, Oct 25, on the Duo's outer screen: send, the reply streams
     /// in, away and back, reopen: black between the header and an
     /// empty composer until the composer is tapped. Not with a draft in the
     /// composer. Each round sends with the keyboard up, waits for the reply,

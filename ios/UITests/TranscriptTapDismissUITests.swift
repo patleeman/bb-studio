@@ -1,6 +1,6 @@
 import XCTest
 
-/// Patrick, Oct 26: a tap anywhere in the chat's transcript closes the
+/// A user, Oct 26: a tap anywhere in the chat's transcript closes the
 /// keyboard. Taps on links and buttons in it still do what they did, the draft
 /// and its photo stay, and the transcript doesn't jump: at the end it stays at
 /// the end, with nothing past it; scrolled up, the same rows stay in view.
@@ -135,7 +135,14 @@ final class TranscriptTapDismissUITests: ServerIsolatedUITestCase {
         composerField.tap()
         expectKeyboard(true, "keyboard up for the thread link")
         app.links["Review open PRs"].firstMatch.tap()
-        XCTAssertTrue(app.textViews["Message"].firstMatch.waitForExistence(timeout: 10), "The thread link opened its thread on the first tap")
+        // Its thread (here a worker: read-only, titled with its name) opens over the conversation.
+        let title = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@ AND label CONTAINS %@",
+                                                                         ["conversationTitle", "shellTitle"], "Review open PRs")).firstMatch
+        let back = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@", ["BackButton", "rail-back"])).firstMatch
+        let opened = NSPredicate { _, _ in title.exists || (back.exists && !self.app.links["Review open PRs"].exists) }
+        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: opened, object: nil)], timeout: 10) != .completed {
+            XCTFail("The thread link opened its thread on the first tap\n\(app.debugDescription)")
+        }
         shot("7-thread-link")
         finish()
     }

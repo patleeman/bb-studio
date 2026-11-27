@@ -144,21 +144,6 @@ final class EnergyTests: XCTestCase {
         }
     }
 
-    @MainActor
-    func testRoomSessionsEvictsLeastRecentlyUsedSessionsBeyondCap() {
-        let sessions = RoomSessions(main: "t0")
-        let first = sessions.current
-        for i in 1...10 {
-            sessions.show("t\(i)")
-            _ = sessions.current
-        }
-        let latest = sessions.session(for: "t10")
-        XCTAssertTrue(sessions.current === latest)
-        // Oldest session t0 was evicted, so asking for it builds a fresh instance.
-        let reloaded = sessions.session(for: "t0")
-        XCTAssertEqual(reloaded.threadId, "t0")
-        XCTAssertFalse(first === reloaded, "oldest session should be evicted past maxCached")
-    }
 }
 
 private final class ExecutionOptionsCallCounter: @unchecked Sendable {

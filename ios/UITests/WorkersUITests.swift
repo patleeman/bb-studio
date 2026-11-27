@@ -1,9 +1,9 @@
 import XCTest
 
 /// Workers in the Bot's shell, offline (`-qaSpacesDemo` with `-qaBotDemo
-/// chat`): a worker opens read-only from the list and from the workers line,
-/// with its status in the header and "Ask the Bot about this worker…" where
-/// the composer was; Ask sends to the owning conversation and goes there.
+/// chat`): a worker opens read-only from Home, its row saying its state and
+/// its title line its name, with "Ask the Bot about this worker…" where the
+/// composer was; Ask sends to the owning conversation and goes there.
 /// `TEST_RUNNER_STEP6_OUT` keeps PNGs.
 final class WorkersUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
@@ -11,7 +11,7 @@ final class WorkersUITests: ServerIsolatedUITestCase {
     private func launch(_ variant: String = "needs") {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", variant]
         app.launchOffline()
-        XCTAssertTrue(app.waitForRoom(), "the app opens on the room")
+        XCTAssertTrue(app.waitForRoom(), "Main opens from Home")
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 
@@ -19,11 +19,16 @@ final class WorkersUITests: ServerIsolatedUITestCase {
 
     private var askField: XCUIElement { app.textViews["Ask the Bot about this worker…"] }
 
-    private func expectWorker(_ title: String, status: String, file: StaticString = #filePath, line: UInt = #line) {
-        let header = app.otherElements["workerTitle"].exists ? app.otherElements["workerTitle"] : app.descendants(matching: .any)["workerTitle"]
-        XCTAssertTrue(header.waitForExistence(timeout: 15), "the worker's header", file: file, line: line)
+    /// Opens a worker from its Home row, which says its state first.
+    private func open(_ row: XCUIElement, state: String, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(row.label.hasPrefix(state), "the row says \(state): \(row.label)", file: file, line: line)
+        row.tap()
+    }
+
+    private func expectWorker(_ title: String, file: StaticString = #filePath, line: UInt = #line) {
+        let header = app.conversationTitle
+        XCTAssertTrue(header.waitForExistence(timeout: 15), "the worker's title", file: file, line: line)
         XCTAssertTrue(header.label.hasPrefix(title), header.label, file: file, line: line)
-        XCTAssertEqual(header.value as? String, status, file: file, line: line)
         XCTAssertTrue(askField.waitForExistence(timeout: 10), "Ask replaces the composer", file: file, line: line)
         XCTAssertFalse(app.textViews["Message"].exists, "no composer", file: file, line: line)
         XCTAssertTrue(app.descendants(matching: .any)["workerBot"].firstMatch.label.contains("Juniper"), "the owner Bot's name", file: file, line: line)
@@ -32,14 +37,15 @@ final class WorkersUITests: ServerIsolatedUITestCase {
     func testOpenFromTheListAndAsk() {
         launch()
         app.openRoomPlace("conversations")
-        // The failed worker sits under the conversation that started it, behind that row's toggle.
-        let nest = app.buttons["roomNestToggle-thr_demo_interview"]
-        let failed = app.buttons["roomWorker-thr_demo_w3"]
-        XCTAssertTrue(nest.waitForExistence(timeout: 15) || failed.exists, "Launch prep's workers are behind its toggle")
-        if !failed.exists { nest.tap() }
+        // The failed worker sits under the conversation that started it, maybe behind its fold.
+        let fold = app.buttons["homeFold-thr_demo_interview"]
+        let failed = app.buttons["homeWorker-thr_demo_w3"]
+        app.scrollHome(to: failed)
+        XCTAssertTrue(failed.waitForExistence(timeout: 10) || fold.exists, "Launch prep's workers")
+        if !failed.exists { fold.tap() }
         XCTAssertTrue(failed.waitForExistence(timeout: 15))
-        failed.tap()
-        expectWorker("Mock question bank", status: "failed")
+        open(failed, state: "Failed")
+        expectWorker("Mock question bank")
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Stopping here'")).firstMatch.waitForExistence(timeout: 15),
                       "the worker's transcript")
         XCTAssertTrue(app.buttons["workerOwner"].label.contains("Launch prep"))
@@ -63,10 +69,10 @@ final class WorkersUITests: ServerIsolatedUITestCase {
     func testOpenFromTheListAndAskGoesBack() {
         launch()
         app.openRoomPlace("conversations")
-        let running = app.buttons["roomWorker-thr_demo_w2"]
+        let running = app.buttons["homeWorker-thr_demo_w2"]
         XCTAssertTrue(running.waitForExistence(timeout: 15))
-        running.tap()
-        expectWorker("Theme stills renderer", status: "running")
+        open(running, state: "Running")
+        expectWorker("Theme stills renderer")
         XCTAssertTrue(app.buttons["workerOwner"].label.contains("Main"))
         XCTAssertFalse(app.navigationBars.buttons["Stop"].exists, "read-only: no Stop")
         shot("running-worker")
@@ -81,12 +87,10 @@ final class WorkersUITests: ServerIsolatedUITestCase {
     func testWaitingOnAnApprovalShowsItsStatusOnly() {
         launch()
         app.openRoomPlace("conversations")
-        let waiting = app.buttons["roomWorker-thr_demo_w1"]
+        let waiting = app.buttons["homeWorker-thr_demo_w1"]
         XCTAssertTrue(waiting.waitForExistence(timeout: 15))
-        waiting.tap()
-        expectWorker("Studio-native BB fork", status: "needs-you")
-        let header = app.descendants(matching: .any)["workerTitle"]
-        XCTAssertTrue(header.label.contains("Waiting for your approval") || header.label.contains("Waiting for you"), header.label)
+        open(waiting, state: "Waiting")
+        expectWorker("Studio-native BB fork")
         XCTAssertFalse(app.buttons["workerAnswerHere"].exists)
         shot("waiting-worker")
         app.buttons["workerOwner"].tap()

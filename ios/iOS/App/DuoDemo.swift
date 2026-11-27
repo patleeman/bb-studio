@@ -39,6 +39,38 @@ enum DuoDemo {
         window.frame = CGRect(x: 0, y: 0, width: 951, height: 669)
     }
 
+    /// "ViewClass frame: keys" for each layer under the window with animations.
+    static func runningAnimations(_ window: UIWindow) -> [String] {
+        var out: [String] = []
+        func walk(_ layer: CALayer, _ path: String) {
+            let owner = (layer.delegate as? UIView).map { String(describing: type(of: $0)) } ?? String(describing: type(of: layer))
+            let here = path.isEmpty ? owner : path + ">" + owner
+            if let view = layer.delegate as? UIView, String(describing: type(of: view)) == "WKWebView", !view.isHidden, view.alpha > 0 {
+                out.append("webview \(here.suffix(120)) \(layer.convert(layer.bounds, to: window.layer).integral)")
+            }
+            if let keys = layer.animationKeys(), !keys.isEmpty {
+                let frame = layer.convert(layer.bounds, to: window.layer)
+                // Finished ones a layer keeps (removedOnCompletion off) don't run: marked, so a test can tell.
+                let now = layer.convertTime(CACurrentMediaTime(), from: nil)
+                let details = keys.compactMap { key in layer.animation(forKey: key).map { animation in
+                    let repeats = max(1, Double(animation.repeatCount))
+                    // Paused (speed 0: a refresh control's, scrubbed by the pull), or over.
+                    let done = layer.speed == 0 || animation.speed == 0
+                        || (animation.repeatCount < 1000 && now > animation.beginTime + animation.duration * repeats + 0.05)
+                    return "\(key) repeat=\(animation.repeatCount) dur=\(animation.duration)\(done ? " done" : "")"
+                } }
+                out.append("\(here.suffix(160)) \(frame.integral): \(details.joined(separator: ", "))")
+            }
+            for sub in layer.sublayers ?? [] { walk(sub, here) }
+        }
+        // Every window of every scene: an animation in another one keeps the app from idling too.
+        let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+        for each in windows.isEmpty ? [window] : windows {
+            walk(each.layer, String(describing: type(of: each)))
+        }
+        return out
+    }
+
     private static func layoutGeometry(_ window: UIWindow) -> [String: Any] {
         func scrolls(_ view: UIView) -> [[String: Any]] {
             var result = view.subviews.flatMap(scrolls)
@@ -77,7 +109,6 @@ enum DuoDemo {
         return ["width": window.bounds.width, "height": window.bounds.height,
                 "composers": (window.windowScene?.windows ?? [window]).flatMap(composers),
                 "transcripts": transcripts(window),
-                "pane": DuoPaneState.shared.pane.rawValue,
                 "safeRight": window.safeAreaInsets.right, "safeBottom": window.safeAreaInsets.bottom,
                 "keyboardTop": keyboardTop ?? window.bounds.height,
                 "scrolls": scrolls(window),
@@ -154,11 +185,16 @@ enum DuoDemo {
             screenSize = size
         case "tab":
             switch url.query() {
-            case "bot": Router.shared.tab = .bot
-            case "studio": Router.shared.tab = .studio
-            case "settings": Router.shared.tab = .settings
+            case "bot": Router.shared.path = []
+            case "studio": Router.shared.path = [.studio]
+            case "settings": Router.shared.path = [.settings]
             default: return false
             }
+            return true
+        case "posture":
+            // A posture the simulator can't make (it has no hinge); `?auto` goes back to measuring.
+            ShellQA.override = url.query().flatMap(ShellPosture.init(rawValue:))
+            Router.shared.objectWillChange.send()
             return true
         case "replies-end":
             func revealEnd(_ view: UIView) -> Bool {
@@ -174,15 +210,18 @@ enum DuoDemo {
             }
             _ = revealEnd(window)
             return true
-        case "pane":
-            guard let pane = url.query().flatMap(DuoPane.init) else { return false }
-            DuoPaneState.shared.set(pane)
-            return true
         case "layout":
             window.layoutIfNeeded()
             if let data = try? JSONSerialization.data(withJSONObject: layoutGeometry(window), options: .sortedKeys) {
                 window.accessibilityValue = String(data: data, encoding: .utf8)
             }
+            return true
+        case "animations":
+            // Every layer with an animation running: what keeps the app from going idle.
+            let running = Self.runningAnimations(window).joined(separator: "\n")
+            window.accessibilityValue = running
+            // Also a file, readable from outside while a test is stuck (simctl openurl, then the app's Documents).
+            try? Data((running.isEmpty ? "none" : running).utf8).write(to: URL.documentsDirectory.appending(path: "animations.txt"))
             return true
         case "dismiss":
             window.endEditing(true)
@@ -198,6 +237,7 @@ enum DuoDemo {
             // `?reset` starts over; otherwise the counts since then, as JSON.
             RenderCount.watchMainThread()
             if url.query() == "reset" { RenderCount.reset() }
+            RenderCount.set("transcript.links", TranscriptDisplayLinkTarget.live)
             if let data = try? JSONSerialization.data(withJSONObject: RenderCount.counts, options: .sortedKeys) {
                 window.accessibilityValue = String(data: data, encoding: .utf8)
             }

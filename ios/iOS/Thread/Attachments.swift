@@ -51,7 +51,7 @@ struct AttachmentMenu: View {
     @Binding var items: [PendingAttachment]
     var symbol = "paperclip"
     var tint: Color?
-    /// "Talk hands-free" at the top, where the header's waveform was (a Bot conversation).
+    /// Live mode (hands-free voice) at the top: the only way in from a conversation (round 7).
     var handsFree: (() -> Void)? = nil
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var choosingPhotos = false
@@ -62,7 +62,7 @@ struct AttachmentMenu: View {
         Menu {
             if let handsFree {
                 Section {
-                    Button(action: handsFree) { Label("Talk hands-free", systemImage: "waveform") }
+                    Button(action: handsFree) { Label("Live mode", systemImage: "waveform") }
                         .accessibilityIdentifier("composerHandsFree")
                 }
             }

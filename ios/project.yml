@@ -37,8 +37,6 @@ targets:
         buildPhase: resources
       - path: Shared
       - path: LiveActivity
-      # Attention Router push buttons, shared with the notification extension.
-      - path: NotificationService/LoopCategories.swift
       # The widgets' views, for `-qaStateDemo widgets` screenshots of them.
       - path: Widgets/StatusWidget.swift
       - path: Widgets/BotWidget.swift

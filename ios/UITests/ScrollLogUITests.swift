@@ -24,7 +24,9 @@ final class ScrollLogUITests: ServerIsolatedUITestCase {
         if (toggle.value as? String) != "1" { toggle.switches.firstMatch.tap() }
         XCTAssertEqual(toggle.value as? String, "1")
 
+        // Home, then Main from it: its chat is what scrolls.
         command("tab?bot")
+        XCTAssertTrue(app.waitForRoom(timeout: 15), "Main opens")
         for _ in 0..<2 { app.swipeDown() }
         app.swipeUp()
         command("tab?settings")

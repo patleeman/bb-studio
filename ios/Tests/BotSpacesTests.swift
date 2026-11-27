@@ -137,7 +137,6 @@ final class BotSpacesTests: XCTestCase {
         XCTAssertNil(bea.presence)
         XCTAssertEqual(bea.activity, BotSpace.Activity(turn: false, workers: 0))
         XCTAssertEqual(bea.presenceState(), .needs)
-        XCTAssertTrue(spaces.anyNeedsYou)
     }
 
     func testSignalFromOtherChannelsOrWithoutBotIsIgnored() {

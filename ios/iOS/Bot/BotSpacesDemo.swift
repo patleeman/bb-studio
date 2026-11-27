@@ -12,14 +12,9 @@ enum BotSpacesDemo {
 
     static let sideThreadId = "thr_demo_side_m3"
 
-    /// `-qaStrandsDemo`: Studio answers `strands.*`, and the Bot's view nests more workers (a worker's worker, runners under Main).
+    /// `-qaStrandsDemo`: Studio answers `strands.tags` (the footer's strand tag), and the Bot's view nests more workers (a worker's worker, runners under Main).
     static var strands: Bool { ProcessInfo.processInfo.arguments.contains("-qaStrandsDemo") }
 
-    /// `-qaReplyAskDemo` (with `-qaStrandsDemo`): Main's newest reply needs the user (`strands.tags` replies),
-    /// and a strand waits on it first, with Show.
-    static var replyAsk: Bool { ProcessInfo.processInfo.arguments.contains("-qaReplyAskDemo") }
-    /// The reply's message in the demo Main (m5, after the quiet [PASS] check).
-    static let replyAskSeq = 7
 
     /// `-qaRouterDemo`: Studio answers the model router's notice for Main (a usage limit with Hand off).
     static var router: Bool { ProcessInfo.processInfo.arguments.contains("-qaRouterDemo") }
@@ -79,7 +74,7 @@ enum BotSpacesDemo {
 
     static func themed(_ json: String, chosen: String? = nil) -> String {
         let arguments = ProcessInfo.processInfo.arguments
-        let given = arguments.firstIndex(of: "-qaRoomTheme").flatMap { arguments.indices.contains($0 + 1) && arguments[$0 + 1] != "none" ? arguments[$0 + 1] : nil }
+        let given = arguments.firstIndex(of: "-qaBotTheme").flatMap { arguments.indices.contains($0 + 1) && arguments[$0 + 1] != "none" ? arguments[$0 + 1] : nil }
         guard let theme = chosen ?? given else { return json }
         return json.replacingOccurrences(of: #""id":"bot_juniper","#, with: #""id":"bot_juniper","appearance":{"themeId":"\#(theme)"},"#)
     }
@@ -102,7 +97,7 @@ enum BotSpacesDemo {
         }
 
         static func page(_ path: String) -> String? {
-            if path.contains("/rpc/memory.") { return "memory" }
+            if MemoryDemo.methods.contains(where: { path.hasSuffix("/rpc/\($0)") }) { return "memory" }
             if path.hasSuffix("/rpc/bot_library") { return "library" }
             if path.hasSuffix("/rpc/bot_threads_older") { return "archive" }
             return nil
@@ -212,7 +207,15 @@ enum BotSpacesDemo {
             ])
             conversations["bot_juniper", default: []].append(
                 Conversation(id: "thr_demo_lisbon", title: "Lisbon trip planning", at: now - 172_800_000, latest: "Booked the Alfama flat"))
-            finishedAt["thr_demo_lisbon"] = (now - 86_400_000, "Booked the Alfama flat for 14–18 Nov and the 09:40 flight. Saved the plan to memory.")
+            finishedAt["thr_demo_lisbon"] = (now - 86_400_000, """
+                **Decisions**
+                - Booked the Alfama flat for 14–18 Nov.
+                - Took the 09:40 flight out.
+                **Left open**
+                - Dinner on the last night.
+                **Made**
+                - The Lisbon itinerary page.
+                """)
             threads["thr_demo_lisbon"] = Thread(title: "Lisbon trip planning", rows: [
                 Self.row("lis-u1", "user", "Plan the Lisbon trip.", now - 180_000_000, seq: 1),
                 Self.row("lis-a1", "assistant", "Booked the Alfama flat for 14–18 Nov.", now - 172_800_000, seq: 2),
@@ -331,7 +334,6 @@ enum BotSpacesDemo {
         }
 
         private var chosenTheme: String?
-        private var strandsResolved = false
         /// Juniper's state for Pause, Resume and Stop (`-qaSpacesDemo`).
         private var juniperState = "active"
         private var routerHandedOff = false
@@ -347,96 +349,9 @@ enum BotSpacesDemo {
             ]
             let names: [[String: Any]] = [["id": "str_lisbon", "title": "Lisbon trip"], ["id": "str_fork", "title": "Studio-native BB fork"],
                                           ["id": "str_stills", "title": "Theme stills"]]
-            let replies: [[String: Any]] = BotSpacesDemo.replyAsk
-                ? [["turnId": "t1", "seq": 1, "tag": "status", "ask": NSNull(), "resolved": false],
-                   ["turnId": "t3", "seq": BotSpacesDemo.replyAskSeq, "tag": "needs-you", "ask": "Want me to draft the approval note?", "resolved": false]]
-                : []
-            return ["tags": tags, "strands": names, "replies": replies]
+            return ["tags": tags, "strands": names]
         }
 
-        /// `strands.list` for the demo's Main and Launch prep: two asks, two running strands with workers, a finished one, a quiet one.
-        static func strandsJSON(_ threadId: String, now: Double, resolved: Bool) -> [String: Any] {
-            func strand(_ id: String, _ title: String, _ summary: String, _ state: String, seq: Double, asks: [[String: Any]] = [], workers: [[String: Any]] = []) -> [String: Any] {
-                let lastAt: Double = now - (100 - seq) * 60_000
-                var out: [String: Any] = ["id": id, "title": title, "summary": summary, "named": true, "state": state, "detail": NSNull()]
-                out["asks"] = asks
-                out["workers"] = workers
-                out["lastAt"] = lastAt
-                out["latestSeq"] = seq
-                out["messages"] = 3
-                out["pinned"] = false
-                out["origin"] = "jev"
-                return out
-            }
-            func worker(_ id: String, _ title: String, _ status: String, endedAgo: Double? = nil) -> [String: Any] {
-                let ended: Any = endedAgo.map { now - $0 } ?? NSNull()
-                return ["threadId": id, "title": title, "status": status, "endedAt": ended]
-            }
-            var strands: [[String: Any]]
-            if threadId == "thr_demo_interview" {
-                strands = [strand("str_notes", "Release notes", "Short changelog or the full list?", "needs-you", seq: 9,
-                                  asks: [["id": "ask_notes", "kind": "question", "threadId": threadId, "label": "Short changelog or the full list?", "details": [Any](), "turnId": NSNull(), "decisions": [Any]()]]),
-                           strand("str_bank", "Question bank", "The worker stopped on a fixture", "active", seq: 6, workers: [worker("thr_demo_w3", "Mock question bank", "failed", endedAgo: 3_600_000)])]
-            } else {
-                var push = strand("str_fork", "Studio-native BB fork", "Wants to push the branch", "needs-you", seq: 40,
-                                  asks: [["id": "ask_demo_push", "kind": "approval", "threadId": "thr_demo_w1", "label": "Push to origin",
-                                          "details": ["git push origin bb-studio-native", "in ~/workingdir/bb-studio-native"], "turnId": NSNull(),
-                                          "decisions": ["allow_once", "allow_for_session", "deny"]]],
-                                  workers: [worker("thr_demo_w1", "Studio-native BB fork", "needs-you")])
-                if resolved {
-                    push["state"] = "running"
-                    push["asks"] = [Any]()
-                    push["workers"] = [worker("thr_demo_w1", "Studio-native BB fork", "running")]
-                }
-                strands = [
-                    push,
-                    strand("str_gateway", "Calendar access", "A tool wants your calendar", "needs-you", seq: 38,
-                           asks: [["id": "ask_gw", "kind": "gateway", "threadId": threadId, "label": "Google Calendar: read events", "details": [Any](), "turnId": NSNull(), "decisions": [Any]()]]),
-                    strand("str_stills", "Theme stills", "Rendering the release page stills", "running", seq: 44,
-                           workers: [worker("thr_demo_w2", "Theme stills renderer", "running"), worker("thr_demo_w5", "Crop stills", "done", endedAgo: 300_000)]),
-                    strand("str_disk", "Disk space", "Finding what else is big", "running", seq: 42, workers: [worker("thr_demo_w6", "Disk scan", "running")]),
-                    strand("str_lisbon", "Lisbon trip", "Passport is in the bag", "done-unseen", seq: 36),
-                    strand("str_notes", "Release notes", "Shipped yesterday", "quiet", seq: 12, workers: [worker("thr_demo_w4", "Release notes", "done", endedAgo: 86_400_000)]),
-                ]
-                if BotSpacesDemo.replyAsk {
-                    strands.insert(strand("str_budget", "Lisbon offsite budget", "Wants your sign-off by 3pm", "needs-you", seq: 46,
-                                          asks: [["id": "ask_reply_budget", "kind": "reply", "threadId": threadId, "label": "Want me to draft the approval note?",
-                                                  "details": [Any](), "turnId": "t3", "decisions": [Any](), "seq": BotSpacesDemo.replyAskSeq]]), at: 0)
-                }
-            }
-            let stray: [Any] = threadId == "thr_demo_interview" ? [] : [worker("thr_demo_w9", "Flaky fixture hunt", "failed", endedAgo: 3_600_000)]
-            let backfill: [String: Any] = ["done": true, "at": now, "messages": 40, "sorted": 40]
-            var out: [String: Any] = ["threadId": threadId, "enabled": true, "backfill": backfill, "jevCallsToday": 3, "jevDailyCap": 200]
-            out["sortingTurn"] = false
-            out["strands"] = strands
-            out["earlier"] = [Any]()
-            out["strayWorkers"] = stray
-            return out
-        }
-        /// `strands.overview` for Juniper: Launch prep's question, Main's asks and running strands, and Budget sign-off gone quiet.
-        static func strandsOverviewJSON(_ botId: String, now: Double, resolved: Bool) -> [String: Any] {
-            guard botId == "bot_juniper" else { return ["conversations": [Any](), "needs": 0, "running": 0] }
-            func strands(_ threadId: String) -> [[String: Any]] { strandsJSON(threadId, now: now, resolved: resolved)["strands"] as? [[String: Any]] ?? [] }
-            let budget: [String: Any] = ["id": "str_budget", "title": "Q4 budget", "summary": "Sent Dana the numbers", "named": true, "state": "quiet",
-                                         "detail": NSNull(), "asks": [Any](), "workers": [Any](), "lastAt": now - 900_000, "latestSeq": 3, "messages": 3,
-                                         "pinned": false, "origin": "jev"]
-            var conversations: [[String: Any]] = [
-                ["threadId": "thr_demo_interview", "title": "Launch prep", "isMain": false, "lastActiveAt": now - 7_200_000, "strands": strands("thr_demo_interview")],
-                ["threadId": BotDemo.threadId, "title": "Main", "isMain": true, "lastActiveAt": now - 30_000, "strands": strands(BotDemo.threadId)],
-                ["threadId": "thr_demo_thread", "title": "Budget sign-off", "isMain": false, "lastActiveAt": now - 900_000, "strands": [budget]],
-            ]
-            func count(_ row: [String: Any], _ state: String) -> Int { (row["strands"] as? [[String: Any]] ?? []).filter { $0["state"] as? String == state }.count }
-            // As Studio sorts them: needs you first, then Main, then the most recently active.
-            conversations.sort { a, b in
-                let (na, nb) = (count(a, "needs-you") > 0, count(b, "needs-you") > 0)
-                if na != nb { return na }
-                let (ma, mb) = (a["isMain"] as? Bool ?? false, b["isMain"] as? Bool ?? false)
-                if ma != mb { return ma }
-                return (a["lastActiveAt"] as? Double ?? 0) > (b["lastActiveAt"] as? Double ?? 0)
-            }
-            return ["conversations": conversations, "needs": conversations.reduce(0) { $0 + count($1, "needs-you") },
-                    "running": conversations.reduce(0) { $0 + count($1, "running") }]
-        }
 
         private(set) var appearanceCalls: [[String: Any]] = []
 
@@ -645,27 +560,20 @@ enum BotSpacesDemo {
                 ]
                 let requests: [[String: Any]] = [["id": "gwr_1", "label": "Google Calendar: read events", "why": "To find a free slot for the furnace tune-up", "createdAt": Self.now - 300_000]]
                 return ok(["servers": servers, "requests": requests])
+            case Studio.Method.pages_create:
+                // `-qaPageDemo`: a new page is the demo page (Library's + New page).
+                guard ProcessInfo.processInfo.arguments.contains("-qaPageDemo") else { return nil }
+                return ok(["page": ["id": PageDemo.id, "title": "Untitled", "icon": "", "position": 0, "createdAt": Self.now, "archived": false] as [String: Any]])
             case "bot_pause", "bot_resume", "bot_stop":
                 lock.withLock { juniperState = name == "bot_resume" ? "active" : name == "bot_pause" ? "paused" : "stopped" }
                 return ok(["id": "bot_juniper", "name": "Juniper", "state": lock.withLock { juniperState }])
             case "bot_make_main", "bot_new_main":
                 lock.withLock { mainMadeFrom = threadId.isEmpty ? "new" : threadId }
                 return ok(["id": "bot_juniper", "name": "Juniper"])
-            case "strands.list":
+            case "strands.tags":
                 guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
-                return ok(Self.strandsJSON(threadId, now: Self.now, resolved: lock.withLock { strandsResolved }))
-            case "strands.overview":
-                guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
-                return ok(Self.strandsOverviewJSON(input["botId"] as? String ?? "", now: Self.now, resolved: lock.withLock { strandsResolved }))
-            case "strands.opened", "strands.tags":
-                guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
-                let answer: [String: Any] = name == "strands.tags" ? Self.strandTagsJSON(threadId) : ["ok": true]
-                return ok(answer)
+                return ok(Self.strandTagsJSON(threadId))
             case "bot_worker_approval_resolve":
-                if (input["interactionId"] as? String) == "ask_demo_push" {
-                    lock.withLock { strandsResolved = true }
-                    return ok(["approval": ["id": "ask_demo_push", "state": "approved", "decisions": ["allow_once"]]])
-                }
                 let decision = input["decision"] as? String ?? ""
                 return lock.withLock {
                     guard approvalPending, threadId == "thr_demo_w1", input["interactionId"] as? String == Self.approvalId else {
@@ -682,26 +590,6 @@ enum BotSpacesDemo {
                     }
                     return ok(["approval": approvalView(decision == "deny" ? "denied" : "approved")])
                 }
-            // Studio retired memory records: its memory RPC (src/memory/register.ts) answers from the Bot's always-on skill,
-            // lists no records and refuses writes. The demo answers the same way.
-            case "memory.overview":
-                return ok([
-                    "bot": ["id": "bot_juniper", "name": "Juniper"],
-                    "profile": ["pageId": "", "title": "Always on", "updatedAt": Self.now - 3_600_000,
-                                "chars": Self.profile.count, "cap": 2000, "over": false],
-                    "split": ["state": "none", "legacyPageId": NSNull(), "legacyTitle": NSNull(), "splitAt": NSNull()],
-                    "counts": ["current": 0, "replaced": 0, "archived": 0],
-                    "topics": [] as [Any],
-                ] as [String: Any])
-            case "memory.profile":
-                return ok(["profile": ["pageId": "", "title": "Always on", "updatedAt": Self.now - 3_600_000,
-                                       "chars": Self.profile.count, "cap": 2000, "over": false, "markdown": Self.profile] as [String: Any]])
-            case "memory.list":
-                return ok(["records": [] as [Any], "total": 0])
-            case "memory.get":
-                return ok(["record": NSNull()])
-            case "memory.add", "memory.update", "memory.archive":
-                return (400, Data(#"{"ok":false,"error":{"message":"Memory records are retired. Standing rules go in the Bot's always-on skill (Memory → Core), procedures in a skill, and what happened stays in the conversation history."}}"#.utf8))
             case "bot_library":
                 return ok(["botId": "bot_juniper", "items": libraryJSON()])
             case "bot_threads_older":
@@ -750,9 +638,6 @@ enum BotSpacesDemo {
                         if BurstDemo.enabled, id == BurstDemo.threadId { return ok(["found": true, "title": "Busy thread", "spec": NSNull()]) }
                         let title = threads[id]?.title ?? conversations.values.flatMap { $0 }.first { $0.id == id }?.title
                         return ok(["found": title != nil, "title": title ?? NSNull(), "spec": NSNull()])
-                    case "record":
-                        // Memory records are retired: none resolves.
-                        return ok(["found": false, "title": NSNull(), "spec": NSNull()])
                     default:
                         return ok(["found": true, "title": NSNull(), "spec": NSNull()])
                     }
@@ -760,6 +645,8 @@ enum BotSpacesDemo {
             case "designs.getDesign" where DesignDemo.on:
                 let design: Any = input["id"] as? String == DesignDemo.id ? DesignDemo.design() : NSNull()
                 return ok(["design": design])
+            case let method where DesignDemo.on && method.hasPrefix("designs."):
+                return DesignDemo.rpc(method, input).map(ok)
             case "bot_get":
                 // Home's default is Auto (the model router); Research names none, so it starts on the project's defaults.
                 switch input["botId"] as? String {
@@ -767,8 +654,20 @@ enum BotSpacesDemo {
                 case "bot_research": return ok(["bot": ["defaultModel": NSNull()]])
                 default: return ok(["bot": ["defaultModel": ["providerId": "claude-code", "model": "claude-opus-5-5", "reasoningLevel": "high"]]])
                 }
+            case _ where MemoryDemo.methods.contains(name):
+                return MemoryDemo.shared.respond(name, input, history: lock.withLock { memoryHistory() })
             default:
                 return nil
+            }
+        }
+
+        /// The Bot's conversations as Memory's History lists them; under the lock.
+        private func memoryHistory() -> [MemoryDemo.Conversation] {
+            (conversations["bot_juniper"] ?? []).filter { !gone.contains($0.id) }.map { conversation in
+                let done = finished.contains(conversation.id) ? finishedAt[conversation.id] : nil
+                let text = (threads[conversation.id]?.rows ?? []).compactMap { $0["text"] as? String }
+                return MemoryDemo.Conversation(id: conversation.id, title: conversation.title, main: conversation.main, at: conversation.at,
+                                               latest: conversation.latest, archivedAt: done?.at, summary: done?.summary, messages: text)
             }
         }
 
@@ -842,14 +741,6 @@ enum BotSpacesDemo {
                 return Thread(title: worker.title, rows: rows)
             }
         }
-
-        static let profile = """
-            ## Preferences
-            - Short answers first, then detail on request.
-            - Ask before pushing or sending anything outside.
-            ## Check-in
-            - Anything waiting on me?
-            """
 
         private func libraryJSON() -> [[String: Any]] {
             let now = Self.now

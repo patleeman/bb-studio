@@ -23,15 +23,15 @@ final class BotTests: XCTestCase {
     }
 
     func testSkillLearningDecodesAndSaysTheLastReview() async throws {
-        let learning = #"{"ok":true,"result":{"enabled":true,"interval":10,"reviewModel":null,"defaultModel":"haiku","models":[],"consolidate":false,"toolTurns":3,"userTurns":1,"reviewing":false,"lastReview":{"at":1000,"result":"Saved 1 skill"},"lastCurator":null}}"#
-        let skills = #"{"ok":true,"result":{"skills":[{"name":"deploy","description":"d","updatedAt":1,"state":"stale","pinned":true,"usedAt":1},{"name":"old","description":"d","updatedAt":1}]}}"#
+        let learning = #"{"ok":true,"result":{"enabled":true,"reviewModel":null,"defaultModel":null,"models":[],"consolidate":false,"cadence":"daily-and-archive","reviewing":false,"queued":0,"lastSweepAt":null,"lastReview":{"at":1000,"result":"Saved 1 skill"},"lastCurator":null}}"#
+        let skills = #"{"ok":true,"result":{"skills":[{"name":"deploy","description":"d","updatedAt":1,"state":"stale","pinned":true,"usedAt":1},{"name":"old","description":"d","updatedAt":1},{"name":"core-profile","description":"d","updatedAt":1,"alwaysOn":true}]}}"#
         let c = client(a, ["bot_learning": (200, learning), "bot_skills": (200, skills)])
-        let result = try await c.botLearning()
-        XCTAssertTrue(result.status(now: Date(timeIntervalSince1970: 3601))?.hasPrefix("Saved 1 skill · ") ?? false)
-        let list = try await c.botSkills()
-        XCTAssertEqual(list.map(\.state), ["stale", nil])
-        XCTAssertEqual(list.first?.pinned, true)
-        XCTAssertFalse(list[1].isArchived)
+        let result = try await c.memoryLearning(botId: nil)
+        XCTAssertTrue(result.status(now: Date(timeIntervalSince1970: 3601)).hasPrefix("Saved 1 skill, "))
+        let list = try await c.memorySkills(botId: nil)
+        XCTAssertEqual(list.map(\.state), ["stale", nil, nil])
+        XCTAssertEqual(list.filter(\.listed).map(\.name), ["deploy", "old"], "always-on skills are Core's")
+        XCTAssertTrue(list[0].stale)
     }
 
     func testBotIsRememberedPerServerWithNameAndAvatar() async throws {
@@ -229,7 +229,7 @@ final class BotTests: XCTestCase {
             "bot_activity": (200, #"{"ok":true,"result":{"attention":null,"inProgress":[],"scheduled":[],"completed":[]}}"#),
             "bot_attention": (200, #"{"ok":true,"result":{"attention":{"reason":"2 things for you","count":2,"since":1}}}"#),
             "bot_chain": (200, #"{"ok":true,"result":{"threadIds":["thr_2"]}}"#),
-            "bot_memory": (200, #"{"ok":true,"result":{"pageId":"pg_1"}}"#),
+            "bot_core": (200, #"{"ok":true,"result":{"skills":[],"chars":0,"cap":2000,"over":false}}"#),
             "bot_skills": (200, #"{"ok":true,"result":{"skills":[]}}"#),
             "bot_runners": (200, #"{"ok":true,"result":{"runners":[{"id":"r1","name":"Sweep","state":"paused","schedule":{"cadence":"weekdays","time":"09:00"},"lastReport":"ok"}]}}"#),
             "bot_runner_resume": (200, #"{"ok":true,"result":{"id":"r1"}}"#),
@@ -246,8 +246,8 @@ final class BotTests: XCTestCase {
         XCTAssertEqual(attention?.reason, "2 things for you")
         XCTAssertEqual(attention?.count, 2)
         _ = try await client.botChain(botId: "bot_2")
-        _ = try await client.botMemoryPageId(botId: "bot_2")
-        _ = try await client.botSkills(botId: "bot_2")
+        _ = try await client.memoryCore(botId: "bot_2")
+        _ = try await client.memorySkills(botId: "bot_2")
         let runners = try await client.botRunners(botId: "bot_2")
         try await client.setRunnerPaused("r1", paused: false, botId: "bot_2")
         try await client.runRunnerNow("r1", botId: "bot_2")

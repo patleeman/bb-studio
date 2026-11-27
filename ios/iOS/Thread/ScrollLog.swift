@@ -51,7 +51,7 @@ enum ScrollLog {
     }
 
     /// Keyboard and scene events, for a composer held up with no keyboard
-    /// (Patrick, Oct 26, beside Safari in the Duo's split view): each
+    /// (a user, Oct 26, beside Safari in the Duo's split view): each
     /// keyboard's end frame, whether it is this app's, how much of it is over
     /// this window, and the scene's activation. A geometry line's
     /// `insetBottom` then shows whether the transcript kept that inset.

@@ -93,7 +93,6 @@ public struct BotSpaces: Codable, Hashable, Sendable {
         bots.first { $0.id == currentBotId } ?? bots.first(where: \.primary) ?? bots.first
     }
 
-    public var anyNeedsYou: Bool { bots.contains(where: \.needsYou) }
 }
 
 public struct BotConversation: Codable, Hashable, Sendable, Identifiable {

@@ -39,9 +39,9 @@ final class PushRegistrationTests: XCTestCase {
     }
 
     func testDeviceLabelCarriesVersionAndBuild() {
-        XCTAssertEqual(PushRegistration.label(device: "Patrick's Duo",
+        XCTAssertEqual(PushRegistration.label(device: "My Duo",
             info: ["CFBundleShortVersionString": "1.4", "CFBundleVersion": "20261025.0214"]),
-            "BB Studio 1.4 (20261025.0214) · Patrick's Duo")
+            "BB Studio 1.4 (20261025.0214) · My Duo")
         XCTAssertEqual(PushRegistration.label(device: "iPhone", info: nil), "BB Studio · iPhone")
     }
 

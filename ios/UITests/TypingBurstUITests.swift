@@ -14,10 +14,11 @@ final class TypingBurstUITests: ServerIsolatedUITestCase {
 
     private var composer: XCUIElement { app.textViews["Message"] }
 
-    /// The thread's title: in its navigation bar, or the folded Duo's title over the messages.
+    /// The thread's title: in its bar, or the Duo's title line over the messages.
     private func threadOpens() -> Bool {
-        let folded = app.staticTexts.matching(NSPredicate(format: "identifier == 'foldedChatTitle' AND label BEGINSWITH 'Busy thread'")).firstMatch
-        let opened = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in self.app.navigationBars["Busy thread"].exists || folded.exists }, object: nil)
+        let title = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@ AND label BEGINSWITH 'Busy thread'",
+                                                                         ["conversationTitle", "shellTitle"])).firstMatch
+        let opened = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in self.app.navigationBars["Busy thread"].exists || title.exists }, object: nil)
         return XCTWaiter.wait(for: [opened], timeout: 30) == .completed
     }
 

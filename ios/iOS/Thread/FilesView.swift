@@ -263,7 +263,8 @@ private struct ChangeDiffView: View {
 /// One file: images shown, Markdown rendered or raw, anything else as text.
 struct WorkspaceFileView: View {
     @EnvironmentObject private var app: AppModel
-    let environmentId: String
+    /// Nil for a file on the conversation's host, read by its absolute path.
+    let environmentId: String?
     let path: String
     /// Lets a path outside the workspace, like `/tmp/shot.png`, open from the host.
     var threadId: String?
@@ -274,36 +275,64 @@ struct WorkspaceFileView: View {
     /// Past this the text view gets slow; the rest is left out.
     private static let maxCharacters = 200_000
 
+    @Environment(\.inWorkbench) private var inWorkbench
+
     var body: some View {
+        if inWorkbench {
+            // A Workbench tab: no title of its own; the shell's bar shows its actions.
+            loaded.screenActions(tabActions)
+        } else {
+            loaded
+                .navigationTitle(URL(fileURLWithPath: path).lastPathComponent)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { toolbarActions }
+        }
+    }
+
+    private var canToggleSource: Bool { isMarkdown && file?.text != nil }
+
+    @ViewBuilder private var toolbarActions: some View {
+        if canToggleSource {
+            Button { raw.toggle() } label: {
+                Image(systemName: raw ? "doc.richtext" : "chevron.left.forwardslash.chevron.right")
+            }
+            .accessibilityLabel(raw ? "Show rendered" : "Show source")
+        }
+        if let text = file?.text { ShareLink(item: text) }
+    }
+
+    private var tabActions: [ScreenAction] {
+        var actions: [ScreenAction] = []
+        if canToggleSource {
+            actions.append(ScreenAction(id: "source", title: raw ? "Show Rendered" : "Show Source",
+                                              systemImage: raw ? "doc.richtext" : "chevron.left.forwardslash.chevron.right",
+                                              run: { raw.toggle() }))
+        }
+        if let text = file?.text {
+            actions.append(ScreenAction(id: "copy", title: "Copy", systemImage: "doc.on.doc", run: { UIPasteboard.general.string = text }))
+        }
+        return actions
+    }
+
+    private var loaded: some View {
         Group {
             if let file {
                 content(file)
             } else if let error {
                 ContentUnavailableView("Couldn't open the file", systemImage: "exclamationmark.triangle", description: Text(error))
             } else {
-                ProgressView()
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationTitle(URL(fileURLWithPath: path).lastPathComponent)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if isMarkdown, file?.text != nil {
-                Button { raw.toggle() } label: {
-                    Image(systemName: raw ? "doc.richtext" : "chevron.left.forwardslash.chevron.right")
-                }
-                .accessibilityLabel(raw ? "Show rendered" : "Show source")
-            }
-            if let text = file?.text {
-                ShareLink(item: text)
-            }
-        }
-        .task {
+        .task(id: path) {
             do {
                 let path = await relativePath()
                 if path.hasPrefix("/"), let threadId {
                     file = try await app.client.hostFile(threadId: threadId, path: path)
-                } else {
+                } else if let environmentId {
                     file = try await app.client.workspaceFile(environmentId, path: path)
+                } else {
+                    error = "This conversation has no workspace to read the file from."
                 }
             } catch {
                 self.error = BBClient.describe(error, server: app.client.baseURL)
@@ -314,7 +343,7 @@ struct WorkspaceFileView: View {
     /// Absolute paths inside the workspace become relative; the server reads
     /// every path from the workspace root. Paths outside it stay absolute.
     private func relativePath() async -> String {
-        guard path.hasPrefix("/"), let root = try? await app.client.environmentRoot(environmentId) else { return path }
+        guard path.hasPrefix("/"), let environmentId, let root = try? await app.client.environmentRoot(environmentId) else { return path }
         let prefix = root.hasSuffix("/") ? root : root + "/"
         return path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : path
     }
@@ -352,12 +381,11 @@ struct WorkspaceFileView: View {
     @ViewBuilder
     private func content(_ file: WorkspaceFile) -> some View {
         if file.mimeType?.hasPrefix("image/") == true, let data = file.data, let image = UIImage(data: data) {
-            // Fit the screen, never wider than the image itself.
-            ScrollView {
+            // Fit the screen; pinch or double-tap to zoom, drag to pan.
+            Zoomable {
                 Image(uiImage: image).resizable().scaledToFit()
-                    .frame(maxWidth: min(image.size.width, 800))
                     .padding()
-                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel(URL(fileURLWithPath: path).lastPathComponent)
             }
         } else if let text = file.text {
             let shown = String(text.prefix(Self.maxCharacters))

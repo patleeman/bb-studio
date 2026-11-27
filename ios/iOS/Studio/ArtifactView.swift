@@ -104,11 +104,7 @@ struct ArtifactView: View {
             }
         }
         .animation(.snappy, value: notice)
-        .modifier(RegularScrollingSurface())
-        .navigationTitle(artifact?.displayTitle ?? "App")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar { toolbar }
-        .toolbar { Button { showingRelated = true } label: { Label("Related", systemImage: "link") } }
+        .screenToolbar(artifact?.displayTitle ?? "App", actions: artifact.map(actions) ?? [])
         .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "artifacts", itemId: id) }
         .studioChat(
             isPresented: $chatting, pluginId: "artifacts", itemId: id, title: artifact?.displayTitle ?? "Artifact",
@@ -256,72 +252,56 @@ struct ArtifactView: View {
         return parts.joined(separator: " · ")
     }
 
-    // MARK: Toolbar
+    // MARK: Actions
 
-    @ToolbarContentBuilder
-    private var toolbar: some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarTrailing) {
-            if version?.type == "markdown", textVersion == version?.id, text != nil {
-                Button { source.toggle() } label: {
-                    Image(systemName: source ? "doc.richtext" : "chevron.left.forwardslash.chevron.right")
-                }
-                .accessibilityLabel(source ? "Show rendered" : "Show source")
-            }
-            if working {
-                ProgressView()
-            } else if artifact != nil {
-                Button { Task { await share() } } label: { Image(systemName: "square.and.arrow.up") }
-                    .accessibilityLabel("Share")
-            }
-            if let artifact { menu(artifact) }
+    /// Share and the source toggle first; the rest under ⋯ (the Duo: the rail and its More).
+    private func actions(_ artifact: Artifact) -> [ScreenAction] {
+        var list = [ScreenAction(id: "share", title: "Share", systemImage: "square.and.arrow.up", disabled: working,
+                                 run: { Task { await share() } })]
+        if version?.type == "markdown", textVersion == version?.id, text != nil {
+            list.append(ScreenAction(id: "source", title: source ? "Show Rendered" : "Show Source",
+                                     systemImage: source ? "doc.richtext" : "chevron.left.forwardslash.chevron.right", run: { source.toggle() }))
         }
-    }
-
-    private func menu(_ artifact: Artifact) -> some View {
-        Menu {
-            Button {
-                operation.complete(on: app) { app.open(.compose("[\(artifact.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(artifact.href)) ")) }
-            } label: { Label("New Thread with This", systemImage: "square.and.pencil") }
-            StudioChatMenuButton(isPresented: $chatting)
-            if let text, version?.isText == true, textVersion == version?.id {
-                Button {
-                    UIPasteboard.general.string = text
-                    flash("Copied")
-                } label: { Label("Copy Text", systemImage: "doc.on.doc") }
-            }
-            if versions.count > 1 {
-                Picker(selection: Binding(get: { version?.id ?? "" }, set: { versionId = $0 == artifact.version.id ? nil : $0 })) {
-                    ForEach(versions) { version in
-                        Text("v\(version.number) · \(Date(timeIntervalSince1970: version.createdAt / 1000).formatted(.relative(presentation: .named)))")
-                            .tag(version.id)
-                    }
-                } label: { Label("Versions", systemImage: "clock.arrow.circlepath") }
-                .pickerStyle(.menu)
-            }
-            if let thread = artifact.sourceThreadId {
-                Button { operation.complete(on: app) { app.push(.thread(id: thread)) } } label: { Label("Open Source Thread", systemImage: Symbols.thread) }
-            }
-            if ["markdown", "text"].contains(artifact.version.type) {
-                Button { Task { await saveAsPage() } } label: { Label("Save as Page", systemImage: "doc.badge.plus") }
-            }
-            Section {
-                Button {
-                    newTitle = artifact.title
-                    renaming = true
-                } label: { Label("Rename", systemImage: "pencil") }
-                Menu {
-                    ForEach(projectChoices, id: \.id) { choice in
-                        Button { Task { await move(choice.id) } } label: {
-                            if choice.id == artifact.projectId { Label(choice.name, systemImage: "checkmark") } else { Text(choice.name) }
-                        }
-                    }
-                } label: { Label("Move to Project", systemImage: "folder") }
-                Button(role: .destructive) { confirmingDelete = true } label: { Label("Delete", systemImage: "trash") }
-            }
-        } label: {
-            Image(systemName: "ellipsis.circle")
+        let label = artifact.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: "")
+        list.append(ScreenAction(id: "newThread", title: "New Thread with This", systemImage: "square.and.pencil", run: {
+            operation.complete(on: app) { app.open(.compose("[\(label)](\(artifact.href)) ")) }
+        }))
+        if StudioStore.shared.plugins.contains("studio") {
+            list.append(ScreenAction(id: "chat", title: "Chat About This", systemImage: "bubble.left.and.text.bubble.right", run: { chatting = true }))
         }
-        .accessibilityLabel("More")
+        list.append(ScreenAction(id: "related", title: "Related", systemImage: "link", run: { showingRelated = true }))
+        if let text, version?.isText == true, textVersion == version?.id {
+            list.append(ScreenAction(id: "copy", title: "Copy Text", systemImage: "doc.on.doc", run: {
+                UIPasteboard.general.string = text
+                flash("Copied")
+            }))
+        }
+        if versions.count > 1 {
+            list.append(ScreenAction(id: "versions", title: "Versions", systemImage: "clock.arrow.circlepath", children: versions.map { choice in
+                ScreenAction(id: "version-\(choice.id)",
+                             title: "v\(choice.number) · \(Date(timeIntervalSince1970: choice.createdAt / 1000).formatted(.relative(presentation: .named)))",
+                             systemImage: "clock", checked: choice.id == version?.id,
+                             run: { versionId = choice.id == self.artifact?.version.id ? nil : choice.id })
+            }))
+        }
+        if let thread = artifact.sourceThreadId {
+            list.append(ScreenAction(id: "sourceThread", title: "Open Source Thread", systemImage: Symbols.thread, run: {
+                operation.complete(on: app) { app.push(.thread(id: thread)) }
+            }))
+        }
+        if ["markdown", "text"].contains(artifact.version.type) {
+            list.append(ScreenAction(id: "saveAsPage", title: "Save as Page", systemImage: "doc.badge.plus", run: { Task { await saveAsPage() } }))
+        }
+        list.append(ScreenAction(id: "rename", title: "Rename", systemImage: "pencil", run: {
+            newTitle = self.artifact?.title ?? ""
+            renaming = true
+        }))
+        list.append(ScreenAction(id: "move", title: "Move to Project", systemImage: "folder", children: projectChoices.map { choice in
+            ScreenAction(id: "project-\(choice.id ?? "none")", title: choice.name, systemImage: "folder", checked: choice.id == artifact.projectId,
+                         run: { Task { await move(choice.id) } })
+        }))
+        list.append(ScreenAction(id: "delete", title: "Delete", systemImage: "trash", role: .destructive, run: { confirmingDelete = true }))
+        return list
     }
 
     private var projectChoices: [(id: String?, name: String)] {

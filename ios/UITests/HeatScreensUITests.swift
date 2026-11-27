@@ -20,14 +20,14 @@ final class HeatScreensUITests: ServerIsolatedUITestCase {
     /// `TEST_RUNNER_HEAT_SERVER`: an isolated staged BB instead of the offline demo (home and conversation only).
     private var server: String? { ProcessInfo.processInfo.environment["HEAT_SERVER"] }
 
-    /// As TestFlight opens: the conversation is home.
+    /// As TestFlight opens: on Home (round 7).
     private func launch(_ extra: [String], variant: String = "list") {
         if let server {
-            app.launchArguments = ["-skipPushPrompt", "YES", "-qaConversationHome", "-qaEnergyProbe"] + extra
+            app.launchArguments = ["-skipPushPrompt", "YES", "-qaEnergyProbe"] + extra
             app.launchStaged(server: server)
             return
         }
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", variant, "-qaConversationHome", "-qaEnergyProbe"] + extra
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", variant, "-qaEnergyProbe"] + extra
         app.launchOffline()
     }
 
@@ -60,29 +60,19 @@ final class HeatScreensUITests: ServerIsolatedUITestCase {
 
     func test1Home() {
         launch([])
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 40), "home: Main's conversation")
+        XCTAssertTrue(any("home").waitForExistence(timeout: 40), "Home")
         hold("home")
     }
 
     func test2Conversation() {
-        launch(["-qaRoomConversation", ProcessInfo.processInfo.environment["HEAT_THREAD"] ?? "thr_botdemo01"])
+        launch(["-qaConversation", ProcessInfo.processInfo.environment["HEAT_THREAD"] ?? "thr_botdemo01"])
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 40), "the conversation")
         hold("conversation")
     }
 
-    func test3StrandsBox() {
-        guard server == nil else { return }
-        launch(["-qaRoomConversation", "thr_botdemo01", "-qaStrandsDemo"])
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 40))
-        let toggle = app.buttons["strands-toggle"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 20), "the strands box's toggle")
-        toggle.tap()
-        hold("strands")
-    }
-
     func test4DesignPlayer() {
         guard server == nil else { return }
-        launch(["-qaRoomConversation", "thr_botdemo01", "-qaDesignDemo"])
+        launch(["-qaConversation", "thr_botdemo01", "-qaDesignDemo"])
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 40))
         XCUIDevice.shared.system.open(URL(string: "bbstudio://design/dsn_demo")!)
         let screen = app.buttons["designScreen-1b"]
@@ -94,7 +84,7 @@ final class HeatScreensUITests: ServerIsolatedUITestCase {
 
     func test5PendingApproval() {
         guard server == nil else { return }
-        launch([], variant: "needs")
+        launch(["-qaConversation", "thr_botdemo01"], variant: "needs")
         // No assertion: on a build where a waiting approval hangs the app, nothing ever shows.
         _ = app.textViews["Message"].waitForExistence(timeout: 40)
         hold("approval")

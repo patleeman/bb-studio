@@ -4,14 +4,14 @@ import XCTest
 /// metadata of `ThreadView`'s deeply nested view type overflowed the device's
 /// 1 MB main-thread stack on the first frame. Simulator builds now link with
 /// the same 1 MB (project.yml), so opening a conversation here crashes the
-/// same way if a view type grows that deep again. Offline, with the Bot
-/// conversation as home, plain and with the folded Duo's rail header.
+/// same way if a view type grows that deep again. Offline: a Bot
+/// conversation pushed over Home, and a worker's thread from Home.
 final class LaunchStackUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launchConversation(_ extra: [String] = []) {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaStrandsDemo",
-                               "-qaRoomConversation", "thr_botdemo01"] + extra
+                               "-qaConversation", "thr_botdemo01"] + extra
         app.launchOffline()
     }
 
@@ -24,8 +24,8 @@ final class LaunchStackUITests: ServerIsolatedUITestCase {
     func testOpensAWorkerThreadOnTheDeviceStack() {
         launchConversation()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
-        app.buttons["roomList"].tap()
-        let worker = app.buttons["roomWorker-thr_demo_w2"]
+        app.goHome()
+        let worker = app.buttons["homeWorker-thr_demo_w2"]
         XCTAssertTrue(worker.waitForExistence(timeout: 10))
         worker.tap()
         XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout: 20), "a plain thread's header and actions drew")

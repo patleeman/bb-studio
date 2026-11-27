@@ -21,8 +21,8 @@ final class ServerIsolationTests: XCTestCase {
         await modelA.load(client)
         let modelB = PageModel(pageId: id)
         XCTAssertNil(modelB.markdown)
-        XCTAssertEqual(DiskCache.load(String.self, key: "page-\(id)", serverURL: a), "A confidential page")
-        XCTAssertNil(DiskCache.load(String.self, key: "page-\(id)", serverURL: b))
+        XCTAssertEqual(DiskCache.load(String.self, key: "page-blocks-\(id)", serverURL: a), "A confidential page")
+        XCTAssertNil(DiskCache.load(String.self, key: "page-blocks-\(id)", serverURL: b))
     }
 
     func testMatchingIDsCannotReadAnotherServersCacheOrLegacyCache() {

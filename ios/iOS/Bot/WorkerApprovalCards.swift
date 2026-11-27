@@ -63,6 +63,8 @@ final class ConversationApprovals: ObservableObject {
     }
 }
 
+/// A worker's approval, inline at the end of its conversation's transcript (round 7):
+/// who asks, what, the whole command, and its decisions.
 struct WorkerApprovalCard: View {
     let card: ConversationApprovals.Card
     let openWorker: () -> Void
@@ -73,33 +75,12 @@ struct WorkerApprovalCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                if approval.state.waiting { Circle().fill(look.needsYou).frame(width: 8, height: 8) }
-                Button(action: openWorker) {
-                    Text(approval.worker.title).lineLimit(1).foregroundStyle(look.needsYou)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open \(approval.worker.title)")
-                .accessibilityIdentifier("approvalWorker")
-                Text(approval.askLine).foregroundStyle(.secondary).lineLimit(1).layoutPriority(-1)
-                Spacer(minLength: 0)
-            }
-            .font(.subheadline.weight(.semibold))
+            ApprovalHeader(approval: approval, openWorker: openWorker)
             Text(approval.title)
                 .font(.headline)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("approvalTitle")
-            if let detail = approval.detail {
-                Text(detail)
-                    .font(.footnote.monospaced())
-                    .lineLimit(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 9)
-                    .background(.fill.tertiary, in: .rect(cornerRadius: 10))
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier("approvalLines")
-            }
+            if let detail = approval.detail { ApprovalDetail(detail: detail) }
             if let settled = approval.state.settledLabel {
                 Label(settled, systemImage: approval.state == .denied ? "xmark" : "checkmark")
                     .font(.footnote.weight(.semibold))
@@ -117,8 +98,8 @@ struct WorkerApprovalCard: View {
             }
         }
         .padding(14)
-        .background(look.needsYou.opacity(approval.state.waiting ? 0.09 : 0.04), in: .rect(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(look.needsYou.opacity(approval.state.waiting ? 0.34 : 0.15)))
+        .background(look.stackFill, in: .rect(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.separator))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Approval for \(approval.worker.title)")
         .accessibilityIdentifier("workerApproval")
@@ -146,23 +127,6 @@ struct WorkerApprovalCard: View {
     }
 }
 
-struct WorkerApprovalCards: View {
-    @ObservedObject var approvals: ConversationApprovals
-    let openWorker: (String) -> Void
-    let decide: (String, WorkerApproval.Decision) -> Void
-
-    var body: some View {
-        if !approvals.cards.isEmpty {
-            VStack(spacing: 8) {
-                ForEach(approvals.cards) { card in
-                    WorkerApprovalCard(card: card, openWorker: { openWorker(card.approval.worker.threadId) },
-                                       decide: { decide(card.id, $0) })
-                }
-            }
-        }
-    }
-}
-
 struct WorkerPendingApproval: View {
     let title: String
     let owner: String
@@ -171,7 +135,6 @@ struct WorkerPendingApproval: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Circle().fill(look.needsYou).frame(width: 8, height: 8)
             Text(title).font(.subheadline).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
             Button(action: open) {
                 HStack(spacing: 4) {
@@ -179,7 +142,7 @@ struct WorkerPendingApproval: View {
                     Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
                 }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(look.needsYou)
+                .foregroundStyle(look.accent)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -188,9 +151,47 @@ struct WorkerPendingApproval: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .background(look.needsYou.opacity(0.09), in: .rect(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(look.needsYou.opacity(0.3)))
+        .background(look.stackFill, in: .rect(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.separator))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("workerPendingApproval")
+    }
+}
+
+/// The card's first line: the worker (opens it) and what it asks.
+private struct ApprovalHeader: View {
+    let approval: WorkerApproval
+    let openWorker: () -> Void
+    @Environment(\.look) private var look
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: openWorker) {
+                Text(approval.worker.title).lineLimit(1).foregroundStyle(look.accent)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open \(approval.worker.title)")
+            .accessibilityIdentifier("approvalWorker")
+            Text(approval.askLine).foregroundStyle(.secondary).lineLimit(1).layoutPriority(-1)
+            Spacer(minLength: 0)
+        }
+        .font(.subheadline.weight(.semibold))
+    }
+}
+
+/// What the approval would run, in a box.
+private struct ApprovalDetail: View {
+    let detail: String
+
+    var body: some View {
+        Text(detail)
+            .font(.footnote.monospaced())
+            .lineLimit(6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
+            .background(.fill.tertiary, in: .rect(cornerRadius: 10))
+            .textSelection(.enabled)
+            .accessibilityIdentifier("approvalLines")
     }
 }
