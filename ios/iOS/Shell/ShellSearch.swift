@@ -6,6 +6,7 @@ struct ShellSearchable: ViewModifier {
     @Binding var text: String
     let prompt: String
     @Environment(\.shellPosture) private var posture
+    @State private var searching = false
 
     func body(content: Content) -> some View {
         if posture.usesRail {
@@ -18,7 +19,15 @@ struct ShellSearchable: ViewModifier {
                 content
             }
         } else {
-            content.searchable(text: $text, placement: .navigationBarDrawer(displayMode: .automatic), prompt: prompt)
+            content
+                .searchable(text: $text, isPresented: $searching, placement: .navigationBarDrawer(displayMode: .automatic), prompt: prompt)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { searching = true } label: { Image(systemName: "magnifyingglass") }
+                            .accessibilityLabel("Search")
+                            .accessibilityIdentifier("screenAction-search")
+                    }
+                }
         }
     }
 }

@@ -531,22 +531,16 @@ final class ThreadUITests: ServerIsolatedUITestCase {
             || shellTitle.waitForExistence(timeout: 5), "Studio collection")
     }
 
-    /// Studio's search field: `shellSearchField` on Duo, pulled-down `searchFields` on iPhone.
+    /// Studio's search field: `shellSearchField` on Duo, toolbar `screenAction-search` -> `searchFields` on iPhone.
     private func studioSearchField() -> XCUIElement {
         let duoField = app.textFields["shellSearchField"].firstMatch
         if duoField.waitForExistence(timeout: 3) { return duoField }
         let navField = app.searchFields.firstMatch
-        if navField.waitForExistence(timeout: 2) { return navField }
-        let list = app.collectionViews.firstMatch
-        for attempt in 0..<3 where !navField.exists {
-            if list.exists {
-                if attempt == 1 { list.swipeUp() }
-                list.swipeDown()
-            } else {
-                app.swipeDown()
-            }
-            if navField.waitForExistence(timeout: 3) { break }
+        let searchButton = app.buttons["screenAction-search"].firstMatch
+        if !navField.exists, searchButton.waitForExistence(timeout: 5) {
+            searchButton.tap()
         }
+        _ = navField.waitForExistence(timeout: 5)
         return navField
     }
 

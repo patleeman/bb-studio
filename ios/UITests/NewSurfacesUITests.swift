@@ -14,8 +14,35 @@ final class NewSurfacesUITests: StagedServerUITestCase {
         shot(app, "search")
     }
 
+    /// On a second (cached) visit to Studio, the toolbar Search button still reveals Search Studio on iPhone
+    /// (and `shellSearchField` stays reachable on Duo), and Cancel/Clear dismisses it.
+    func testSearchReachableOnSecondCachedVisit() throws {
+        guard rpcRaw("studio", "searchAll", ["query": "QA iOS7", "limit": 10]) is [[String: Any]] else {
+            throw XCTSkip("Updated Studio search is not installed")
+        }
+        // First visit populates StudioStore's cache.
+        let first = launch()
+        first.open(URL(string: "bbstudio://studio")!)
+        XCTAssertTrue(first.descendants(matching: .any).matching(identifier: "studioItem").firstMatch.waitForExistence(timeout: 15))
+        first.terminate()
+
+        // Second (cached) visit: search must still be reachable in one tap.
+        let second = launch()
+        second.open(URL(string: "bbstudio://studio")!)
+        let search = studioSearch(second)
+        XCTAssertTrue(search.exists, "search field reachable on cached second visit")
+        search.tap()
+        search.typeText("Staged")
+        let cancel = second.buttons["Cancel"].firstMatch
+        if cancel.waitForExistence(timeout: 2) {
+            cancel.tap()
+        } else if second.buttons["Clear search"].firstMatch.exists {
+            second.buttons["Clear search"].firstMatch.tap()
+        }
+    }
+
     /// On Duo, `ShellSearchable` puts `shellSearchField` at the top of the page;
-    /// on iPhone, SwiftUI's `.automatic` searchable drawer reveals `Search Studio` when the list is pulled down.
+    /// on iPhone, tapping the toolbar Search button (`screenAction-search`) presents `.searchable`.
     private func studioSearch(_ app: XCUIApplication) -> XCUIElement {
         let duoField = app.textFields["shellSearchField"].firstMatch
         let navField = app.searchFields.firstMatch
@@ -23,18 +50,11 @@ final class NewSurfacesUITests: StagedServerUITestCase {
             || app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Studio'")).firstMatch.waitForExistence(timeout: 5))
         if duoField.waitForExistence(timeout: 3) { return duoField }
         _ = app.descendants(matching: .any).matching(identifier: "studioItem").firstMatch.waitForExistence(timeout: 10)
-        if navField.waitForExistence(timeout: 2) { return navField }
-        let list = app.collectionViews.firstMatch
-        for _ in 0..<3 where !navField.exists {
-            if list.exists {
-                list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
-                    .press(forDuration: 0.05, thenDragTo: list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)), withVelocity: .slow, thenHoldForDuration: 0.1)
-            } else {
-                app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
-                    .press(forDuration: 0.05, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85)), withVelocity: .slow, thenHoldForDuration: 0.1)
-            }
-            if navField.waitForExistence(timeout: 3) { break }
+        let searchButton = app.buttons["screenAction-search"].firstMatch
+        if !navField.exists, searchButton.waitForExistence(timeout: 5) {
+            searchButton.tap()
         }
+        _ = navField.waitForExistence(timeout: 5)
         return navField
     }
 
