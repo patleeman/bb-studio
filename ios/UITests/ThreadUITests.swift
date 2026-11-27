@@ -531,23 +531,21 @@ final class ThreadUITests: ServerIsolatedUITestCase {
             || shellTitle.waitForExistence(timeout: 5), "Studio collection")
     }
 
-    /// Studio's search field: `shellSearchField` on Duo, pulled-down `Search Studio` on iPhone.
+    /// Studio's search field: `shellSearchField` on Duo, pulled-down `searchFields` on iPhone.
     private func studioSearchField() -> XCUIElement {
         let duoField = app.textFields["shellSearchField"].firstMatch
         if duoField.waitForExistence(timeout: 3) { return duoField }
-        let navField = app.searchFields["Search Studio"].firstMatch
-        if !navField.waitForExistence(timeout: 2) {
-            let list = app.collectionViews.firstMatch
-            if list.waitForExistence(timeout: 5) {
+        let navField = app.searchFields.firstMatch
+        if navField.waitForExistence(timeout: 2) { return navField }
+        let list = app.collectionViews.firstMatch
+        for attempt in 0..<3 where !navField.exists {
+            if list.exists {
+                if attempt == 1 { list.swipeUp() }
                 list.swipeDown()
-                if navField.waitForExistence(timeout: 3) { return navField }
+            } else {
+                app.swipeDown()
             }
-            let window = app.windows.firstMatch
-            for _ in 0..<2 where !navField.exists {
-                window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
-                    .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)))
-                _ = navField.waitForExistence(timeout: 3)
-            }
+            if navField.waitForExistence(timeout: 3) { break }
         }
         return navField
     }
@@ -712,14 +710,6 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         for id in ids {
             app.open(URL(string: "bbstudio://recording/\(id)")!)
             let play = app.buttons["Play"].firstMatch
-            if !play.waitForExistence(timeout: 8) {
-                openStudioCollection()
-                let chip = app.buttons["studio-kind-recording"].firstMatch
-                if chip.waitForExistence(timeout: 5) { chip.tap() }
-                let row = app.descendants(matching: .any).matching(identifier: "studioItem").firstMatch
-                XCTAssertTrue(row.waitForExistence(timeout: 10), "recording row in Studio")
-                row.tap()
-            }
             XCTAssertTrue(play.waitForExistence(timeout: 15), "player bar")
             play.tap()
             XCTAssertTrue(app.buttons["Pause"].firstMatch.waitForExistence(timeout: 15), "playing \(id)")
@@ -1072,7 +1062,6 @@ final class ThreadUITests: ServerIsolatedUITestCase {
     /// tag, archives one page and deletes both from select mode.
     func testStudioBulk() throws {
         try requireQAServer()
-        app.launchStaged(server: qaServer)
         let stamp = Int(Date().timeIntervalSince1970)
         let word = "zebracorn\(stamp)", titleA = "QA bulk A \(stamp)", titleB = "QA bulk B \(stamp)"
         let tagName = "QA bulk tag \(stamp)", renamed = "QA renamed \(stamp)"
@@ -1094,6 +1083,8 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         let tag = try XCTUnwrap((rpc("studio", "createTag", ["name": tagName])?["tag"] as? [String: Any])?["id"] as? String)
         _ = rpc("studio", "tagItems", ["items": [["pluginId": "pages", "id": ids[0]]], "add": [tag], "remove": [String]()])
 
+        app.launchArguments += ["-skipPushPrompt", "YES"]
+        app.launchStaged(server: qaServer)
         openStudioCollection()
         _ = app.descendants(matching: .any).matching(identifier: "studioItem").firstMatch.waitForExistence(timeout: 10)
         let search = studioSearchField()

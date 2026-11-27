@@ -15,23 +15,26 @@ final class NewSurfacesUITests: StagedServerUITestCase {
     }
 
     /// On Duo, `ShellSearchable` puts `shellSearchField` at the top of the page;
-    /// on iPhone, SwiftUI's searchable drawer reveals `Search Studio` when pulled down.
+    /// on iPhone, SwiftUI's `.automatic` searchable drawer reveals `Search Studio` when the list is pulled down.
     private func studioSearch(_ app: XCUIApplication) -> XCUIElement {
         let duoField = app.textFields["shellSearchField"].firstMatch
-        let navField = app.searchFields["Search Studio"].firstMatch
+        let navField = app.searchFields.firstMatch
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10)
             || app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Studio'")).firstMatch.waitForExistence(timeout: 5))
         if duoField.waitForExistence(timeout: 3) { return duoField }
+        _ = app.descendants(matching: .any).matching(identifier: "studioItem").firstMatch.waitForExistence(timeout: 10)
         if navField.waitForExistence(timeout: 2) { return navField }
         let list = app.collectionViews.firstMatch
-        if list.waitForExistence(timeout: 5) {
-            list.swipeDown()
-            if navField.waitForExistence(timeout: 3) { return navField }
+        for _ in 0..<3 where !navField.exists {
+            if list.exists {
+                list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
+                    .press(forDuration: 0.05, thenDragTo: list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)), withVelocity: .slow, thenHoldForDuration: 0.1)
+            } else {
+                app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
+                    .press(forDuration: 0.05, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85)), withVelocity: .slow, thenHoldForDuration: 0.1)
+            }
+            if navField.waitForExistence(timeout: 3) { break }
         }
-        let window = app.windows.firstMatch
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
-            .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)))
-        _ = navField.waitForExistence(timeout: 5)
         return navField
     }
 
