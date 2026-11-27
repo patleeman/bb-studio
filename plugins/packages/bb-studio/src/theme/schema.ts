@@ -42,7 +42,6 @@ const glass = z.object({
   modes: z.object({ light: glassModeSurfaces.optional(), dark: glassModeSurfaces.optional() }).optional(),
 }).refine((value) => value.sidebar.opacity <= value.transcript.opacity && value.sidebar.opacity <= value.composer.opacity, "The sidebar's glass is lighter than the transcript's and the composer's.")
   .refine((value) => value.main.opacity <= value.transcript.opacity, "The main view's glass is lighter than the transcript's.");
-export type ThemeGlass = z.infer<typeof glass>;
 
 export const uniformName = z.string().regex(/^u_[a-zA-Z][a-zA-Z0-9]{0,30}$/, "A uniform is named u_ and letters or digits.");
 const uniformValue = z.union([z.number().finite(), z.array(z.number().finite()).min(2).max(4), hexColor]);

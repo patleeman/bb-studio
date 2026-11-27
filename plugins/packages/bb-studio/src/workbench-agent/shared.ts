@@ -24,7 +24,6 @@ export const MIN_PANE_PERCENT = 15;
 export const NEW_MARK = "• ";
 
 export type LayoutField = "panel" | "widthPercent" | "conversation" | "panes" | "paneWidths";
-export const LAYOUT_FIELDS: readonly LayoutField[] = ["panel", "widthPercent", "conversation", "panes", "paneWidths"];
 
 const json: z.ZodType<JsonValue> = z.lazy(() => z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(json), z.record(z.string(), json)]));
 
@@ -169,6 +168,3 @@ export function paneOfKeys(host: HostLayout): Map<string, 1 | 2> {
   (host.panes ?? []).slice(0, MAX_PANES).forEach((pane, index) => { for (const key of pane.tabs) panes.set(key, index === 0 ? 1 : 2); });
   return panes;
 }
-
-/** Studio's thread tab (src/kit/app/workbench.ts THREAD_TAB), named here so the server needn't load the app kit. */
-export const THREAD_TAB_ID = "thread";

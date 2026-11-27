@@ -27,7 +27,6 @@ export const restoreSectionSchema = z.object({
   reason: z.string().nullable(),
   report: studioBackupSchemas(z).report.nullable(),
 });
-export type RestoreSectionView = z.infer<typeof restoreSectionSchema>;
 
 export const restoreResultSchema = z.object({
   dryRun: z.boolean(),

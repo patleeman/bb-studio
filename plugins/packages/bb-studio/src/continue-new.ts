@@ -2,7 +2,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { continuedLines } from "./continue-shared";
 
-export { CONTINUED_DIRECTIVE, continuedFallback, continuedLines, conversationLink } from "./continue-shared";
+export { continuedLines } from "./continue-shared";
 
 export const CONTINUE_TOOL = "conversation_continue_new";
 export const HANDOFF_MAX = 4_000;

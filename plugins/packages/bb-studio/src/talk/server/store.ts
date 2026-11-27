@@ -60,8 +60,6 @@ export const MIGRATIONS = [
    ALTER TABLE segments ADD COLUMN speaker TEXT;
    ALTER TABLE segments ADD COLUMN echo INTEGER NOT NULL DEFAULT 0`,
 ];
-/** Historical statements; Studio's applied sequence is frozen in src/migrations.ts. */
-export const TALK_MIGRATIONS = MIGRATIONS;
 
 interface RecordingRow {
   id: string;

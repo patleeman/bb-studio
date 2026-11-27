@@ -56,17 +56,6 @@ export const TOOL_NAMES = [
   "pages_comments",
 ] as const;
 
-export const AGENT_INSTRUCTIONS = [
-  "BB Pages are collaborative documents the user edits live. Read a page with pages_read before changing it; it returns Markdown with a `<!-- ^id -->` marker on the line before each block, naming the block below it.",
-  "Edit with pages_edit using small, targeted operations that reference those block ids, so you don't overwrite the user's concurrent typing. Use replace_all only when asked to rewrite a whole page.",
-  "Pages Markdown supports GFM plus: ```chart / ```stats / ```embed fenced JSON blocks, ```mermaid diagrams, ```html blocks, `> [!NOTE]` callouts (NOTE, TIP, WARNING, CAUTION, IMPORTANT), `<details><summary>Title</summary>` … `</details>` toggles (a `## ` summary makes a toggle heading), and mentions like @[Title](page:pg_id), @[Title](item:plugin:id), @[2026-10-01](date:2026-10-01).",
-  'Chart JSON: {"type":"bar|line|area|pie","title":"…","x":"label","series":["Revenue"],"unit":"$","data":[{"label":"Q1","Revenue":10}]}. Stats JSON: [{"label":"ARR","value":"$1.2M","delta":"+8%","trend":"up"}] (1–6 items). Embed JSON: {"kind":"bookmark|thread|page|drawing|artifact|recording|mini|table|item","target":"https://… or an id","title":"…"}; item targets are plugin:id from studio_list_items; a table target may be <table id>/view/<view id>; a drawing (whiteboard) embed may set "height" in pixels (160–1200).',
-  "An ```html block renders its HTML in a sandboxed iframe: scripts run, but with no same-origin access (no cookies, storage or BB APIs), and don't assume network access. Keep it self-contained with inline <style> and <script>, follow light and dark with prefers-color-scheme, and keep it under 200,000 characters (longer ones show as code). Use ```html only for something to render; show HTML source as code with ```html source (or another language such as ```xml).",
-  "Images: prefer an artifact embed (save the image as an artifact, then ```embed {\"kind\":\"artifact\",\"target\":\"art_…\"}). Local image paths (`![](/…/chart.png)`) are imported into the page when supported: PNG, JPEG, GIF or WebP up to 10 MB from your thread's workspace or thread storage. The tool result names any image it couldn't import.",
-  "Manage page comments with pages_read (comments) (op: list, create, reply, resolve): answer in the same thread with op \"reply\"; start new threads with op \"create\" on the block/quote you are discussing.",
-  'When you create or change a page, put its card on its own line in your reply, `::page{id="pg_…"}`, so the user can open it beside the chat.',
-].join("\n");
-
 const ref = z.string().min(1).describe("Page id (pg_…) or title");
 const block = z.string().min(4).describe("Block id or 8-char prefix");
 

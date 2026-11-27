@@ -12,7 +12,6 @@ import { BotAvatar } from "../../ui/bot/BotAvatar";
 import { CARD_GHOST } from "../../loops/ui/LoopMenus";
 import { dueLabel, fullWhen, shortWhen, triggerLabel } from "../../loops/ui/model";
 import { useLoopPeople, useTodosZone, type LoopPeople } from "../../loops/ui/hooks";
-import { useCardOnScreen } from "../../work/ui/on-screen";
 import { isClosed, needsYou, TODO_ID, USER_OWNER, type Task } from "../contract";
 import type { TaskView } from "../rpc-contract";
 import { WORK_ID } from "../../work/shared";
@@ -64,7 +63,7 @@ export function LiveTask({ id, row, threadId, messageId }: { id: string; row: nu
     if (missing) return <div data-testid="task-missing" className="my-1 flex items-center gap-2 text-xs text-muted-foreground"><Icon name="Unavailable" className="size-3.5" />This task was removed.</div>;
     if (!view && live.error) return <p role="alert" data-testid="task-error" className="my-1 flex items-center gap-2 text-xs text-destructive"><Icon name="AlertCircle" className="size-3.5 shrink-0" />{live.error}</p>;
     if (!view) return row !== null ? <div className="h-8 animate-pulse rounded-md bg-muted/40 motion-reduce:animate-none" /> : <div className={cn(CHAT_CARD_SKELETON, "h-28")} />;
-    return row !== null ? <TaskRow view={view} people={people} refresh={live.refresh} /> : <TaskCardView view={view} people={people} refresh={live.refresh} chat />;
+    return row !== null ? <TaskRow view={view} people={people} refresh={live.refresh} /> : <TaskCardView view={view} people={people} refresh={live.refresh} />;
   }
 }
 
@@ -115,12 +114,11 @@ export function linkedThread(task: Pick<Task, "owner" | "workers" | "conversatio
  * also shows its notes in full, its facts and linked thread, and Drop and
  * Start work. `extra` adds actions the caller owns.
  */
-export function TaskCardView({ view, people, chat = false, bare = false, detail = false, extra }: { view: TaskView; people: LoopPeople; refresh(): void; chat?: boolean; bare?: boolean; detail?: boolean; extra?: ReactNode }) {
+export function TaskCardView({ view, people, bare = false, detail = false, extra }: { view: TaskView; people: LoopPeople; refresh(): void; bare?: boolean; detail?: boolean; extra?: ReactNode }) {
   const { task, history, threads } = view;
   const navigate = useBbNavigate();
   const now = useCardNow();
   const zone = useTodosZone();
-  const onScreen = useCardOnScreen(task.id);
   const [showHistory, setShowHistory] = useState(false);
   const names: Names = { bot: people.botName, leads: people.leads, threads, botThreadId: people.botThreadId };
   const status = taskStatus(task);
@@ -144,8 +142,8 @@ export function TaskCardView({ view, people, chat = false, bare = false, detail 
   const actions: ReactNode = openButton;
   const stamp = closed && task.closedAt ? task.closedAt : task.updatedAt;
   return (
-    <ChatCard ref={chat ? onScreen : undefined} data-testid="task-card" data-work-card-id={task.id} data-task-id={task.id} data-state={status.id} data-kind={task.kind} data-stale={task.stale || undefined}
-      className={cn("studio-work-card", bare && "my-0")}>
+    <ChatCard data-testid="task-card" data-work-card-id={task.id} data-task-id={task.id} data-state={status.id} data-kind={task.kind} data-stale={task.stale || undefined}
+      className={cn(bare && "my-0")}>
       <ChatCardHeader icon={kind.icon} iconClassName={closed ? TONE[status.tone] : undefined} title={detail ? <span data-testid="task-title" className="whitespace-normal [overflow-wrap:anywhere]">{task.title}</span> : task.title} onOpen={openThread}
         meta={<>
           {kind.label}

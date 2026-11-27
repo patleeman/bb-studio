@@ -93,14 +93,6 @@ Reply cut: true. Then ask if they want the rest. If yes, call read_replies with 
   return `(Studio, not the user:) ${title} answered: ${summary}\nTell the user in a sentence or two, then let them talk.`;
 }
 
-/** The note the phone adds after the user talked over the voice: where it was cut off. */
-export function interruptedNote(heard: string): string {
-  const said = heard.trim();
-  return said
-    ? `(Studio, not the user:) The user interrupted you. They heard up to: "${said.slice(-200)}". Don't repeat it; answer what they said next.`
-    : "(Studio, not the user:) The user interrupted you before you said anything. Answer what they said.";
-}
-
 /** How long the client waits for an "answer" relay's reply before the voice says it's still waiting, once. */
 export const STILL_WAITING_MS = 20_000;
 

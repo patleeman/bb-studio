@@ -20,7 +20,6 @@ export const chartSpecSchema = z
     data: z.array(z.record(z.string().max(80), cell)).min(1).max(500),
   })
   .strict();
-export type ChartSpec = z.infer<typeof chartSpecSchema>;
 
 export const statItemSchema = z
   .object({
@@ -32,11 +31,10 @@ export const statItemSchema = z
   })
   .strict();
 export const statItemsSchema = z.array(statItemSchema).min(1).max(6);
-export type StatItem = z.infer<typeof statItemSchema>;
 
 // Drawing helpers live apart from the schemas, so mini apps' chart lib
 // (src/minis/shelf/charts.tsx) doesn't ship zod.
-export { SERIES_COLORS, resolveChart, type ResolvedChart } from "./chart-draw";
+export { SERIES_COLORS, resolveChart } from "./chart-draw";
 
 export function parseJsonWith<T>(schema: z.ZodType<T>, text: string): { ok: true; value: T } | { ok: false; error: string } {
   let raw: unknown;

@@ -12,8 +12,6 @@ import { newId } from "../../kit/ids";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 
-export { COMMENT_MIGRATIONS } from "../../kit/code-migrations";
-
 /** The longest comment, and the most of its lines a comment keeps. */
 const MAX_BODY = 20_000;
 const MAX_LINE_TEXT = 4_000;
@@ -62,7 +60,6 @@ export const commentCallSchema = z.discriminatedUnion("method", [
   z.object({ method: z.literal("resolve"), threadId: z.string().min(1).max(100), resolved: z.boolean() }),
   z.object({ method: z.literal("submit") }),
 ]);
-export type CommentCall = z.infer<typeof commentCallSchema>;
 
 export class CommentStore {
   constructor(private readonly db: Database.Database) {}

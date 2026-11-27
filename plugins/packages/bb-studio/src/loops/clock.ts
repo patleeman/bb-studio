@@ -44,26 +44,6 @@ export function zonedTime(year: number, month: number, day: number, hour: number
   return zonedTimes(year, month, day, hour, minute, zone)[0]!;
 }
 
-export function addDays(at: number, days: number, hour: number, minute: number, zone?: string): number {
-  const { year, month, day } = wall(at, zone);
-  const date = new Date(Date.UTC(year, month - 1, day + days));
-  return zonedTime(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), hour, minute, zone);
-}
-
-export function inputValue(at: number, zone?: string): string {
-  const { year, month, day, hour, minute } = wall(at, zone);
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}`;
-}
-
-export function fromInputValue(value: string, zone?: string): number | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
-  if (!match) return null;
-  const [, year, month, day, hour, minute] = match.map(Number) as [number, number, number, number, number, number];
-  const at = zonedTime(year, month, day, hour, minute, zone);
-  return Number.isFinite(at) ? at : null;
-}
-
 export function zoneOption(zone?: string): { timeZone: string } | Record<string, never> {
   return zone ? { timeZone: zone } : {};
 }

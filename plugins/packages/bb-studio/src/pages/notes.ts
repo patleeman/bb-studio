@@ -18,16 +18,6 @@ import { readMarkdown } from "./doc";
 import { rpcContract, SEND_INLINE_LIMIT, type NoteSendMode, type NoteState, type NoteView } from "./notes-contract";
 import { truncate, type PagesService } from "./service";
 
-/** Historical notes schema. Append changes at the END of MIGRATIONS in src/migrations.ts. */
-export const PAGE_NOTES_TABLE = `CREATE TABLE page_notes (
-     page_id TEXT PRIMARY KEY,
-     thread_id TEXT NOT NULL,
-     state TEXT NOT NULL,
-     created_at INTEGER NOT NULL,
-     resolved_at INTEGER
-   );
-   CREATE INDEX page_notes_thread ON page_notes (thread_id, state, created_at);`;
-
 /** The Studio tag every note carries. */
 export const NOTES_TAG = "Notes";
 const NOTE_ICON = "📝";

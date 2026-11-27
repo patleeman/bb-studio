@@ -126,7 +126,6 @@ import { registerTimelineFilter } from "./src/strands/ui/selection";
 import { canZoom, ZoomView, zoomThreadBy } from "./src/strands/ui/Zoom";
 import { StrandMarks, StrandTag } from "./src/strands/ui/Tag";
 import { StrandsTab } from "./src/strands/ui/Tab";
-import "./src/work/ui/work.css";
 import { OFF_NEW_TAB, onThreadTabOpen, registerThreadTab, ThreadTabReceiver } from "./src/kit/app/thread-panel";
 import { forgetView } from "./src/ui/studio-tab/view-state";
 import { registerThreadHeader } from "./src/ui/thread-header";
