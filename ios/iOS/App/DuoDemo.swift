@@ -55,7 +55,11 @@ enum DuoDemo {
             }
             for sub in layer.sublayers ?? [] { walk(sub, here) }
         }
-        walk(window.layer, "")
+        // Every window of every scene: an animation in another one keeps the app from idling too.
+        let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+        for each in windows.isEmpty ? [window] : windows {
+            walk(each.layer, String(describing: type(of: each)))
+        }
         return out
     }
 

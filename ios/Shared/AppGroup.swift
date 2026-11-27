@@ -40,8 +40,14 @@ public enum ServerScope {
         return url
     }()
     public static var selectedURL: URL {
-        (AppGroup.defaults.string(forKey: "serverURL") ?? UserDefaults.standard.string(forKey: "serverURL"))
+        (launchArgument ?? AppGroup.defaults.string(forKey: "serverURL") ?? UserDefaults.standard.string(forKey: "serverURL"))
             .flatMap(URL.init(string:)) ?? defaultURL
+    }
+
+    /// `-serverURL <url>` at launch (the UI tests, Xcode): it wins over the
+    /// one saved in the app group, which outlives a reinstall.
+    public static var launchArgument: String? {
+        UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)["serverURL"] as? String
     }
     public static func namespace(_ serverURL: URL) -> String {
         SHA256.hash(data: Data(serverURL.absoluteString.utf8)).map { String(format: "%02x", $0) }.joined()

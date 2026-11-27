@@ -70,7 +70,7 @@ public final class BBClient: @unchecked Sendable {
     /// Kept in the app group so the widgets and share extension use the same server.
     public static var storedServerURL: URL {
         get {
-            (AppGroup.defaults.string(forKey: serverURLKey) ?? UserDefaults.standard.string(forKey: serverURLKey))
+            (ServerScope.launchArgument ?? AppGroup.defaults.string(forKey: serverURLKey) ?? UserDefaults.standard.string(forKey: serverURLKey))
                 .flatMap(URL.init(string:)) ?? defaultServerURL
         }
         set { AppGroup.defaults.set(newValue.absoluteString, forKey: serverURLKey) }

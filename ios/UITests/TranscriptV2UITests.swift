@@ -393,7 +393,9 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
             opened = matching.count > before
         }
         // The menu's item: not one that was there before the press (a code block's Copy).
-        let added = matching.allElementsBoundByIndex.last { !beforeFrames.contains("\($0.frame)") }
+        // On screen too: on a short screen a code block's own Copy, scrolled off, is in the tree as well.
+        let window = app.windows.firstMatch.frame
+        let added = matching.allElementsBoundByIndex.last { !beforeFrames.contains("\($0.frame)") && window.contains($0.frame) }
         if opened { (added ?? matching.element(boundBy: matching.count - 1)).tap() } else { failures.append("\(step): no \(item) in the menu") }
         Thread.sleep(forTimeInterval: 0.8)
     }
