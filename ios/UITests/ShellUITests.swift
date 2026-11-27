@@ -122,6 +122,8 @@ final class ShellUITests: ServerIsolatedUITestCase {
             Thread.sleep(forTimeInterval: 0.3)
             seen += (app.windows.firstMatch.value as? String ?? "").split(separator: "\n").map(String.init)
                 .filter { !$0.contains("UITextSelectionView") && !$0.contains("Caret") && $0.hasPrefix("webview") == false }
+                // Only animations still running: a layer can keep a finished or paused one.
+                .filter { row in (row.components(separatedBy: "): ").last ?? row).components(separatedBy: ", ").contains { !$0.hasSuffix(" done") } }
         }
         print("IDLE-SAMPLES \(variant): \(seen.count)\n" + Array(Set(seen)).joined(separator: "\n"))
         XCTAssertLessThanOrEqual(seen.count, 2, "animations keep starting at rest: \(Array(Set(seen)).prefix(3))", file: file, line: line)

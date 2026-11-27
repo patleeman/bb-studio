@@ -50,7 +50,15 @@ enum DuoDemo {
             }
             if let keys = layer.animationKeys(), !keys.isEmpty {
                 let frame = layer.convert(layer.bounds, to: window.layer)
-                let details = keys.compactMap { key in layer.animation(forKey: key).map { "\(key) repeat=\($0.repeatCount) dur=\($0.duration)" } }
+                // Finished ones a layer keeps (removedOnCompletion off) don't run: marked, so a test can tell.
+                let now = layer.convertTime(CACurrentMediaTime(), from: nil)
+                let details = keys.compactMap { key in layer.animation(forKey: key).map { animation in
+                    let repeats = max(1, Double(animation.repeatCount))
+                    // Paused (speed 0: a refresh control's, scrubbed by the pull), or over.
+                    let done = layer.speed == 0 || animation.speed == 0
+                        || (animation.repeatCount < 1000 && now > animation.beginTime + animation.duration * repeats + 0.05)
+                    return "\(key) repeat=\(animation.repeatCount) dur=\(animation.duration)\(done ? " done" : "")"
+                } }
                 out.append("\(here.suffix(160)) \(frame.integral): \(details.joined(separator: ", "))")
             }
             for sub in layer.sublayers ?? [] { walk(sub, here) }
