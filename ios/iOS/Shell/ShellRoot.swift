@@ -154,7 +154,7 @@ private struct ShellTabs: View {
                 ShellStack(path: $router.libraryPath, bot: bot, store: store) { LibraryPageView(botId: bot.id) }
             }
             Tab("Memory", systemImage: BotPage.memory.symbol, value: ShellTab.memory) {
-                MemoryTab(bot: bot, store: store)
+                MemoryTab(bot: bot, store: store, width: width)
             }
             Tab(value: ShellTab.search, role: .search) {
                 ShellStack(path: $router.searchPath, bot: bot, store: store) { HomeSearchView(bot: bot, store: store) }
@@ -203,6 +203,8 @@ private struct HomeTab: View {
 private struct MemoryTab: View {
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
+    /// The room between the safe areas; page one takes half.
+    let width: CGFloat
     @ObservedObject private var router = Router.shared
     @EnvironmentObject private var app: AppModel
     @Environment(\.shellPosture) private var posture
@@ -214,6 +216,9 @@ private struct MemoryTab: View {
         if posture.splitsWorkbench {
             HStack(spacing: 0) {
                 page
+                    .frame(width: (width / 2).rounded())
+                    // A page left of another: SwiftUI hands it the window's trailing inset, a page away.
+                    .ignoresSafeArea(.container, edges: .trailing)
                 ShellStack(path: $router.detail, bot: bot, store: store) {
                     MemoryBrowsePane(store: MemoryStore.shared(botId: bot.id, client: app.client), open: router.open(item:))
                 }

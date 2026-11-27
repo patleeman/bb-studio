@@ -12,7 +12,7 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(home.waitForExistence(timeout: 60), "the app opens on Home")
     }
 
-    private var home: XCUIElement { app.descendants(matching: .any)["home"].firstMatch }
+    private var home: XCUIElement { app.descendants(matching: .any).matching(identifier: "home").firstMatch }
 
     private func shot(_ name: String) {
         guard let folder = ProcessInfo.processInfo.environment["REMOVE_OUT"] else { return }
@@ -25,7 +25,7 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
     /// Home's row, scrolled to: the list is lazy and the folded Duo short.
     private func row(_ id: String) -> XCUIElement {
         let row = app.buttons["homeConversation-\(id)"]
-        if !row.exists, app.descendants(matching: .any)["home"].exists { app.scrollHome(to: row) }
+        if !row.exists, app.descendants(matching: .any).matching(identifier: "home").firstMatch.exists { app.scrollHome(to: row) }
         return row
     }
 

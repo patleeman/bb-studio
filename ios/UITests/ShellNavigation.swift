@@ -22,7 +22,7 @@ extension XCUIApplication {
         return composer.exists
     }
 
-    private var home: XCUIElement { descendants(matching: .any)["home"].firstMatch }
+    private var home: XCUIElement { descendants(matching: .any).matching(identifier: "home").firstMatch }
 
     /// A tap, or where the inner screen's stretched window runs past the
     /// simulator's (outer) screen, the control's action as VoiceOver runs it.

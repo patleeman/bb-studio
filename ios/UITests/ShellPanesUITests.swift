@@ -58,7 +58,7 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
         command("capture?" + name)
     }
 
-    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id] }
+    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
 
     // MARK: The default text size
 

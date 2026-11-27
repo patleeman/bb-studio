@@ -46,7 +46,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         sleep(1)
     }
 
-    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id] }
+    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
 
     // MARK: Idle
 

@@ -10,7 +10,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
     private func launch(_ extra: [String] = []) {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list"] + extra
         app.launchOffline()
-        XCTAssertTrue(app.descendants(matching: .any)["home"].waitForExistence(timeout: 30), "the app opens on Home")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "home").firstMatch.waitForExistence(timeout: 30), "the app opens on Home")
     }
 
     private func openPage(_ page: String) {
@@ -22,7 +22,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         }
     }
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
 
     /// Back to Home: its tab.
     private func closeMemory() {

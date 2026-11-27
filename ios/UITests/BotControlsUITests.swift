@@ -16,7 +16,7 @@ final class BotControlsUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")
     }
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
 
     func testPauseFromTheListAndResumeFromTheConversation() {
         launch()
