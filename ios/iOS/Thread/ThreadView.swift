@@ -1977,11 +1977,19 @@ final class ThreadViewLifetime: ObservableObject {
         session.hold(app)
     }
 
+    /// SwiftUI drops its state on the main thread, but a deinit may run on
+    /// any: the release goes to the main actor, inline only when already on it.
     deinit {
         guard let session, let notes else { return }
-        MainActor.assumeIsolated {
-            session.stop()
-            notes.detach()
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { Self.release(session, notes) }
+        } else {
+            Task { @MainActor in Self.release(session, notes) }
         }
+    }
+
+    private static func release(_ session: ConversationSession, _ notes: ThreadNotes) {
+        session.stop()
+        notes.detach()
     }
 }

@@ -171,10 +171,7 @@ the composer also took or gave up focus on the next run loop whatever the
 window was doing. Now the size class is set only when it changes, after the
 layout pass, and with the keyboard up only once the window has kept its size
 for 0.4 s (`ResizeSettling`); the composer's focus changes and the
-transcript's tap-to-close wait the same way. `KeyboardFoldUITests` folds,
-unfolds, splits and backgrounds the Duo with the keyboard up and coming up,
-and fails on any unsatisfiable-constraint report (read from the app's own
-log, `qa-duo/constraints`) or a keyboard reload mid-resize.
+transcript's tap-to-close wait the same way.
 
 **Crash breadcrumbs.** The last 200 keyboard, window, pane, focus and scene
 events (frames, sizes and ids, never message text) are kept in memory and
@@ -401,6 +398,10 @@ Headless simulator runs: `-skipPushPrompt YES -openURL bbstudio://thread/<id>`.
 `-qaShelfDemo` (Debug builds) fills every thread's shelf with sample cards.
 
 ### Testing
+
+Every UI test has a five-minute limit (`ServerIsolatedUITestCase.timeLimit`,
+XCTest's `executionTimeAllowance`); the scripts run with
+`-test-timeouts-enabled YES`, and a direct `xcodebuild` run should too.
 
 `ShellUITests` checks the app shell offline (`-qaSpacesDemo list -qaBotDemo
 chat -qaWorkbenchDemo`): on the iPhone, Home as the root with the tab bar

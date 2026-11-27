@@ -178,7 +178,7 @@ env TEST_RUNNER_BBGO_QA_SERVER="$server" \
     TEST_RUNNER_BBGO_QA_PAGE="${qa_page:-${TEST_RUNNER_BBGO_QA_PAGE:-}}" \
     TEST_RUNNER_BBGO_QA_RECORDING="${qa_recording:-${TEST_RUNNER_BBGO_QA_RECORDING:-}}" \
     xcodebuild test-without-building -scheme BBStudio -destination "id=$device_id" \
-    -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO \
+    -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -test-timeouts-enabled YES \
     -resultBundlePath "$result_bundle" \
     "${only[@]}" ${extra_args[@]+"${extra_args[@]}"}
 status=$?

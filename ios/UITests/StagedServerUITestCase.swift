@@ -4,6 +4,15 @@ import XCTest
 class ServerIsolatedUITestCase: XCTestCase {
     private(set) var qaServer = ""
 
+    /// No UI test runs for long: past this one fails (with `-test-timeouts-enabled YES`,
+    /// which the scripts pass), so a hung or crawling test can't hold a run for an hour.
+    static let timeLimit: TimeInterval = 300
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        executionTimeAllowance = Self.timeLimit
+    }
+
     func requireQAServer() throws {
         let env = ProcessInfo.processInfo.environment
         let value = env["TEST_RUNNER_BBGO_QA_SERVER"] ?? env["BBGO_QA_SERVER"]
