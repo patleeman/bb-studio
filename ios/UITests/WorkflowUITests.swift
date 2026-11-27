@@ -20,9 +20,17 @@ final class WorkflowUITests: StagedServerUITestCase {
         screenshot("plugins")
 
         app.open(URL(string: "bbstudio://new")!)
-        XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 10)
-            || app.staticTexts["New conversation"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["newThreadProject"].exists, "no project picker")
+        XCTAssertTrue(app.navigationBars["New conversation"].waitForExistence(timeout: 10)
+            || app.navigationBars["New thread"].waitForExistence(timeout: 2)
+            || app.staticTexts["New conversation"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["newThreadProject"].exists, "project picker")
+        app.buttons["newThreadProject"].tap()
+        let stagedProject = app.buttons["Staged QA"].firstMatch
+        if stagedProject.waitForExistence(timeout: 3) {
+            stagedProject.tap()
+            // Wait for .task(id: projectId) to load project environments.
+            sleep(2)
+        }
         XCTAssertTrue(app.buttons["newThreadAgent"].exists)
         app.buttons["newThreadWorkspace"].tap()
         XCTAssertTrue(app.buttons["Project checkout"].waitForExistence(timeout: 5))
@@ -39,15 +47,16 @@ final class WorkflowUITests: StagedServerUITestCase {
     func testAutomationEditor() {
         app.open(URL(string: "bbstudio://automations")!)
         XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10)
-            || app.staticTexts["Automations"].waitForExistence(timeout: 5))
-        let newBtn = app.buttons["workflowNewAutomation"].firstMatch
-        if newBtn.waitForExistence(timeout: 5) {
-            newBtn.tap()
-        } else {
-            let fallback = app.buttons["New automation"].firstMatch
-            XCTAssertTrue(fallback.waitForExistence(timeout: 5))
-            fallback.tap()
+            || app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Automations'")).firstMatch.waitForExistence(timeout: 5))
+        // In Round 7, bbstudio://automations opens the Bot's Schedules sheet,
+        // with BB's project automations behind "All automations".
+        let allRow = app.buttons["schedulesAllAutomations"].firstMatch
+        if allRow.waitForExistence(timeout: 5) {
+            allRow.tap()
         }
+        let newBtn = app.screenAction("new")
+        XCTAssertTrue(newBtn.waitForExistence(timeout: 10), "New automation button")
+        newBtn.tap()
         XCTAssertTrue(app.navigationBars["New automation"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.textFields["workflowAutomationName"].exists)
         XCTAssertTrue(app.textFields["workflowAutomationPrompt"].exists)

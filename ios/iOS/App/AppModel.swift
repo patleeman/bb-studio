@@ -10,6 +10,7 @@ enum Route: Hashable {
     case page(id: String)
     case automations
     case automation(Automation)
+    case botAutomation(botId: String?, automation: BotAutomation, active: Bool)
     case usage
     case archived
     case drawing(id: String)

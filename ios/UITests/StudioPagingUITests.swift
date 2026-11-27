@@ -14,16 +14,17 @@ final class StudioPagingUITests: StagedServerUITestCase {
         app.launchStaged(server: qaServer)
     }
 
-    /// The selected kind chip (the tab bar's selected tab aside).
+    /// The selected kind chip (studio-kind-*).
     private var selectedKind: String {
-        app.buttons.matching(NSPredicate(format: "isSelected == true AND NOT (label IN %@)", ["Threads", "Studio", "Bot", "Settings"]))
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'studio-kind-' AND isSelected == true"))
             .firstMatch.label
     }
 
     private func openStudio() throws -> XCUIElement {
         app.open(URL(string: "bbstudio://studio")!)
-        guard app.buttons["All"].waitForExistence(timeout: 20) else { throw XCTSkip("Studio has one kind") }
-        if !app.buttons["All"].isSelected { app.buttons["All"].tap() }
+        let allChip = app.buttons["studio-kind-all"].firstMatch
+        guard allChip.waitForExistence(timeout: 20) else { throw XCTSkip("Studio has one kind") }
+        if !allChip.isSelected { allChip.tap() }
         // A day header on the page shown, not a row.
         let header = app.staticTexts.matching(NSPredicate(format: "label IN %@", ["Today", "Yesterday", "Previous 7 Days"]))
             .allElementsBoundByIndex.first { $0.isHittable }
@@ -38,7 +39,8 @@ final class StudioPagingUITests: StagedServerUITestCase {
         screenshot("kind-paged")
         let next = selectedKind
         XCTAssertNotEqual(next, "All", "a swipe left moves to the next kind")
-        XCTAssertTrue(app.navigationBars["Studio"].exists)
+        let studioTitle = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Studio'")).firstMatch
+        XCTAssertTrue(app.navigationBars["Studio"].exists || studioTitle.exists)
         let back = app.staticTexts.matching(NSPredicate(format: "label IN %@", ["Today", "Yesterday", "Previous 7 Days"]))
             .allElementsBoundByIndex.first { $0.isHittable }
         try XCTUnwrap(back).swipeRight()

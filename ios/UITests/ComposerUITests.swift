@@ -39,7 +39,8 @@ final class ComposerUITests: ServerIsolatedUITestCase {
         app.buttons["dictationFinish"].tap()
         XCTAssertTrue(waitGone(listening, 120), "the dictation finishes")
         XCTAssertTrue((field.value as? String)?.hasPrefix("Typed first") == true, "it stays in the field, unsent")
-        XCTAssertTrue(app.navigationBars["New thread"].exists, "nothing was sent")
+        XCTAssertTrue(app.navigationBars["New conversation"].exists || app.navigationBars["New thread"].exists
+            || app.staticTexts["New conversation"].exists || app.staticTexts["New thread"].exists, "nothing was sent")
     }
 
     /// Holding the mic talks; letting go doesn't also count as a tap, and doesn't dictate inline.
@@ -85,8 +86,8 @@ final class ComposerUITests: ServerIsolatedUITestCase {
         if app.buttons["Continue"].exists { app.buttons["Continue"].tap() }
         snapshot("command-inserted")
 
-        XCTAssertTrue(app.screenMore.waitForExistence(timeout: 5))
-        app.screenMore.tap()
+        XCTAssertTrue(app.conversationMore.waitForExistence(timeout: 5))
+        app.conversationMore.tap()
         let contextMenu = app.buttons["Context"].firstMatch
         if contextMenu.waitForExistence(timeout: 3) { contextMenu.tap() }
         let contextUsage = app.buttons["Context usage"].firstMatch
@@ -96,7 +97,7 @@ final class ComposerUITests: ServerIsolatedUITestCase {
         snapshot("context")
         app.buttons["Done"].tap()
 
-        app.screenMore.tap()
+        app.conversationMore.tap()
         if app.buttons["Context"].firstMatch.waitForExistence(timeout: 3) { app.buttons["Context"].firstMatch.tap() }
         app.buttons["Clear context"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Clear context"].waitForExistence(timeout: 5))

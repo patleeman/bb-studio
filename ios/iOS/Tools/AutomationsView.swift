@@ -22,11 +22,9 @@ struct AutomationsView: View {
                     description: Text("Add one to run an agent on a schedule."))
             }
         }
-        .navigationTitle("Automations")
-        .toolbar {
-            Button { creating = true } label: { Label("New automation", systemImage: "plus") }
-                .accessibilityIdentifier("workflowNewAutomation")
-        }
+        .screenToolbar("Automations", actions: [
+            ScreenAction(id: "new", title: "New automation", systemImage: "plus", run: { creating = true }),
+        ])
         .sheet(isPresented: $creating) {
             AutomationEditor(automation: nil) { _ in await load() }
         }

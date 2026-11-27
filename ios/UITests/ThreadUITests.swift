@@ -222,8 +222,12 @@ final class ThreadUITests: ServerIsolatedUITestCase {
             || app.staticTexts["Automations"].waitForExistence(timeout: 5))
         sleep(1)
         shot("tools-automations")
-        let daily = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Daily'")).firstMatch
-        if daily.waitForExistence(timeout: 3) {
+        let allRow = app.buttons["schedulesAllAutomations"].firstMatch
+        if allRow.waitForExistence(timeout: 5) {
+            allRow.tap()
+        }
+        let daily = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Daily'")).firstMatch
+        if daily.waitForExistence(timeout: 5) {
             daily.tap()
             XCTAssertTrue(app.switches["Enabled"].waitForExistence(timeout: 10), "automation detail")
             shot("tools-automation")
@@ -246,19 +250,25 @@ final class ThreadUITests: ServerIsolatedUITestCase {
     func testThreadExtras() throws {
         try requireQAServer()
         app.launchStaged(server: qaServer)
-        app.open(URL(string: "bbstudio://thread/\(threadId)")!)
-        let more = app.screenMore
+        let targetThread = ProcessInfo.processInfo.environment["BBGO_QA_SENT_THREAD"] ?? threadId
+        app.open(URL(string: "bbstudio://thread/\(targetThread)")!)
+        let more = app.conversationMore
         XCTAssertTrue(more.waitForExistence(timeout: 10))
         more.tap()
         XCTAssertTrue(app.buttons["Files & changes"].waitForExistence(timeout: 5))
         shot("extras-menu")
         app.buttons["Files & changes"].tap()
-        XCTAssertTrue(app.segmentedControls.buttons["Changes"].waitForExistence(timeout: 10))
-        sleep(1)
+        let changesTab = app.segmentedControls.buttons["Changes"]
+        XCTAssertTrue(changesTab.waitForExistence(timeout: 10))
+        changesTab.tap()
+        let emptyChanges = app.staticTexts["No uncommitted changes"]
+        let mdRow = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH '.md'")).firstMatch
+        let loadedChanges = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in emptyChanges.exists || mdRow.exists }, object: nil)
+        _ = XCTWaiter.wait(for: [loadedChanges], timeout: 10)
         shot("extras-changes")
         // The diff steps need the fixture thread's checkout to have changes.
-        try XCTSkipIf(app.staticTexts["No uncommitted changes"].exists, "no uncommitted changes to open")
-        app.staticTexts.matching(NSPredicate(format: "label ENDSWITH '.md'")).firstMatch.tap()
+        try XCTSkipIf(emptyChanges.exists || !mdRow.exists, "no uncommitted changes to open")
+        mdRow.tap()
         sleep(2)
         shot("extras-diff")
         if app.buttons["View file"].waitForExistence(timeout: 3) {
@@ -279,11 +289,13 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         shot("extras-history")
         app.buttons["Done"].tap()
         app.open(URL(string: "bbstudio://archived")!)
-        XCTAssertTrue(app.navigationBars["Archived"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Archived"].waitForExistence(timeout: 10)
+            || app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label CONTAINS 'Archived'")).firstMatch.waitForExistence(timeout: 5))
         sleep(2)
         shot("extras-archived")
         app.open(URL(string: "bbstudio://drawings")!)
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10)
+            || app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Studio'")).firstMatch.waitForExistence(timeout: 5))
         sleep(2)
         shot("extras-drawings")
         if let id = ProcessInfo.processInfo.environment["BBGO_QA_DRAWING"] {
@@ -298,7 +310,6 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         try requireQAServer()
         app.launchStaged(server: qaServer)
         openStudioCollection()
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         sleep(2)
         shot("studio-all")
         for (chip, name) in [("Pages", "page"), ("Recordings", "recording"), ("Dictations", "dictation"), ("Whiteboards", "drawing"), ("Apps", "app")] {
@@ -314,15 +325,13 @@ final class ThreadUITests: ServerIsolatedUITestCase {
                 sleep(3)
                 shot("studio-\(name)")
                 XCTAssertFalse(app.navigationBars["Recording"].exists)
-                app.navigationBars.buttons.firstMatch.tap()
+                app.goBack()
                 sleep(1)
             }
-            app.buttons[chip].firstMatch.tap()
+            let chipAgain = app.buttons[chip].firstMatch
+            if chipAgain.waitForExistence(timeout: 3) { chipAgain.tap() }
         }
-        let search = app.searchFields.firstMatch
-        if !search.waitForExistence(timeout: 2) {
-            app.collectionViews.firstMatch.swipeDown()
-        }
+        let search = studioSearchField()
         if search.waitForExistence(timeout: 3) {
             search.tap()
             search.typeText("roadmap")
@@ -517,8 +526,22 @@ final class ThreadUITests: ServerIsolatedUITestCase {
     /// Studio opens on the collection.
     private func openStudioCollection() {
         app.open(URL(string: "bbstudio://studio")!)
+        let shellTitle = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Studio'")).firstMatch
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10)
-            || app.staticTexts["Studio"].waitForExistence(timeout: 5), "Studio collection")
+            || shellTitle.waitForExistence(timeout: 5), "Studio collection")
+    }
+
+    /// Studio's search field: `shellSearchField` on Duo, toolbar `screenAction-search` -> `searchFields` on iPhone.
+    private func studioSearchField() -> XCUIElement {
+        let duoField = app.textFields["shellSearchField"].firstMatch
+        if duoField.waitForExistence(timeout: 3) { return duoField }
+        let navField = app.searchFields.firstMatch
+        let searchButton = app.buttons["screenAction-search"].firstMatch
+        if !navField.exists, searchButton.waitForExistence(timeout: 5) {
+            searchButton.tap()
+        }
+        _ = navField.waitForExistence(timeout: 5)
+        return navField
     }
 
     /// The socket closes in the background: on return the inbox catches up on what
@@ -595,7 +618,7 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.descendants(matching: .any)["pageWorkField"].waitForExistence(timeout: 10), "work bar")
         sleep(1)
         shot("page-work-bar")
-        app.buttons["More"].firstMatch.tap()
+        app.screenMore.tap()
         XCTAssertTrue(app.buttons["Version History"].waitForExistence(timeout: 5), "menu")
         shot("page-menu")
         app.buttons["Version History"].tap()
@@ -607,7 +630,7 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS 'QA version'")).firstMatch.waitForExistence(timeout: 10), "saved version")
         shot("page-history")
         app.buttons["Done"].tap()
-        app.buttons["More"].firstMatch.tap()
+        app.screenMore.tap()
         app.buttons["Rename"].tap()
         let title = app.alerts.textFields.firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 5))
@@ -631,7 +654,7 @@ final class ThreadUITests: ServerIsolatedUITestCase {
             _ = rpc("studio", "pages.commentResolve", ["id": id, "thread": thread["id"] as? String ?? "", "resolved": true])
         }
         app.open(URL(string: "bbstudio://page/\(id)")!)
-        let comments = app.buttons["Comments"].firstMatch
+        let comments = app.screenAction("comments")
         XCTAssertTrue(comments.waitForExistence(timeout: 10), "comments button")
         shot("page-comments-button")
         comments.tap()
@@ -665,17 +688,23 @@ final class ThreadUITests: ServerIsolatedUITestCase {
     func testRecordingPlayback() throws {
         try requireQAServer()
         app.launchStaged(server: qaServer)
-        let webm = ProcessInfo.processInfo.environment["BBGO_QA_RECORDING"] ?? "rec_ad0bc5936076aad9"
-        let mp4 = ProcessInfo.processInfo.environment["BBGO_QA_RECORDING_MP4"] ?? "rec_4e03a488bb709b29"
+        let env = ProcessInfo.processInfo.environment
+        var ids = [env["BBGO_QA_RECORDING"], env["BBGO_QA_RECORDING_MP4"]].compactMap { $0 }.filter { !$0.isEmpty }
+        if ids.isEmpty,
+           let list = rpc("studio", "recordings.recordings_list", ["limit": 10])?["recordings"] as? [[String: Any]],
+           let first = list.first?["id"] as? String {
+            ids = [first]
+        }
+        guard !ids.isEmpty else { throw XCTSkip("no recording available on staged server") }
         let position = app.staticTexts["playerPosition"]
         func seconds() -> Int {
             let parts = position.label.split(separator: ":").compactMap { Int($0) }
             return parts.reduce(0) { $0 * 60 + $1 }
         }
-        for id in [webm, mp4] {
+        for id in ids {
             app.open(URL(string: "bbstudio://recording/\(id)")!)
             let play = app.buttons["Play"].firstMatch
-            XCTAssertTrue(play.waitForExistence(timeout: 10), "player bar")
+            XCTAssertTrue(play.waitForExistence(timeout: 15), "player bar")
             play.tap()
             XCTAssertTrue(app.buttons["Pause"].firstMatch.waitForExistence(timeout: 15), "playing \(id)")
             sleep(3)
@@ -718,7 +747,7 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         let thread = try XCTUnwrap(scratchThread("QA save to studio \(Int(Date().timeIntervalSince1970))"))
         addTeardownBlock { _ = self.api("DELETE", "/threads/\(thread)", ["childThreadsConfirmed": false]) }
         app.open(URL(string: "bbstudio://thread/\(thread)")!)
-        let more = app.buttons["More"].firstMatch
+        let more = app.conversationMore
         XCTAssertTrue(more.waitForExistence(timeout: 10))
         more.tap()
         let item = app.buttons["Save Files to Studio…"]
@@ -747,7 +776,7 @@ final class ThreadUITests: ServerIsolatedUITestCase {
             }
         }
         openStudioCollection()
-        let new = app.buttons["New"].firstMatch
+        let new = app.screenAction("new")
         XCTAssertTrue(new.waitForExistence(timeout: 10), "New menu")
         new.tap()
         let newPage = app.buttons["New Page"]
@@ -780,7 +809,8 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         shot("page-studio-embeds")
         embed.tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Transcript' OR label CONTAINS 'transcript'")).firstMatch.waitForExistence(timeout: 10)
-            || app.navigationBars.count > 0, "recording opens")
+            || app.navigationBars.count > 0
+            || app.descendants(matching: .any)["shellTitle"].exists, "recording opens")
         sleep(1)
         shot("page-embed-opened")
     }
@@ -836,37 +866,53 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         let thread = try XCTUnwrap(scratchThread("QA permissions \(Int(Date().timeIntervalSince1970))"))
         addTeardownBlock { _ = self.api("DELETE", "/threads/\(thread)", ["childThreadsConfirmed": false]) }
         app.open(URL(string: "bbstudio://thread/\(thread)")!)
-        let more = app.buttons["More"].firstMatch
+        let more = app.conversationMore
         XCTAssertTrue(more.waitForExistence(timeout: 10))
         more.tap()
         app.buttons["Model & permissions"].tap()
         let picker = app.buttons["permissionPicker"].firstMatch
         XCTAssertTrue(picker.waitForExistence(timeout: 10), "permissions picker")
         shot("permissions-sheet")
+        let targetMode = picker.label.contains("Accept edits") ? "Auto" : "Accept edits"
         picker.tap()
-        app.buttons["Accept edits"].firstMatch.tap()
+        app.buttons[targetMode].firstMatch.tap()
         app.buttons["Save"].tap()
         XCTAssertTrue(more.waitForExistence(timeout: 5))
-        let pending = app.descendants(matching: .any)["pendingPermission"].firstMatch
-        XCTAssertTrue(pending.waitForExistence(timeout: 5), "pending permissions over the composer")
+        let pendingCard = app.descendants(matching: .any)["pendingPermission"].firstMatch
+        let pendingChip = app.buttons["chip-permission"].firstMatch
+        let shown = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in pendingCard.exists || pendingChip.exists }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 5), .completed, "pending permissions over the composer")
         shot("permissions-pending")
         sleep(1)
         more.tap()
-        XCTAssertTrue(app.buttons["Copy Thread ID"].exists, "Copy Thread ID")
+        let shareMenu = app.buttons["Share & notifications"].firstMatch
+        if shareMenu.waitForExistence(timeout: 3) {
+            shareMenu.tap()
+            XCTAssertTrue(app.buttons["Copy Thread ID"].waitForExistence(timeout: 3), "Copy Thread ID")
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.4)).tap()
+            more.tap()
+        } else {
+            XCTAssertTrue(app.buttons["Copy Thread ID"].exists, "Copy Thread ID")
+        }
         app.buttons["Model & permissions"].tap()
         XCTAssertTrue(picker.waitForExistence(timeout: 10))
-        XCTAssertTrue(picker.label.contains("Accept edits") || (picker.value as? String)?.contains("Accept edits") == true, "kept the choice: \(picker.label)")
+        XCTAssertTrue(picker.label.contains(targetMode) || (picker.value as? String)?.contains(targetMode) == true, "kept the choice: \(picker.label)")
         shot("permissions-kept")
         app.buttons["Cancel"].tap()
-        app.buttons["Undo"].tap()
-        XCTAssertTrue(wait(5) { !pending.exists }, "undo clears it")
+        let clearBtn = app.buttons["chip-permission-close"].firstMatch.exists
+            ? app.buttons["chip-permission-close"].firstMatch
+            : app.buttons["Undo"].firstMatch
+        XCTAssertTrue(clearBtn.waitForExistence(timeout: 5), "clear pending permission button")
+        clearBtn.tap()
+        XCTAssertTrue(wait(5) { !pendingCard.exists && !pendingChip.exists }, "undo clears it")
     }
 
     /// A message's menu ends with when it was sent. Read-only on a real thread.
     func testMessageSentTime() throws {
         try requireQAServer()
         app.launchStaged(server: qaServer)
-        app.open(URL(string: "bbstudio://thread/thr_demo000003")!)
+        let sentId = ProcessInfo.processInfo.environment["BBGO_QA_SENT_THREAD"] ?? threadId
+        app.open(URL(string: "bbstudio://thread/\(sentId)")!)
         let texts = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "(?s).{20,}"))
         XCTAssertTrue(texts.firstMatch.waitForExistence(timeout: 15), "messages")
         sleep(2)
@@ -1010,7 +1056,6 @@ final class ThreadUITests: ServerIsolatedUITestCase {
     /// tag, archives one page and deletes both from select mode.
     func testStudioBulk() throws {
         try requireQAServer()
-        app.launchStaged(server: qaServer)
         let stamp = Int(Date().timeIntervalSince1970)
         let word = "zebracorn\(stamp)", titleA = "QA bulk A \(stamp)", titleB = "QA bulk B \(stamp)"
         let tagName = "QA bulk tag \(stamp)", renamed = "QA renamed \(stamp)"
@@ -1032,9 +1077,11 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         let tag = try XCTUnwrap((rpc("studio", "createTag", ["name": tagName])?["tag"] as? [String: Any])?["id"] as? String)
         _ = rpc("studio", "tagItems", ["items": [["pluginId": "pages", "id": ids[0]]], "add": [tag], "remove": [String]()])
 
+        app.launchArguments += ["-skipPushPrompt", "YES"]
+        app.launchStaged(server: qaServer)
         openStudioCollection()
-        let search = app.searchFields.firstMatch
-        if !search.waitForExistence(timeout: 5) { app.swipeDown() }
+        _ = app.descendants(matching: .any).matching(identifier: "studioItem").firstMatch.waitForExistence(timeout: 10)
+        let search = studioSearchField()
         XCTAssertTrue(search.waitForExistence(timeout: 10), "search field")
         search.tap()
         search.typeText(word)
@@ -1042,7 +1089,7 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         shot("studio-snippet")
 
         // The tag chip: rename, then delete.
-        let chips = app.scrollViews.containing(.button, identifier: "All").firstMatch
+        let chips = app.scrollViews.containing(.button, identifier: "studio-kind-all").firstMatch
         let chip = chips.buttons.matching(NSPredicate(format: "label CONTAINS %@", tagName)).firstMatch
         for _ in 0..<6 where !chip.isHittable { chips.swipeLeft() }
         XCTAssertTrue(chip.waitForExistence(timeout: 10), "tag chip")
@@ -1065,7 +1112,9 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(wait(10) { tagId(renamed) == nil }, "tag deleted")
 
         // Archive one from select mode.
-        app.buttons["Select"].tap()
+        let selectBtn = app.screenAction("select")
+        XCTAssertTrue(selectBtn.waitForExistence(timeout: 5), "Select button")
+        selectBtn.tap()
         let rowA = app.cells.containing(NSPredicate(format: "label CONTAINS %@", titleA)).firstMatch
         XCTAssertTrue(rowA.waitForExistence(timeout: 10), "row A")
         rowA.tap()
@@ -1075,7 +1124,8 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(wait(10) { page(ids[0])?["archived"] as? Bool == true }, "archived")
 
         // Delete what's left. Rows are picked one by one: Select All would take real items if the search were lost.
-        app.buttons["Select"].tap()
+        XCTAssertTrue(selectBtn.waitForExistence(timeout: 5), "Select button again")
+        selectBtn.tap()
         let rowB = app.cells.containing(NSPredicate(format: "label CONTAINS %@", titleB)).firstMatch
         XCTAssertTrue(rowB.waitForExistence(timeout: 10), "row B")
         rowB.tap()

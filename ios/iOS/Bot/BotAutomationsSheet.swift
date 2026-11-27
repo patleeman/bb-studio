@@ -26,9 +26,9 @@ struct BotAutomationsSheet: View {
     /// An automation, with Delete (or Turn off) and Pause or Resume. Apart
     /// from `body`, so that type-checks quickly.
     private func row(_ automation: BotAutomation) -> some View {
-        NavigationLink {
-            BotAutomationDetail(automation: automation, botId: botId, active: active) { editing = Editing(kind: automation.kind, automation: automation) } changed: { await load() }
-        } label: { BotAutomationRow(automation: automation) }
+        NavigationLink(value: Route.botAutomation(botId: botId, automation: automation, active: active)) {
+            BotAutomationRow(automation: automation)
+        }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) { deleting = automation } label: { Label(automation.original ? "Turn off" : "Delete", systemImage: "trash") }
             if automation.state == "active" || automation.state == "paused" {
@@ -40,7 +40,14 @@ struct BotAutomationsSheet: View {
     }
 
     var body: some View {
-        if embedded { content } else { NavigationStack { content } }
+        if embedded {
+            content
+        } else {
+            NavigationStack {
+                content
+                    .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+            }
+        }
     }
 
     private var content: some View {
@@ -82,7 +89,7 @@ struct BotAutomationsSheet: View {
             }
             if allAutomations, runningPlugins.split(separator: ",").contains("automations") {
                 Section {
-                    NavigationLink { AutomationsView() } label: { Label("All automations", systemImage: "clock.arrow.circlepath") }
+                    NavigationLink(value: Route.automations) { Label("All automations", systemImage: "clock.arrow.circlepath") }
                         .accessibilityIdentifier("schedulesAllAutomations")
                 } footer: { Text("Every automation in BB, in every project.") }
             }
@@ -188,13 +195,15 @@ struct BotAutomationDetail: View {
     let automation: BotAutomation
     var botId: String?
     var active: Bool
-    var edit: () -> Void
-    var changed: () async -> Void
+    var edit: (() -> Void)? = nil
+    var changed: (() async -> Void)? = nil
     @EnvironmentObject private var app: AppModel
     @State private var current: BotAutomation?
     @State private var runs: [BotAutomationRun]?
     @State private var error: String?
     @State private var busy = false
+    @State private var showingEditor = false
+    @State private var runners: [BotAutomation] = []
 
     private var shown: BotAutomation { current ?? automation }
 
@@ -221,7 +230,9 @@ struct BotAutomationDetail: View {
                         .disabled(busy || (!shown.active && !active))
                 }
                 if shown.state != "done" { Button("Run now", systemImage: "bolt") { act(.runNow) }.disabled(busy || !active) }
-                Button("Edit", systemImage: "pencil", action: edit)
+                Button("Edit", systemImage: "pencil") {
+                    if let edit { edit() } else { showingEditor = true }
+                }
             }
             Section("Recent runs") {
                 if let runs, !runs.isEmpty {
@@ -237,16 +248,28 @@ struct BotAutomationDetail: View {
             }
             if let error { Section { Text(error).foregroundStyle(.red) } }
         }
-        .navigationTitle(shown.name)
-        .navigationBarTitleDisplayMode(.inline)
+        .screenToolbar(shown.name, actions: [])
+        .sheet(isPresented: $showingEditor) {
+            BotAutomationEditor(kind: shown.kind, automation: shown, botId: botId, runners: runners) {
+                await reload()
+                await changed?()
+            }
+        }
         .refreshable { await loadRuns() }
         .task { await loadRuns() }
+    }
+
+    private func reload() async {
+        guard let list = try? await app.client.botAutomations(botId: botId) else { return }
+        runners = list.filter { $0.kind == .runner }
+        if let updated = list.first(where: { $0.id == automation.id }) { current = updated }
     }
 
     private func loadRuns() async {
         #if DEBUG
         if let demo = BotDemo.current { runs = demo.automationRuns; return }
         #endif
+        await reload()
         do { runs = try await app.client.botAutomationRuns(id: automation.id, botId: botId) } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
     }
 
@@ -257,7 +280,7 @@ struct BotAutomationDetail: View {
             do {
                 current = try await app.client.botAutomation(action, id: automation.id, botId: botId)
                 error = nil
-                await changed()
+                await changed?()
                 if action == .runNow { try? await Task.sleep(for: .seconds(2)) }
                 await loadRuns()
             } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
