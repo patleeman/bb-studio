@@ -157,7 +157,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 20), "the conversation is pushed")
         let button = app.buttons["workbenchButton"]
         XCTAssertTrue(button.exists, "the Workbench button")
-        XCTAssertEqual(button.label, "Workbench, 4 tabs", "with the tab count")
+        XCTAssertEqual(button.label, "Workbench, 3 tabs", "the tabs the phone can show (not the VS Code one)")
         XCTAssertTrue(app.buttons["conversationMore"].exists, "and ⋯")
         XCTAssertFalse(element("conversationHandsFree").exists, "no Live button in the chrome")
         XCTAssertFalse(element("shellRail").exists, "no rail on the iPhone")
@@ -171,6 +171,21 @@ final class ShellUITests: ServerIsolatedUITestCase {
 
         app.buttons["workbenchButton"].tap()
         XCTAssertTrue(element("conversationTitle").waitForExistence(timeout: 10), "back in the chat")
+    }
+
+    /// Review SF5: a conversation whose only tab is Mac-only: "0 tabs" on
+    /// the Workbench button, and the Workbench says "No tabs", as the count does.
+    func testAMacOnlyTabCountsAsNoTab() throws {
+        try XCTSkipIf(isDuo, "the iPhone")
+        launchConversation(["-qaWorkbenchMacOnly"])
+        let button = app.buttons["workbenchButton"]
+        XCTAssertTrue(button.waitForExistence(timeout: 10))
+        XCTAssertEqual(button.label, "Workbench, 0 tabs")
+        button.tap()
+        XCTAssertTrue(element("workbenchEmpty").waitForExistence(timeout: 10), "No tabs")
+        app.buttons["workbenchTitle"].tap()
+        XCTAssertTrue(app.buttons["README.md"].waitForExistence(timeout: 5) || element("workbenchTab-tab-code").exists,
+                      "the tab menu still lists the Mac-only tab")
     }
 
     func testASidewaysSwipeFlipsChatAndWorkbench() throws {
@@ -203,7 +218,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         app.buttons["Close “Theme stills”"].tap()
         XCTAssertEqual(app.buttons["workbenchButton"].exists, true)
         app.buttons["workbenchButton"].tap()
-        XCTAssertEqual(app.buttons["workbenchButton"].label, "Workbench, 3 tabs", "one tab fewer")
+        XCTAssertEqual(app.buttons["workbenchButton"].label, "Workbench, 2 tabs", "one tab fewer")
     }
 
     func testTheMoreMenuHoldsTheConversationsItems() throws {

@@ -74,6 +74,41 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertTrue(WorkbenchTabKind(page).showsOnPhone)
     }
 
+    /// Review SF5: the Workbench button counts what the Workbench can show,
+    /// so a Mac-only tab alone is "0 tabs" and the Workbench says "No tabs".
+    func testTheCountIsTheTabsThePhoneCanShow() {
+        let code = WorkbenchTab(id: "code", ref: .init(kind: "vscode", path: "a.swift"), title: "VS Code", support: .desktopOnly)
+        let page = WorkbenchTab(id: "page", ref: .init(kind: "page", id: "p"), title: "Page")
+        let broken = WorkbenchTab(id: "broken", ref: .init(kind: "page"), title: "No id")
+        XCTAssertEqual(WorkbenchStore.shown([code]).count, 0)
+        XCTAssertEqual(WorkbenchStore.shown([code, page, broken]).map(\.id), ["page"])
+        XCTAssertEqual(WorkbenchStore.shown([code]).isEmpty, WorkbenchStore.selected([code], picked: nil, active: nil) == nil,
+                       "the count is 0 exactly when the Workbench shows nothing")
+    }
+
+    /// Review nit 2: a closed tab's place goes to its nearest neighbour the phone can show.
+    func testClosingATabShowsTheNearestOneThePhoneCanShow() {
+        let page1 = WorkbenchTab(id: "p1", ref: .init(kind: "page", id: "1"), title: "1")
+        let page2 = WorkbenchTab(id: "p2", ref: .init(kind: "page", id: "2"), title: "2")
+        let code = WorkbenchTab(id: "code", ref: .init(kind: "vscode", path: "a.swift"), title: "VS Code", support: .desktopOnly)
+        XCTAssertEqual(WorkbenchStore.neighbour(closing: "p2", in: [page1, page2, code])?.id, "p1", "not the Mac-only tab after it")
+        XCTAssertEqual(WorkbenchStore.neighbour(closing: "p1", in: [page1, code, page2])?.id, "p2", "the next one, past the Mac-only tab")
+        XCTAssertNil(WorkbenchStore.neighbour(closing: "p1", in: [page1, code]), "none left to show")
+    }
+
+    /// Review nit 1: the tab menu says why it can't show a tab, by kind.
+    func testTheTabMenuSaysWhyATabDoesNotShow() {
+        let code = WorkbenchTab(id: "code", ref: .init(kind: "vscode", path: "a.swift"), title: "VS Code", support: .desktopOnly)
+        let link = WorkbenchTab(id: "link", ref: .init(kind: "browser", url: "javascript:alert(1)"), title: "Link")
+        let broken = WorkbenchTab(id: "broken", ref: .init(kind: "page"), title: "No id")
+        let page = WorkbenchTab(id: "page", ref: .init(kind: "page", id: "p"), title: "Page")
+        XCTAssertEqual(WorkbenchTabKind(code).unshown?.label, "On your Mac")
+        XCTAssertEqual(WorkbenchTabKind(link), .unsafeLink)
+        XCTAssertEqual(WorkbenchTabKind(link).unshown?.label, "Link not opened here")
+        XCTAssertEqual(WorkbenchTabKind(broken).unshown?.label, "Can't open here")
+        XCTAssertNil(WorkbenchTabKind(page).unshown)
+    }
+
     func testNewTabOpensStudioItemsByKind() throws {
         func item(_ href: String) throws -> Studio.SearchAllOutputItem {
             try JSONDecoder().decode(Studio.SearchAllOutputItem.self, from: Data(#"{"title":"x","href":"\#(href)"}"#.utf8))

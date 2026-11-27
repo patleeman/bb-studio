@@ -66,10 +66,15 @@ enum WorkbenchTabKind: Equatable {
 
     /// The phone has something to show for it. The rest (a Mac-only kind,
     /// a link it won't open, a tab sent without its id) never take a pane.
-    var showsOnPhone: Bool {
+    var showsOnPhone: Bool { unshown == nil }
+
+    /// Why the tab menu lists a tab the phone never shows, and its symbol.
+    var unshown: (label: String, symbol: String)? {
         switch self {
-        case .desktopOnly, .unsafeLink, .incomplete: false
-        default: true
+        case .desktopOnly: ("On your Mac", "desktopcomputer")
+        case .unsafeLink: ("Link not opened here", "link")
+        case .incomplete: ("Can't open here", "questionmark.square.dashed")
+        default: nil
         }
     }
 

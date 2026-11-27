@@ -191,6 +191,16 @@ enum DuoDemo {
             default: return false
             }
             return true
+        case "workbench":
+            // The shown conversation's Workbench (`-qaWorkbenchDemo`): `?close` its shown tab, `?open` a page tab.
+            guard let threadId = Router.shared.conversation else { return false }
+            let store = WorkbenchStore.shared
+            switch url.query() {
+            case "close": if let shown = store.selected(threadId) { store.close(shown.id, in: threadId) }
+            case "open": store.open(.init(kind: "page", id: "qa-demo"), title: "Lisbon budget", in: threadId)
+            default: return false
+            }
+            return true
         case "posture":
             // A posture the simulator can't make (it has no hinge); `?auto` goes back to measuring.
             ShellQA.override = url.query().flatMap(ShellPosture.init(rawValue:))
@@ -270,6 +280,16 @@ enum DuoDemo {
             return true
         case "attach":
             NotificationCenter.default.post(name: Notification.Name("qa-attach"), object: nil)
+            return true
+        case "covered":
+            // Whether VoiceOver reaches a UIKit view (`?composerField`): hidden if it or a view above it is.
+            guard let id = url.query() else { return false }
+            func named(_ view: UIView) -> UIView? {
+                view.accessibilityIdentifier == id ? view : view.subviews.lazy.compactMap(named).first
+            }
+            guard let found = named(window) else { return false }
+            let hidden = sequence(first: found, next: \.superview).contains { $0.accessibilityElementsHidden }
+            window.accessibilityValue = hidden ? "hidden" : "shown"
             return true
         case "inspect":
             NotificationCenter.default.post(name: Notification.Name("duo-qa-inspect"), object: nil)
