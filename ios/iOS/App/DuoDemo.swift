@@ -1,5 +1,4 @@
 #if DEBUG
-import OSLog
 import UIKit
 
 /// Simulator-only window resizing for the Duo fixture. The hosting controller,
@@ -37,6 +36,11 @@ enum DuoDemo {
         guard args.contains("-qaDuoColdWide"), configured.insert(ObjectIdentifier(window)).inserted else { return }
         screenSize = CGSize(width: 951, height: 669)
         window.frame = CGRect(x: 0, y: 0, width: 951, height: 669)
+        DispatchQueue.main.async {
+            innerScreenInsets(window)
+            window.rootViewController?.view.setNeedsLayout()
+            window.layoutIfNeeded()
+        }
     }
 
     /// "ViewClass frame: keys" for each layer under the window with animations.
@@ -126,25 +130,6 @@ enum DuoDemo {
         return Array(rgba.prefix(3))
     }
 
-    private static var constraintsSince = Date.distantPast
-
-    private static func constraintReport() -> String {
-        var count = 0
-        var samples: [String] = []
-        if let store = try? OSLogStore(scope: .currentProcessIdentifier),
-           let entries = try? store.getEntries(at: store.position(date: constraintsSince),
-               matching: NSPredicate(format: "subsystem == 'com.apple.UIKit' AND category == 'LayoutConstraints'")) {
-            for case let entry as OSLogEntryLog in entries where entry.date >= constraintsSince
-                && entry.composedMessage.contains("Unable to simultaneously satisfy constraints") {
-                count += 1
-                let lines = entry.composedMessage.split(separator: "\n").filter { $0.contains("NSLayoutConstraint") || $0.contains("NSAutoresizing") }
-                if samples.count < 6 { samples.append(lines.prefix(4).joined(separator: " | ")) }
-            }
-        }
-        let data = try? JSONSerialization.data(withJSONObject: ["count": count, "samples": samples], options: .sortedKeys)
-        return data.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-    }
-
     static func handle(_ url: URL) -> Bool {
         guard BotDemo.variant != nil || BurstDemo.enabled, url.host() == "qa-duo",
               let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
@@ -185,9 +170,13 @@ enum DuoDemo {
             screenSize = size
         case "tab":
             switch url.query() {
-            case "bot": Router.shared.path = []
-            case "studio": Router.shared.path = [.studio]
-            case "settings": Router.shared.path = [.settings]
+            case "bot": Router.shared.home([])
+            case "studio": Router.shared.home([.studio])
+            case "settings": Router.shared.home([.settings])
+            case "home": Router.shared.tab = .home
+            case "library": Router.shared.tab = .library
+            case "memory": Router.shared.tab = .memory
+            case "search": Router.shared.tab = .search
             default: return false
             }
             return true
@@ -236,18 +225,12 @@ enum DuoDemo {
         case "dismiss":
             window.endEditing(true)
             return true
-        case "constraints":
-            // UIKit's "Unable to simultaneously satisfy constraints" reports
-            // since launch, from this process's own log, with the first
-            // line of each constraint list. `?clear` starts over from now.
-            if url.query() == "clear" { constraintsSince = Date() }
-            window.accessibilityValue = constraintReport()
-            return true
         case "counts":
             // `?reset` starts over; otherwise the counts since then, as JSON.
             RenderCount.watchMainThread()
             if url.query() == "reset" { RenderCount.reset() }
             RenderCount.set("transcript.links", TranscriptDisplayLinkTarget.live)
+            RenderCount.set("router.path", Router.shared.path.count)
             if let data = try? JSONSerialization.data(withJSONObject: RenderCount.counts, options: .sortedKeys) {
                 window.accessibilityValue = String(data: data, encoding: .utf8)
             }
@@ -303,7 +286,10 @@ enum DuoDemo {
             var metadata: [String: Any] = ["idiom": window.traitCollection.userInterfaceIdiom == .phone ? "phone" : "other",
                 "width": window.bounds.width, "height": window.bounds.height,
                 "appearance": window.traitCollection.userInterfaceStyle == .dark ? "dark" : "light",
-                "safeTop": window.safeAreaInsets.top, "safeRight": window.safeAreaInsets.right,
+                "safeTop": window.safeAreaInsets.top, "safeRight": window.safeAreaInsets.right, "safeLeft": window.safeAreaInsets.left,
+                "rootSafeLeft": window.rootViewController?.view.safeAreaInsets.left ?? -1,
+                "rootSafeRight": window.rootViewController?.view.safeAreaInsets.right ?? -1,
+                "additionalRight": window.rootViewController?.additionalSafeAreaInsets.right ?? 0,
                 "screenWidth": window.screen.bounds.width, "screenHeight": window.screen.bounds.height,
                 "windows": window.windowScene?.windows.map { ["class": String(describing: type(of: $0)),
                     "width": $0.bounds.width, "height": $0.bounds.height, "hidden": $0.isHidden] as [String: Any] } ?? []]
@@ -385,15 +371,26 @@ enum DuoDemo {
                 input.becomeFirstResponder()
                 return true
             }
-            _ = find(window)?.accessibilityActivate()
+            // The system's bars can sit in a window of their own (the Duo's right column).
+            let windows = [window] + (window.windowScene?.windows ?? []).filter { $0 !== window }
+            _ = windows.lazy.compactMap(find).first?.accessibilityActivate()
             return true
         default: return false
         }
         window.accessibilityIdentifier = "duo-process-\(ProcessInfo.processInfo.processIdentifier)"
         window.frame = CGRect(origin: origin, size: size)
+        innerScreenInsets(window)
         window.rootViewController?.view.setNeedsLayout()
         window.layoutIfNeeded()
         return true
+    }
+
+    /// The simulator's screen is the outer one, whose status column UIKit keeps at the window's
+    /// trailing edge (84 pt) however the window is stretched, and lays the system's bars out
+    /// for. The inner screen has none: for its sizes, cancel it (as Kensico's inner-screen demo does).
+    static func innerScreenInsets(_ window: UIWindow) {
+        // The window's own safe area: what the root view controller adds isn't in it.
+        window.rootViewController?.additionalSafeAreaInsets.right = screenSize == nil ? 0 : -window.safeAreaInsets.right
     }
 }
 #endif

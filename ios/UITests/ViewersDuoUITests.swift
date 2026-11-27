@@ -37,9 +37,10 @@ final class ViewersDuoUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(onEitherPage("pageScroll"), "the page opens")
         XCTAssertTrue(app.buttons["pageCommentMark-aaaa0004"].waitForExistence(timeout: 10), "comment marks")
         shot("duo-unfolded-page")
-        // The page spans both halves; its bar's Comments is on the right one.
-        page("right")
-        app.screenAction("comments").tap()
+        // Pushed over the conversation; its bar's Comments is where the system puts the bar's buttons.
+        let comments = app.screenAction("comments")
+        XCTAssertTrue(comments.waitForExistence(timeout: 10), "Comments in the page's bar")
+        app.press(comments, id: "screenAction-comments")
         XCTAssertTrue(onEitherPage("Add the press kit."), "the comments")
         shot("duo-unfolded-page-comments")
     }
@@ -53,6 +54,9 @@ final class ViewersDuoUITests: ServerIsolatedUITestCase {
         screen.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5)).tap()
         let still = any("designStill")
         XCTAssertTrue(still.waitForExistence(timeout: 15))
+        // Drawn and fit to the width (its value is the zoom, from then on): a double tap before that does nothing.
+        let drawn = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in (still.value as? String) == "1.0000" }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [drawn], timeout: 20), .completed, "the still is drawn")
         // Its left part: the simulator shows one page of the inner screen, and the still spans both.
         still.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.4)).doubleTap()
         let until = Date().addingTimeInterval(10)

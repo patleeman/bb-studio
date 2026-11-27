@@ -12,6 +12,8 @@ struct ThreadView: View {
     @StateObject private var dictation = DictationGate()
     /// "Expand to page": the thread's open note and its editor.
     @StateObject private var notes: ThreadNotes
+    /// Holds the thread from the view's first appearance until it is gone.
+    @StateObject private var lifetime = ThreadViewLifetime()
     /// What was typed before an inline dictation; what you say goes in after it.
     @State private var talkTyped: String?
     @State private var draftText = DraftText()
@@ -70,7 +72,7 @@ struct ThreadView: View {
     @Environment(\.botConversation) private var shell
     @Environment(\.look) private var look
     @Environment(\.shellPosture) private var posture
-    @Environment(\.shellPaneAtRail) private var paneAtRail
+    @Environment(\.shellPaneAtEdge) private var paneAtEdge
     @Environment(\.shellInnerScreen) private var innerScreen
     @ObservedObject private var router = Router.shared
     /// The Workbench over the rows (between the title and the composer); nil shows the chat.
@@ -396,10 +398,12 @@ struct ThreadView: View {
             session.attach(app)
             await model.load()
         }
-        // Attached as it appears, in step with `onDisappear`'s stop: a screen
-        // that replaces another in the same update takes over before the
-        // deferred detach looks (no async start racing it).
-        .onAppear { session.hold(app) }
+        // Held for the view's life, not while it shows: a conversation under
+        // another tab (or a screen pushed over it) keeps listening, so what
+        // arrives meanwhile is there on return. Taken as it first appears: a
+        // screen that replaces another in the same update takes over before
+        // the deferred detach looks (no async start racing it).
+        .onAppear { lifetime.hold(session, notes: notes, app: app) }
         // Open where the reader left off. Waits a beat for the rows to be laid out.
         .task(id: model.unreadFrom) {
             guard model.unreadFrom != nil else { return }
@@ -410,8 +414,6 @@ struct ThreadView: View {
             saveDraftLocally()
             resizeRestore?.cancel()
             resizeAnchor.cancel()
-            session.stop()
-            notes.detach()
         }
     }
 
@@ -429,7 +431,7 @@ struct ThreadView: View {
     /// Hands-free voice speaks as this conversation (its identity comes from the thread).
     private func startHandsFree() { Router.shared.sheet = .handsFree(threadId: model.threadId) }
 
-    /// What the conversation's menu asked for (`ConversationMenuItems`, in the shell's bar or rail).
+    /// What the conversation's menu asked for (`ConversationMenuItems`, in the conversation's bar).
     private func perform(_ command: ConversationCommand) {
         switch command {
         case .find: finding = true
@@ -1653,7 +1655,6 @@ extension ThreadView {
                                         findQuery: findQuery))
             .environment(\.threadId, model.threadId)
             .environment(\.openURL, transcriptV2OpenURL)
-            .onAppear { session.transcript = transcriptV2 }
     }
 
     private var transcriptV2Body: some View {
@@ -1831,7 +1832,7 @@ extension ThreadView {
         chrome.rows.margin = Self.margin
         chrome.rows.spacing = 10
         chrome.rows.readableWidth = readableWidth
-        if posture.splitsWorkbench, !paneAtRail {
+        if posture.splitsWorkbench, !paneAtEdge {
             // A pane left of another: its stack still hands the transcript the
             // window's trailing inset (the status column, a screen away).
             chrome.composerIgnoresTrailingSafeArea = true
@@ -1958,5 +1959,37 @@ struct InlineJump: ViewModifier {
         .transition(.opacity.combined(with: .scale(scale: 0.8)))
         .accessibilityLabel(label.map { "Jump to latest, \($0)" } ?? "Jump to latest")
         .accessibilityIdentifier("jumpToLatest")
+    }
+}
+
+/// A thread view's hold on its session and notes, for the view's life: it
+/// lets go when SwiftUI drops the view (popped, replaced), not when it is
+/// only out of sight (another tab, a screen pushed over it).
+@MainActor
+final class ThreadViewLifetime: ObservableObject {
+    private var session: ConversationSession?
+    private var notes: ThreadNotes?
+
+    func hold(_ session: ConversationSession, notes: ThreadNotes, app: AppModel) {
+        guard self.session == nil else { return }
+        self.session = session
+        self.notes = notes
+        session.hold(app)
+    }
+
+    /// SwiftUI drops its state on the main thread, but a deinit may run on
+    /// any: the release goes to the main actor, inline only when already on it.
+    deinit {
+        guard let session, let notes else { return }
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { Self.release(session, notes) }
+        } else {
+            Task { @MainActor in Self.release(session, notes) }
+        }
+    }
+
+    private static func release(_ session: ConversationSession, _ notes: ThreadNotes) {
+        session.stop()
+        notes.detach()
     }
 }

@@ -60,7 +60,7 @@ final class HeatScreensUITests: ServerIsolatedUITestCase {
 
     func test1Home() {
         launch([])
-        XCTAssertTrue(any("home").waitForExistence(timeout: 40), "Home")
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 40), "Home")
         hold("home")
     }
 

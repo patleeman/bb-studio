@@ -254,7 +254,7 @@ struct ArtifactView: View {
 
     // MARK: Actions
 
-    /// Share and the source toggle first; the rest under ⋯ (the Duo: the rail and its More).
+    /// Share and the source toggle first; the rest under ⋯.
     private func actions(_ artifact: Artifact) -> [ScreenAction] {
         var list = [ScreenAction(id: "share", title: "Share", systemImage: "square.and.arrow.up", disabled: working,
                                  run: { Task { await share() } })]

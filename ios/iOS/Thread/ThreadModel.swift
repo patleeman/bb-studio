@@ -283,6 +283,8 @@ final class ThreadModel: ObservableObject {
                 break
             }
         }
+        // Attached again after a detach: catch up on what came while it wasn't listening.
+        if loaded { scheduleRefresh(nil) }
         if backgroundObserver == nil {
             backgroundObserver = NotificationCenter.default.addObserver(
                 forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
@@ -299,6 +301,9 @@ final class ThreadModel: ObservableObject {
         }
         cacheFlushTask?.cancel()
         cacheFlushTask = nil
+        #if DEBUG
+        if BotDemo.served != nil { BotDemo.Server.shared.unobserve(self) }
+        #endif
         guard let client = boundClient else { return }
         if loaded { cache(force: true) }
         if readPending {

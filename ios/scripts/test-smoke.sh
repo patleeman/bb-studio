@@ -42,7 +42,7 @@ ComposerUITests
 "
 only=""
 for suite in $suites; do only="$only -only-testing:BBStudioUITests/$suite"; done
-xcodebuild test-without-building -scheme BBStudio -destination "id=$device" -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO \
+xcodebuild test-without-building -scheme BBStudio -destination "id=$device" -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -test-timeouts-enabled YES \
   -only-testing:BBStudioTests -skip-testing:BBStudioTests/TranscriptReplayTests $only
 
 if [ "${STAGED:-0}" = 1 ]; then

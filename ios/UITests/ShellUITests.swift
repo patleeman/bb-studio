@@ -1,8 +1,9 @@
 import XCTest
 
-/// The app shell (round 7), offline: Home as the root, one bar on the
-/// iPhone with the Workbench button and the tab menu, the sideways flip, and
-/// on the Duo the rail in every posture (folded, book, flat, vertical).
+/// The app shell (round 8), offline: the native tab bar (Home, Library,
+/// Memory, Search), one stack per tab with native bars in every posture
+/// (iPhone; Duo folded, book, flat, vertical): the system's Back, the
+/// Workbench button and ⋯, the tab menu as the Workbench's title, the sideways flip.
 /// Window sizes come from the app's own resize (`bbstudio://qa-duo/…`); the
 /// simulator has no hinge, so `-qaPosture` names book or flat. With
 /// `SHELL_CAPTURE` set, `qa-duo/capture` keeps window PNGs in the app's Documents.
@@ -41,10 +42,11 @@ final class ShellUITests: ServerIsolatedUITestCase {
 
     /// The inner screen is wider than the simulator's: controls off it are activated as VoiceOver does.
     private func activate(_ id: String) {
-        command("activate?" + id)
+        app.press(element(id), id: id)
+        sleep(1)
     }
 
-    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id] }
+    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     // MARK: Idle
 
@@ -78,7 +80,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertEqual(counts["transcript.links"], 0, "display links left running: \(counts)")
     }
 
-    /// Back to Home from a conversation (the rail's Home): Home settles too.
+    /// Back to Home from a conversation: Home settles too.
     func testHomeGoesIdleAfterAConversation() {
         launch(["-qaConversation", "thr_botdemo01"])
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")
@@ -96,6 +98,13 @@ final class ShellUITests: ServerIsolatedUITestCase {
     }
     func testTheBotChatGoesIdleAfterAStream() {
         expectIdle(["-qaDemoLatency", "300", "-qaDemoColdCache", "-qaDemoStream", "-openURL", "bbstudio://bot"])
+    }
+
+    /// The system's Liquid Glass keeping its lens on what's under it (the tab bar's and the bar's
+    /// glass): `match-…` animations that last for good and never restart; the system's, as the caret is.
+    private static func systemGlass(_ row: String) -> Bool {
+        let animations = (row.components(separatedBy: "): ").last ?? "").components(separatedBy: ", ")
+        return !animations.isEmpty && animations.allSatisfy { $0.hasPrefix("match-") || $0.contains(".match") }
     }
 
     /// Repeating for good (a huge repeatCount); the caret's blink is the system's.
@@ -121,7 +130,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
             XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/animations")!)
             Thread.sleep(forTimeInterval: 0.3)
             seen += (app.windows.firstMatch.value as? String ?? "").split(separator: "\n").map(String.init)
-                .filter { !$0.contains("UITextSelectionView") && !$0.contains("Caret") && $0.hasPrefix("webview") == false }
+                .filter { !$0.contains("UITextSelectionView") && !$0.contains("Caret") && $0.hasPrefix("webview") == false && !Self.systemGlass($0) }
                 // Only animations still running: a layer can keep a finished or paused one.
                 .filter { row in (row.components(separatedBy: "): ").last ?? row).components(separatedBy: ", ").contains { !$0.hasSuffix(" done") } }
         }
@@ -131,36 +140,64 @@ final class ShellUITests: ServerIsolatedUITestCase {
 
     // MARK: iPhone
 
-    func testHomeIsTheRootAndPushesItsPlaces() throws {
+    func testHomeIsTheRootAndTheTabsHoldThePlaces() throws {
         try XCTSkipIf(isDuo, "the iPhone")
         launch()
-        XCTAssertTrue(element("home").waitForExistence(timeout: 30), "the app opens on Home")
-        XCTAssertTrue(app.navigationBars["Home"].exists, "one bar titled Home")
-        XCTAssertTrue(app.buttons["homeSearchButton"].exists && app.buttons["homeNew"].exists, "Search and New in the bar")
-        XCTAssertTrue(element("homeMemory").exists && element("homeLibrary").exists, "Memory and Library rows")
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 30), "the app opens on Home")
+        XCTAssertTrue(app.navigationBars["Home"].exists, "a native bar titled Home")
+        XCTAssertTrue(app.buttons["homeNew"].exists, "New in the bar")
+        for title in ["Home", "Library", "Memory", "Search"] { XCTAssertTrue(app.tab(title).exists, "the \(title) tab") }
         XCTAssertTrue(element("homeConversation-thr_botdemo01").exists, "the conversations")
         XCTAssertFalse(element("strands-toggle").exists, "no strands")
         capture("iphone-home")
 
-        element("homeMemory").tap()
-        XCTAssertTrue(app.navigationBars.buttons.firstMatch.waitForExistence(timeout: 10))
-        XCTAssertFalse(element("home").isHittable, "Memory is pushed over Home, not a sheet")
-        app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(element("home").waitForExistence(timeout: 10), "Back returns to Home")
+        app.tab("Memory").tap()
+        XCTAssertTrue(element("memory-page").waitForExistence(timeout: 10), "Memory is a tab")
+        XCTAssertTrue(app.navigationBars["Memory"].exists, "under its own bar")
+        capture("iphone-memory")
+        app.tab("Library").tap()
+        XCTAssertTrue(element("library-page").waitForExistence(timeout: 10), "Library is a tab")
+        capture("iphone-library")
+        app.tab("Home").tap()
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 10), "and back to Home")
+
+        element("homeConversation-thr_botdemo01").tap()
+        app.goBack()
+        XCTAssertTrue(app.homeNew.waitForExistence(timeout: 10), "the system's Back returns to Home")
     }
 
-    func testConversationHasOneBarWithTheWorkbenchButton() throws {
+    func testSearchIsATab() throws {
+        try XCTSkipIf(isDuo, "the iPhone")
+        launch()
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 30))
+        app.tab("Search").tap()
+        let field = app.searchFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "the native search field")
+        field.tap()
+        field.typeText("Launch")
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'homeConversation-' AND label CONTAINS 'Launch prep'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "the conversation found")
+        capture("iphone-search")
+        row.tap()
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 15), "it opens")
+        app.goBack()
+        XCTAssertTrue(app.homeNew.waitForExistence(timeout: 10), "on Home's tab: Back is Home")
+        XCTAssertTrue(app.tab("Home").isSelected, "Home's tab")
+    }
+
+    func testConversationHasNativeBarWithTheWorkbenchButton() throws {
         try XCTSkipIf(isDuo, "the iPhone")
         launch()
         XCTAssertTrue(element("homeConversation-thr_botdemo01").waitForExistence(timeout: 30))
         element("homeConversation-thr_botdemo01").tap()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 20), "the conversation is pushed")
         let button = app.buttons["workbenchButton"]
-        XCTAssertTrue(button.exists, "the Workbench button")
+        XCTAssertTrue(button.waitForExistence(timeout: 10), "the Workbench button")
         XCTAssertEqual(button.label, "Workbench, 3 tabs", "the tabs the phone can show (not the VS Code one)")
         XCTAssertTrue(app.buttons["conversationMore"].exists, "and ⋯")
+        XCTAssertTrue(app.backButton.exists, "the system's Back")
+        XCTAssertFalse(app.tabBars.firstMatch.exists && app.tabBars.firstMatch.isHittable, "no tab bar under the composer, as in a messaging app")
         XCTAssertFalse(element("conversationHandsFree").exists, "no Live button in the chrome")
-        XCTAssertFalse(element("shellRail").exists, "no rail on the iPhone")
         capture("iphone-chat")
 
         button.tap()
@@ -172,7 +209,6 @@ final class ShellUITests: ServerIsolatedUITestCase {
         app.buttons["workbenchButton"].tap()
         XCTAssertTrue(element("conversationTitle").waitForExistence(timeout: 10), "back in the chat")
     }
-
     /// Review SF5: a conversation whose only tab is Mac-only: "0 tabs" on
     /// the Workbench button, and the Workbench says "No tabs", as the count does.
     func testAMacOnlyTabCountsAsNoTab() throws {
@@ -231,92 +267,87 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 5), "Find opens its bar")
     }
 
+    /// Review (blocker 2): a conversation under another tab keeps listening:
+    /// a message that comes while Library shows is there on return.
+    func testAMessageWhileOnAnotherTabShowsOnReturn() throws {
+        launchConversation(["-qaDemoLatency", "50"])  // the served demo, which `say` adds to
+        // As a link does (on the iPhone a conversation hides the tab bar).
+        command("tab?library")
+        XCTAssertTrue(element("library-page").waitForExistence(timeout: 10), "Library's tab")
+        command("say?Arrived%20while%20away")
+        sleep(2)
+        command("tab?home")
+        let said = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Arrived while away")).firstMatch
+        XCTAssertTrue(said.waitForExistence(timeout: 10), "the message, without a refresh")
+        XCTAssertTrue(app.textViews["Message"].exists, "the same conversation")
+    }
+
     // MARK: Duo
 
-    func testFoldedRailHoldsTheControlsLowestFirst() throws {
+    /// The folded Duo (Patrick's "more native, as Kensico"): the system puts
+    /// the bar's buttons and the tab bar in the reserved right column.
+    func testFoldedUsesTheNativeBarAndTabBar() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launchConversation()
-        XCTAssertTrue(element("shellRail").exists, "the rail")
-        XCTAssertFalse(app.navigationBars.firstMatch.exists, "no bar on top, a title line only")
-        let workbench = app.buttons["rail-workbench"], home = app.buttons["rail-home"], more = app.buttons["rail-more"]
-        XCTAssertTrue(workbench.exists && home.exists && more.exists)
-        XCTAssertGreaterThan(workbench.frame.minY, home.frame.minY, "Workbench lowest")
-        XCTAssertGreaterThan(home.frame.minY, more.frame.minY, "then Home, then More")
-        XCTAssertGreaterThan(workbench.frame.minX, 466 - 100, "in the right column")
+        let back = app.backButton, workbench = app.buttons["workbenchButton"], more = app.buttons["conversationMore"]
+        XCTAssertTrue(back.exists && workbench.exists && more.exists, "Back, Workbench and ⋯ in the native bar")
+        XCTAssertEqual(workbench.label, "Workbench, 3 tabs")
+        XCTAssertGreaterThan(workbench.frame.minX, 466 - 100, "the system puts them in the right column")
+        XCTAssertTrue(app.tab("Home").exists && app.tab("Memory").exists, "the tab bar")
+        XCTAssertGreaterThan(app.tab("Home").frame.minX, 466 - 100, "in the right column too")
         capture("duo-folded-chat")
 
         workbench.tap()
-        XCTAssertTrue(app.buttons["rail-chat"].waitForExistence(timeout: 10), "Chat takes the lowest slot")
-        XCTAssertTrue(app.buttons["rail-tabs"].exists, "Tabs")
+        XCTAssertEqual(app.buttons["workbenchButton"].label, "Show chat", "the same flip as the iPhone")
+        let title = app.buttons["workbenchTitle"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10), "the tab is the title")
         capture("duo-folded-workbench")
-        app.buttons["rail-tabs"].tap()
-        XCTAssertTrue(app.buttons["Lisbon budget"].waitForExistence(timeout: 5), "the tab menu from the rail")
+        title.tap()
+        XCTAssertTrue(app.buttons["Lisbon budget"].waitForExistence(timeout: 5), "the tab menu from the title")
         capture("duo-folded-tabs")
         app.buttons["Lisbon budget"].tap()
 
-        app.buttons["rail-home"].tap()
-        XCTAssertTrue(element("home").waitForExistence(timeout: 10), "Home in the rail goes Home")
-        XCTAssertTrue(app.buttons["rail-new"].exists && app.buttons["rail-search"].exists, "Home's rail: New, Search")
+        back.tap()
+        XCTAssertTrue(app.homeNew.waitForExistence(timeout: 10), "Back is Home")
+        XCTAssertTrue(app.navigationBars["Home"].exists, "Home's large title")
         capture("duo-folded-home")
-        element("homeMemory").tap()
-        XCTAssertTrue(element("memory-page").waitForExistence(timeout: 10), "Memory, pushed")
-        XCTAssertTrue(app.buttons["rail-back"].waitForExistence(timeout: 5), "one rail: Back in it")
-        XCTAssertFalse(app.navigationBars.firstMatch.exists, "no bar of its own")
+        app.tab("Memory").tap()
+        XCTAssertTrue(element("memory-page").waitForExistence(timeout: 10), "Memory's tab")
+        XCTAssertTrue(app.buttons["memorySearch"].exists, "its Search in its bar")
         capture("duo-folded-memory")
+        app.tab("Library").tap()
+        XCTAssertTrue(element("library-page").waitForExistence(timeout: 10), "Library's tab")
+        capture("duo-folded-library")
+        app.tab("Search").tap()
+        XCTAssertTrue(app.searchFields.firstMatch.waitForExistence(timeout: 10), "Search's tab")
+        capture("duo-folded-search")
     }
 
-    /// One rail for every screen on the Duo: a pushed page, design or Memory hides its bar;
-    /// its title is the title line, and Back and its actions are in the rail.
-    func testPushedScreensUseTheOneRail() throws {
+    /// A pushed page or design on the folded Duo: its native bar, Back and
+    /// its actions the system places; Library's + New page pushes on its tab.
+    func testPushedScreensUseTheNativeBar() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launch(["-qaPageDemo", "-qaDesignDemo"])
-        XCTAssertTrue(element("home").waitForExistence(timeout: 30))
-        element("homeMemory").tap()
-        XCTAssertTrue(app.buttons["rail-back"].waitForExistence(timeout: 10), "Back in the rail")
-        XCTAssertTrue(app.buttons["rail-action-memorySearch"].exists, "Memory's Search in the rail")
-        XCTAssertFalse(app.navigationBars.firstMatch.exists, "no bar of its own")
-        capture("duo-folded-memory")
-        app.buttons["rail-back"].tap()
-        XCTAssertTrue(element("home").waitForExistence(timeout: 10), "Back is Home from one push away")
-
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 30))
         for (link, name) in [("page/qa-demo", "page"), ("design/dsn_demo", "design")] {
             XCUIDevice.shared.system.open(URL(string: "bbstudio://" + link)!)
-            XCTAssertTrue(app.buttons["rail-back"].waitForExistence(timeout: 15), "\(name): Back in the rail")
+            XCTAssertTrue(app.backButton.waitForExistence(timeout: 15), "\(name): the system's Back")
             sleep(2)
-            XCTAssertFalse(app.navigationBars.firstMatch.exists, "\(name): no bar of its own")
-            XCTAssertTrue(element("shellTitle").exists, "\(name): the title line")
             capture("duo-folded-\(name)")
             app.goHome()
         }
 
-        // Review S6: a page made from Library's + New page is pushed on the
-        // shell's stack, with the rail's Back and the title line.
-        element("homeLibrary").tap()
-        let newPage = app.buttons["rail-action-libraryNewPage"]
-        XCTAssertTrue(newPage.waitForExistence(timeout: 10), "New page in the rail")
+        app.tab("Library").tap()
+        let newPage = app.buttons["libraryNewPage"]
+        XCTAssertTrue(newPage.waitForExistence(timeout: 10), "New page in Library's bar")
         newPage.tap()
-        let title = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label != 'Library'")).firstMatch
-        XCTAssertTrue(title.waitForExistence(timeout: 15), "the new page under the title line")
-        XCTAssertTrue(app.buttons["rail-back"].exists, "and Back in the rail")
-        XCTAssertFalse(app.navigationBars.firstMatch.exists, "no bar of its own")
+        XCTAssertTrue(app.backButton.waitForExistence(timeout: 15), "the new page, pushed on Library's tab")
+        app.goBack()
+        XCTAssertTrue(element("library-page").waitForExistence(timeout: 10), "Back is Library")
     }
 
-    /// Review B1: in book, a place opened from Home over the conversation
-    /// shows in the conversation's column (Home closes), its companion beside it.
-    func testBookShowsAPlaceOpenedFromHome() throws {
-        try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
-        launchConversation(["-qaPosture", "book"])
-        resize("landscape", CGSize(width: 951, height: 669))
-        activate("rail-home")
-        XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home over the conversation")
-        activate("homeMemory")
-        XCTAssertTrue(element("memory-page").waitForExistence(timeout: 10), "Memory shows")
-        XCTAssertFalse(element("homeColumn").exists, "Home closed")
-        capture("duo-book-memory")
-        command("outer")
-    }
-
-    /// Book and flat share the width rule (`ShellPanesUITests` covers the sizes).
+    /// Book: the conversation and its Workbench, each under its own bar;
+    /// Home over the conversation from the bar's Home button.
     func testBookShowsConversationAndWorkbenchAndHomeOnRequest() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launchConversation(["-qaPosture", "book"])
@@ -324,12 +355,21 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(element("conversationColumn").waitForExistence(timeout: 10), "the conversation")
         XCTAssertTrue(element("workbenchPage").exists, "its Workbench beside it")
         XCTAssertFalse(element("homeColumn").exists, "Home doesn't fit beside both")
-        XCTAssertTrue(element("rail-tabs").exists && element("rail-home").exists && element("rail-new").exists && element("rail-more").exists,
-                      "Tabs, Home, New, More")
+        XCTAssertTrue(element("homePane").exists && element("conversationMore").exists && element("workbenchTitle").exists,
+                      "Home and ⋯ in the conversation's bar, the tab menu as the Workbench's title")
+        XCTAssertFalse(app.backButton.exists, "the conversation is its page's root: no Back")
         capture("duo-book")
 
+        // Review (blocker 1): the side pane has no bar; its tab's actions lead the conversation's ⋯.
+        app.press(element("conversationMore"), id: "conversationMore")
+        XCTAssertTrue(app.menuItem("Edit").waitForExistence(timeout: 5), "the Lisbon budget page's Edit")
+        XCTAssertTrue(app.menuItem("Find in conversation").exists, "then the conversation's own items")
+        capture("duo-book-more")
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 200, dy: 300)).tap()
+        XCTAssertTrue(app.menuItem("Edit").waitForNonExistence(timeout: 5), "the menu closes")
+
         command("counts?reset")
-        activate("rail-home")
+        activate("homePane")
         XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home over the conversation")
         // Review S3: the conversation stays mounted under Home; its thread keeps running.
         command("counts")
@@ -341,41 +381,48 @@ final class ShellUITests: ServerIsolatedUITestCase {
         command("outer")
     }
 
+    /// Flat: as book; Memory's tab is two pages, Core and Skills | History.
     func testFlatShowsTheConversationAndItsWorkbench() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launchConversation(["-qaPosture", "flat"])
         resize("landscape", CGSize(width: 951, height: 669))
         XCTAssertTrue(element("conversationColumn").waitForExistence(timeout: 10), "the conversation")
         XCTAssertTrue(element("workbenchPage").exists, "the Workbench")
-        XCTAssertTrue(element("rail-new").exists && element("rail-more").exists, "Tabs, Home, New, More")
+        XCTAssertTrue(element("conversationMore").exists, "⋯ in the conversation's bar")
         capture("duo-flat")
-        activate("rail-home")
-        XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home over the conversation")
-        activate("homeMemory")
-        XCTAssertTrue(element("homeColumn").waitForNonExistence(timeout: 10), "Memory closes Home")
+        command("tab?memory")
+        XCTAssertTrue(element("memory-page").waitForExistence(timeout: 10), "Memory's tab")
+        XCTAssertTrue(element("memory-browse").exists, "Skills | History on page two")
+        XCTAssertGreaterThan(element("memory-browse").frame.minX, element("memory-page").frame.minX, "beside Core")
+        // Review: Search across the layers on two pages too, in page two's bar.
+        app.press(element("memorySearch"), id: "memorySearch")
+        XCTAssertTrue(element("memorySearchField").waitForExistence(timeout: 10), "Memory's search")
         capture("duo-flat-memory")
+        command("tab?library")
+        XCTAssertTrue(element("library-page").waitForExistence(timeout: 10), "Library's tab")
+        capture("duo-flat-library")
+        command("tab?bot")
+        XCTAssertTrue(element("conversationColumn").waitForExistence(timeout: 10), "Home's tab: the conversation again")
         command("outer")
     }
 
-    func testVerticalIsABigIPhoneWithTheRail() throws {
+    /// Vertical: a big iPhone, the native bar and tab bar.
+    func testVerticalIsABigIPhone() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launchConversation(["-qaPosture", "vertical"])
         resize("portrait", CGSize(width: 669, height: 951))
-        XCTAssertTrue(element("shellRail").waitForExistence(timeout: 10), "the rail down the right edge")
         XCTAssertFalse(element("workbenchPage").exists, "one column")
-        let workbench = element("rail-workbench")
-        XCTAssertTrue(workbench.exists)
-        XCTAssertGreaterThan(workbench.frame.minY, 951 * 0.75, "its buttons at the bottom-right")
+        let workbench = element("workbenchButton")
+        XCTAssertTrue(workbench.waitForExistence(timeout: 10), "the Workbench button in the bar")
         capture("duo-vertical-chat")
-        activate("rail-workbench")
-        XCTAssertTrue(element("rail-chat").waitForExistence(timeout: 10), "the same flip as the iPhone")
+        activate("workbenchButton")
+        XCTAssertTrue(element("workbenchTitle").waitForExistence(timeout: 10), "the same flip as the iPhone")
         capture("duo-vertical-workbench")
-        activate("rail-home")
-        XCTAssertTrue(element("home").waitForExistence(timeout: 10))
+        activate("BackButton")
+        XCTAssertTrue(app.homeList.waitForExistence(timeout: 10), "the system's Back is Home")
         capture("duo-vertical-home")
-        activate("homeMemory")
-        XCTAssertTrue(element("rail-back").waitForExistence(timeout: 10), "one rail: Back in it")
-        XCTAssertFalse(app.navigationBars.firstMatch.exists, "no bar of its own")
+        command("tab?memory")
+        XCTAssertTrue(element("memoryLayer").waitForExistence(timeout: 10), "Memory's tab, one page with its layers")
         capture("duo-vertical-memory")
         command("outer")
     }

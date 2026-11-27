@@ -174,7 +174,7 @@ final class BotSpacesTests: XCTestCase {
         BotSpacesCache.saveView(view, botId: "bot_a", serverURL: server)
         BotSpacesSupport.store(.available, serverURL: server)
 
-        let store = BotSpacesStore(serverURL: server)
+        let store = BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false))
         store.restore()
         XCTAssertEqual(store.support, .available)
         XCTAssertEqual(store.spaces?.bots.map(\.id), ["bot_a", "bot_b"])
@@ -192,7 +192,7 @@ final class BotSpacesTests: XCTestCase {
     @MainActor
     func testSignalsRefetchOnlyTheMatchingBotAndCoalesce() async {
         let calls = Calls()
-        let store = BotSpacesStore(serverURL: server)
+        let store = BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false))
         store.coalesceDelay = .milliseconds(50)
         store.attach(client: client(calls: calls), realtime: nil)
         await store.refresh()
@@ -222,7 +222,7 @@ final class BotSpacesTests: XCTestCase {
     @MainActor
     func testReconnectRefetchesSpacesAndEveryWatchedBot() async {
         let calls = Calls()
-        let store = BotSpacesStore(serverURL: server)
+        let store = BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false))
         store.coalesceDelay = .milliseconds(50)
         store.attach(client: client(calls: calls), realtime: nil)
         await store.refresh()
@@ -249,7 +249,7 @@ final class BotSpacesTests: XCTestCase {
     @MainActor
     func testGateIsAvailableWithTheMethod() async {
         let calls = Calls()
-        let store = BotSpacesStore(serverURL: server)
+        let store = BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false))
         XCTAssertEqual(store.support, .unknown)
         XCTAssertFalse(store.useSpaces)
         store.attach(client: client(calls: calls), realtime: nil)
@@ -257,7 +257,7 @@ final class BotSpacesTests: XCTestCase {
         XCTAssertEqual(store.support, .available)
         XCTAssertTrue(store.useSpaces)
         XCTAssertEqual(BotSpacesSupport.stored(serverURL: server), .available)
-        XCTAssertEqual(BotSpacesStore(serverURL: server).support, .available)
+        XCTAssertEqual(BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false)).support, .available)
         XCTAssertEqual(BotSpacesSupport.stored(serverURL: URL(string: "https://bot-spaces-elsewhere.invalid")!), .unknown)
     }
 
@@ -265,7 +265,7 @@ final class BotSpacesTests: XCTestCase {
     func testGateIsUnavailableOnAnOlderStudioAndRecheckedOnReconnect() async {
         let calls = Calls()
         let hasMethod = LockedFlag()
-        let store = BotSpacesStore(serverURL: server)
+        let store = BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false))
         store.coalesceDelay = .milliseconds(50)
         BotSpacesCache.saveView(BotThreadsView(Studio.BotThreadsViewOutput(botId: "bot_a")), botId: "bot_a", serverURL: server)
         store.attach(client: client(spaces: {
@@ -310,7 +310,7 @@ final class BotSpacesTests: XCTestCase {
     func testAnOfflineFirstAskIsRetriedUntilSpacesAnswer() async {
         let calls = Calls()
         let online = LockedFlag()
-        let store = BotSpacesStore(serverURL: server)
+        let store = BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false))
         store.coalesceDelay = .milliseconds(10)
         store.retryDelays = [.milliseconds(40), .milliseconds(80)]
         store.attach(client: offlineClient(online: online, calls: calls), realtime: nil)
@@ -334,7 +334,7 @@ final class BotSpacesTests: XCTestCase {
     func testForegroundAsksAgainRightAwayWhileUnknown() async {
         let calls = Calls()
         let online = LockedFlag()
-        let store = BotSpacesStore(serverURL: server)
+        let store = BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false))
         store.coalesceDelay = .milliseconds(10)
         store.retryDelays = [.seconds(60)]
         store.attach(client: offlineClient(online: online, calls: calls), realtime: nil)
@@ -357,7 +357,7 @@ final class BotSpacesTests: XCTestCase {
     func testReconnectAnswersAnOfflineFirstAsk() async {
         let calls = Calls()
         let online = LockedFlag()
-        let store = BotSpacesStore(serverURL: server)
+        let store = BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false))
         store.coalesceDelay = .milliseconds(10)
         store.retryDelays = [.seconds(60)]
         store.attach(client: offlineClient(online: online, calls: calls), realtime: nil)
@@ -374,14 +374,14 @@ final class BotSpacesTests: XCTestCase {
     func testAnErrorAnswerIsRememberedUntilSpacesAnswer() async {
         let calls = Calls()
         let up = LockedFlag()
-        let store = BotSpacesStore(serverURL: server)
+        let store = BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false))
         store.coalesceDelay = .milliseconds(10)
         store.retryDelays = [.seconds(60)]
         store.attach(client: client(spaces: { up.value ? (200, Self.spacesJSON) : (503, #"{"ok":false,"error":{"message":"studio is not running"}}"#) }, calls: calls), realtime: nil)
         XCTAssertFalse(store.answeredWithError)
         await store.refresh()
         XCTAssertEqual(store.support, .unknown)
-        XCTAssertTrue(BotSpacesStore(serverURL: server).answeredWithError, "the next launch says Studio is unreachable at once")
+        XCTAssertTrue(BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false)).answeredWithError, "the next launch says Studio is unreachable at once")
         up.value = true
         store.askIfUnknown()
         await waitUntil { store.support == .available }
@@ -391,20 +391,20 @@ final class BotSpacesTests: XCTestCase {
     @MainActor
     func testAnOfflineAnswerIsNotRememberedAsAnError() async {
         let calls = Calls()
-        let store = BotSpacesStore(serverURL: server)
+        let store = BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false))
         store.coalesceDelay = .milliseconds(10)
         store.retryDelays = [.seconds(60)]
         store.attach(client: offlineClient(online: LockedFlag(), calls: calls), realtime: nil)
         store.askIfUnknown()
         await waitUntil { calls.count("offline") == 1 }
         await settle()
-        XCTAssertFalse(BotSpacesStore(serverURL: server).answeredWithError)
+        XCTAssertFalse(BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false)).answeredWithError)
     }
 
     @MainActor
     func testTheForegroundAskStartsTheBackoffOver() async {
         let calls = Calls()
-        let store = BotSpacesStore(serverURL: server)
+        let store = BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false))
         store.coalesceDelay = .milliseconds(10)
         store.retryDelays = [.seconds(60)]
         store.attach(client: offlineClient(online: LockedFlag(), calls: calls), realtime: nil)
@@ -434,7 +434,7 @@ final class BotSpacesTests: XCTestCase {
     func testStudioNotRunningKeepsTheLastAnswer() async {
         let calls = Calls()
         BotSpacesSupport.store(.available, serverURL: server)
-        let store = BotSpacesStore(serverURL: server)
+        let store = BotSpacesStore(serverURL: server, gate: EnergyGate(watchKeyboard: false))
         store.attach(client: client(spaces: { (503, #"{"ok":false,"error":{"message":"studio is not running"}}"#) }, calls: calls), realtime: nil)
         await store.refresh()
         XCTAssertEqual(store.support, .available)

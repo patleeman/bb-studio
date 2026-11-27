@@ -78,7 +78,7 @@ struct PageView: View {
     }
 
     /// The content with its one action list (Edit and Comments first): pushed, the bar's
-    /// buttons and ⋯ on the iPhone and the rail on the Duo; in a Workbench tab, the shell's More.
+    /// buttons and ⋯ in the native bar; in a Workbench tab, the conversation's ⋯.
     @ViewBuilder private var chrome: some View {
         let actions = PageActions(page: meta, model: model, chats: chats, gone: gone, star: starItem, studio: studio,
                                   open: { sheet = $0 }, ask: { dialog = $0 }, act: act).all

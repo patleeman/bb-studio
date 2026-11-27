@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// What the conversation's More menu asks of its `ThreadView`. The menu sits
-/// in the shell's bar or rail, outside the thread's own views; the thread
+/// in the conversation's bar, outside the thread's own views; the thread
 /// takes the command and presents what it needs (a sheet, an alert, a push).
 enum ConversationCommand: Equatable {
     case find, rename, model, files, terminals, history, saveFiles, sourcePage
@@ -18,8 +18,6 @@ final class ConversationSession: ObservableObject {
     let threadId: String
     let model: ThreadModel
     let talk: HoldToTalk
-    /// The transcript's handle, for the Duo rail's Jump to latest.
-    weak var transcript: TranscriptHandle?
     /// The menu's request, taken by the thread (`take()`).
     @Published private(set) var command: ConversationCommand?
     /// Studio's page this chat belongs to (`studio.chatPage`), for Open <page>.

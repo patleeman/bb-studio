@@ -1,7 +1,7 @@
 import XCTest
 
-/// New voice chat is gone: the conversation's header (the folded Duo's side
-/// column) has the list and the ⋯ menu but no phone button, and a thread's ⋯
+/// New voice chat is gone: the conversation's bar has the ⋯ menu but no
+/// phone button, and a thread's ⋯
 /// menu has no New Voice Chat. The composer's
 /// mic and speaker stay. On the local `-qaBotDemo` Bot; the server is a closed
 /// local port, so nothing leaves the simulator. Runs on an iPhone, or with
@@ -12,7 +12,7 @@ final class NoVoiceChatUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
     private let duo = ProcessInfo.processInfo.environment["NO_VOICE_DUO"] != nil
 
-    func testBotRailHasNoVoiceChatButton() {
+    func testConversationBarHasNoVoiceChatButton() {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaDark", "-qaReduceMotion",
                                "-qaBotDemo", duo ? "duo" : "chat", "-openURL", "bbstudio://bot"]
         if duo { app.launchArguments.append("-qaDuoPhone") }
@@ -22,8 +22,8 @@ final class NoVoiceChatUITests: ServerIsolatedUITestCase {
         if duo { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/outer")!) }
         XCTAssertTrue(app.conversationMore.exists, "The ⋯ menu stays")
         sleep(2)
-        shot("bot-rail")
-        XCTAssertFalse(app.buttons["New voice chat"].exists, "No phone button in the header")
+        shot("conversation-bar")
+        XCTAssertFalse(app.buttons["New voice chat"].exists, "No phone button in the bar")
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'voice chat'")).count, 0)
         XCTAssertTrue(app.buttons["composerMic"].exists, "The composer's mic stays")
     }
@@ -37,7 +37,7 @@ final class NoVoiceChatUITests: ServerIsolatedUITestCase {
         if duo { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/outer")!) }
         sleep(2)
         shot("thread")
-        // ⋯ in the iPhone's bar, More in the Duo's rail.
+        // ⋯ in the conversation's bar.
         app.openConversationMenu()
         XCTAssertTrue(app.buttons["Find in conversation"].waitForExistence(timeout: 5), "The menu opened")
         sleep(1)

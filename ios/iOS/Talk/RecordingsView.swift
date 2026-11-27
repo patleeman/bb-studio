@@ -77,7 +77,7 @@ struct RecordingDetailView: View {
         }
     }
 
-    /// Share and New Thread first; the rest under ⋯ (the Duo: the rail and its More).
+    /// Share and New Thread first; the rest under ⋯.
     private var actions: [ScreenAction] {
         guard let recording else { return [] }
         var list: [ScreenAction] = []

@@ -61,7 +61,7 @@ struct DesignView: View {
     }
 
     /// One action list (Comment and Screens first): pushed, the bar's buttons and ⋯ on the
-    /// iPhone and the rail on the Duo; in a Workbench tab, the shell's More.
+    /// native bar; in a Workbench tab, the conversation's ⋯.
     @ViewBuilder private var chrome: some View {
         if inWorkbench {
             content.screenActions(actions)

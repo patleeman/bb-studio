@@ -17,10 +17,6 @@ final class BotTerminalUITests: ServerIsolatedUITestCase {
         sleep(1)
         try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/qa-bot-terminal-menu.png"))
         terminals.tap()
-        // The iPhone's bar, or the Duo's title line.
-        let title = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Terminals'")).firstMatch
-        let opened = NSPredicate { _, _ in app.navigationBars["Terminals"].exists || title.exists }
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: opened, object: nil)], timeout: 5), .completed,
-                       "it opens the thread's terminals")
+        XCTAssertTrue(app.navigationBars["Terminals"].waitForExistence(timeout: 5), "it opens the thread's terminals")
     }
 }

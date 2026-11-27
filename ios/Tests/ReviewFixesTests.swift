@@ -26,13 +26,14 @@ final class ReviewFixesTests: XCTestCase {
         let store = try seeded()
         shell.land(store) { _, main in main }
         XCTAssertTrue(shell.consume(store))
-        XCTAssertEqual(shell.path, [.place(.memory)], "the link opens over Home")
+        XCTAssertEqual(shell.tab, .memory, "the link opens Memory's tab")
         XCTAssertNil(shell.pending, "followed once")
 
         shell.openConversation("thr_main")
+        XCTAssertEqual(shell.tab, .home)
         shell.open(.place(.memory, botId: nil))
         XCTAssertTrue(shell.consume(store), "the same link works a second time")
-        XCTAssertEqual(shell.path, [.place(.memory)])
+        XCTAssertEqual(shell.tab, .memory)
     }
 
     func testOnlyBotThreadsOpenInTheShell() throws {

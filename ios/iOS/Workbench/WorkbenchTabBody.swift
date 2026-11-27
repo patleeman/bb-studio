@@ -10,7 +10,7 @@ extension EnvironmentValues {
 /// One Workbench tab's content, by the desktop's tab kind (`tab-kinds.ts`).
 /// Native where the phone has a view, even when Studio marks the kind `web`
 /// (recordings); the in-app web view for the rest. What only the desktop
-/// opens is never shown (`showsOnPhone`). The Workbench container (tabs, bar, rail) is the shell's:
+/// opens is never shown (`showsOnPhone`). The Workbench container (tabs, bar) is the shell's:
 /// it puts this under its bar.
 struct WorkbenchTabBody: View {
     let tab: WorkbenchTab

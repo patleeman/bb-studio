@@ -1,34 +1,22 @@
 import SwiftUI
 
-/// Search in the bar's drawer on the iPhone; on the Duo, whose pushed screens
-/// have no bar, a field at the top of the page.
+/// Native search in the bar's drawer, with a Search button in the bar that
+/// opens it in one tap (the drawer hides until the list is pulled down).
 struct ShellSearchable: ViewModifier {
     @Binding var text: String
     let prompt: String
-    @Environment(\.shellPosture) private var posture
     @State private var searching = false
 
     func body(content: Content) -> some View {
-        if posture.usesRail {
-            VStack(spacing: 0) {
-                ShellSearchField(text: $text, prompt: prompt)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("shellSearch")
-                content
-            }
-        } else {
-            content
-                .searchable(text: $text, isPresented: $searching, placement: .navigationBarDrawer(displayMode: .automatic), prompt: prompt)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { searching = true } label: { Image(systemName: "magnifyingglass") }
-                            .accessibilityLabel("Search")
-                            .accessibilityIdentifier("screenAction-search")
-                    }
+        content
+            .searchable(text: $text, isPresented: $searching, placement: .navigationBarDrawer(displayMode: .automatic), prompt: prompt)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { searching = true } label: { Image(systemName: "magnifyingglass") }
+                        .accessibilityLabel("Search")
+                        .accessibilityIdentifier("screenAction-search")
                 }
-        }
+            }
     }
 }
 
@@ -39,13 +27,11 @@ extension View {
 }
 
 /// The one search field: a magnifying glass, the field, and Clear once
-/// something is typed. Home's, Memory's and a pushed page's on the Duo.
+/// something is typed: in a page, where a bar's drawer doesn't fit (Memory's History).
 struct ShellSearchField: View {
     @Binding var text: String
     let prompt: String
     var id = "shellSearchField"
-    /// The caller's focus (Home's Search button), else the field's own.
-    var focused: FocusState<Bool>.Binding?
     var focusOnAppear = false
     @FocusState private var ownFocus: Bool
 
@@ -53,7 +39,7 @@ struct ShellSearchField: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
             TextField(prompt, text: $text)
-                .focused(focused ?? $ownFocus)
+                .focused($ownFocus)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)

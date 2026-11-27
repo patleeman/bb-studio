@@ -53,7 +53,7 @@ final class DesignZoomUITests: ServerIsolatedUITestCase {
     }
 
     private func open(_ screen: String) {
-        // Its left part: on the folded Duo a wide thumbnail runs under the rail.
+        // Its left part: on the folded Duo a wide thumbnail runs under the right column.
         app.buttons["designScreen-\(screen)"].coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5)).tap()
         XCTAssertTrue(still.waitForExistence(timeout: 15), "the screen opens full screen")
     }

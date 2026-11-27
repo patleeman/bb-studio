@@ -46,8 +46,7 @@ final class WorkflowUITests: StagedServerUITestCase {
 
     func testAutomationEditor() {
         app.open(URL(string: "bbstudio://automations")!)
-        XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10)
-            || app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Automations'")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10))
         // In Round 7, bbstudio://automations opens the Bot's Schedules sheet,
         // with BB's project automations behind "All automations".
         let allRow = app.buttons["schedulesAllAutomations"].firstMatch

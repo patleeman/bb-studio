@@ -136,9 +136,9 @@ final class TranscriptTapDismissUITests: ServerIsolatedUITestCase {
         expectKeyboard(true, "keyboard up for the thread link")
         app.links["Review open PRs"].firstMatch.tap()
         // Its thread (here a worker: read-only, titled with its name) opens over the conversation.
-        let title = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@ AND label CONTAINS %@",
-                                                                         ["conversationTitle", "shellTitle"], "Review open PRs")).firstMatch
-        let back = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@", ["BackButton", "rail-back"])).firstMatch
+        let title = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'conversationTitle' AND label CONTAINS %@",
+                                                                         "Review open PRs")).firstMatch
+        let back = app.backButton.firstMatch
         let opened = NSPredicate { _, _ in title.exists || (back.exists && !self.app.links["Review open PRs"].exists) }
         if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: opened, object: nil)], timeout: 10) != .completed {
             XCTFail("The thread link opened its thread on the first tap\n\(app.debugDescription)")

@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// A conversation's Workbench (round 7): the shown tab's content, under the
-/// shell's one bar (or title line). Tabs change from the title's tab menu or
-/// the rail's Tabs (`WorkbenchTabMenuItems`); there is no tab row. At most
+/// conversation's bar. Tabs change from the title's tab menu
+/// (`WorkbenchTabMenuItems`); there is no tab row. At most
 /// two heavy tab views stay loaded.
 struct WorkbenchView: View {
     let threadId: String
@@ -91,7 +91,7 @@ private struct WorkbenchEmpty: View {
 }
 
 /// The tab menu (9b): the open tabs with a check on the shown one, then New
-/// tab and Close. From the title on the iPhone, from Tabs in the Duo rail.
+/// tab and Close. From the Workbench's title, or the conversation's Workbench tabs button beside two pages.
 struct WorkbenchTabMenuItems: View {
     let threadId: String
     let newTab: () -> Void
