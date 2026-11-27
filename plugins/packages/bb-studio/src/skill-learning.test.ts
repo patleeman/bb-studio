@@ -253,6 +253,8 @@ it("moves a thread's mark only when its review finishes: a stopped or failed rev
 it("keeps a queued review when it can't start yet, and caps daily and archive passes per day", async () => {
   const x = await setup();
   const now = new Date(2026, 10, 26, 9).getTime();
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(now);
   await x.learning.baseline("bot_main", now);
   for (let n = 1; n <= 9; n++) {
     const id = `conv${n}`;
