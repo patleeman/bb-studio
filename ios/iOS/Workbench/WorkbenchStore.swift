@@ -24,7 +24,13 @@ final class WorkbenchStore {
     static var origin: String { "phone:" + (UIDevice.current.identifierForVendor?.uuidString ?? "unknown") }
 
     func tabs(_ threadId: String) -> [WorkbenchTab] { states[threadId]?.tabs ?? [] }
-    func count(_ threadId: String) -> Int { tabs(threadId).count }
+    /// The tabs the phone can show: the Workbench button's count, which
+    /// agrees with the Workbench ("No tabs" at 0). The tab menu lists them all.
+    func count(_ threadId: String) -> Int { Self.shown(tabs(threadId)).count }
+
+    nonisolated static func shown(_ tabs: [WorkbenchTab]) -> [WorkbenchTab] {
+        tabs.filter { WorkbenchTabKind($0).showsOnPhone }
+    }
 
     /// The tab shown: picked here, else Studio's active one, else the first,
     /// among the tabs the phone can show. Nil: nothing to show, and the
@@ -36,8 +42,17 @@ final class WorkbenchStore {
     /// A tab only the Mac opens (VS Code…) is never shown, picked or not: it
     /// stays in the tab menu, marked "On your Mac".
     nonisolated static func selected(_ tabs: [WorkbenchTab], picked: String?, active: String?) -> WorkbenchTab? {
-        let shown = tabs.filter { WorkbenchTabKind($0).showsOnPhone }
+        let shown = shown(tabs)
         return shown.first { $0.id == picked } ?? shown.first { $0.id == active } ?? shown.first
+    }
+
+    /// The tab that takes a closed one's place, as on the desktop: the next
+    /// one the phone can show, else the one before it.
+    nonisolated static func neighbour(closing id: String, in tabs: [WorkbenchTab]) -> WorkbenchTab? {
+        let shown = shown(tabs)
+        guard let at = shown.firstIndex(where: { $0.id == id }) else { return nil }
+        let rest = shown.filter { $0.id != id }
+        return rest.isEmpty ? nil : rest[min(at, rest.count - 1)]
     }
 
     func attach(_ realtime: BBRealtime) {
@@ -94,12 +109,7 @@ final class WorkbenchStore {
     }
 
     func close(_ id: String, in threadId: String) {
-        let tabs = tabs(threadId)
-        if selected(threadId)?.id == id, let at = tabs.firstIndex(where: { $0.id == id }) {
-            // The neighbour takes its place, as on the desktop.
-            let rest = tabs.filter { $0.id != id }
-            picked[threadId] = rest.isEmpty ? nil : rest[min(at, rest.count - 1)].id
-        }
+        if selected(threadId)?.id == id { picked[threadId] = Self.neighbour(closing: id, in: tabs(threadId))?.id }
         mounted.removeAll { $0 == id }
         defer { keepShown(threadId) }
         if var state = states[threadId] {

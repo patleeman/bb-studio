@@ -169,6 +169,8 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         controller.onEmptyTap = onEmptyTap
         controller.onPage = onPage
         controller.rowsHidden = rowsHidden
+        // SwiftUI's accessibilityHidden doesn't reliably reach a hosted UIKit view.
+        controller.view.accessibilityElementsHidden = environment.shellCovered
         controller.onPillChange = onPillChange
         controller.log = log
         if let dismissKeyboard { controller.dismissKeyboard = dismissKeyboard }

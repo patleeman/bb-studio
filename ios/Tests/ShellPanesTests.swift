@@ -88,4 +88,37 @@ final class ShellPanesTests: XCTestCase {
         XCTAssertEqual(ShellPanes.overlayWidth(width: duo, body: large), (duo * 0.4).rounded())
         XCTAssertGreaterThanOrEqual(ShellPanes.overlayWidth(width: duo, body: large), ShellPanes.homeMinimum(body: large))
     }
+
+    /// Review nit 5: on the Duo, xLarge text (19 pt) already misses two
+    /// readable panes by 3 pt, so it and everything above lay out as one column.
+    func testXLargeAndUpIsOneColumnOnTheDuo() {
+        XCTAssertEqual(ShellPanes.body(.xLarge), 19)
+        XCTAssertTrue(ShellPanes.splits(width: duo, body: ShellPanes.body(.large)))
+        for size in DynamicTypeSize.allCases where size >= .xLarge {
+            XCTAssertFalse(ShellPanes.splits(width: duo, body: ShellPanes.body(size)), "\(size)")
+        }
+    }
+
+    /// Review nit 3: the panes share the room between both safe areas and the rail.
+    func testThePanesStayInsideTheLeadingSafeArea() {
+        let duoGeometry = ShellGeometry(window: CGSize(width: 951, height: 669), screen: CGSize(width: 951, height: 669), phone: true)
+        XCTAssertEqual(duoGeometry.paneWidth, duo)
+        let inset = ShellGeometry(window: CGSize(width: 1180, height: 820), screen: CGSize(width: 1180, height: 820), phone: false,
+                                  trailingInset: 20, leadingInset: 20)
+        XCTAssertEqual(inset.paneWidth, 1180 - 20 - ShellPosture.railWidth)
+        let reserved = ShellGeometry(window: CGSize(width: 951, height: 669), screen: .zero, phone: true, trailingInset: 100)
+        XCTAssertEqual(reserved.paneWidth, 951 - 100, "a reserved column wider than the rail")
+    }
+
+    /// Review SF4: Home over the conversation, closed by a new layout, stays closed.
+    func testANewLayoutClosesHomeOverTheConversation() {
+        var pane = ShellHomePane()
+        pane.toggle(fits: false)
+        XCTAssertTrue(pane.shown(fits: false))
+        pane.layoutChanged()
+        XCTAssertFalse(pane.shown(fits: false), "it doesn't come back when Home stops fitting again")
+        pane.toggle(fits: true)
+        pane.layoutChanged()
+        XCTAssertFalse(pane.shown(fits: true), "Home hidden by hand stays hidden")
+    }
 }

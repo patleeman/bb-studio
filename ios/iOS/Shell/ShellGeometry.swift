@@ -10,13 +10,15 @@ struct ShellGeometry: Equatable {
     var hinge: ShellPosture.Hinge?
     /// The window's trailing safe area: the column the Duo's system keeps for its status.
     var trailingInset: CGFloat = 0
+    /// The window's leading safe area (none on the Duo's inner screen).
+    var leadingInset: CGFloat = 0
 
     @MainActor var posture: ShellPosture {
         ShellPosture.resolve(window: window, screen: screen, phone: phone, hinge: hinge, forced: ShellQA.posture)
     }
 
-    /// The room left of the rail, for the panes (`ShellPanes`).
-    var paneWidth: CGFloat { max(0, window.width - max(ShellPosture.railWidth, trailingInset)) }
+    /// The room between the leading safe area and the rail, for the panes (`ShellPanes`).
+    var paneWidth: CGFloat { max(0, window.width - leadingInset - max(ShellPosture.railWidth, trailingInset)) }
 
     /// On the Duo's inner screen, whatever the window: it draws no home
     /// indicator, though iOS reports one (also beside another app).
@@ -39,6 +41,8 @@ extension EnvironmentValues {
     @Entry var shellPaneAtRail = false
     /// The window is on the Duo's inner screen (see `ShellGeometry.innerScreen`).
     @Entry var shellInnerScreen = false
+    /// Home is over this screen (`ShellPages`): VoiceOver leaves it, its UIKit views too.
+    @Entry var shellCovered = false
 }
 
 enum ShellQA {
@@ -124,9 +128,9 @@ struct ShellGeometryReader: UIViewRepresentable {
             #endif
             let next = ShellGeometry(window: window.bounds.size, screen: screen,
                                      phone: traitCollection.userInterfaceIdiom == .phone, hinge: hinge,
-                                     trailingInset: window.safeAreaInsets.right)
+                                     trailingInset: window.safeAreaInsets.right, leadingInset: window.safeAreaInsets.left)
             guard next != last else { return }
-            if next.window != last?.window || next.trailingInset != last?.trailingInset {
+            if next.window != last?.window || next.trailingInset != last?.trailingInset || next.leadingInset != last?.leadingInset {
                 // Keyboard work waits for the window to settle (crash 3, `ResizeSettling`).
                 ResizeSettling.shared.changed()
                 Breadcrumbs.shared.record(String(format: "window %.0fx%.0f safe %.0f", next.window.width, next.window.height, next.trailingInset))

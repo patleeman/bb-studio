@@ -45,7 +45,6 @@ struct ShellRoot: View {
         .onChange(of: store.spaces) { _, _ in land() }
         .onChange(of: store.views) { _, _ in land() }
         .onChange(of: router.pending, initial: true) { _, _ in router.consume(store) }
-        .onChange(of: posture) { _, _ in router.homePane.layoutChanged() }
         .onChange(of: router.conversation) { _, id in
             if let id, let bot { ShellMemory.remember(id, botId: bot.id) }
         }
@@ -288,6 +287,8 @@ private struct ShellPages: View {
     var body: some View {
         let panes = panes
         let overlaid = !panes.homeFits && router.homePane.overlaid
+        // Not over a pushed screen: its Back is the rail's, and Home over it would hide it.
+        let edgeSwipe = panes.home == 0 && !overlaid && !pushed
         HStack(spacing: 0) {
             if panes.home > 0 {
                 homeColumn.frame(width: panes.home)
@@ -295,10 +296,8 @@ private struct ShellPages: View {
             conversationColumn
                 .frame(width: panes.conversation)
                 .environment(\.shellPaneAtRail, panes.side == 0)
-                // Under Home, out of VoiceOver's reach where SwiftUI's hiding reaches its UIKit host.
-                .accessibilityHidden(overlaid)
                 .overlay(alignment: .leading) { if panes.home > 0 { Divider() } }
-                .overlay(alignment: .leading) { if panes.home == 0, !overlaid { HomeEdge(fits: panes.homeFits) } }
+                .gesture(HomeEdgePan(enabled: edgeSwipe, fits: panes.homeFits))
             if panes.side > 0 {
                 ShellSidePane(threadId: conversation, companion: companion)
                     .frame(width: panes.side)
@@ -306,6 +305,11 @@ private struct ShellPages: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // Under Home (both panes): out of VoiceOver's reach, the transcript's UIKit views too.
+        .environment(\.shellCovered, overlaid)
+        #if DEBUG
+        .overlay(alignment: .topLeading) { HomeEdgeMarker(enabled: edgeSwipe) }
+        #endif
         .overlay(alignment: .leading) {
             if overlaid {
                 HomeOverlay(width: ShellPanes.overlayWidth(width: width, body: bodySize)) { homeColumn }
@@ -317,6 +321,12 @@ private struct ShellPages: View {
                                  pushed: pushed, pushedActions: pushed ? paneActions : [], companion: companion != nil))
         .animation(.snappy(duration: 0.25), value: panes)
         .animation(.snappy(duration: 0.25), value: overlaid)
+        .onChange(of: overlaid) { _, over in HomeOverlayFocus.changed(over: over) }
+        // Side by side again, or Home now fits beside the others (the last
+        // tab the phone shows closed, the text got smaller), or no longer does.
+        .onChange(of: panes.homeFits, initial: true) { _, _ in
+            if router.homePane.overlaid { router.homePane.layoutChanged() }
+        }
         // The side pane follows the Workbench's tabs, shown or not.
         .task(id: conversation) {
             workbench.attach(app.realtime)
@@ -350,6 +360,7 @@ private struct ShellPages: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("conversationColumn")
+        .modifier(ShellCovered())
     }
 
     /// What's pushed over the column's conversation: the stack past it.
@@ -365,7 +376,8 @@ private struct ShellPages: View {
 
 /// Home over the conversation, from its leading edge, where it doesn't fit
 /// beside it; a tap beside it, a pick in it, the rail's Home or VoiceOver's
-/// escape closes it.
+/// escape closes it. Modal to VoiceOver: the dimmed panes are out of reach,
+/// and the dimming is its close button.
 private struct HomeOverlay<Home: View>: View {
     let width: CGFloat
     @ViewBuilder var home: Home
@@ -379,34 +391,71 @@ private struct HomeOverlay<Home: View>: View {
                 .background(look.canvas)
                 .overlay(alignment: .trailing) { Divider() }
                 .shadow(color: .black.opacity(0.3), radius: 12)
-                .accessibilityAction(.escape) { router.homePane.toggle(fits: false) }
-            Color.black.opacity(0.25)
+            Color(white: 0, opacity: 0.25)
                 .contentShape(.rect)
-                .onTapGesture { router.homePane.toggle(fits: false) }
-                .accessibilityHidden(true)
+                .onTapGesture { close() }
+                .accessibilityElement()
+                .accessibilityLabel("Close Home")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { close() }
+                .accessibilityIdentifier("homeOverlayScrim")
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape) { close() }
+    }
+
+    private func close() { router.homePane.toggle(fits: false) }
+}
+
+/// What opening or closing Home over the conversation does beyond showing it.
+@MainActor
+enum HomeOverlayFocus {
+    static func changed(over: Bool) {
+        // The composer's keyboard (and a hardware keyboard's typing) stays with the conversation under Home.
+        if over { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
+        // VoiceOver moves into Home, or back to the conversation.
+        UIAccessibility.post(notification: .screenChanged, argument: nil)
     }
 }
 
-/// A swipe in from the conversation's left edge shows Home (or brings it over).
-private struct HomeEdge: View {
+/// A swipe in from the screen's left edge, over the conversation, shows
+/// Home (or brings it over). A screen-edge pan: it starts only on a
+/// sideways drag from the edge, so taps there (the composer's +) go through.
+private struct HomeEdgePan: UIGestureRecognizerRepresentable {
+    let enabled: Bool
     let fits: Bool
-    @ObservedObject private var router = Router.shared
+
+    func makeUIGestureRecognizer(context: Context) -> UIScreenEdgePanGestureRecognizer {
+        let pan = UIScreenEdgePanGestureRecognizer()
+        pan.edges = .left
+        return pan
+    }
+
+    func updateUIGestureRecognizer(_ recognizer: UIScreenEdgePanGestureRecognizer, context: Context) {
+        recognizer.isEnabled = enabled
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UIScreenEdgePanGestureRecognizer, context: Context) {
+        guard recognizer.state == .ended else { return }
+        let drag = recognizer.translation(in: recognizer.view)
+        if drag.x > 60, abs(drag.y) < drag.x { Router.shared.homePane.toggle(fits: fits) }
+    }
+}
+
+#if DEBUG
+/// A point for the UI tests: whether the edge swipe would open Home.
+private struct HomeEdgeMarker: View {
+    let enabled: Bool
 
     var body: some View {
-        Color.clear
-            .frame(width: 20)
-            .frame(maxHeight: .infinity)
-            .padding(.vertical, 60)
-            .contentShape(.rect)
-            .gesture(DragGesture(minimumDistance: 12).onEnded { drag in
-                if drag.translation.width > 60, abs(drag.translation.height) < drag.translation.width {
-                    withAnimation(.snappy) { router.homePane.toggle(fits: fits) }
-                }
-            })
-            .accessibilityHidden(true)
+        Color.clear.frame(width: 1, height: 1)
+            .accessibilityElement()
+            .accessibilityIdentifier("homeEdge")
+            .accessibilityValue(enabled ? "on" : "off")
     }
 }
+#endif
 
 /// The side pane: the conversation's Workbench under its title line (the
 /// tab, which opens the tab menu), or what a pushed screen puts there.
@@ -447,6 +496,17 @@ private struct ShellSidePane: View {
         .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("workbenchPage")
+        .modifier(ShellCovered())
+    }
+}
+
+/// A pane under Home over the conversation: hidden from VoiceOver, besides
+/// being outside Home's modal (the pane's own hiding: a container's doesn't reach it).
+private struct ShellCovered: ViewModifier {
+    @Environment(\.shellCovered) private var covered
+
+    func body(content: Content) -> some View {
+        content.accessibilityHidden(covered)
     }
 }
 
@@ -511,7 +571,7 @@ private struct ShellPagesRail: ViewModifier {
     private func tap(_ slot: RailSlot) {
         switch slot {
         case .back: if !router.path.isEmpty { router.path.removeLast() }
-        case .home: withAnimation(.snappy) { router.homePane.toggle(fits: homeFits) }
+        case .home: router.homePane.toggle(fits: homeFits)
         case .new: router.compose = ""
         default: break
         }

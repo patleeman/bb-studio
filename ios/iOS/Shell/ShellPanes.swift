@@ -96,7 +96,10 @@ struct ShellHomePane: Equatable {
         overlaid = false
     }
 
-    /// A new layout (posture, text size) starts without Home over the conversation.
+    /// The panes laid out anew (side by side again, or Home now fits beside
+    /// the others, or no longer does): Home isn't over the conversation, so
+    /// it never comes back over it unasked. Opening the hinge from book to
+    /// flat is no new layout.
     mutating func layoutChanged() {
         overlaid = false
     }
