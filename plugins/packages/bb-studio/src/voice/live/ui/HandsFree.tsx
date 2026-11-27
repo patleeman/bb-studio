@@ -43,6 +43,12 @@ const useStore = () => useSyncExternalStore((listener) => { listeners.add(listen
 /** The pill keeps Studio's RPC client, so the command palette can start a session too. */
 let windowRpc: Rpc | null = null;
 
+export function resetHandsFreeForTests(): void {
+  state = { session: null, expanded: false };
+  windowRpc = null;
+  delete (globalThis as { __studioVoiceLive?: LiveSession }).__studioVoiceLive;
+}
+
 /**
  * Starts a session, or, when one is running, opens its pill. It speaks as the
  * thread it's launched from (docs/voice/identity.md); none: the Chief of Staff.

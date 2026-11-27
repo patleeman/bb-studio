@@ -92,7 +92,8 @@ export function installFastTitles(
       target = el;
       target.setAttribute(HELD, el.getAttribute("title") ?? "");
       target.removeAttribute("title");
-      const delay = Date.now() - lastHiddenAt < SKIP_DELAY_MS ? 0 : FAST_TITLE_DELAY_MS;
+      const elapsed = Date.now() - lastHiddenAt;
+      const delay = elapsed >= 0 && elapsed < SKIP_DELAY_MS ? 0 : FAST_TITLE_DELAY_MS;
       timer = setTimeout(show, delay);
     },
     captureSignal,

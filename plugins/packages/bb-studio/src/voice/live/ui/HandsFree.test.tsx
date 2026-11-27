@@ -25,7 +25,7 @@ vi.mock("./session", () => ({
 }));
 
 import { COMPOSER_BUTTON } from "../../../kit/app/index";
-import { HandsFreeComposerButton, handsFreeButtonClass } from "./HandsFree";
+import { HandsFreeComposerButton, handsFreeButtonClass, resetHandsFreeForTests } from "./HandsFree";
 
 let root: Root;
 let host: HTMLDivElement;
@@ -35,7 +35,7 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
 });
-afterEach(() => { act(() => root.unmount()); host.remove(); });
+afterEach(() => { act(() => root.unmount()); host.remove(); resetHandsFreeForTests(); });
 
 const button = () => host.querySelector<HTMLButtonElement>('[data-testid="handsfree-composer"]')!;
 
