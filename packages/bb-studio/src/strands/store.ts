@@ -4,6 +4,7 @@
 // src/strands/states.ts works them out on each read.
 import type Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
+import { firstLineTitle, looksLikeEnvelope } from "./naming";
 import type { ReplyBy, ReplyTag } from "./reply";
 
 export type StrandOrigin = "jev" | "model" | "user" | "task" | "backfill";
@@ -112,6 +113,8 @@ const marksOf = (value: string | null | undefined): MergeMark[] => {
 /** strands.kind of the whole-conversation strand. */
 export const TRUNK = "trunk";
 export const TRUNK_TITLE = "Whole conversation";
+/** A strand's neutral title, when its messages give nothing to title it by. */
+export const UNTITLED = "Untitled";
 
 /** The strand_reads row that counts today's calls across every conversation. */
 export const ALL_CONVERSATIONS = "strands:all-conversations";
@@ -204,6 +207,8 @@ export class StrandStore {
 
   /** A new strand. With `seq` null it has no message yet: its span starts empty and grows with its first one. */
   create(input: { threadId: string; title: string; summary?: string | null; named?: boolean; origin: StrandOrigin; seq: number | null; at: number; taskId?: string | null; parentId?: string | null }): Strand {
+    // Never envelope text as a title ("[bb message from thread:…]"): a neutral one, left for the namer.
+    if (looksLikeEnvelope(input.title)) input = { ...input, title: UNTITLED, named: false };
     const id = `str_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
     const at = this.now();
     this.db.prepare(`INSERT INTO strands (id, thread_id, title, summary, named, summary_at, first_seq, last_seq, last_at, origin, task_id, created_at, parent_id)
@@ -213,8 +218,29 @@ export class StrandStore {
   }
 
   named(id: string, title: string, summary: string | null): void {
+    if (looksLikeEnvelope(title)) return;
     this.db.prepare("UPDATE strands SET title = ?, summary = COALESCE(?, summary), summary_at = CASE WHEN ? IS NULL THEN summary_at ELSE ? END, named = 1 WHERE id = ? AND named = 0")
       .run(title, summary, summary, this.now(), id);
+  }
+
+  /**
+   * One-time repair, safe to run on every start: strands titled with envelope
+   * text ("[bb message from thread:…]", "[bb system]", a mangled
+   * "bb message from thread:thr…") get a title from their first messages
+   * (envelopes off), else a neutral one, and go back to the namer. A repaired
+   * title never looks like an envelope, so a second run changes nothing.
+   */
+  repairEnvelopeTitles(): number {
+    const rows = this.db.prepare("SELECT id, thread_id, title FROM strands WHERE title LIKE '%bb%' OR title LIKE '%[%' OR title LIKE '%<%' OR title LIKE '%thread%'").all() as { id: string; thread_id: string; title: string }[];
+    const update = this.db.prepare("UPDATE strands SET title = ?, named = 0, name_tries = 0 WHERE id = ?");
+    let repaired = 0;
+    for (const row of rows) {
+      if (!looksLikeEnvelope(row.title)) continue;
+      const title = this.first(row.id, row.thread_id, 3).map((item) => firstLineTitle(item.line ?? "")).find((each) => each !== UNTITLED) ?? UNTITLED;
+      update.run(title, row.id);
+      repaired++;
+    }
+    return repaired;
   }
 
   triedName(id: string): void {

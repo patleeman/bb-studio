@@ -27,16 +27,42 @@ const SMALL = new Set(["a", "an", "the", "and", "or", "of", "for", "to", "on", "
 const PERSONAL = new Set(["i", "i'm", "i've", "me", "my", "we", "we're", "us", "our", "you", "you're", "your", "let's", "lets", "please"]);
 const SENTENCE_START = /^(?:can|could|would|should|will|do|does|did|is|are|was|were|what|why|how|when|where|who|which|please|let's|lets|hey|hi|hello|thanks|ok|okay|yes|no)\b/i;
 
-export type NameProblem = "empty" | "too-long" | "too-many-words" | "sentence" | "generic" | "duplicate" | "markup";
+export type NameProblem = "empty" | "too-long" | "too-many-words" | "sentence" | "generic" | "duplicate" | "markup" | "envelope";
+
+// Host-injected envelopes: what BB, Studio or a provider puts in front of a
+// turn's real text ("[bb message from thread:thr_…]", "[bb system]",
+// "[bb studio]", "[bb automation due:…]", a <task-notification> block). They
+// say who sent a message, never what it is about, so no strand is named from them.
+const LEADING_BRACKET = /^\s*\[\s*bb\b[^\]\n]*\][ \t]*(?:\r?\n)*/iu;
+const INLINE_BRACKET = /\[\s*bb\b[^\]\n]*\]/giu;
+/** Tag blocks that carry no topic of their own (ids, paths, status words), dropped whole. */
+const META_BLOCK = /<(system-reminder|task-id|tool-use-id|output-file|status)>[\s\S]*?<\/\1>/giu;
+/** Any other host tag (<task-notification>, <summary>, <result>…): the tag goes, its text stays. */
+const HOST_TAG = /<\/?(?:task-notification|summary|result|system-reminder|task-id|tool-use-id|output-file|status)>/giu;
+/** A title that is (or holds) an envelope, also with its id mangled ("thread:thrkrwu3…"). */
+const ENVELOPE_TITLE = /\[\s*bb\b|\bbb\s+(?:message\s+from\s+thread|automation\s+due)\b|\bthread\s*:\s*thr_?[a-z0-9]{4,}|<\/?(?:task-notification|system-reminder|summary|result|task-id|tool-use-id|output-file|status)>|^\s*\[[^\]\n]*\]\s*$/iu;
+
+/** A turn's text with host-injected envelopes taken off: the content a title is made from. */
+export function stripEnvelopes(text: string): string {
+  let rest = text.replace(META_BLOCK, "").replace(HOST_TAG, "");
+  for (let match = LEADING_BRACKET.exec(rest); match; match = LEADING_BRACKET.exec(rest)) rest = rest.slice(match[0].length);
+  return rest.trim();
+}
+
+/** True when a title is envelope text, not a name: "[bb message from thread:…]", "[bb system]", a bare tag or bracket. */
+export const looksLikeEnvelope = (title: string): boolean => ENVELOPE_TITLE.test(title);
 
 /** Folds a name for comparing: lower case, accents and punctuation off. */
 export function nameKey(name: string): string {
   return name.toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "").replace(/[^\p{L}\p{N}#]+/gu, " ").trim();
 }
 
+/** Emphasis marks: * and ` anywhere, _ only at a word's edge (snake_case and thr_ ids keep theirs). */
+const EDGE_MARKS = /[*`]+|(?<![\p{L}\p{N}])_+|_+(?![\p{L}\p{N}])/gu;
+
 /** A name as the model or a task wrote it, tidied: quotes, markdown and a trailing period off, spaces folded. */
 export function tidyName(raw: string): string {
-  let name = raw.replace(/[*_`]+/g, "").replace(/^\s*(?:title|name)\s*:\s*/i, "").replace(/\s+/g, " ").trim();
+  let name = raw.replace(EDGE_MARKS, "").replace(/^\s*(?:title|name)\s*:\s*/i, "").replace(/\s+/g, " ").trim();
   // Quotes and a trailing period, in either order ('"Model router".' and '"Model router."').
   for (let pass = 0; pass < 2; pass++) name = name.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").replace(/[.;,:]+$/, "").trim();
   return name;
@@ -47,6 +73,7 @@ export function checkName(name: string, others: readonly string[] = []): NamePro
   const problems: NameProblem[] = [];
   const text = name.trim();
   if (!text) return ["empty"];
+  if (looksLikeEnvelope(text)) problems.push("envelope");
   if (/[\n\r]|::|\[[^\]]*\]\(|^#+\s|[*`]/.test(text)) problems.push("markup");
   if (text.length > NAME_MAX_CHARS) problems.push("too-long");
   const words = text.split(/\s+/);
@@ -62,9 +89,9 @@ export function checkName(name: string, others: readonly string[] = []): NamePro
 
 export const isGoodName = (name: string, others: readonly string[] = []) => checkName(name, others).length === 0;
 
-/** A strand's title before it is named: the message's first line, cut to 60 characters. */
+/** A strand's title before it is named: the message's first line (envelopes off), cut to 60 characters. Never envelope text. */
 export function firstLineTitle(text: string): string {
-  const line = text.split("\n").map((each) => each.replace(/[*_`#>]+/g, "").replace(/\s+/g, " ").trim()).find(Boolean) ?? "";
+  const line = stripEnvelopes(text).split("\n").map((each) => each.replace(INLINE_BRACKET, "").replace(EDGE_MARKS, "").replace(/[#>]+/g, "").replace(/\s+/g, " ").trim()).find((each) => each && !looksLikeEnvelope(each)) ?? "";
   if (line.length <= FIRST_LINE_MAX) return line || "Untitled";
   const cut = line.slice(0, FIRST_LINE_MAX - 1);
   const space = cut.lastIndexOf(" ");
