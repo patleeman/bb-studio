@@ -82,7 +82,7 @@ struct BotAutomationsSheet: View {
             }
             if allAutomations, runningPlugins.split(separator: ",").contains("automations") {
                 Section {
-                    NavigationLink { AutomationsView() } label: { Label("All automations", systemImage: "clock.arrow.circlepath") }
+                    NavigationLink(value: Route.automations) { Label("All automations", systemImage: "clock.arrow.circlepath") }
                         .accessibilityIdentifier("schedulesAllAutomations")
                 } footer: { Text("Every automation in BB, in every project.") }
             }

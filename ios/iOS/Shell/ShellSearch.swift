@@ -9,12 +9,13 @@ struct ShellSearchable: ViewModifier {
 
     func body(content: Content) -> some View {
         if posture.usesRail {
-            content.safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
                 ShellSearchField(text: $text, prompt: prompt)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 6)
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("shellSearch")
+                content
             }
         } else {
             content.searchable(text: $text, placement: .navigationBarDrawer(displayMode: .automatic), prompt: prompt)
