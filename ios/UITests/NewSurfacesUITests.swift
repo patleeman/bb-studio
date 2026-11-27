@@ -14,18 +14,25 @@ final class NewSurfacesUITests: StagedServerUITestCase {
         shot(app, "search")
     }
 
-    /// The collection's search field sits in the navigation drawer, hidden until the list is pulled down.
+    /// On Duo, `ShellSearchable` puts `shellSearchField` at the top of the page;
+    /// on iPhone, SwiftUI's searchable drawer reveals `Search Studio` when pulled down.
     private func studioSearch(_ app: XCUIApplication) -> XCUIElement {
-        let search = app.searchFields["Search Studio"]
+        let duoField = app.textFields["shellSearchField"].firstMatch
+        let navField = app.searchFields["Search Studio"].firstMatch
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10)
-            || app.staticTexts["Studio"].waitForExistence(timeout: 5))
-        if !search.waitForExistence(timeout: 3) {
-            let window = app.windows.firstMatch
-            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
-                .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)))
-            _ = search.waitForExistence(timeout: 5)
+            || app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Studio'")).firstMatch.waitForExistence(timeout: 5))
+        if duoField.waitForExistence(timeout: 3) { return duoField }
+        if navField.waitForExistence(timeout: 2) { return navField }
+        let list = app.collectionViews.firstMatch
+        if list.waitForExistence(timeout: 5) {
+            list.swipeDown()
+            if navField.waitForExistence(timeout: 3) { return navField }
         }
-        return search
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+            .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)))
+        _ = navField.waitForExistence(timeout: 5)
+        return navField
     }
 
     func testMeetingNotes() throws {
