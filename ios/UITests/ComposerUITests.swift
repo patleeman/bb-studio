@@ -85,15 +85,20 @@ final class ComposerUITests: ServerIsolatedUITestCase {
         if app.buttons["Continue"].exists { app.buttons["Continue"].tap() }
         snapshot("command-inserted")
 
-        app.buttons["More"].tap()
-        XCTAssertTrue(app.buttons["Context usage"].waitForExistence(timeout: 5))
-        app.buttons["Context usage"].tap()
+        XCTAssertTrue(app.screenMore.waitForExistence(timeout: 5))
+        app.screenMore.tap()
+        let contextMenu = app.buttons["Context"].firstMatch
+        if contextMenu.waitForExistence(timeout: 3) { contextMenu.tap() }
+        let contextUsage = app.buttons["Context usage"].firstMatch
+        XCTAssertTrue(contextUsage.waitForExistence(timeout: 5))
+        contextUsage.tap()
         XCTAssertTrue(app.navigationBars["Context usage"].waitForExistence(timeout: 5))
         snapshot("context")
         app.buttons["Done"].tap()
 
-        app.buttons["More"].tap()
-        app.buttons["Clear context"].tap()
+        app.screenMore.tap()
+        if app.buttons["Context"].firstMatch.waitForExistence(timeout: 3) { app.buttons["Context"].firstMatch.tap() }
+        app.buttons["Clear context"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Clear context"].waitForExistence(timeout: 5))
         snapshot("clear-confirmation")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.4)).tap()

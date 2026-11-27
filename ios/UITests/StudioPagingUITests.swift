@@ -21,7 +21,7 @@ final class StudioPagingUITests: StagedServerUITestCase {
     }
 
     private func openStudio() throws -> XCUIElement {
-        app.buttons["Studio"].firstMatch.tap()
+        app.open(URL(string: "bbstudio://studio")!)
         guard app.buttons["All"].waitForExistence(timeout: 20) else { throw XCTSkip("Studio has one kind") }
         if !app.buttons["All"].isSelected { app.buttons["All"].tap() }
         // A day header on the page shown, not a row.
