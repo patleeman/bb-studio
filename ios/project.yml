@@ -153,6 +153,7 @@ targets:
     sources:
       - path: Tests
       - path: Share/SharedFile.swift
+      - path: NotificationService/NotificationService.swift
     dependencies:
       - target: BBStudio
     settings:

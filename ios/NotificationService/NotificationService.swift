@@ -1,5 +1,39 @@
 import UserNotifications
 
+enum NotificationChoiceCategory {
+    static let prefix = "BB_CHOICE."
+    static let maxDynamicCount = 20
+
+    static func identifier(for choices: [String]) -> String {
+        prefix + choices.joined(separator: "\u{1F}")
+    }
+
+    static func makeCategory(choices: [String], freeText: Bool) -> UNNotificationCategory {
+        var actions: [UNNotificationAction] = choices.enumerated().map { index, label in
+            UNNotificationAction(identifier: "BB_CHOICE_\(index)", title: label, options: [.authenticationRequired])
+        }
+        if freeText {
+            actions.append(
+                UNTextInputNotificationAction(
+                    identifier: "BB_REPLY_TEXT", title: "Other…", options: [.authenticationRequired],
+                    icon: UNNotificationActionIcon(systemImageName: "text.bubble"), textInputButtonTitle: "Send",
+                    textInputPlaceholder: "Your answer"))
+        }
+        return UNNotificationCategory(identifier: identifier(for: choices), actions: actions, intentIdentifiers: [])
+    }
+
+    static func mergedCategories(
+        existing: Set<UNNotificationCategory>,
+        adding category: UNNotificationCategory
+    ) -> Set<UNNotificationCategory> {
+        var dynamic = existing.filter { $0.identifier.hasPrefix(prefix) }
+        if dynamic.count >= maxDynamicCount { dynamic = [] }
+        return existing.filter { !$0.identifier.hasPrefix(prefix) }
+            .union(dynamic.filter { $0.identifier != category.identifier })
+            .union([category])
+    }
+}
+
 /// Gives a multiple-choice question one lock-screen button per option. iOS only offers the
 /// actions of categories registered before the push arrives, so this registers a category for
 /// the question's options and points the notification at it. The relay sends `BB_CHOICE` with
@@ -20,29 +54,17 @@ final class NotificationService: UNNotificationServiceExtension {
         guard content.categoryIdentifier == "BB_CHOICE", let choices = info["choices"] as? [String], !choices.isEmpty
         else { return finish() }
 
-        var actions = choices.enumerated().map { index, label in
-            UNNotificationAction(identifier: "BB_CHOICE_\(index)", title: label, options: [.authenticationRequired])
-        }
-        if info["choiceFreeText"] as? Bool == true {
-            actions.append(
-                UNTextInputNotificationAction(
-                    identifier: "BB_REPLY_TEXT", title: "Other…", options: [.authenticationRequired],
-                    icon: UNNotificationActionIcon(systemImageName: "text.bubble"), textInputButtonTitle: "Send",
-                    textInputPlaceholder: "Your answer"))
-        }
-        // Keyed by the labels, so repeated option sets reuse one category.
-        let identifier = "BB_CHOICE." + choices.joined(separator: "\u{1F}")
+        let category = NotificationChoiceCategory.makeCategory(
+            choices: choices,
+            freeText: info["choiceFreeText"] as? Bool == true
+        )
         let center = UNUserNotificationCenter.current()
         center.getNotificationCategories { existing in
-            var dynamic = existing.filter { $0.identifier.hasPrefix("BB_CHOICE.") }
-            if dynamic.count >= 20 { dynamic = [] }
-            let categories = existing.filter { !$0.identifier.hasPrefix("BB_CHOICE.") }
-                .union(dynamic.filter { $0.identifier != identifier })
-                .union([UNNotificationCategory(identifier: identifier, actions: actions, intentIdentifiers: [])])
+            let categories = NotificationChoiceCategory.mergedCategories(existing: existing, adding: category)
             center.setNotificationCategories(categories)
             // Reading back waits until iOS has stored the category, so the notification can use it.
             center.getNotificationCategories { _ in
-                content.categoryIdentifier = identifier
+                content.categoryIdentifier = category.identifier
                 self.finish()
             }
         }
