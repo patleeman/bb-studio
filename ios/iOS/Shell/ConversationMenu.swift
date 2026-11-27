@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The conversation's menu (the iPhone's ⋯, the Duo rail's More): the shown
+/// The conversation's menu (⋯ in its bar): the shown
 /// Workbench tab's own actions first, then the thread's. Each item sends a
 /// `ConversationCommand` to the thread, which does it.
 struct ConversationMenuItems: View {

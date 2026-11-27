@@ -1,7 +1,7 @@
 import XCTest
 
-/// The Bot's pages pushed from Home, offline (`-qaSpacesDemo list` with
-/// `-qaBotDemo chat`; `BotSpacesDemo.State` answers Memory's RPCs,
+/// The Bot's pages (Memory and Library are tabs, the rest pushed from Home),
+/// offline (`-qaSpacesDemo list` with `-qaBotDemo chat`; `BotSpacesDemo.State` answers Memory's RPCs,
 /// `bot_library`, `bot_threads_older`, `bot_finished` and `bot_reopen`).
 /// `TEST_RUNNER_STEP8_OUT` keeps PNGs.
 final class BotPagesUITests: ServerIsolatedUITestCase {
@@ -24,7 +24,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
 
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
-    /// Back to Home: the bar's Back, or Back in the Duo's rail.
+    /// Back to Home: its tab.
     private func closeMemory() {
         app.goHome()
     }
@@ -73,7 +73,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         shot("slow-memory-loaded")
         closeMemory()
         openPage("library")
-        XCTAssertTrue(any("library-page").waitForExistence(timeout: 5), "the Library, pushed")
+        XCTAssertTrue(any("library-page").waitForExistence(timeout: 5), "the Library tab")
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'library-row-'")).firstMatch.exists,
                        "still loading while the answer is slow")
         shot("slow-library-loading")

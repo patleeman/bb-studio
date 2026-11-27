@@ -6,13 +6,10 @@ enum MemoryLayer: String, CaseIterable, Identifiable {
     var title: String { rawValue.capitalized }
 }
 
-/// Memory as a full page (designs 8d, 8g, 9g): Core | Skills | History.
-///
-/// - iPhone: one 44-point bar: back, the layer switch in the title's place, Search.
-/// - Duo in one column (folded, vertical): the switch is the title line; Back
-///   and Search are in the shell's rail (`.screenActions`).
-/// - Duo beside two pages (book, flat): Core on the left page, and
-///   Skills | History on the right one (`.screenCompanion`).
+/// Memory, the Memory tab's root (designs 8d, 8g, 9g): Core | Skills | History.
+/// Its large title, the layer switch under the bar, and Search in the bar.
+/// Beside two pages (the open Duo) this is Core alone; Skills | History are
+/// page two (`MemoryBrowsePane`).
 struct MemoryPageView: View {
     let botId: String?
     var open: (BotShellItem) -> Void
@@ -25,7 +22,8 @@ struct MemoryPageView: View {
             if let store, store.botId == botId {
                 if posture.splitsWorkbench {
                     CoreLayerView(store: store)
-                        .screenCompanion(id: "memory-browse-\(botId ?? "")") { MemoryBrowsePane(store: store, open: open) }
+                        .navigationTitle("Memory")
+                        .navigationBarTitleDisplayMode(.large)
                 } else {
                     MemoryLayeredPage(store: store, open: open)
                 }
@@ -42,23 +40,24 @@ struct MemoryPageView: View {
     }
 }
 
-/// The page on one screen, with the layer switch.
+/// The page on one screen: the layer switch under the bar, Search in it.
 private struct MemoryLayeredPage: View {
     let store: MemoryStore
     var open: (BotShellItem) -> Void
     @State private var layer: MemoryLayer = .core
     @State private var searching = false
 
-    @Environment(\.shellPosture) private var posture
-
     var body: some View {
-        let content = MemoryPageContent(store: store, layer: $layer, searching: $searching, open: open)
+        MemoryPageContent(store: store, layer: $layer, searching: $searching, open: open)
             .sensoryFeedback(.selection, trigger: layer)
-        if posture.usesRail {
-            content.modifier(DuoMemoryChrome(layer: $layer, searching: $searching))
-        } else {
-            content.modifier(PhoneMemoryChrome(layer: $layer, searching: $searching))
-        }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                MemoryLayerPicker(layer: $layer)
+                    .padding(.horizontal, 16)
+                    .frame(height: 44)
+            }
+            .navigationTitle("Memory")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar { ToolbarItem(placement: .primaryAction) { MemorySearchButton(searching: $searching) } }
     }
 }
 
@@ -98,22 +97,6 @@ struct MemoryLayerPicker: View {
     }
 }
 
-/// iPhone: the switch stands in for the title ("Memory" is what you tapped to get here).
-private struct PhoneMemoryChrome: ViewModifier {
-    @Binding var layer: MemoryLayer
-    @Binding var searching: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .navigationTitle("Memory")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) { MemoryLayerPicker(layer: $layer).frame(maxWidth: 260) }
-                ToolbarItem(placement: .primaryAction) { MemorySearchButton(searching: $searching) }
-            }
-    }
-}
-
 private struct MemorySearchButton: View {
     @Binding var searching: Bool
 
@@ -125,39 +108,9 @@ private struct MemorySearchButton: View {
     }
 }
 
-/// The Duo in one column (9g): the switch is the title line; Search is in
-/// the shell's rail, beside Back.
-private struct DuoMemoryChrome: ViewModifier {
-    @Binding var layer: MemoryLayer
-    @Binding var searching: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .safeAreaInset(edge: .top, spacing: 0) {
-                MemoryLayerPicker(layer: $layer)
-                    .padding(.horizontal, 16)
-                    .frame(height: 44)
-            }
-            .screenDrawsTitleLine()
-            .screenActions([ScreenAction(id: "memorySearch", title: searching ? "Close" : "Search",
-                                         systemImage: searching ? "xmark" : "magnifyingglass") {
-                withAnimation(.snappy) { searching.toggle() }
-            }])
-    }
-}
-
-/// Skills | History on the open Duo's right page; + New skill in its bar while on Skills.
-/// Its own stack: a skill and New skill open on that page.
+/// Skills | History, page two beside Core on the open Duo, with + New skill
+/// in its bar while on Skills. What they open pushes on this page (`Router.detail`).
 struct MemoryBrowsePane: View {
-    let store: MemoryStore
-    var open: (BotShellItem) -> Void
-
-    var body: some View {
-        NavigationStack { MemoryBrowseLayers(store: store, open: open) }
-    }
-}
-
-private struct MemoryBrowseLayers: View {
     let store: MemoryStore
     var open: (BotShellItem) -> Void
     @State private var layer: MemoryLayer = .skills
@@ -167,31 +120,21 @@ private struct MemoryBrowseLayers: View {
             if layer == .skills { SkillsLayerView(store: store, newSkillRow: false) } else { HistoryLayerView(store: store, open: open) }
         }
         .scrollContentBackground(.hidden)
-        .safeAreaInset(edge: .top, spacing: 0) { MemoryBrowseBar(store: store, layer: $layer) }
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle(layer.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                MemoryLayerPicker(layer: $layer, layers: [.skills, .history]).frame(maxWidth: 240)
+            }
+            if layer == .skills {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { Router.shared.push(.memoryNewSkill(botId: store.botId)) } label: { Label("New skill", systemImage: "plus") }
+                        .accessibilityIdentifier("memorySkillNew")
+                }
+            }
+        }
         .sensoryFeedback(.selection, trigger: layer)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("memory-browse")
-    }
-}
-
-private struct MemoryBrowseBar: View {
-    let store: MemoryStore
-    @Binding var layer: MemoryLayer
-
-    var body: some View {
-        ZStack {
-            MemoryLayerPicker(layer: $layer, layers: [.skills, .history]).frame(maxWidth: 240)
-            if layer == .skills {
-                Button { Router.shared.push(.memoryNewSkill(botId: store.botId)) } label: {
-                    Image(systemName: "plus").font(.body.weight(.medium)).frame(width: 44, height: 44).contentShape(.rect)
-                }
-                .accessibilityLabel("New skill")
-                .accessibilityIdentifier("memorySkillNew")
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 44)
     }
 }

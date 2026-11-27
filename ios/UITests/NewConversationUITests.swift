@@ -5,8 +5,8 @@ import XCTest
 /// Auto, Research with no default model). New conversation says who it is
 /// with and lets you pick another Bot or none, the project, the workspace and
 /// the model, defaulting as the desktop does; the list has a "+ New
-/// conversation" row and a Bot switcher on the Bot's name; the folded Duo's
-/// ↓ is one of the rail's round buttons. `TEST_RUNNER_ROUND2_OUT` keeps PNGs;
+/// conversation" button in Home's bar and a Bot switcher on the Bot's name.
+/// `TEST_RUNNER_ROUND2_OUT` keeps PNGs;
 /// `TEST_RUNNER_ROUND2_DUO` runs the Duo tests.
 final class NewConversationUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
@@ -28,8 +28,8 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
 
     private func openNewConversation() {
         app.goHome()
-        // New: in Home's bar on the iPhone, in the rail on the Duo.
-        let row = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["homeNew", "rail-new"])).firstMatch
+        // New: in Home's bar.
+        let row = app.homeNew
         XCTAssertTrue(row.waitForExistence(timeout: 10), "New conversation")
         shot("1-list")
         row.tap()
@@ -72,8 +72,8 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
         launch()
         openNewConversation()
         app.buttons["newConversationBot"].tap()
-        // The Bot named Home, not the header's Home button (round 5).
-        let home = app.buttons.matching(NSPredicate(format: "label == 'Home' AND NOT (identifier BEGINSWITH 'rail-')")).firstMatch
+        // The Bot named Home, not Home's pane toggle (round 5).
+        let home = app.buttons.matching(NSPredicate(format: "label == 'Home' AND identifier != 'homePane'")).firstMatch
         XCTAssertTrue(home.waitForExistence(timeout: 5), "every Bot, to pick from")
         XCTAssertTrue(app.buttons["No Bot: a thread in a project"].exists, "or a plain thread")
         shot("4-bots")
@@ -129,8 +129,8 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("homeColumn").waitForExistence(timeout: 15), "Home's column on the left screen")
         XCTAssertTrue(app.buttons["botSwitcher"].exists, "with the Bot switcher")
         shot("10-duo")
-        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/activate?rail-new")!)
-        XCTAssertTrue(waitFor(any("newConversationWith"), label: "Juniper"), "New conversation with Juniper, from the rail")
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/activate?homeNew")!)
+        XCTAssertTrue(waitFor(any("newConversationWith"), label: "Juniper"), "New conversation with Juniper, from Home's bar")
         app.buttons["Cancel"].tap()
         app.buttons["botSwitcher"].tap()
         let home = app.buttons["Home"]

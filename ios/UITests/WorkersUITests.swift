@@ -2,7 +2,7 @@ import XCTest
 
 /// Workers in the Bot's shell, offline (`-qaSpacesDemo` with `-qaBotDemo
 /// chat`): a worker opens read-only from Home, its row saying its state and
-/// its title line its name, with "Ask the Bot about this worker…" where the
+/// its bar titled with its name, with "Ask the Bot about this worker…" where the
 /// composer was; Ask sends to the owning conversation and goes there.
 /// `TEST_RUNNER_STEP6_OUT` keeps PNGs.
 final class WorkersUITests: ServerIsolatedUITestCase {

@@ -15,10 +15,11 @@ enum ShellBotState: Equatable {
     }
 }
 
-/// The app once Studio's Bots answer (round 7). Home is the root and every
-/// other screen is pushed on its stack, laid out by the posture: one column
-/// on the iPhone and the folded or vertical Duo; panes side by side on the
-/// open Duo, by width and text size (`ShellPanes`), with the controls in the rail.
+/// The app once Studio's Bots answer (round 8, native as Kensico): the
+/// system's tab bar (Home, Library, Memory, Search), one stack per tab with
+/// native bars. Home's tab is laid out by the posture: one column on the
+/// iPhone and the folded or vertical Duo; panes side by side on the open
+/// Duo, by width and text size (`ShellPanes`).
 struct ShellRoot: View {
     @ObservedObject var store: BotSpacesStore
     @ObservedObject private var router = Router.shared
@@ -36,11 +37,7 @@ struct ShellRoot: View {
         Group {
             switch ShellBotState.resolve(spaces: store.spaces, bot: bot, error: store.error) {
             case .ready(let bot):
-                if posture.splitsWorkbench {
-                    ShellPages(bot: bot, store: store, width: geometry.paneWidth)
-                } else {
-                    ShellColumn(bot: bot, store: store)
-                }
+                ShellTabs(bot: bot, store: store, width: geometry.paneWidth)
             case .empty:
                 EmptyBotsColumn(store: store, error: nil)
             case .failed(let message):
@@ -55,7 +52,6 @@ struct ShellRoot: View {
             }
         }
         .environment(\.shellPosture, posture)
-        .environment(\.shellReservedColumn, geometry.trailingInset)
         .environment(\.shellInnerScreen, geometry.innerScreen || posture.innerScreen)
         .background { ShellBackground() }
         // The vertical Duo is a big iPhone: type a step up (9f: 18 pt body), never down.
@@ -70,6 +66,7 @@ struct ShellRoot: View {
         .onChange(of: store.spaces) { _, _ in land() }
         .onChange(of: store.views) { _, _ in land() }
         .onChange(of: router.pending, initial: true) { _, _ in router.consume(store) }
+        .onChange(of: posture.splitsWorkbench, initial: true) { _, two in router.twoPages = two }
         .onChange(of: router.conversation) { _, id in
             if let id, let bot { ShellMemory.remember(id, botId: bot.id) }
         }
@@ -136,19 +133,94 @@ enum ShellMemory {
     #endif
 }
 
-// MARK: One column
+// MARK: Tabs
 
-/// The iPhone, and the folded or vertical Duo: Home with everything pushed over it.
-private struct ShellColumn: View {
+/// The tabs, as Kensico's: SwiftUI's TabView with the tab bar only. The
+/// system draws it (on the folded Duo, as the capsule in the reserved right
+/// column). Home holds the conversations; Library and Memory are the Bot's
+/// places; Search finds across them.
+private struct ShellTabs: View {
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
+    let width: CGFloat
     @ObservedObject private var router = Router.shared
 
     var body: some View {
-        NavigationStack(path: $router.path) {
-            HomeScreen(bot: bot, store: store)
+        TabView(selection: $router.tab) {
+            Tab("Home", systemImage: "house", value: ShellTab.home) {
+                HomeTab(bot: bot, store: store, width: width)
+            }
+            Tab("Library", systemImage: BotPage.library.symbol, value: ShellTab.library) {
+                ShellStack(path: $router.libraryPath, bot: bot, store: store) { LibraryPageView(botId: bot.id) }
+            }
+            Tab("Memory", systemImage: BotPage.memory.symbol, value: ShellTab.memory) {
+                MemoryTab(bot: bot, store: store)
+            }
+            Tab(value: ShellTab.search, role: .search) {
+                ShellStack(path: $router.searchPath, bot: bot, store: store) { HomeSearchView(bot: bot, store: store) }
+            }
+        }
+        .tabViewStyle(.tabBarOnly)
+        .sensoryFeedback(.selection, trigger: router.tab)
+    }
+}
+
+/// One tab's stack: its root, and every route pushed over it.
+private struct ShellStack<Root: View>: View {
+    @Binding var path: [Route]
+    let bot: BotSpace
+    @ObservedObject var store: BotSpacesStore
+    @ViewBuilder var root: Root
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            root
                 .shellSurface()
                 .navigationDestination(for: Route.self) { ShellDestination(route: $0, bot: bot, store: store).shellSurface() }
+        }
+    }
+}
+
+/// Home's tab: Home with everything pushed over it, or beside two pages, the panes.
+private struct HomeTab: View {
+    let bot: BotSpace
+    @ObservedObject var store: BotSpacesStore
+    let width: CGFloat
+    @ObservedObject private var router = Router.shared
+    @Environment(\.shellPosture) private var posture
+
+    var body: some View {
+        if posture.splitsWorkbench {
+            ShellPages(bot: bot, store: store, width: width)
+        } else {
+            ShellStack(path: $router.path, bot: bot, store: store) { HomeScreen(bot: bot, store: store) }
+        }
+    }
+}
+
+/// Memory's tab: one stack, or beside two pages Core on page one and
+/// Skills | History on page two, which keeps a stack of its own (`Router.detail`).
+private struct MemoryTab: View {
+    let bot: BotSpace
+    @ObservedObject var store: BotSpacesStore
+    @ObservedObject private var router = Router.shared
+    @EnvironmentObject private var app: AppModel
+    @Environment(\.shellPosture) private var posture
+
+    var body: some View {
+        let page = ShellStack(path: $router.memoryPath, bot: bot, store: store) {
+            MemoryPageView(botId: bot.id, open: router.open(item:))
+        }
+        if posture.splitsWorkbench {
+            HStack(spacing: 0) {
+                page
+                ShellStack(path: $router.detail, bot: bot, store: store) {
+                    MemoryBrowsePane(store: MemoryStore.shared(botId: bot.id, client: app.client), open: router.open(item:))
+                }
+                .overlay(alignment: .leading) { Divider() }
+            }
+        } else {
+            page
         }
     }
 }
@@ -159,18 +231,21 @@ private struct EmptyBotsColumn: View {
     @ObservedObject var store: BotSpacesStore
     let error: String?
     @ObservedObject private var router = Router.shared
-    @Environment(\.shellPosture) private var posture
 
     var body: some View {
         NavigationStack(path: $router.path) {
             emptyHome
+                .navigationTitle("Home")
+                .navigationBarTitleDisplayMode(.large)
                 .shellSurface()
-                .navigationDestination(for: Route.self) { ShellNoBotDestination(route: $0).shellSurface() }
+                .navigationDestination(for: Route.self) {
+                    ShellNoBotDestination(route: $0).navigationBarTitleDisplayMode(.inline).shellSurface()
+                }
         }
     }
 
-    @ViewBuilder private var emptyHome: some View {
-        let content = ContentUnavailableView {
+    private var emptyHome: some View {
+        ContentUnavailableView {
             Label(error == nil ? "No Bot yet" : "Couldn't load Bots",
                   systemImage: error == nil ? "sparkles" : "exclamationmark.triangle")
         } description: {
@@ -192,18 +267,6 @@ private struct EmptyBotsColumn: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(error == nil ? "homeNoBots" : "homeBotsError")
-
-        if posture.usesRail {
-            VStack(spacing: 0) {
-                ShellTitleLine(title: "Home", posture: posture)
-                content
-            }
-            .toolbar(.hidden, for: .navigationBar)
-        } else {
-            content
-                .navigationTitle("Home")
-                .navigationBarTitleDisplayMode(.inline)
-        }
     }
 }
 
@@ -213,83 +276,61 @@ private struct ShellNoBotDestination: View {
 
     var body: some View {
         switch route {
-        case .conversation(let id), .thread(let id):
-            ConversationScreen(threadId: id, pane: false)
-        case .studio:
-            StudioView().modifier(PushedChrome(title: route.shellTitle))
-        case .settings:
-            SettingsView().modifier(PushedChrome(title: route.shellTitle))
-        default:
-            RouteDestination(route: route).modifier(PushedChrome(title: route.shellTitle))
+        case .conversation(let id), .thread(let id): ConversationScreen(threadId: id)
+        case .studio: StudioView()
+        case .settings: SettingsView()
+        default: RouteDestination(route: route)
         }
     }
 }
 
-/// Home at the root of a stack: the iPhone's bar (Search, New), or the
-/// Duo's title line and rail (New, Search).
+/// Home at the root of its tab: a large title, and New conversation in the bar.
 private struct HomeScreen: View {
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
-    @ObservedObject private var router = Router.shared
-    @Environment(\.shellPosture) private var posture
+    var column = false
 
     var body: some View {
-        if posture.usesRail {
-            VStack(spacing: 0) {
-                ShellTitleLine(title: "Home", posture: posture)
-                HomeView(bot: bot, store: store)
-            }
-            .toolbar(.hidden, for: .navigationBar)
-            .rail(RailLayout.slots(posture, screen: .home, tabs: 0, homeShown: true),
-                  actions: RailActions(tap: tap), large: posture.largeType)
-        } else {
-            HomeView(bot: bot, store: store)
-                .navigationTitle("Home")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItemGroup(placement: .topBarTrailing) {
-                        Button { router.focusSearch() } label: { Image(systemName: RailSlot.search.symbol) }
-                            .accessibilityLabel("Search")
-                            .accessibilityIdentifier("homeSearchButton")
-                        Button { router.compose = "" } label: { Image(systemName: RailSlot.new.symbol) }
-                            .accessibilityLabel("New conversation")
-                            .accessibilityIdentifier("homeNew")
-                    }
-                }
-        }
-    }
-
-    private func tap(_ slot: RailSlot) {
-        switch slot {
-        case .new: router.compose = ""
-        case .search: router.focusSearch()
-        default: break
-        }
+        HomeView(bot: bot, store: store, column: column)
+            .navigationTitle("Home")
+            .navigationBarTitleDisplayMode(column ? .inline : .large)
+            .toolbar { ToolbarItem(placement: .primaryAction) { NewConversationButton() } }
     }
 }
 
-/// A screen pushed over Home, by its route.
+/// New conversation, in Home's bar and the open Duo's conversation column.
+private struct NewConversationButton: View {
+    var body: some View {
+        Button { Router.shared.compose = "" } label: { Label("New conversation", systemImage: "square.and.pencil") }
+            .accessibilityIdentifier("homeNew")
+    }
+}
+
+/// A screen pushed on a tab's stack, by its route. Inline titles: a screen
+/// that wants a large one says so itself.
 struct ShellDestination: View {
     let route: Route
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
     var pane = false
     @ObservedObject private var router = Router.shared
-    @Environment(\.shellPosture) private var posture
     @EnvironmentObject private var app: AppModel
 
     var body: some View {
-        switch route {
-        case .conversation(let id):
-            ConversationScreen(threadId: id, pane: pane)
-                .environment(\.botConversation, ShellContext.make(id, kind: .conversation, bot: bot, store: store))
-        case .thread(let id):
-            ConversationScreen(threadId: id, pane: pane)
-                .environment(\.botConversation, ShellContext.make(id, kind: ShellContext.kind(id, bot: bot, store: store),
-                                                                 bot: bot, store: store))
-        default:
-            other.modifier(PushedChrome(title: route.shellTitle, pane: pane))
+        Group {
+            switch route {
+            case .conversation(let id):
+                ConversationScreen(threadId: id, pane: pane)
+                    .environment(\.botConversation, ShellContext.make(id, kind: .conversation, bot: bot, store: store))
+            case .thread(let id):
+                ConversationScreen(threadId: id, pane: pane)
+                    .environment(\.botConversation, ShellContext.make(id, kind: ShellContext.kind(id, bot: bot, store: store),
+                                                                     bot: bot, store: store))
+            default:
+                other
+            }
         }
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     @ViewBuilder private var other: some View {
@@ -311,7 +352,7 @@ struct ShellDestination: View {
     }
 }
 
-/// One of the Bot's places, pushed: Memory, Library, Schedules, Archive.
+/// One of the Bot's places, pushed: Schedules, Archive (Memory and Library are tabs).
 struct ShellPlace: View {
     let page: BotPage
     let bot: BotSpace
@@ -342,18 +383,19 @@ enum ShellContext {
         return BotShell.context(threadId: threadId, kind: kind, bot: bot, view: store.view(for: bot.id),
                                 push: { router.push($0) },
                                 openConversation: { router.openConversation($0) },
-                                showList: { router.path = [] },
+                                showList: { router.home([]) },
                                 refresh: { Task { await store.refresh() } })
     }
 }
 
 // MARK: Side by side
 
-/// The open Duo (book or flat): the conversation, the Workbench beside it
-/// when it has a tab the phone can show (or what a pushed screen puts in
-/// its place), and Home beside them when it fits, each as wide as
-/// `ShellPanes` decides. Home that doesn't fit comes over the conversation
-/// from the rail. The rail is at the right edge.
+/// Home's tab on the open Duo (book or flat), as Kensico's two pages: Home's
+/// column, then the conversation as the detail page (its stack's root, so
+/// no Back to an empty page; what it opens pushes over it), and the
+/// Workbench beside it when it has a tab the phone can show. Each is as wide
+/// as `ShellPanes` decides, with its own native bar. Home that doesn't fit
+/// comes over the conversation from the bar's Home button or the edge swipe.
 private struct ShellPages: View {
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
@@ -361,42 +403,35 @@ private struct ShellPages: View {
     @State private var workbench = WorkbenchStore.shared
     @EnvironmentObject private var app: AppModel
     @Environment(\.dynamicTypeSize) private var typeSize
-    /// What's pushed over the conversation offers: in the rail.
-    @State private var paneActions: [ScreenAction] = []
-    /// And what it puts in the side pane in the Workbench's place.
-    @State private var paneCompanion: ScreenCompanion?
-    /// The room left of the rail (`ShellGeometry.paneWidth`): the one the posture was laid out for.
+    /// The room between the safe areas (`ShellGeometry.paneWidth`): the one the posture was laid out for.
     let width: CGFloat
-    @Environment(\.shellPosture) private var posture
 
     private var conversation: String {
         router.conversation ?? BotShell.mainThreadId(bot, view: store.view(for: bot.id)) ?? ""
     }
     private var pushed: Bool { !panePath.wrappedValue.isEmpty }
-    private var companion: ScreenCompanion? { pushed ? paneCompanion : nil }
     private var bodySize: CGFloat { ShellPanes.body(typeSize) }
 
     private var panes: ShellPanes {
-        ShellPanes.make(width: width, body: bodySize, side: companion != nil || workbench.selected(conversation) != nil,
-                        home: !router.homePane.hidden)
+        ShellPanes.make(width: width, body: bodySize, side: workbench.selected(conversation) != nil, home: !router.homePane.hidden)
     }
 
     var body: some View {
         let panes = panes
         let overlaid = !panes.homeFits && router.homePane.overlaid
-        // Not over a pushed screen: its Back is the rail's, and Home over it would hide it.
+        // Not over a pushed screen: the edge is its Back swipe there.
         let edgeSwipe = panes.home == 0 && !overlaid && !pushed
         HStack(spacing: 0) {
             if panes.home > 0 {
                 homeColumn.frame(width: panes.home)
             }
-            conversationColumn
+            conversationColumn(panes)
                 .frame(width: panes.conversation)
-                .environment(\.shellPaneAtRail, panes.side == 0)
+                .environment(\.shellPaneAtEdge, panes.side == 0)
                 .overlay(alignment: .leading) { if panes.home > 0 { Divider() } }
                 .gesture(HomeEdgePan(enabled: edgeSwipe, fits: panes.homeFits))
             if panes.side > 0 {
-                ShellSidePane(threadId: conversation, companion: companion)
+                ShellSidePane(threadId: conversation)
                     .frame(width: panes.side)
                     .overlay(alignment: .leading) { Divider() }
             }
@@ -413,9 +448,6 @@ private struct ShellPages: View {
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
         }
-        .modifier(ShellPagesRail(threadId: conversation, bot: bot, store: store, homeFits: panes.homeFits,
-                                 homeShown: router.homePane.shown(fits: panes.homeFits),
-                                 pushed: pushed, pushedActions: pushed ? paneActions : [], companion: companion != nil))
         .animation(.snappy(duration: 0.25), value: panes)
         .animation(.snappy(duration: 0.25), value: overlaid)
         .onChange(of: overlaid) { _, over in HomeOverlayFocus.changed(over: over) }
@@ -432,28 +464,22 @@ private struct ShellPages: View {
     }
 
     private var homeColumn: some View {
-        VStack(spacing: 0) {
-            ShellTitleLine(title: "Home", posture: posture)
-            HomeView(bot: bot, store: store, column: true)
-        }
-        // As the conversation's column: SwiftUI hands it the window's trailing inset, a screen away.
-        .ignoresSafeArea(.container, edges: .trailing)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("homeColumn")
+        NavigationStack { HomeScreen(bot: bot, store: store, column: true).shellSurface() }
+            // As the conversation's column: SwiftUI hands it the window's trailing inset, a screen away.
+            .ignoresSafeArea(.container, edges: .trailing)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("homeColumn")
     }
 
-    private var conversationColumn: some View {
+    private func conversationColumn(_ panes: ShellPanes) -> some View {
         NavigationStack(path: panePath) {
             ShellDestination(route: .conversation(id: conversation), bot: bot, store: store, pane: true)
                 .id(conversation)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) { HomePaneButton(fits: panes.homeFits, shown: panes.home > 0 || router.homePane.overlaid) }
+                }
                 .shellSurface()
                 .navigationDestination(for: Route.self) { ShellDestination(route: $0, bot: bot, store: store, pane: true).shellSurface() }
-        }
-        .onPreferenceChange(ScreenActionsKey.self) { value in
-            MainActor.assumeIsolated { if paneActions != value { paneActions = value } }
-        }
-        .onPreferenceChange(ScreenCompanionKey.self) { value in
-            MainActor.assumeIsolated { if paneCompanion != value { paneCompanion = value } }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("conversationColumn")
@@ -471,8 +497,21 @@ private struct ShellPages: View {
     }
 }
 
+/// Home's column shown or hidden beside the conversation, or brought over it where it doesn't fit.
+private struct HomePaneButton: View {
+    let fits: Bool
+    let shown: Bool
+
+    var body: some View {
+        Button { Router.shared.homePane.toggle(fits: fits) } label: {
+            Label(shown ? "Hide Home" : "Home", systemImage: "sidebar.leading")
+        }
+        .accessibilityIdentifier("homePane")
+    }
+}
+
 /// Home over the conversation, from its leading edge, where it doesn't fit
-/// beside it; a tap beside it, a pick in it, the rail's Home or VoiceOver's
+/// beside it; a tap beside it, a pick in it, the bar's Home or VoiceOver's
 /// escape closes it. Modal to VoiceOver: the dimmed panes are out of reach,
 /// and the dimming is its close button.
 private struct HomeOverlay<Home: View>: View {
@@ -554,41 +593,37 @@ private struct HomeEdgeMarker: View {
 }
 #endif
 
-/// The side pane: the conversation's Workbench under its title line (the
-/// tab, which opens the tab menu), or what a pushed screen puts there.
+/// The side pane: the conversation's Workbench under its own bar, whose
+/// title is the shown tab and opens the tab menu.
 private struct ShellSidePane: View {
     let threadId: String
-    let companion: ScreenCompanion?
     @ObservedObject private var router = Router.shared
     @State private var workbench = WorkbenchStore.shared
     @State private var addingTab = false
     @EnvironmentObject private var app: AppModel
-    @Environment(\.shellPosture) private var posture
     @ObservedObject private var session: ConversationSession
     @ObservedObject private var model: ThreadModel
 
-    init(threadId: String, companion: ScreenCompanion?) {
+    init(threadId: String) {
         self.threadId = threadId
-        self.companion = companion
         let session = ConversationSessions.shared.session(threadId)
         self.session = session
         model = session.model
     }
 
     var body: some View {
-        Group {
-            if let companion {
-                companion.view.id(companion.id)
-            } else {
-                VStack(spacing: 0) {
-                    ShellTitleLine(title: workbench.selected(threadId)?.title ?? "Workbench", posture: posture) {
-                        WorkbenchTabMenuItems(threadId: threadId) { addingTab = true }
+        NavigationStack {
+            WorkbenchView(threadId: threadId, webURL: model.thread.map { app.client.webURL(forThread: $0) },
+                          openThread: { router.push(.thread(id: $0)) },
+                          actionsChanged: { if session.tabActions != $0 { session.tabActions = $0 } })
+                .navigationTitle(workbench.selected(threadId)?.title ?? "Workbench")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        WorkbenchTitleMenu(threadId: threadId, subtitle: nil) { addingTab = true }
                     }
-                    WorkbenchView(threadId: threadId, webURL: model.thread.map { app.client.webURL(forThread: $0) },
-                                  openThread: { router.push(.thread(id: $0)) },
-                                  actionsChanged: { if session.tabActions != $0 { session.tabActions = $0 } })
                 }
-            }
+                .shellSurface()
         }
         .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
         .accessibilityElement(children: .contain)
@@ -604,74 +639,6 @@ private struct ShellCovered: ViewModifier {
 
     func body(content: Content) -> some View {
         content.accessibilityHidden(covered)
-    }
-}
-
-/// The open Duo's rail: Tabs, Home, New and More for the conversation; Back
-/// and a pushed screen's actions first while one shows over it.
-private struct ShellPagesRail: ViewModifier {
-    let threadId: String
-    let bot: BotSpace
-    @ObservedObject var store: BotSpacesStore
-    let homeFits: Bool
-    let homeShown: Bool
-    var pushed = false
-    var pushedActions: [ScreenAction] = []
-    /// The pushed screen has the side pane: the rail keeps Home alone after its own.
-    var companion = false
-    @ObservedObject private var router = Router.shared
-    @State private var workbench = WorkbenchStore.shared
-    @State private var addingTab = false
-    @Environment(\.shellPosture) private var posture
-    /// Observed, as on `ConversationScreen`: the tab actions in More follow it.
-    @ObservedObject private var session: ConversationSession
-
-    init(threadId: String, bot: BotSpace, store: BotSpacesStore, homeFits: Bool, homeShown: Bool, pushed: Bool,
-         pushedActions: [ScreenAction], companion: Bool) {
-        self.threadId = threadId
-        self.bot = bot
-        self.store = store
-        self.homeFits = homeFits
-        self.homeShown = homeShown
-        self.pushed = pushed
-        self.pushedActions = pushedActions
-        self.companion = companion
-        session = ConversationSessions.shared.session(threadId)
-    }
-
-    func body(content: Content) -> some View {
-        content
-            .rail(slots, actions: RailActions(tap: tap, tabs: AnyView(tabMenu), more: AnyView(moreMenu)))
-            .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
-    }
-
-    private var tabMenu: some View {
-        WorkbenchTabMenuItems(threadId: threadId) { addingTab = true }
-    }
-
-    private var slots: [RailSlot] {
-        let own = RailLayout.slots(posture, screen: .conversation(workbench: true), tabs: workbench.count(threadId), homeShown: homeShown)
-        guard pushed else { return own }
-        return RailLayout.panePushed(pushedActions, companion: companion, homeShown: homeShown, own: own)
-    }
-
-    /// The pushed screen's overflow while one shows over the conversation; else the conversation's menu.
-    @ViewBuilder private var moreMenu: some View {
-        if pushed, pushedActions.count > 2 {
-            ScreenActionItems(actions: RailLayout.overflow(pushedActions))
-        } else {
-            ConversationMenuItems(session: session, conversation: ShellContext.make(threadId, kind: .conversation, bot: bot, store: store),
-                                  tabActions: session.tabActions)
-        }
-    }
-
-    private func tap(_ slot: RailSlot) {
-        switch slot {
-        case .back: if !router.path.isEmpty { router.path.removeLast() }
-        case .home: router.homePane.toggle(fits: homeFits)
-        case .new: router.compose = ""
-        default: break
-        }
     }
 }
 

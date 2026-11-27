@@ -72,19 +72,19 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
             XCTAssertTrue(conversation.waitForExistence(timeout: 10), "\(posture): the conversation")
             XCTAssertTrue(workbench.exists, "\(posture): a page tab the phone can show takes the Workbench pane")
             XCTAssertFalse(element("homeColumn").exists, "\(posture): Home doesn't fit beside both")
-            // The panes share the room left of the rail's 84 pt column.
-            let share = conversation.frame.width / (landscape.width - 84)
+            // The panes share the room between the safe areas.
+            let share = conversation.frame.width / (conversation.frame.width + workbench.frame.width)
             XCTAssertEqual(share, 0.58, accuracy: 0.02, "\(posture): the conversation keeps the larger share")
             XCTAssertEqual(workbench.frame.minX, conversation.frame.maxX, accuracy: 1, "\(posture): the Workbench beside it")
             XCTAssertGreaterThanOrEqual(conversation.frame.width, 481, "about 60 characters a line")
             capture("\(posture)-landscape-default")
         }
-        // Home from the rail comes over the conversation, and goes again.
-        command("activate?rail-home")
+        // Home from the conversation's bar comes over it, and goes again.
+        command("activate?homePane")
         XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home over the conversation")
         XCTAssertLessThan(element("homeColumn").frame.width, landscape.width / 2)
         capture("flat-landscape-default-home-over")
-        // Modal to VoiceOver: its way out is the dimming (Close Home) or escape, not the rail outside it.
+        // Modal to VoiceOver: its way out is the dimming (Close Home) or escape, not the bar under it.
         command("activate?homeOverlayScrim")
         XCTAssertTrue(element("homeColumn").waitForNonExistence(timeout: 10))
         portraitAndFolded(.large)
@@ -101,13 +101,14 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
             XCTAssertTrue(home.exists, "\(posture): Home fits beside the conversation")
             XCTAssertGreaterThanOrEqual(home.frame.width, 269, "a name and its time on one line")
             XCTAssertGreaterThanOrEqual(element("conversationColumn").frame.width, 481)
-            XCTAssertLessThanOrEqual(app.textViews["Message"].frame.maxX, landscape.width - 84, "the composer clear of the rail")
+            XCTAssertLessThanOrEqual(app.textViews["Message"].frame.maxX, element("conversationColumn").frame.maxX, "the composer in its column")
             capture("\(posture)-landscape-default-mac-tab")
         }
-        command("activate?rail-home")
-        XCTAssertTrue(element("homeColumn").waitForNonExistence(timeout: 10), "Home in the rail hides it")
+        XCTAssertTrue(element("workbenchTabs").exists, "no Workbench pane: its tab menu in the conversation's bar")
+        command("activate?homePane")
+        XCTAssertTrue(element("homeColumn").waitForNonExistence(timeout: 10), "Home's button hides it")
         capture("flat-landscape-default-mac-tab-home-hidden")
-        command("activate?rail-home")
+        command("activate?homePane")
         XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "and shows it again")
     }
 
@@ -125,7 +126,7 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
         command("activate?composerField")
         XCTAssertTrue(waitFor(message, focused: true), "the composer has the keyboard")
 
-        command("activate?rail-home")
+        command("activate?homePane")
         XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home over the conversation")
         // Modal (XCUITest reads it as an alert): VoiceOver stays in it, off its siblings, the panes.
         let modal = app.alerts.firstMatch
@@ -172,13 +173,14 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
         swipeFromTheEdge()
         XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "the edge swipe brings Home over")
         XCTAssertEqual(element("homeEdge").value as? String, "off", "not again while it is over")
-        command("activate?homeMemory")
-        XCTAssertTrue(element("memory-page").waitForExistence(timeout: 10), "Memory, pushed in the column")
+        command("activate?homeWorker-thr_demo_w2")
+        let worker = element("conversation-thr_demo_w2")
+        XCTAssertTrue(worker.waitForExistence(timeout: 10), "a worker, pushed in the column")
         XCTAssertEqual(element("homeEdge").value as? String, "off", "pushed: the edge belongs to the stack")
         swipeFromTheEdge()
         XCTAssertFalse(element("homeColumn").exists, "the edge swipe over a pushed screen doesn't open Home")
-        command("activate?rail-back")
-        XCTAssertTrue(element("memory-page").waitForNonExistence(timeout: 10), "Back in the rail")
+        command("activate?BackButton")
+        XCTAssertTrue(worker.waitForNonExistence(timeout: 10), "the system's Back")
         XCTAssertEqual(element("homeEdge").value as? String, "on", "the conversation again: the swipe opens Home")
     }
 
@@ -189,7 +191,7 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launch(.large)
         show("book", "landscape", landscape)
-        command("activate?rail-home")
+        command("activate?homePane")
         XCTAssertTrue(element("homeOverlayScrim").waitForExistence(timeout: 10), "Home over the conversation")
         for _ in 0..<3 { command("workbench?close") }
         XCTAssertTrue(element("workbenchPage").waitForNonExistence(timeout: 10), "only the Mac-only tab is left: no Workbench pane")
@@ -201,19 +203,19 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textViews["Message"].exists)
     }
 
-    /// Review SF5: one column with only a Mac-only tab: the rail says 0 tabs and the Workbench "No tabs".
+    /// Review SF5: one column with only a Mac-only tab: the Workbench button says 0 tabs and the Workbench "No tabs".
     func testAMacOnlyTabCountsAsNoneInOneColumn() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
         launch(.large, macOnly: true)
         for (posture, window, size) in [("folded", "outer", outer), ("vertical", "portrait", portrait)] {
             show(posture, window, size)
-            let workbench = element("rail-workbench")
+            let workbench = element("workbenchButton")
             XCTAssertTrue(workbench.waitForExistence(timeout: 10), "\(posture): one column")
             XCTAssertEqual(workbench.label, "Workbench, 0 tabs", posture)
-            command("activate?rail-workbench")
+            command("activate?workbenchButton")
             XCTAssertTrue(element("workbenchEmpty").waitForExistence(timeout: 10), "\(posture): No tabs, as the count says")
-            command("activate?rail-chat")
-            XCTAssertTrue(element("rail-workbench").waitForExistence(timeout: 10))
+            command("activate?workbenchButton")
+            XCTAssertTrue(element("conversationTitle").waitForExistence(timeout: 10), "\(posture): the chat again")
         }
     }
 
@@ -257,13 +259,13 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
     private func oneColumn(_ size: TextSize) {
         for posture in ["book", "flat"] {
             show(posture, "landscape", landscape)
-            XCTAssertTrue(element("rail-workbench").waitForExistence(timeout: 10), "\(posture): the Workbench a flip away")
+            XCTAssertTrue(element("workbenchButton").waitForExistence(timeout: 10), "\(posture): the Workbench a flip away")
             XCTAssertFalse(element("conversationColumn").exists, "\(posture): no squeezed panes")
             XCTAssertFalse(element("workbenchPage").exists)
             capture("\(posture)-landscape-\(size.name)")
         }
-        command("activate?rail-home")
-        XCTAssertTrue(element("home").waitForExistence(timeout: 10), "Home, as in vertical")
+        command("activate?BackButton")
+        XCTAssertTrue(element("home").waitForExistence(timeout: 10), "Back is Home, as in vertical")
         capture("flat-landscape-\(size.name)-home")
         command("activate?homeConversation-thr_botdemo01")
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 10))
@@ -275,14 +277,14 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
     private func portraitAndFolded(_ size: TextSize) {
         for posture in ["flat", "vertical"] {
             show(posture, "portrait", portrait)
-            XCTAssertTrue(element("rail-workbench").waitForExistence(timeout: 10), "\(posture) upright: one column")
+            XCTAssertTrue(element("workbenchButton").waitForExistence(timeout: 10), "\(posture) upright: one column")
             XCTAssertFalse(element("conversationColumn").exists)
             capture("\(posture)-portrait-\(size.name)")
         }
         show("folded", "outer", outer)
-        XCTAssertTrue(element("rail-workbench").waitForExistence(timeout: 10), "folded: one column")
+        XCTAssertTrue(element("workbenchButton").waitForExistence(timeout: 10), "folded: one column")
         capture("folded-\(size.name)")
-        command("activate?rail-home")
+        command("activate?BackButton")
         XCTAssertTrue(element("home").waitForExistence(timeout: 10))
         capture("folded-\(size.name)-home")
     }

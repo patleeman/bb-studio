@@ -17,7 +17,7 @@ extension EnvironmentValues {
 }
 
 /// The shell's one entry point for a tab's content: the Workbench container
-/// (its bar, tab menu, rail and posture) puts this under its bar and knows
+/// (its bar, tab menu and posture) puts this under its bar and knows
 /// nothing of tab kinds. The content by kind is `WorkbenchTabBody`.
 struct WorkbenchTabContent: View {
     let tab: WorkbenchTab

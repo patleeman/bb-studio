@@ -604,7 +604,7 @@ struct StudioView: View {
         return showArchived ? "Archived" : "Studio"
     }
 
-    /// The bar's items as one list (the iPhone's bar, the Duo's rail): Done and Select All
+    /// The bar's items as one list (the bar's): Done and Select All
     /// while selecting; else New and Select first, then the project filter.
     private var actions: [ScreenAction] {
         if selecting {

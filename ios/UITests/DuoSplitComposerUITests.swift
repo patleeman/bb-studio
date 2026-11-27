@@ -26,10 +26,10 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
         // The inner screen, landscape: with no hinge to read, the book posture.
         command("landscape")
-        XCTAssertTrue(app.buttons["rail-tabs"].waitForExistence(timeout: 10), "the book posture's rail")
+        XCTAssertTrue(app.descendants(matching: .any)["workbenchTitle"].firstMatch.waitForExistence(timeout: 10), "the book posture's Workbench page")
 
         try check("bot-chat", last: "Duo message 80")
-        // Another conversation, from Home (the rail brings it back).
+        // Another conversation, from Home (its tab brings it back).
         app.pickConversation(otherId)
         try check("conversation", last: other, history: false)
 
@@ -249,7 +249,7 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         command("capture?split-composer-" + name + "-end")
     }
 
-    /// Text of the conversation page's transcript: not the title line, composer or Workbench.
+    /// Text of the conversation page's transcript: not the bar, composer or Workbench.
     private func transcriptTexts() -> [CGRect] {
         let composer = app.otherElements["threadComposer"].firstMatch.frame
         let maxX: CGFloat = pageMaxX + 1

@@ -1,8 +1,8 @@
 import XCTest
 
-/// Round 7: Home is the root and everything is pushed over it. Helpers to
-/// reach Home, its places and a conversation, on the iPhone's bar or the
-/// Duo's rail.
+/// Round 8: the native tab bar (Home, Library, Memory, Search) and one
+/// stack per tab with native bars, in every posture. Helpers to reach Home,
+/// its places and a conversation.
 extension XCUIApplication {
     /// A conversation shows (its composer). The app opens on Home: a test that
     /// starts in a conversation opens its Main from there (`-qaConversation`
@@ -34,24 +34,33 @@ extension XCUIApplication {
         sleep(1)
     }
 
-    /// Home is the screen on top: its New conversation shows (the iPhone's
-    /// bar, the Duo's rail). A list never counts as hittable, so not that.
+    /// Home is the screen on top: its New conversation shows in its bar.
+    /// A list never counts as hittable, so not that.
     var homeOnTop: Bool { home.exists && homeNew.exists }
 
-    /// Home, from wherever: Back on the iPhone, Home in the Duo's rail.
+    /// A tab bar's tab, by its title (Home, Library, Memory, Search).
+    func tab(_ title: String) -> XCUIElement { tabBars.buttons[title].firstMatch }
+
+    /// Home, from wherever: its tab (a tap on the shown tab pops its stack), else Back.
     func goHome(file: StaticString = #filePath, line: UInt = #line) {
         for _ in 0..<4 where !homeOnTop {
-            let back = buttons["rail-back"], railHome = buttons["rail-home"], barBack = navigationBars.buttons["BackButton"]
-            if back.exists { press(back, id: "rail-back") } else if railHome.exists { press(railHome, id: "rail-home") }
-            else if barBack.exists { barBack.tap() }
+            let barBack = navigationBars.buttons["BackButton"]
+            if tab("Home").exists { tab("Home").tap() } else if barBack.exists { barBack.tap() }
             _ = homeNew.waitForExistence(timeout: 3)
         }
         XCTAssertTrue(homeOnTop, "Home", file: file, line: line)
     }
 
-    /// One of Home's places: Memory, Library and Archive are rows; Schedules,
-    /// Theme and Settings are in the Bot menu. "conversations" is Home itself.
+    /// One of the Bot's places: Memory and Library are tabs, Archive is
+    /// Home's last row, and Schedules, Theme and Settings are in its Bot menu.
+    /// "conversations" is Home itself.
     func openRoomPlace(_ place: String, file: StaticString = #filePath, line: UInt = #line) {
+        if place == "memory" || place == "library" {
+            let tab = tab(place.capitalized)
+            XCTAssertTrue(tab.waitForExistence(timeout: 10), "the \(place) tab", file: file, line: line)
+            tab.tap()
+            return
+        }
         goHome(file: file, line: line)
         guard place != "conversations" else { return }
         let row = botMenuItem(place)
@@ -64,10 +73,8 @@ extension XCUIApplication {
 
     /// A place on Home or in its Bot menu, by id or by its title.
     func botMenuItem(_ place: String) -> XCUIElement {
-        let ids = ["memory": "homeMemory", "library": "homeLibrary", "archive": "homeArchive", "schedules": "homeSchedules",
-                   "theme": "homeTheme", "settings": "homeSettings"]
-        let titles = ["memory": "Memory", "library": "Library", "schedules": "Schedules", "theme": "Theme", "archive": "Archive",
-                      "settings": "Settings"]
+        let ids = ["archive": "homeArchive", "schedules": "homeSchedules", "theme": "homeTheme", "settings": "homeSettings"]
+        let titles = ["schedules": "Schedules", "theme": "Theme", "archive": "Archive", "settings": "Settings"]
         return buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", ids[place] ?? place, titles[place] ?? place)).firstMatch
     }
 
@@ -97,24 +104,18 @@ extension XCUIApplication {
         XCTAssertTrue(waitForRoom(timeout: 15), "the conversation opens", file: file, line: line)
     }
 
-    /// Back from a pushed screen: the bar's Back, or Back (else Home) in the Duo's rail.
+    /// Back from a pushed screen: the system's Back in the bar.
     func goBack(timeout: TimeInterval = 20, file: StaticString = #filePath, line: UInt = #line) {
-        let barBack = navigationBars.buttons["BackButton"]
-        let back = buttons["rail-back"], railHome = buttons["rail-home"]
-        let shown = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in barBack.exists || back.exists || railHome.exists }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: timeout), .completed, "a way back", file: file, line: line)
-        if barBack.exists { barBack.tap() } else if back.exists { press(back, id: "rail-back") } else { press(railHome, id: "rail-home") }
+        let back = navigationBars.buttons["BackButton"].firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: timeout), "a way back", file: file, line: line)
+        back.tap()
     }
 
-    /// Home's New conversation: + in the iPhone's bar, New in the Duo's rail.
-    var homeNew: XCUIElement {
-        buttons.matching(NSPredicate(format: "identifier IN %@", ["homeNew", "rail-new"])).firstMatch
-    }
+    /// Home's New conversation, in its bar.
+    var homeNew: XCUIElement { buttons["homeNew"].firstMatch }
 
-    /// The conversation's menu: ⋯ in the iPhone's bar, More in the Duo's rail.
-    var conversationMore: XCUIElement {
-        buttons.matching(NSPredicate(format: "identifier == 'conversationMore' OR identifier == 'rail-more'")).firstMatch
-    }
+    /// The conversation's ⋯ menu, in its bar.
+    var conversationMore: XCUIElement { buttons["conversationMore"].firstMatch }
 
     /// An item of an open menu, by its title: SwiftUI's menus drop their items' identifiers.
     func menuItem(_ title: String) -> XCUIElement {
@@ -129,10 +130,8 @@ extension XCUIApplication {
         XCTAssertTrue(buttons["Find in conversation"].waitForExistence(timeout: 5), "its items", file: file, line: line)
     }
 
-    /// The conversation's name: the bar's title, or the Duo's title line.
-    var conversationTitle: XCUIElement {
-        descendants(matching: .any).matching(NSPredicate(format: "identifier == 'conversationTitle' OR identifier == 'shellTitle'")).firstMatch
-    }
+    /// The conversation's name, in its bar.
+    var conversationTitle: XCUIElement { descendants(matching: .any)["conversationTitle"].firstMatch }
 
     /// Which conversation shows: its title.
     var shownConversation: XCUIElement { conversationTitle }
@@ -142,6 +141,6 @@ extension XCUIApplication {
         goBack()
     }
 
-    /// The Duo: its controls are in the rail.
-    var isFoldedDuo: Bool { descendants(matching: .any)["shellRail"].exists }
+    /// The folded Duo: its outer screen, where the system puts the bar's buttons and the tab bar in the right column.
+    var isFoldedDuo: Bool { UIDevice.current.name.lowercased().contains("duo") && windows.firstMatch.frame.width < 500 }
 }

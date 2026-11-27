@@ -25,20 +25,33 @@ enum Destination: Hashable {
     case sheet(Sheet)
 }
 
-/// All of the app's navigation in one place (round 7): Home is the root and
-/// everything else is pushed on its one stack (`path`). Beside two Duo
-/// pages the conversation is a column of its own: `conversation` is the
-/// one it shows, and `path` past it is what's pushed over it.
+/// The app's top-level places: the tab bar's tabs (round 8). Each has its own stack.
+enum ShellTab: String, Hashable, CaseIterable {
+    case home, library, memory, search
+}
+
+/// All of the app's navigation in one place (round 8, as Kensico's
+/// Navigator): the tab showing, and one stack per tab. Home's stack holds
+/// the conversations and everything opened from them. Beside two Duo pages
+/// the conversation is a column of its own, Home's detail page:
+/// `conversation` is the one it shows, and `path` past it is what's pushed over it.
 @MainActor
 final class Router: ObservableObject {
     static let shared = Router()
 
-    /// Home's stack: a conversation, Memory, Library, a page…
-    /// The one stack over Home. Anything pushed closes Home over the
-    /// conversation column (it shows in that column).
+    @Published var tab: ShellTab = .home
+    /// Home's stack: a conversation, a worker, a page, Settings…
+    /// Anything pushed closes Home over the conversation column (it shows in that column).
     @Published var path: [Route] = [] {
         didSet { if !path.isEmpty, homePane.overlaid { homePane.pushed() } }
     }
+    @Published var libraryPath: [Route] = []
+    @Published var memoryPath: [Route] = []
+    @Published var searchPath: [Route] = []
+    /// Page two of the Memory tab beside two pages (Skills | History, and what they open).
+    @Published var detail: [Route] = []
+    /// Two pages show (the open Duo): what the Memory tab opens goes on page two.
+    var twoPages = false
     /// The conversation on screen (or last on screen): the conversation
     /// column beside two pages, and where Home's "You're here" points.
     @Published private(set) var conversation: String?
@@ -61,8 +74,6 @@ final class Router: ObservableObject {
     @Published var homePane = ShellHomePane()
     /// Bumped to put the keyboard in the conversation's composer.
     @Published private(set) var focusRequests = 0
-    /// Bumped to put the keyboard in Home's search (the Duo rail's Search).
-    @Published private(set) var searchRequests = 0
 
     private(set) var landed = false
 
@@ -76,9 +87,35 @@ final class Router: ObservableObject {
         }
     }
 
-    /// Onto the stack showing, so Back returns where you were.
+    /// Onto the shown tab's stack, so Back returns where you were.
     func push(_ route: Route) {
-        path.append(route)
+        switch tab {
+        case .home: path.append(route)
+        case .library: libraryPath.append(route)
+        case .memory: if twoPages { detail.append(route) } else { memoryPath.append(route) }
+        case .search: searchPath.append(route)
+        }
+    }
+
+    /// One of the Bot's places: Memory and Library are tabs, the rest open on Home.
+    func show(_ page: BotPage) {
+        switch page {
+        case .memory:
+            tab = .memory
+            memoryPath = []
+            detail = []
+        case .library:
+            tab = .library
+            libraryPath = []
+        case .automations, .archive:
+            home([.place(page)])
+        }
+    }
+
+    /// Home's tab, with this stack.
+    func home(_ stack: [Route]) {
+        tab = .home
+        path = stack
     }
 
     /// Takes the waiting destination once Studio's Bots are loaded. True when one was followed.
@@ -94,18 +131,18 @@ final class Router: ObservableObject {
         landed = true
         switch destination {
         case .conversation(let id):
-            if Self.isConversation(id, store: store) { openConversation(id) } else { path = [.thread(id: id)] }
+            if Self.isConversation(id, store: store) { openConversation(id) } else { home([.thread(id: id)]) }
         case .worker(let id):
-            path = [.thread(id: id)]
+            home([.thread(id: id)])
         case .place(let page, let botId):
             if let botId, store.spaces?.bots.contains(where: { $0.id == botId }) == true { show(botId, store: store) }
-            path = [.place(page)]
+            show(page)
         case .route(let route):
-            path.append(route)
+            push(route)
         case .list:
-            path = []
+            home([])
         case .compose(let text):
-            path = []
+            home([])
             compose = text
         case .bot(let id):
             let botId = id ?? store.spaces?.bots.first(where: \.primary)?.id ?? store.spaces?.current?.id
@@ -117,9 +154,9 @@ final class Router: ObservableObject {
             }
         case .studio(let kind, let route):
             if let kind { studioKind = StudioKind.family(kind) }
-            path = [.studio] + (route.map { [$0] } ?? [])
+            home([.studio] + (route.map { [$0] } ?? []))
         case .settings:
-            path = [.settings]
+            home([.settings])
         case .sheet(let next):
             sheet = next
         }
@@ -134,15 +171,15 @@ final class Router: ObservableObject {
     func openConversation(_ threadId: String) {
         landed = true
         conversation = threadId
-        path = [.conversation(id: threadId)]
+        home([.conversation(id: threadId)])
     }
 
     /// Memory, Library, a worker…: from Home's rows and the Bot's pages.
     func open(item: BotShellItem) {
         switch item {
         case .conversation(let id): openConversation(id)
-        case .worker(let id): path = [.thread(id: id)]
-        case .page(let page): path = [.place(page)]
+        case .worker(let id): home([.thread(id: id)])
+        case .page(let page): show(page)
         }
     }
 
@@ -172,15 +209,14 @@ final class Router: ObservableObject {
         landed = true
         conversation = nil
         path = []
+        libraryPath = []
+        memoryPath = []
+        detail = []
+        searchPath = []
     }
 
     func focusInput() {
         focusRequests += 1
-    }
-
-    func focusSearch() {
-        path = []
-        searchRequests += 1
     }
 
     /// Another server: nothing of the last one's navigation carries over.
@@ -192,7 +228,12 @@ final class Router: ObservableObject {
         pending = nil
         shownBotId = nil
         conversation = nil
+        tab = .home
         path = []
+        libraryPath = []
+        memoryPath = []
+        detail = []
+        searchPath = []
         landed = false
         homePane = ShellHomePane()
     }

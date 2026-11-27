@@ -1,8 +1,8 @@
 import XCTest
 @testable import BBStudio
 
-/// Round 7: the posture from the window, the screen and the hinge, and the
-/// rail's buttons in each posture, lowest first.
+/// The posture from the window, the screen and the hinge; Home beside or
+/// over the conversation; and the Router's tabs (round 8).
 final class ShellPostureTests: XCTestCase {
     private let iPhone = CGSize(width: 402, height: 874)
     private let outer = ShellPosture.foldedScreen
@@ -28,28 +28,8 @@ final class ShellPostureTests: XCTestCase {
     }
 
     func testWhatEachPostureLaysOut() {
-        XCTAssertFalse(ShellPosture.phone.usesRail, "the iPhone keeps its one bar")
-        XCTAssertTrue([ShellPosture.folded, .book, .flat, .vertical].allSatisfy(\.usesRail))
         XCTAssertEqual(ShellPosture.allCases.filter(\.splitsWorkbench), [.book, .flat])
-        XCTAssertTrue(ShellPosture.vertical.largeType)
-        XCTAssertEqual(ShellPosture.folded.titleLine, 40)
-        XCTAssertEqual(ShellPosture.vertical.titleLine, 44)
-    }
-
-    func testTheRailLowestFirst() {
-        XCTAssertEqual(RailLayout.slots(.folded, screen: .conversation(workbench: false), tabs: 3, homeShown: false),
-                       [.workbench(tabs: 3), .home(lit: false), .more], "9c, Chat")
-        XCTAssertEqual(RailLayout.slots(.folded, screen: .conversation(workbench: true), tabs: 3, homeShown: false),
-                       [.chat, .home(lit: false), .tabs, .more], "9c, Workbench")
-        // Pushed over another conversation (a reply thread, a worker): Back lowest.
-        XCTAssertEqual(RailLayout.slots(.folded, screen: .conversation(workbench: false, over: true), tabs: 3, homeShown: false),
-                       [.back, .workbench(tabs: 3), .home(lit: false), .more])
-        XCTAssertEqual(RailLayout.slots(.vertical, screen: .home, tabs: 0, homeShown: false), [.new, .search], "9f, Home")
-        XCTAssertEqual(RailLayout.slots(.book, screen: .conversation(workbench: true), tabs: 3, homeShown: false),
-                       [.tabs, .home(lit: false), .new, .more], "9d: book and flat share one rule")
-        XCTAssertEqual(RailLayout.slots(.flat, screen: .conversation(workbench: true), tabs: 3, homeShown: true),
-                       [.tabs, .home(lit: true), .new, .more], "9e")
-        XCTAssertEqual(RailLayout.slots(.phone, screen: .home, tabs: 0, homeShown: false), [], "no rail on the iPhone")
+        XCTAssertEqual(ShellPosture.allCases.filter(\.largeType), [.vertical])
     }
 
     /// Review B1: anything pushed (not only a conversation) closes Home over
@@ -72,12 +52,33 @@ final class ShellPostureTests: XCTestCase {
         XCTAssertTrue(router.homePane.shown(fits: false), "back to Home keeps Home")
     }
 
+    /// Round 8: Memory and Library are tabs; a push goes on the shown tab's
+    /// stack, and on the open Duo Memory's go on its page two.
+    @MainActor func testPlacesAreTabsAndPushesGoOnTheShownTab() {
+        let router = Router()
+        router.open(item: .page(.memory))
+        XCTAssertEqual(router.tab, .memory)
+        XCTAssertEqual(router.path, [], "not pushed over Home")
+        router.push(.memorySkill(botId: "b", name: "s"))
+        XCTAssertEqual(router.memoryPath, [.memorySkill(botId: "b", name: "s")])
+        router.twoPages = true
+        router.push(.memoryNewSkill(botId: "b"))
+        XCTAssertEqual(router.detail, [.memoryNewSkill(botId: "b")], "beside two pages: page two")
+        router.open(item: .page(.archive))
+        XCTAssertEqual(router.tab, .home)
+        XCTAssertEqual(router.path, [.place(.archive)], "Archive opens on Home")
+        router.tab = .library
+        router.openConversation("thr_c")
+        XCTAssertEqual(router.tab, .home, "a conversation opens on Home's tab")
+        XCTAssertEqual(router.path, [.conversation(id: "thr_c")])
+    }
+
     func testHomeBesideOrOverTheConversation() {
         var pane = ShellHomePane()
         XCTAssertTrue(pane.shown(fits: true), "Home shows where it fits")
-        XCTAssertFalse(pane.shown(fits: false), "and waits for the rail where it doesn't")
+        XCTAssertFalse(pane.shown(fits: false), "and waits for its button where it doesn't")
         pane.toggle(fits: false)
-        XCTAssertTrue(pane.shown(fits: false), "the rail's Home brings it over the conversation")
+        XCTAssertTrue(pane.shown(fits: false), "the bar's Home brings it over the conversation")
         pane.pushed()
         XCTAssertFalse(pane.shown(fits: false), "a pick closes it")
         pane.toggle(fits: true)
@@ -96,15 +97,6 @@ final class ShellPostureTests: XCTestCase {
         XCTAssertEqual(ComposerStatus.working(since: nil, now: now), "Working")
         XCTAssertFalse(ComposerStatus(running: false, since: nil, queued: 0).shown)
         XCTAssertTrue(ComposerStatus(running: false, since: nil, queued: 2).shown, "the queue alone shows the line")
-    }
-
-    /// Review B2: a share action in the rail is the share sheet, not a dead button.
-    func testTheRailSharesAShareAction() {
-        let url = URL(string: "https://example.com/transcript.txt")!
-        XCTAssertEqual(RailControl(ScreenAction(id: "share", title: "Share", systemImage: "square.and.arrow.up", share: url)), .share(url))
-        XCTAssertEqual(RailControl(ScreenAction(id: "edit", title: "Edit", systemImage: "pencil")), .button)
-        XCTAssertEqual(RailControl(ScreenAction(id: "more", title: "More", systemImage: "ellipsis",
-                                                children: [ScreenAction(id: "a", title: "A", systemImage: "a.circle")])), .menu)
     }
 
     /// The inner screen comes from the screen, not the window: beside another

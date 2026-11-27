@@ -8,7 +8,7 @@ struct ShellGeometry: Equatable {
     var screen: CGSize = .zero
     var phone = UIDevice.current.userInterfaceIdiom == .phone
     var hinge: ShellPosture.Hinge?
-    /// The window's trailing safe area: the column the Duo's system keeps for its status.
+    /// The window's trailing safe area: the column the Duo's system keeps for its status (and the tab bar).
     var trailingInset: CGFloat = 0
     /// The window's leading safe area (none on the Duo's inner screen).
     var leadingInset: CGFloat = 0
@@ -17,8 +17,8 @@ struct ShellGeometry: Equatable {
         ShellPosture.resolve(window: window, screen: screen, phone: phone, hinge: hinge, forced: ShellQA.posture)
     }
 
-    /// The room between the leading safe area and the rail, for the panes (`ShellPanes`).
-    var paneWidth: CGFloat { max(0, window.width - leadingInset - max(ShellPosture.railWidth, trailingInset)) }
+    /// The room between the safe areas, for the panes (`ShellPanes`).
+    var paneWidth: CGFloat { max(0, window.width - leadingInset - trailingInset) }
 
     /// On the Duo's inner screen, whatever the window: it draws no home
     /// indicator, though iOS reports one (also beside another app).
@@ -34,11 +34,9 @@ struct ShellGeometry: Equatable {
 
 extension EnvironmentValues {
     @Entry var shellPosture: ShellPosture = .phone
-    /// The column the system reserves at the window's trailing edge, which the rail fills.
-    @Entry var shellReservedColumn: CGFloat = 0
-    /// A pane beside others whose trailing edge is the rail's (`ShellPages`):
+    /// A pane beside others whose trailing edge is the window's (`ShellPages`):
     /// the window's trailing inset is really its own there.
-    @Entry var shellPaneAtRail = false
+    @Entry var shellPaneAtEdge = false
     /// The window is on the Duo's inner screen (see `ShellGeometry.innerScreen`).
     @Entry var shellInnerScreen = false
     /// Home is over this screen (`ShellPages`): VoiceOver leaves it, its UIKit views too.

@@ -19,7 +19,7 @@ final class DesignViewerUITests: ServerIsolatedUITestCase {
 
     func testCommentsListOpensAPinnedScreen() {
         launch()
-        XCTAssertTrue(app.screenAction("comment").waitForExistence(timeout: 10), "Comment is one of the two buttons (bar or rail)")
+        XCTAssertTrue(app.screenAction("comment").waitForExistence(timeout: 10), "Comment is one of the two buttons in the bar")
         XCTAssertTrue(app.screenAction("screens").exists, "and Screens the other")
         app.screenMoreAction("comments")
         let first = app.buttons["designComment-1"]

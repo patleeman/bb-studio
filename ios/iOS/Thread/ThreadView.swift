@@ -70,7 +70,7 @@ struct ThreadView: View {
     @Environment(\.botConversation) private var shell
     @Environment(\.look) private var look
     @Environment(\.shellPosture) private var posture
-    @Environment(\.shellPaneAtRail) private var paneAtRail
+    @Environment(\.shellPaneAtEdge) private var paneAtEdge
     @Environment(\.shellInnerScreen) private var innerScreen
     @ObservedObject private var router = Router.shared
     /// The Workbench over the rows (between the title and the composer); nil shows the chat.
@@ -429,7 +429,7 @@ struct ThreadView: View {
     /// Hands-free voice speaks as this conversation (its identity comes from the thread).
     private func startHandsFree() { Router.shared.sheet = .handsFree(threadId: model.threadId) }
 
-    /// What the conversation's menu asked for (`ConversationMenuItems`, in the shell's bar or rail).
+    /// What the conversation's menu asked for (`ConversationMenuItems`, in the conversation's bar).
     private func perform(_ command: ConversationCommand) {
         switch command {
         case .find: finding = true
@@ -1653,7 +1653,6 @@ extension ThreadView {
                                         findQuery: findQuery))
             .environment(\.threadId, model.threadId)
             .environment(\.openURL, transcriptV2OpenURL)
-            .onAppear { session.transcript = transcriptV2 }
     }
 
     private var transcriptV2Body: some View {
@@ -1831,7 +1830,7 @@ extension ThreadView {
         chrome.rows.margin = Self.margin
         chrome.rows.spacing = 10
         chrome.rows.readableWidth = readableWidth
-        if posture.splitsWorkbench, !paneAtRail {
+        if posture.splitsWorkbench, !paneAtEdge {
             // A pane left of another: its stack still hands the transcript the
             // window's trailing inset (the status column, a screen away).
             chrome.composerIgnoresTrailingSafeArea = true

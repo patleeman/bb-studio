@@ -289,13 +289,11 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         shot("extras-history")
         app.buttons["Done"].tap()
         app.open(URL(string: "bbstudio://archived")!)
-        XCTAssertTrue(app.navigationBars["Archived"].waitForExistence(timeout: 10)
-            || app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label CONTAINS 'Archived'")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Archived"].waitForExistence(timeout: 10))
         sleep(2)
         shot("extras-archived")
         app.open(URL(string: "bbstudio://drawings")!)
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10)
-            || app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Studio'")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         sleep(2)
         shot("extras-drawings")
         if let id = ProcessInfo.processInfo.environment["BBGO_QA_DRAWING"] {
@@ -526,15 +524,11 @@ final class ThreadUITests: ServerIsolatedUITestCase {
     /// Studio opens on the collection.
     private func openStudioCollection() {
         app.open(URL(string: "bbstudio://studio")!)
-        let shellTitle = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'shellTitle' AND label == 'Studio'")).firstMatch
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10)
-            || shellTitle.waitForExistence(timeout: 5), "Studio collection")
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10), "Studio collection")
     }
 
-    /// Studio's search field: `shellSearchField` on Duo, toolbar `screenAction-search` -> `searchFields` on iPhone.
+    /// Studio's search field: the toolbar's `screenAction-search` presents `.searchable`.
     private func studioSearchField() -> XCUIElement {
-        let duoField = app.textFields["shellSearchField"].firstMatch
-        if duoField.waitForExistence(timeout: 3) { return duoField }
         let navField = app.searchFields.firstMatch
         let searchButton = app.buttons["screenAction-search"].firstMatch
         if !navField.exists, searchButton.waitForExistence(timeout: 5) {
@@ -809,8 +803,7 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         shot("page-studio-embeds")
         embed.tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Transcript' OR label CONTAINS 'transcript'")).firstMatch.waitForExistence(timeout: 10)
-            || app.navigationBars.count > 0
-            || app.descendants(matching: .any)["shellTitle"].exists, "recording opens")
+            || app.navigationBars.count > 0, "recording opens")
         sleep(1)
         shot("page-embed-opened")
     }

@@ -185,9 +185,12 @@ enum DuoDemo {
             screenSize = size
         case "tab":
             switch url.query() {
-            case "bot": Router.shared.path = []
-            case "studio": Router.shared.path = [.studio]
-            case "settings": Router.shared.path = [.settings]
+            case "bot": Router.shared.home([])
+            case "studio": Router.shared.home([.studio])
+            case "settings": Router.shared.home([.settings])
+            case "library": Router.shared.tab = .library
+            case "memory": Router.shared.tab = .memory
+            case "search": Router.shared.tab = .search
             default: return false
             }
             return true

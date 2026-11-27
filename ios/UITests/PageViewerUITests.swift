@@ -107,7 +107,7 @@ final class PageViewerUITests: ServerIsolatedUITestCase {
 
     func testActionsAndEditor() {
         openPage()
-        XCTAssertTrue(app.screenAction("edit").waitForExistence(timeout: 10), "Edit is one of the two buttons (bar or rail)")
+        XCTAssertTrue(app.screenAction("edit").waitForExistence(timeout: 10), "Edit is one of the two buttons in the bar")
         XCTAssertTrue(app.screenAction("comments").exists, "and Comments the other")
         app.screenMore.tap()
         for title in ["Add a Page Inside", "Copy Reference", "Version History", "Export PDF", "Delete"] {
@@ -136,13 +136,12 @@ final class PageViewerUITests: ServerIsolatedUITestCase {
                                "-qaConversation", "thr_botdemo01", "-qaWorkbenchDemo", "-qaPageDemo"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
-        let either = { (ids: [String]) in self.app.buttons.matching(NSPredicate(format: "identifier IN %@", ids)).firstMatch }
-        either(["workbenchButton", "rail-workbench"]).tap()
+        app.buttons["workbenchButton"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Callouts take their tone's colour."].waitForExistence(timeout: 15), "the page tab")
         XCTAssertFalse(app.buttons["screenAction-edit"].exists, "no bar of its own")
         XCTAssertFalse(app.textFields["Work with this page…"].exists || app.textViews["Work with this page…"].exists, "no second composer")
         shot("page-tab")
-        either(["conversationMore", "rail-more"]).tap()
+        app.conversationMore.tap()
         // A system menu: its items keep their labels, not always their identifiers.
         XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 5), "Edit at the top of More")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Comments'")).firstMatch.exists, "and Comments")

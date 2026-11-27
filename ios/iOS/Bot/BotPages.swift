@@ -99,7 +99,6 @@ struct ArchivePageView: View {
         if row.finished {
             NavigationLink {
                 FinishedConversationScreen(threadId: row.threadId, title: row.title, open: open) { await reopened() }
-                    .modifier(PushedChrome(title: row.title))
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.circle").foregroundStyle(.green).frame(width: 22)

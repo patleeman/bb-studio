@@ -46,7 +46,6 @@ private struct SkillRows: View {
                 .listRowSeparator(.hidden)
         }
         ForEach(skills) { skill in
-            // On the shell's stack, from either page: its title line and rail on the Duo.
             Button { Router.shared.push(.memorySkill(botId: store.botId, name: skill.name)) } label: {
                 HStack {
                     SkillRow(skill: skill)
@@ -132,7 +131,7 @@ struct SkillScreen: View {
                 SkillReader(store: store, skill: skill, history: history)
             }
         }
-        // Edit in the iPhone's bar, the Duo's rail; the editor's own actions replace it while editing.
+        // Edit in the bar; the editor's own actions replace it while editing.
         .screenToolbar(skill.name, actions: !editing && currentText != nil
             ? [ScreenAction(id: "skillEdit", title: "Edit", systemImage: "pencil") { editing = true }] : [])
         .task { load() }
@@ -265,10 +264,6 @@ private struct SkillEditor: View {
             }
             if let error { Section { Text(error).foregroundStyle(.red).font(.footnote) } }
         }
-        .screenActions([
-            ScreenAction(id: "skillSave", title: conflict == nil ? "Save" : "Replace", systemImage: "checkmark", disabled: !ready) { Task { await save() } },
-            ScreenAction(id: "skillCancel", title: "Cancel", systemImage: "xmark") { done(false) },
-        ])
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("Cancel") { done(false) } }
             ToolbarItem(placement: .confirmationAction) {
@@ -365,8 +360,6 @@ struct NewSkillScreen: View {
                 Button("Save") { Task { await save() } }.disabled(!ready).accessibilityIdentifier("newSkillSave")
             }
         }
-        // On the Duo the bar hides: Save is in the rail.
-        .screenActions([ScreenAction(id: "newSkillSave", title: "Save", systemImage: "checkmark", disabled: !ready) { Task { await save() } }])
     }
 
     private func save() async {

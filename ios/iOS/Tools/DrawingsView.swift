@@ -20,7 +20,7 @@ struct DrawingView: View {
     @State private var showingRelated = false
     @State private var openedEmptyEditor = false
 
-    /// Edit and Related first; the rest under ⋯ (the Duo: the rail and its More).
+    /// Edit and Related first; the rest under ⋯.
     private var actions: [ScreenAction] {
         var list = [
             ScreenAction(id: "edit", title: "Edit Drawing", systemImage: "pencil.tip.crop.circle", disabled: scene == nil, run: { editing = true }),

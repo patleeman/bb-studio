@@ -13,7 +13,7 @@ import UIKit
 /// The conversation always shows. The side pane shows only when there is
 /// something for it (a tab the phone can show, a companion) and gets the
 /// smaller share (the conversation keeps about 58%). Home shows beside them
-/// only when all of them meet their minimums; else the rail's Home brings it
+/// only when all of them meet their minimums; else Home's button in the conversation's bar brings it
 /// over the conversation. Where the conversation and a side pane can't both
 /// be readable, the posture lays out as one column (`ShellPosture.laidOut`).
 struct ShellPanes: Equatable {
@@ -40,7 +40,7 @@ struct ShellPanes: Equatable {
         conversationMinimum(body: body) + sideMinimum(body: body) <= width
     }
 
-    /// The panes for `width` (the room left of the rail). `side`: the side
+    /// The panes for `width` (the room between the safe areas). `side`: the side
     /// pane has something to show. `home`: Home is wanted beside them (not hidden by hand).
     static func make(width: CGFloat, body: CGFloat, side: Bool, home: Bool) -> ShellPanes {
         let conversationMin = conversationMinimum(body: body)
@@ -74,7 +74,7 @@ struct ShellPanes: Equatable {
     }
 }
 
-/// Home beside the conversation, or over it, by hand (the rail's Home and
+/// Home beside the conversation, or over it, by hand (Home's button in the bar and
 /// the edge swipe). Where Home fits it shows unless you hid it; where it
 /// doesn't, Home comes over the conversation until something is picked.
 struct ShellHomePane: Equatable {
@@ -85,7 +85,7 @@ struct ShellHomePane: Equatable {
 
     func shown(fits: Bool) -> Bool { fits ? !hidden : overlaid }
 
-    /// The rail's Home: shows or hides it.
+    /// Home's button: shows or hides it.
     mutating func toggle(fits: Bool) {
         if fits { hidden.toggle() } else { overlaid.toggle() }
     }
