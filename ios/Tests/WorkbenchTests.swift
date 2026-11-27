@@ -63,6 +63,17 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertNil(WorkbenchStore.selected([], picked: "a", active: "a"), "no tabs: the empty Workbench")
     }
 
+    /// Round 7 fix: a tab only the Mac opens never claims the Workbench, picked, active or first.
+    func testATabOnlyTheMacOpensIsNeverShown() {
+        let code = WorkbenchTab(id: "code", ref: .init(kind: "vscode", path: "a.swift"), title: "VS Code", support: .desktopOnly)
+        let page = WorkbenchTab(id: "page", ref: .init(kind: "page", id: "p"), title: "Page")
+        XCTAssertNil(WorkbenchStore.selected([code], picked: "code", active: "code"), "nothing to show: no pane")
+        XCTAssertEqual(WorkbenchStore.selected([code, page], picked: nil, active: "code")?.id, "page")
+        XCTAssertEqual(WorkbenchStore.selected([code, page], picked: "code", active: nil)?.id, "page")
+        XCTAssertFalse(WorkbenchTabKind(code).showsOnPhone)
+        XCTAssertTrue(WorkbenchTabKind(page).showsOnPhone)
+    }
+
     func testNewTabOpensStudioItemsByKind() throws {
         func item(_ href: String) throws -> Studio.SearchAllOutputItem {
             try JSONDecoder().decode(Studio.SearchAllOutputItem.self, from: Data(#"{"title":"x","href":"\#(href)"}"#.utf8))

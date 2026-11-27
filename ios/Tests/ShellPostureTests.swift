@@ -46,51 +46,47 @@ final class ShellPostureTests: XCTestCase {
                        [.back, .workbench(tabs: 3), .home(lit: false), .more])
         XCTAssertEqual(RailLayout.slots(.vertical, screen: .home, tabs: 0, homeShown: false), [.new, .search], "9f, Home")
         XCTAssertEqual(RailLayout.slots(.book, screen: .conversation(workbench: true), tabs: 3, homeShown: false),
-                       [.tabs, .home(lit: false), .more], "9d")
-        XCTAssertEqual(RailLayout.slots(.book, screen: .conversation(workbench: true), tabs: 3, homeShown: true),
-                       [.tabs, .home(lit: true), .new], "9d, Home shown: More becomes New")
+                       [.tabs, .home(lit: false), .new, .more], "9d: book and flat share one rule")
         XCTAssertEqual(RailLayout.slots(.flat, screen: .conversation(workbench: true), tabs: 3, homeShown: true),
                        [.tabs, .home(lit: true), .new, .more], "9e")
         XCTAssertEqual(RailLayout.slots(.phone, screen: .home, tabs: 0, homeShown: false), [], "no rail on the iPhone")
     }
 
-    /// Review B1: in book, anything pushed (not only a conversation) gives the
-    /// left page back from Home, through `Router.path`.
-    @MainActor func testEveryPushTakesTheBooksPageBackFromHome() {
+    /// Review B1: anything pushed (not only a conversation) closes Home over
+    /// the conversation, through `Router.path`.
+    @MainActor func testEveryPushClosesHomeOverTheConversation() {
         for route: Route in [.place(.memory), .thread(id: "thr_w"), .settings, .studio, .conversation(id: "thr_c")] {
             let router = Router()
-            router.homePane.toggle(.book)
-            XCTAssertTrue(router.homePane.shown(.book))
+            router.homePane.toggle(fits: false)
+            XCTAssertTrue(router.homePane.shown(fits: false))
             router.path = [route]
-            XCTAssertFalse(router.homePane.shown(.book), "\(route) shows on the left page")
+            XCTAssertFalse(router.homePane.shown(fits: false), "\(route) closes Home over the conversation")
         }
         let router = Router()
         router.path = [.conversation(id: "thr_c")]
-        router.homePane.toggle(.book)
+        router.homePane.toggle(fits: false)
         router.openConversation("thr_c")
-        XCTAssertFalse(router.homePane.shown(.book), "the same conversation picked again")
-        router.homePane.toggle(.book)
+        XCTAssertFalse(router.homePane.shown(fits: false), "the same conversation picked again")
+        router.homePane.toggle(fits: false)
         router.path = []
-        XCTAssertTrue(router.homePane.shown(.book), "back to Home keeps Home")
+        XCTAssertTrue(router.homePane.shown(fits: false), "back to Home keeps Home")
     }
 
-    func testHomeBesideTheConversation() {
+    func testHomeBesideOrOverTheConversation() {
         var pane = ShellHomePane()
-        XCTAssertTrue(pane.shown(.flat), "flat shows Home")
-        XCTAssertFalse(pane.shown(.book), "book hides it")
-        pane.toggle(.book)
-        XCTAssertTrue(pane.shown(.book), "Home in the rail brings it back")
+        XCTAssertTrue(pane.shown(fits: true), "Home shows where it fits")
+        XCTAssertFalse(pane.shown(fits: false), "and waits for the rail where it doesn't")
+        pane.toggle(fits: false)
+        XCTAssertTrue(pane.shown(fits: false), "the rail's Home brings it over the conversation")
         pane.pushed()
-        XCTAssertFalse(pane.shown(.book), "a push takes the page back")
-        pane.toggle(.flat)
-        XCTAssertFalse(pane.shown(.flat), "hidden by hand in flat")
-        pane.postureChanged(from: .flat, to: .book)
-        pane.postureChanged(from: .book, to: .flat)
-        XCTAssertFalse(pane.shown(.flat), "a Home you hid yourself stays hidden")
-        pane.toggle(.book)
-        pane.postureChanged(from: .book, to: .flat)
-        pane.postureChanged(from: .flat, to: .book)
-        XCTAssertFalse(pane.shown(.book), "a book's request ends with the posture")
+        XCTAssertFalse(pane.shown(fits: false), "a pick closes it")
+        pane.toggle(fits: true)
+        XCTAssertFalse(pane.shown(fits: true), "hidden by hand where it fits")
+        pane.layoutChanged()
+        XCTAssertFalse(pane.shown(fits: true), "a Home you hid yourself stays hidden")
+        pane.toggle(fits: false)
+        pane.layoutChanged()
+        XCTAssertFalse(pane.shown(fits: false), "Home over the conversation ends with the layout")
     }
 
     func testTheComposersStatusLine() {

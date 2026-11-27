@@ -91,11 +91,20 @@ struct WorkbenchTabMenuItems: View {
         let shown = store.selected(threadId)
         Section {
             ForEach(store.tabs(threadId)) { tab in
-                Button { store.select(tab.id, in: threadId) } label: {
-                    Label(tab.title, systemImage: tab.id == shown?.id ? "checkmark" : Self.symbol(tab.ref.kind))
+                if WorkbenchTabKind(tab).showsOnPhone {
+                    Button { store.select(tab.id, in: threadId) } label: {
+                        Label(tab.title, systemImage: tab.id == shown?.id ? "checkmark" : Self.symbol(tab.ref.kind))
+                    }
+                    .accessibilityAddTraits(tab.id == shown?.id ? .isSelected : [])
+                    .accessibilityIdentifier("workbenchTab-\(tab.id)")
+                } else {
+                    // Listed, never shown: the phone has nothing to put in a pane for it.
+                    Button {} label: {
+                        Label { Text(tab.title); Text("On your Mac") } icon: { Image(systemName: "desktopcomputer") }
+                    }
+                    .disabled(true)
+                    .accessibilityIdentifier("workbenchTab-\(tab.id)")
                 }
-                .accessibilityAddTraits(tab.id == shown?.id ? .isSelected : [])
-                .accessibilityIdentifier("workbenchTab-\(tab.id)")
             }
         }
         Section {
