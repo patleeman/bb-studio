@@ -10,7 +10,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
     private func launch(_ extra: [String] = []) {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list"] + extra
         app.launchOffline()
-        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "home").firstMatch.waitForExistence(timeout: 30), "the app opens on Home")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", "home")).firstMatch.waitForExistence(timeout: 30), "the app opens on Home")
     }
 
     private func openPage(_ page: String) {
@@ -22,11 +22,17 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         }
     }
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
 
     /// Back to Home: its tab.
     private func closeMemory() {
         app.goHome()
+    }
+
+    private func counts() -> [String: Int] {
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/counts")!)
+        sleep(1)
+        return (try? JSONDecoder().decode([String: Int].self, from: Data((app.windows.firstMatch.value as? String ?? "").utf8))) ?? [:]
     }
 
     private func text(_ contains: String) -> XCUIElement {
@@ -61,8 +67,13 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(reopened.waitForExistence(timeout: 15), "back in Conversations")
     }
 
+    /// Memory and Library are tabs that load when first shown, not with the
+    /// app (`memory.open`, `library.open`). The answer is slower than a tab
+    /// switch takes (XCUITest's tap waits out the tab bar's transition, about 2.3 s).
     func testSlowMemoryAndLibraryLoadThroughTheBotFlip() {
-        launch(["-qaDemoPageLatency", ProcessInfo.processInfo.environment["PAGE_LATENCY"] ?? "2500", "-qaDemoCachedBot"])
+        launch(["-qaDemoPageLatency", ProcessInfo.processInfo.environment["PAGE_LATENCY"] ?? "6000", "-qaDemoCachedBot"])
+        XCTAssertNil(counts()["memory.open"], "Memory doesn't load with the app")
+        XCTAssertNil(counts()["library.open"], "nor Library")
         openPage("memory")
         XCTAssertTrue(any("memory-page").waitForExistence(timeout: 5))
         XCTAssertFalse(any("memoryBudget").exists, "still loading while the answer is slow")

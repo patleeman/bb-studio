@@ -17,7 +17,7 @@ final class MemoryLibraryUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("home").waitForExistence(timeout: 30), "the app opens on Home")
     }
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
 
     private func text(_ contains: String) -> XCUIElement {
         app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", contains)).firstMatch

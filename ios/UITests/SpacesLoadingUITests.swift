@@ -11,7 +11,7 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
 
     private var loading: XCUIElement { app.descendants(matching: .any)["spacesLoading"].firstMatch }
     private var unreachable: XCUIElement { app.descendants(matching: .any)["studioUnreachable"].firstMatch }
-    private var home: XCUIElement { app.descendants(matching: .any).matching(identifier: "home").firstMatch }
+    private var home: XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", "home")).firstMatch }
 
     private func launch(late: String, fallback: Int, extra: [String] = []) {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaReduceMotion",

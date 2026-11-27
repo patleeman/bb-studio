@@ -48,10 +48,6 @@ final class Router: ObservableObject {
     @Published var libraryPath: [Route] = []
     @Published var memoryPath: [Route] = []
     @Published var searchPath: [Route] = []
-    /// Page two of the Memory tab beside two pages (Skills | History, and what they open).
-    @Published var detail: [Route] = []
-    /// Two pages show (the open Duo): what the Memory tab opens goes on page two.
-    var twoPages = false
     /// The conversation on screen (or last on screen): the conversation
     /// column beside two pages, and where Home's "You're here" points.
     @Published private(set) var conversation: String?
@@ -87,14 +83,19 @@ final class Router: ObservableObject {
         }
     }
 
-    /// Onto the shown tab's stack, so Back returns where you were.
+    /// Onto the shown tab's stack, so Back returns where you were. A second
+    /// tap on what's already on top (a quick double tap) pushes nothing.
     func push(_ route: Route) {
         switch tab {
-        case .home: path.append(route)
-        case .library: libraryPath.append(route)
-        case .memory: if twoPages { detail.append(route) } else { memoryPath.append(route) }
-        case .search: searchPath.append(route)
+        case .home: Self.push(route, on: &path)
+        case .library: Self.push(route, on: &libraryPath)
+        case .memory: Self.push(route, on: &memoryPath)
+        case .search: Self.push(route, on: &searchPath)
         }
+    }
+
+    private static func push(_ route: Route, on stack: inout [Route]) {
+        if stack.last != route { stack.append(route) }
     }
 
     /// One of the Bot's places: Memory and Library are tabs, the rest open on Home.
@@ -103,7 +104,6 @@ final class Router: ObservableObject {
         case .memory:
             tab = .memory
             memoryPath = []
-            detail = []
         case .library:
             tab = .library
             libraryPath = []
@@ -211,7 +211,6 @@ final class Router: ObservableObject {
         path = []
         libraryPath = []
         memoryPath = []
-        detail = []
         searchPath = []
     }
 
@@ -232,7 +231,6 @@ final class Router: ObservableObject {
         path = []
         libraryPath = []
         memoryPath = []
-        detail = []
         searchPath = []
         landed = false
         homePane = ShellHomePane()

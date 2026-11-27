@@ -12,6 +12,8 @@ struct ThreadView: View {
     @StateObject private var dictation = DictationGate()
     /// "Expand to page": the thread's open note and its editor.
     @StateObject private var notes: ThreadNotes
+    /// Holds the thread from the view's first appearance until it is gone.
+    @StateObject private var lifetime = ThreadViewLifetime()
     /// What was typed before an inline dictation; what you say goes in after it.
     @State private var talkTyped: String?
     @State private var draftText = DraftText()
@@ -396,10 +398,12 @@ struct ThreadView: View {
             session.attach(app)
             await model.load()
         }
-        // Attached as it appears, in step with `onDisappear`'s stop: a screen
-        // that replaces another in the same update takes over before the
-        // deferred detach looks (no async start racing it).
-        .onAppear { session.hold(app) }
+        // Held for the view's life, not while it shows: a conversation under
+        // another tab (or a screen pushed over it) keeps listening, so what
+        // arrives meanwhile is there on return. Taken as it first appears: a
+        // screen that replaces another in the same update takes over before
+        // the deferred detach looks (no async start racing it).
+        .onAppear { lifetime.hold(session, notes: notes, app: app) }
         // Open where the reader left off. Waits a beat for the rows to be laid out.
         .task(id: model.unreadFrom) {
             guard model.unreadFrom != nil else { return }
@@ -410,8 +414,6 @@ struct ThreadView: View {
             saveDraftLocally()
             resizeRestore?.cancel()
             resizeAnchor.cancel()
-            session.stop()
-            notes.detach()
         }
     }
 
@@ -1957,5 +1959,29 @@ struct InlineJump: ViewModifier {
         .transition(.opacity.combined(with: .scale(scale: 0.8)))
         .accessibilityLabel(label.map { "Jump to latest, \($0)" } ?? "Jump to latest")
         .accessibilityIdentifier("jumpToLatest")
+    }
+}
+
+/// A thread view's hold on its session and notes, for the view's life: it
+/// lets go when SwiftUI drops the view (popped, replaced), not when it is
+/// only out of sight (another tab, a screen pushed over it).
+@MainActor
+final class ThreadViewLifetime: ObservableObject {
+    private var session: ConversationSession?
+    private var notes: ThreadNotes?
+
+    func hold(_ session: ConversationSession, notes: ThreadNotes, app: AppModel) {
+        guard self.session == nil else { return }
+        self.session = session
+        self.notes = notes
+        session.hold(app)
+    }
+
+    deinit {
+        guard let session, let notes else { return }
+        MainActor.assumeIsolated {
+            session.stop()
+            notes.detach()
+        }
     }
 }

@@ -58,7 +58,7 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
         command("capture?" + name)
     }
 
-    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
+    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
 
     // MARK: The default text size
 
@@ -72,9 +72,8 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
             XCTAssertTrue(conversation.waitForExistence(timeout: 10), "\(posture): the conversation")
             XCTAssertTrue(workbench.exists, "\(posture): a page tab the phone can show takes the Workbench pane")
             XCTAssertFalse(element("homeColumn").exists, "\(posture): Home doesn't fit beside both")
-            // The panes share the room between the safe areas; the simulator's stretched window keeps
-            // the outer screen's 84 pt status column as its trailing one (the side pane's bar runs under it).
-            let share = conversation.frame.width / (landscape.width - 84)
+            // The panes share the inner screen's width (it has no status column; `DuoDemo.innerScreenInsets`).
+            let share = conversation.frame.width / landscape.width
             XCTAssertEqual(share, 0.58, accuracy: 0.02, "\(posture): the conversation keeps the larger share")
             XCTAssertEqual(workbench.frame.minX, conversation.frame.maxX, accuracy: 1, "\(posture): the Workbench beside it")
             XCTAssertGreaterThanOrEqual(conversation.frame.width, 481, "about 60 characters a line")

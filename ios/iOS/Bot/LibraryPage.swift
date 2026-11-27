@@ -45,6 +45,9 @@ struct LibraryPageView: View {
     }
 
     private func start() {
+        #if DEBUG
+        RenderCount.bump("library.open")
+        #endif
         let (client, botId) = (app.client, botId)
         load.describe = { BBClient.describe($0, server: client.baseURL) }
         load.run(key: scope) { try await client.botLibrary(botId: botId) }
@@ -119,7 +122,7 @@ private struct LibraryRowLabel: View {
     }
 }
 
-/// + New page in the iPhone's bar.
+/// + New page in Library's bar.
 private struct LibraryNewPageButton: ToolbarContent {
     let making: Bool
     let make: () -> Void

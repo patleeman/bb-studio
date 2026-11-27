@@ -31,7 +31,7 @@ final class HeatScreensUITests: ServerIsolatedUITestCase {
         app.launchOffline()
     }
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
 
     private func mark(_ what: String) {
         guard let out else { return }

@@ -1,13 +1,15 @@
 import SwiftUI
 
 /// A conversation (or any thread) on a stack, under its native bar: the
-/// system's Back, the title, the Workbench button with the tab count, and ⋯
+/// system's Back, the title, the Workbench button (the tab count in its
+/// label: SwiftUI's toolbar items take no badge), and ⋯
 /// (round 8). The Workbench shows in the chat's place with the composer
 /// kept; its title is then the tab, which opens the tab menu. The button or
 /// a sideways swipe flips Chat and Workbench.
 ///
 /// Beside two pages (`pane`, the open Duo) the chat is alone: the Workbench
-/// is the side pane's, and Home's button is the bar's first (`ShellPages`).
+/// is the side pane's, its tab's actions first in ⋯, and Home's button is
+/// the bar's first (`ShellPages`).
 /// Where the side pane is hidden (no tab the phone can show) the tab menu
 /// takes the Workbench button's place.
 struct ConversationScreen: View {
@@ -35,6 +37,9 @@ struct ConversationScreen: View {
     }
 
     private var showsWorkbench: Bool { !pane && session.showsWorkbench }
+    /// The shown tab's actions lead ⋯ while its Workbench shows: in the chat's
+    /// place, or beside two pages in the side pane (which has no bar of its own).
+    private var showsTabActions: Bool { showsWorkbench || (pane && !atEdge) }
 
     var body: some View {
         ThreadView(session: session, workbench: showsWorkbench ? { AnyView(workbenchView) } : nil, flips: !pane)
@@ -47,7 +52,8 @@ struct ConversationScreen: View {
             .sensoryFeedback(.selection, trigger: session.showsWorkbench)
             .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
             .task(id: threadId) {
-                if shell?.threadId == threadId { router.shown(threadId) }
+                // A conversation is the one on screen (the open Duo's column); a worker or reply pushed over it isn't.
+                if shell?.threadId == threadId, shell?.kind == .conversation { router.shown(threadId) }
                 workbench.attach(app.realtime)
                 await workbench.load(threadId)
             }
@@ -78,7 +84,7 @@ struct ConversationScreen: View {
             }
         }
         ToolbarItem(placement: .topBarTrailing) {
-            Menu { ConversationMenuItems(session: session, conversation: shell, tabActions: showsWorkbench ? session.tabActions : []) } label: {
+            Menu { ConversationMenuItems(session: session, conversation: shell, tabActions: showsTabActions ? session.tabActions : []) } label: {
                 Label("Conversation menu", systemImage: "ellipsis")
             }
             .menuOrder(.fixed)

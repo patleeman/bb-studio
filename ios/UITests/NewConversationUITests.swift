@@ -19,7 +19,7 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")
     }
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
 
     private func waitFor(_ element: XCUIElement, label contains: String, timeout: TimeInterval = 15) -> Bool {
         let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", contains), object: element)

@@ -66,7 +66,6 @@ struct ShellRoot: View {
         .onChange(of: store.spaces) { _, _ in land() }
         .onChange(of: store.views) { _, _ in land() }
         .onChange(of: router.pending, initial: true) { _, _ in router.consume(store) }
-        .onChange(of: posture.splitsWorkbench, initial: true) { _, two in router.twoPages = two }
         .onChange(of: router.conversation) { _, id in
             if let id, let bot { ShellMemory.remember(id, botId: bot.id) }
         }
@@ -138,7 +137,10 @@ enum ShellMemory {
 /// The tabs, as Kensico's: SwiftUI's TabView with the tab bar only. The
 /// system draws it (on the folded Duo, as the capsule in the reserved right
 /// column). Home holds the conversations; Library and Memory are the Bot's
-/// places; Search finds across them.
+/// places; Search finds across them. As UIKit's tab bar controller, a
+/// visited tab stays mounted while another shows (its stack, a conversation
+/// still listening), so going back is instant and nothing is missed; the
+/// cost is memory for what's pushed in tabs out of sight.
 private struct ShellTabs: View {
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
@@ -198,8 +200,10 @@ private struct HomeTab: View {
     }
 }
 
-/// Memory's tab: one stack, or beside two pages Core on page one and
-/// Skills | History on page two, which keeps a stack of its own (`Router.detail`).
+/// Memory's tab: one stack. Beside two pages, Core is page one, with a
+/// title of its own, and Skills | History page two, the tab's stack: its bar
+/// (the layer switch, Search, + New skill) and what they open. The one
+/// `memoryPath` either way, so folding or unfolding keeps what's pushed.
 private struct MemoryTab: View {
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
@@ -210,22 +214,25 @@ private struct MemoryTab: View {
     @Environment(\.shellPosture) private var posture
 
     var body: some View {
-        let page = ShellStack(path: $router.memoryPath, bot: bot, store: store) {
-            MemoryPageView(botId: bot.id, open: router.open(item:))
-        }
         if posture.splitsWorkbench {
+            let memory = MemoryStore.shared(botId: bot.id, client: app.client)
             HStack(spacing: 0) {
-                page
+                CoreLayerView(store: memory)
+                    .paneBar { Text("Memory").font(.headline).accessibilityAddTraits(.isHeader) }
                     .frame(width: (width / 2).rounded())
                     // A page left of another: SwiftUI hands it the window's trailing inset, a page away.
                     .ignoresSafeArea(.container, edges: .trailing)
-                ShellStack(path: $router.detail, bot: bot, store: store) {
-                    MemoryBrowsePane(store: MemoryStore.shared(botId: bot.id, client: app.client), open: router.open(item:))
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("memory-page")
+                ShellStack(path: $router.memoryPath, bot: bot, store: store) {
+                    MemoryBrowsePane(store: memory, open: router.open(item:))
                 }
                 .overlay(alignment: .leading) { Divider() }
             }
         } else {
-            page
+            ShellStack(path: $router.memoryPath, bot: bot, store: store) {
+                MemoryPageView(botId: bot.id, open: router.open(item:))
+            }
         }
     }
 }
@@ -293,12 +300,11 @@ private struct ShellNoBotDestination: View {
 private struct HomeScreen: View {
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
-    var column = false
 
     var body: some View {
-        HomeView(bot: bot, store: store, column: column)
+        HomeView(bot: bot, store: store)
             .navigationTitle("Home")
-            .navigationBarTitleDisplayMode(column ? .inline : .large)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar { ToolbarItem(placement: .primaryAction) { NewConversationButton() } }
     }
 }
@@ -399,8 +405,12 @@ enum ShellContext {
 /// column, then the conversation as the detail page (its stack's root, so
 /// no Back to an empty page; what it opens pushes over it), and the
 /// Workbench beside it when it has a tab the phone can show. Each is as wide
-/// as `ShellPanes` decides, with its own native bar. Home that doesn't fit
-/// comes over the conversation from the bar's Home button or the edge swipe.
+/// as `ShellPanes` decides. The conversation's stack is the only one, so its
+/// bar (Home, New, the Workbench's tabs, ⋯) is the one the system shows: where
+/// it moves bar buttons into the Duo's right column it takes one stack's, and
+/// with several, which one changed as panes came and went. Home and the
+/// Workbench have a bar-height title of their own (`PaneBar`). Home that doesn't
+/// fit comes over the conversation from the bar's Home button or the edge swipe.
 private struct ShellPages: View {
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
@@ -414,11 +424,20 @@ private struct ShellPages: View {
     private var conversation: String {
         router.conversation ?? BotShell.mainThreadId(bot, view: store.view(for: bot.id)) ?? ""
     }
+    /// The thread on top of the conversation's column (a worker or a thread
+    /// pushed over it, else the conversation): the side pane is its Workbench.
+    private var shownThread: String {
+        for route in router.path.reversed() {
+            if case .conversation(let id) = route { return id }
+            if case .thread(let id) = route { return id }
+        }
+        return conversation
+    }
     private var pushed: Bool { !panePath.wrappedValue.isEmpty }
     private var bodySize: CGFloat { ShellPanes.body(typeSize) }
 
     private var panes: ShellPanes {
-        ShellPanes.make(width: width, body: bodySize, side: workbench.selected(conversation) != nil, home: !router.homePane.hidden)
+        ShellPanes.make(width: width, body: bodySize, side: workbench.selected(shownThread) != nil, home: !router.homePane.hidden)
     }
 
     var body: some View {
@@ -436,7 +455,8 @@ private struct ShellPages: View {
                 .overlay(alignment: .leading) { if panes.home > 0 { Divider() } }
                 .gesture(HomeEdgePan(enabled: edgeSwipe, fits: panes.homeFits))
             if panes.side > 0 {
-                ShellSidePane(threadId: conversation)
+                ShellSidePane(threadId: shownThread)
+                    .id(shownThread)
                     .frame(width: panes.side)
                     .overlay(alignment: .leading) { Divider() }
             }
@@ -469,7 +489,8 @@ private struct ShellPages: View {
     }
 
     private var homeColumn: some View {
-        NavigationStack { HomeScreen(bot: bot, store: store, column: true).shellSurface() }
+        HomeView(bot: bot, store: store, column: true)
+            .paneBar { Text("Home").font(.headline).accessibilityAddTraits(.isHeader) }
             // As the conversation's column: SwiftUI hands it the window's trailing inset, a screen away.
             .ignoresSafeArea(.container, edges: .trailing)
             .accessibilityElement(children: .contain)
@@ -482,6 +503,7 @@ private struct ShellPages: View {
                 .id(conversation)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) { HomePaneButton(fits: panes.homeFits, shown: panes.home > 0 || router.homePane.overlaid) }
+                    ToolbarItem(placement: .topBarTrailing) { NewConversationButton() }
                 }
                 .shellSurface()
                 .navigationDestination(for: Route.self) { ShellDestination(route: $0, bot: bot, store: store, pane: true).shellSurface() }
@@ -598,8 +620,9 @@ private struct HomeEdgeMarker: View {
 }
 #endif
 
-/// The side pane: the conversation's Workbench under its own bar, whose
-/// title is the shown tab and opens the tab menu.
+/// The side pane: the Workbench of the thread on top of the conversation's
+/// column, under its title, the shown tab, which opens the tab menu. Its
+/// tab's actions are in that thread's ⋯ (`ConversationScreen`).
 private struct ShellSidePane: View {
     let threadId: String
     @ObservedObject private var router = Router.shared
@@ -617,23 +640,44 @@ private struct ShellSidePane: View {
     }
 
     var body: some View {
-        NavigationStack {
+        // A link in a tab (a page's related item) opens over the conversation, as
+        // everything the pane opens does: this stack only hands its pushes on.
+        NavigationStack(path: Binding(get: { [Route]() }, set: { $0.forEach(router.push) })) {
             WorkbenchView(threadId: threadId, webURL: model.thread.map { app.client.webURL(forThread: $0) },
                           openThread: { router.push(.thread(id: $0)) },
                           actionsChanged: { if session.tabActions != $0 { session.tabActions = $0 } })
-                .navigationTitle(workbench.selected(threadId)?.title ?? "Workbench")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        WorkbenchTitleMenu(threadId: threadId, subtitle: nil) { addingTab = true }
-                    }
-                }
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(for: Route.self) { _ in EmptyView() }
                 .shellSurface()
         }
-        .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("workbenchPage")
-        .modifier(ShellCovered())
+            .paneBar { WorkbenchTitleMenu(threadId: threadId, subtitle: nil) { addingTab = true } }
+            .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("workbenchPage")
+            .modifier(ShellCovered())
+    }
+}
+
+/// The top of a page beside another on the open Duo: its title at a bar's
+/// height, as the stack beside it has. Such a page has no stack of its own:
+/// where the system moves bar buttons into the Duo's right column it shows
+/// one stack's, and with several, which one changed as pages came and went.
+private struct PaneBar<Title: View>: ViewModifier {
+    @ViewBuilder var title: Title
+
+    func body(content: Content) -> some View {
+        content.safeAreaInset(edge: .top, spacing: 0) {
+            title
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(.bar)
+                .overlay(alignment: .bottom) { Divider() }
+        }
+    }
+}
+
+extension View {
+    func paneBar(@ViewBuilder _ title: () -> some View) -> some View {
+        modifier(PaneBar(title: title))
     }
 }
 

@@ -15,7 +15,7 @@ final class RouterGatewayUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
     }
 
-    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
+    private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
 
     func testTheUsageLimitNoticeHandsOff() {
         launch()

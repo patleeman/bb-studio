@@ -37,6 +37,7 @@ enum DuoDemo {
         guard args.contains("-qaDuoColdWide"), configured.insert(ObjectIdentifier(window)).inserted else { return }
         screenSize = CGSize(width: 951, height: 669)
         window.frame = CGRect(x: 0, y: 0, width: 951, height: 669)
+        DispatchQueue.main.async { innerScreenInsets(window) }
     }
 
     /// "ViewClass frame: keys" for each layer under the window with animations.
@@ -396,9 +397,19 @@ enum DuoDemo {
         }
         window.accessibilityIdentifier = "duo-process-\(ProcessInfo.processInfo.processIdentifier)"
         window.frame = CGRect(origin: origin, size: size)
+        innerScreenInsets(window)
         window.rootViewController?.view.setNeedsLayout()
         window.layoutIfNeeded()
         return true
+    }
+
+    /// The simulator's screen is the outer one, whose status column UIKit keeps at the window's
+    /// trailing edge (84 pt) however the window is stretched, and lays the system's bars out
+    /// for. The inner screen has none: for its sizes, cancel it (as Kensico's inner-screen demo does).
+    static func innerScreenInsets(_ window: UIWindow) {
+        guard let root = window.rootViewController else { return }
+        let inherited = window.safeAreaInsets.right - root.additionalSafeAreaInsets.right
+        root.additionalSafeAreaInsets.right = screenSize == nil ? 0 : -inherited
     }
 }
 #endif

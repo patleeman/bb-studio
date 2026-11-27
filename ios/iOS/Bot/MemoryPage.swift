@@ -6,32 +6,28 @@ enum MemoryLayer: String, CaseIterable, Identifiable {
     var title: String { rawValue.capitalized }
 }
 
-/// Memory, the Memory tab's root (designs 8d, 8g, 9g): Core | Skills | History.
-/// Its large title, the layer switch under the bar, and Search in the bar.
-/// Beside two pages (the open Duo) this is Core alone; Skills | History are
-/// page two (`MemoryBrowsePane`).
+/// Memory on one page, the Memory tab's root (designs 8d, 8g, 9g):
+/// Core | Skills | History, its large title, the layer switch under the bar,
+/// and Search in the bar. Beside two pages (the open Duo) the tab lays out
+/// Core and `MemoryBrowsePane` itself.
 struct MemoryPageView: View {
     let botId: String?
     var open: (BotShellItem) -> Void
     @EnvironmentObject private var app: AppModel
-    @Environment(\.shellPosture) private var posture
     @State private var store: MemoryStore?
 
     var body: some View {
         Group {
             if let store, store.botId == botId {
-                if posture.splitsWorkbench {
-                    CoreLayerView(store: store)
-                        .navigationTitle("Memory")
-                        .navigationBarTitleDisplayMode(.large)
-                } else {
-                    MemoryLayeredPage(store: store, open: open)
-                }
+                MemoryLayeredPage(store: store, open: open)
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .task(id: "\(app.client.baseURL.absoluteString)|\(botId ?? "")") {
+            #if DEBUG
+            RenderCount.bump("memory.open")
+            #endif
             // Kept across pushes and pops: only another Bot or server makes a new one.
             if store?.botId != botId || store?.client !== app.client { store = MemoryStore.shared(botId: botId, client: app.client) }
         }
@@ -108,16 +104,27 @@ private struct MemorySearchButton: View {
     }
 }
 
-/// Skills | History, page two beside Core on the open Duo, with + New skill
-/// in its bar while on Skills. What they open pushes on this page (`Router.detail`).
+/// Skills | History, page two beside Core on the open Duo, and the Memory
+/// tab's stack there: the layer switch, Search (across all three layers) and,
+/// on Skills, + New skill in its bar. What they open pushes on this page.
 struct MemoryBrowsePane: View {
     let store: MemoryStore
     var open: (BotShellItem) -> Void
     @State private var layer: MemoryLayer = .skills
+    @State private var searching = false
 
     var body: some View {
         Group {
-            if layer == .skills { SkillsLayerView(store: store, newSkillRow: false) } else { HistoryLayerView(store: store, open: open) }
+            if searching {
+                MemorySearchView(store: store, open: open) { next in
+                    if next != .core { layer = next }
+                    searching = false
+                }
+            } else if layer == .skills {
+                SkillsLayerView(store: store, newSkillRow: false)
+            } else {
+                HistoryLayerView(store: store, open: open)
+            }
         }
         .scrollContentBackground(.hidden)
         .navigationTitle(layer.title)
@@ -126,13 +133,15 @@ struct MemoryBrowsePane: View {
             ToolbarItem(placement: .principal) {
                 MemoryLayerPicker(layer: $layer, layers: [.skills, .history]).frame(maxWidth: 240)
             }
-            if layer == .skills {
+            ToolbarItem(placement: .primaryAction) { MemorySearchButton(searching: $searching) }
+            if layer == .skills, !searching {
                 ToolbarItem(placement: .primaryAction) {
                     Button { Router.shared.push(.memoryNewSkill(botId: store.botId)) } label: { Label("New skill", systemImage: "plus") }
                         .accessibilityIdentifier("memorySkillNew")
                 }
             }
         }
+        .onChange(of: layer) { _, _ in searching = false }
         .sensoryFeedback(.selection, trigger: layer)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("memory-browse")

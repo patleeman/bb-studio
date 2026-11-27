@@ -46,7 +46,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         sleep(1)
     }
 
-    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
+    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@", id)).firstMatch }
 
     // MARK: Idle
 
@@ -190,7 +190,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         element("homeConversation-thr_botdemo01").tap()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 20), "the conversation is pushed")
         let button = app.buttons["workbenchButton"]
-        XCTAssertTrue(button.exists, "the Workbench button")
+        XCTAssertTrue(button.waitForExistence(timeout: 10), "the Workbench button")
         XCTAssertEqual(button.label, "Workbench, 3 tabs", "the tabs the phone can show (not the VS Code one)")
         XCTAssertTrue(app.buttons["conversationMore"].exists, "and ⋯")
         XCTAssertTrue(app.backButton.exists, "the system's Back")
@@ -262,6 +262,20 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["Model & permissions"].exists, "Model")
         app.buttons["Find in conversation"].tap()
         XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 5), "Find opens its bar")
+    }
+
+    /// Review (blocker 2): a conversation under another tab keeps listening:
+    /// a message that comes while Library shows is there on return.
+    func testAMessageWhileOnAnotherTabShowsOnReturn() throws {
+        launchConversation(["-qaDemoLatency", "50"])  // the served demo, which `say` adds to
+        app.tab("Library").tap()
+        XCTAssertTrue(element("library-page").waitForExistence(timeout: 10), "Library's tab")
+        command("say?Arrived%20while%20away")
+        sleep(2)
+        app.tab("Home").tap()
+        let said = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Arrived while away")).firstMatch
+        XCTAssertTrue(said.waitForExistence(timeout: 10), "the message, without a refresh")
+        XCTAssertTrue(app.textViews["Message"].exists, "the same conversation")
     }
 
     // MARK: Duo
@@ -342,6 +356,14 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertFalse(app.backButton.exists, "the conversation is its page's root: no Back")
         capture("duo-book")
 
+        // Review (blocker 1): the side pane has no bar; its tab's actions lead the conversation's ⋯.
+        app.press(element("conversationMore"), id: "conversationMore")
+        XCTAssertTrue(app.menuItem("Edit").waitForExistence(timeout: 5), "the Lisbon budget page's Edit")
+        XCTAssertTrue(app.menuItem("Find in conversation").exists, "then the conversation's own items")
+        capture("duo-book-more")
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 200, dy: 300)).tap()
+        XCTAssertTrue(app.menuItem("Edit").waitForNonExistence(timeout: 5), "the menu closes")
+
         command("counts?reset")
         activate("homePane")
         XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home over the conversation")
@@ -368,6 +390,9 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(element("memory-page").waitForExistence(timeout: 10), "Memory's tab")
         XCTAssertTrue(element("memory-browse").exists, "Skills | History on page two")
         XCTAssertGreaterThan(element("memory-browse").frame.minX, element("memory-page").frame.minX, "beside Core")
+        // Review: Search across the layers on two pages too, in page two's bar.
+        app.press(element("memorySearch"), id: "memorySearch")
+        XCTAssertTrue(element("memorySearchField").waitForExistence(timeout: 10), "Memory's search")
         capture("duo-flat-memory")
         command("tab?library")
         XCTAssertTrue(element("library-page").waitForExistence(timeout: 10), "Library's tab")

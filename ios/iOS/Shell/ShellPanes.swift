@@ -8,13 +8,13 @@ import UIKit
 ///
 /// - the conversation: about 60 characters a line;
 /// - Home: a conversation's name and its time on one line;
-/// - the side pane (the Workbench, or what a pushed screen puts there).
+/// - the side pane (the Workbench of the thread on top of the column).
 ///
-/// The conversation always shows. The side pane shows only when there is
-/// something for it (a tab the phone can show, a companion) and gets the
-/// smaller share (the conversation keeps about 58%). Home shows beside them
-/// only when all of them meet their minimums; else Home's button in the conversation's bar brings it
-/// over the conversation. Where the conversation and a side pane can't both
+/// The conversation always shows. The side pane shows only when the thread
+/// has a tab the phone can show, and gets the smaller share (the
+/// conversation keeps about 58%). Home shows beside them only when all of
+/// them meet their minimums; else Home's button in the conversation's bar
+/// brings it over the conversation. Where the conversation and a side pane can't both
 /// be readable, the posture lays out as one column (`ShellPosture.laidOut`).
 struct ShellPanes: Equatable {
     var home: CGFloat = 0

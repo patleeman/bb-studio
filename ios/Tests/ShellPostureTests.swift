@@ -53,7 +53,7 @@ final class ShellPostureTests: XCTestCase {
     }
 
     /// Round 8: Memory and Library are tabs; a push goes on the shown tab's
-    /// stack, and on the open Duo Memory's go on its page two.
+    /// stack (one Memory stack, folded or not), never twice in a row.
     @MainActor func testPlacesAreTabsAndPushesGoOnTheShownTab() {
         let router = Router()
         router.open(item: .page(.memory))
@@ -61,9 +61,10 @@ final class ShellPostureTests: XCTestCase {
         XCTAssertEqual(router.path, [], "not pushed over Home")
         router.push(.memorySkill(botId: "b", name: "s"))
         XCTAssertEqual(router.memoryPath, [.memorySkill(botId: "b", name: "s")])
-        router.twoPages = true
+        router.push(.memorySkill(botId: "b", name: "s"))
+        XCTAssertEqual(router.memoryPath.count, 1, "a double tap pushes once")
         router.push(.memoryNewSkill(botId: "b"))
-        XCTAssertEqual(router.detail, [.memoryNewSkill(botId: "b")], "beside two pages: page two")
+        XCTAssertEqual(router.memoryPath, [.memorySkill(botId: "b", name: "s"), .memoryNewSkill(botId: "b")])
         router.open(item: .page(.archive))
         XCTAssertEqual(router.tab, .home)
         XCTAssertEqual(router.path, [.place(.archive)], "Archive opens on Home")

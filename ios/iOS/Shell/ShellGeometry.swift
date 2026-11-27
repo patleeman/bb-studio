@@ -124,9 +124,12 @@ struct ShellGeometryReader: UIViewRepresentable {
             // The simulator's screen is the outer one; a resized window stands for the inner one.
             if let size = DuoDemo.screenSize { screen = size }
             #endif
+            // The root view's safe area: the window's, with what the app adds (the
+            // simulator's inner-screen demo takes the outer screen's column away).
+            let insets = window.rootViewController?.view.safeAreaInsets ?? window.safeAreaInsets
             let next = ShellGeometry(window: window.bounds.size, screen: screen,
                                      phone: traitCollection.userInterfaceIdiom == .phone, hinge: hinge,
-                                     trailingInset: window.safeAreaInsets.right, leadingInset: window.safeAreaInsets.left)
+                                     trailingInset: insets.right, leadingInset: insets.left)
             guard next != last else { return }
             if next.window != last?.window || next.trailingInset != last?.trailingInset || next.leadingInset != last?.leadingInset {
                 // Keyboard work waits for the window to settle (crash 3, `ResizeSettling`).
