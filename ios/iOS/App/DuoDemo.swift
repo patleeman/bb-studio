@@ -37,7 +37,11 @@ enum DuoDemo {
         guard args.contains("-qaDuoColdWide"), configured.insert(ObjectIdentifier(window)).inserted else { return }
         screenSize = CGSize(width: 951, height: 669)
         window.frame = CGRect(x: 0, y: 0, width: 951, height: 669)
-        DispatchQueue.main.async { innerScreenInsets(window) }
+        DispatchQueue.main.async {
+            innerScreenInsets(window)
+            window.rootViewController?.view.setNeedsLayout()
+            window.layoutIfNeeded()
+        }
     }
 
     /// "ViewClass frame: keys" for each layer under the window with animations.
@@ -189,6 +193,7 @@ enum DuoDemo {
             case "bot": Router.shared.home([])
             case "studio": Router.shared.home([.studio])
             case "settings": Router.shared.home([.settings])
+            case "home": Router.shared.tab = .home
             case "library": Router.shared.tab = .library
             case "memory": Router.shared.tab = .memory
             case "search": Router.shared.tab = .search
@@ -252,6 +257,7 @@ enum DuoDemo {
             RenderCount.watchMainThread()
             if url.query() == "reset" { RenderCount.reset() }
             RenderCount.set("transcript.links", TranscriptDisplayLinkTarget.live)
+            RenderCount.set("router.path", Router.shared.path.count)
             if let data = try? JSONSerialization.data(withJSONObject: RenderCount.counts, options: .sortedKeys) {
                 window.accessibilityValue = String(data: data, encoding: .utf8)
             }
@@ -307,7 +313,10 @@ enum DuoDemo {
             var metadata: [String: Any] = ["idiom": window.traitCollection.userInterfaceIdiom == .phone ? "phone" : "other",
                 "width": window.bounds.width, "height": window.bounds.height,
                 "appearance": window.traitCollection.userInterfaceStyle == .dark ? "dark" : "light",
-                "safeTop": window.safeAreaInsets.top, "safeRight": window.safeAreaInsets.right,
+                "safeTop": window.safeAreaInsets.top, "safeRight": window.safeAreaInsets.right, "safeLeft": window.safeAreaInsets.left,
+                "rootSafeLeft": window.rootViewController?.view.safeAreaInsets.left ?? -1,
+                "rootSafeRight": window.rootViewController?.view.safeAreaInsets.right ?? -1,
+                "additionalRight": window.rootViewController?.additionalSafeAreaInsets.right ?? 0,
                 "screenWidth": window.screen.bounds.width, "screenHeight": window.screen.bounds.height,
                 "windows": window.windowScene?.windows.map { ["class": String(describing: type(of: $0)),
                     "width": $0.bounds.width, "height": $0.bounds.height, "hidden": $0.isHidden] as [String: Any] } ?? []]
@@ -407,9 +416,8 @@ enum DuoDemo {
     /// trailing edge (84 pt) however the window is stretched, and lays the system's bars out
     /// for. The inner screen has none: for its sizes, cancel it (as Kensico's inner-screen demo does).
     static func innerScreenInsets(_ window: UIWindow) {
-        guard let root = window.rootViewController else { return }
-        let inherited = window.safeAreaInsets.right - root.additionalSafeAreaInsets.right
-        root.additionalSafeAreaInsets.right = screenSize == nil ? 0 : -inherited
+        // The window's own safe area: what the root view controller adds isn't in it.
+        window.rootViewController?.additionalSafeAreaInsets.right = screenSize == nil ? 0 : -window.safeAreaInsets.right
     }
 }
 #endif

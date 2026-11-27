@@ -179,7 +179,9 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 10), "the conversation found")
         capture("iphone-search")
         row.tap()
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 15), "it opens on Home's tab")
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 15), "it opens")
+        app.goBack()
+        XCTAssertTrue(app.homeNew.waitForExistence(timeout: 10), "on Home's tab: Back is Home")
         XCTAssertTrue(app.tab("Home").isSelected, "Home's tab")
     }
 
@@ -194,6 +196,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
         XCTAssertEqual(button.label, "Workbench, 3 tabs", "the tabs the phone can show (not the VS Code one)")
         XCTAssertTrue(app.buttons["conversationMore"].exists, "and ⋯")
         XCTAssertTrue(app.backButton.exists, "the system's Back")
+        XCTAssertFalse(app.tabBars.firstMatch.exists && app.tabBars.firstMatch.isHittable, "no tab bar under the composer, as in a messaging app")
         XCTAssertFalse(element("conversationHandsFree").exists, "no Live button in the chrome")
         capture("iphone-chat")
 
@@ -268,11 +271,12 @@ final class ShellUITests: ServerIsolatedUITestCase {
     /// a message that comes while Library shows is there on return.
     func testAMessageWhileOnAnotherTabShowsOnReturn() throws {
         launchConversation(["-qaDemoLatency", "50"])  // the served demo, which `say` adds to
-        app.tab("Library").tap()
+        // As a link does (on the iPhone a conversation hides the tab bar).
+        command("tab?library")
         XCTAssertTrue(element("library-page").waitForExistence(timeout: 10), "Library's tab")
         command("say?Arrived%20while%20away")
         sleep(2)
-        app.tab("Home").tap()
+        command("tab?home")
         let said = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Arrived while away")).firstMatch
         XCTAssertTrue(said.waitForExistence(timeout: 10), "the message, without a refresh")
         XCTAssertTrue(app.textViews["Message"].exists, "the same conversation")

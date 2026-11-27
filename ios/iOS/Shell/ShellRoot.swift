@@ -466,6 +466,7 @@ private struct ShellPages: View {
         .environment(\.shellCovered, overlaid)
         #if DEBUG
         .overlay(alignment: .topLeading) { HomeEdgeMarker(enabled: edgeSwipe) }
+        .background(ShellPagesReport(panes: panes))
         #endif
         .overlay(alignment: .leading) {
             if overlaid {
@@ -607,6 +608,28 @@ private struct HomeEdgePan: UIGestureRecognizerRepresentable {
 }
 
 #if DEBUG
+/// For the UI tests (`qa-duo/counts`): the panes as laid out, and where the
+/// shell starts in the window. The simulator stands in for the inner screen
+/// with a window stretched past its outer screen, where the system's tab
+/// view places its content 44 points left and a stack's bar runs into its
+/// inset; the tests measure the pages from these instead.
+private struct ShellPagesReport: View {
+    let panes: ShellPanes
+
+    var body: some View {
+        GeometryReader { proxy in
+            let minX = proxy.frame(in: .global).minX
+            Color.clear.onChange(of: [minX, panes.home, panes.conversation, panes.side, CGFloat(Router.shared.path.count)], initial: true) { _, _ in
+                RenderCount.set("pages.minX", Int(minX.rounded()))
+                RenderCount.set("pages.home", Int(panes.home))
+                RenderCount.set("pages.conversation", Int(panes.conversation))
+                RenderCount.set("pages.side", Int(panes.side))
+                RenderCount.set("pages.pushed", Router.shared.path.count)
+            }
+        }
+    }
+}
+
 /// A point for the UI tests: whether the edge swipe would open Home.
 private struct HomeEdgeMarker: View {
     let enabled: Bool

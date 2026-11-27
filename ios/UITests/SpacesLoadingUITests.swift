@@ -72,6 +72,8 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
                                 "-openURL", "bbstudio://bot"]
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the link opens the Bot's Main over Home")
-        XCTAssertTrue(app.tab("Home").exists, "in the room, on Home's tab")
+        app.goBack()
+        XCTAssertTrue(app.homeNew.waitForExistence(timeout: 10), "in the room: Back is Home")
+        XCTAssertTrue(app.tab("Home").exists, "with its tabs")
     }
 }

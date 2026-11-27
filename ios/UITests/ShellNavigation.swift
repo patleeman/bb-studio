@@ -48,10 +48,11 @@ extension XCUIApplication {
     /// The system's Back: in the bar, or on the folded Duo in its right column.
     var backButton: XCUIElement { buttons["BackButton"].firstMatch }
 
-    /// Home, from wherever: its tab (a tap on the shown tab pops its stack), else Back.
+    /// Home, from wherever: Back while there is one (always in reach, unlike
+    /// the tab bar under a keyboard or hidden in a conversation), else Home's tab.
     func goHome(file: StaticString = #filePath, line: UInt = #line) {
-        for _ in 0..<4 where !homeOnTop {
-            if tab("Home").exists { tab("Home").tap() } else if backButton.exists { backButton.tap() }
+        for _ in 0..<6 where !homeOnTop {
+            if backButton.exists { backButton.tap() } else if tab("Home").exists { tab("Home").tap() }
             _ = homeNew.waitForExistence(timeout: 3)
         }
         XCTAssertTrue(homeOnTop, "Home", file: file, line: line)
@@ -115,6 +116,24 @@ extension XCUIApplication {
         let back = backButton
         XCTAssertTrue(back.waitForExistence(timeout: timeout), "a way back", file: file, line: line)
         back.tap()
+    }
+
+    /// The open Duo's panes as the app lays them out (`ShellPagesReport`):
+    /// where the shell starts in the window and each pane's width. The
+    /// simulator's stretched window offsets the system's tab view and lets a
+    /// stack's bar run into its inset, so element frames can't measure them.
+    struct Pages { var minX, home, conversation, side: CGFloat
+        /// The conversation's page in the window.
+        var conversationX: ClosedRange<CGFloat> { (minX + home)...(minX + home + conversation) }
+    }
+
+    func pages(file: StaticString = #filePath, line: UInt = #line) -> Pages {
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/counts")!)
+        sleep(1)
+        let counts = (try? JSONDecoder().decode([String: Int].self, from: Data((windows.firstMatch.value as? String ?? "").utf8))) ?? [:]
+        XCTAssertNotNil(counts["pages.conversation"], "the panes reported", file: file, line: line)
+        func value(_ key: String) -> CGFloat { CGFloat(counts["pages." + key] ?? 0) }
+        return Pages(minX: value("minX"), home: value("home"), conversation: value("conversation"), side: value("side"))
     }
 
     /// Home's New conversation, in its bar.

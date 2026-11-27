@@ -351,17 +351,25 @@ final class LookTests: XCTestCase {
         let rendered = await stills.still(theme: theme, mode: .dark, size: CGSize(width: 200, height: 400), scale: 1)
         let image = try XCTUnwrap(rendered)
         let window = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first)
+        // The test host's own CPU (what earlier tests left winding down) is
+        // measured first: the still's cost is what it adds to that.
+        await pause(0.5)
+        let baseline = await coreShare(over: 2)
         let host = UIHostingController(rootView: ParallaxImage(image: image, amount: 12).frame(width: 200, height: 400))
         host.view.frame = CGRect(x: 0, y: 0, width: 200, height: 400)
         window.addSubview(host.view)
         defer { host.view.removeFromSuperview() }
         await pause(0.5)
+        let share = await coreShare(over: 2)
+        print("LOOK-PERF idle still: \(String(format: "%.1f", share * 100))% of one core, \(String(format: "%.1f", baseline * 100))% before it")
+        XCTAssertLessThan(share - baseline, 0.1, "An idle still should cost near zero")
+    }
+
+    /// The process's CPU over `seconds`, as a share of one core.
+    private func coreShare(over seconds: Double) async -> Double {
         let start = cpuSeconds(), clock = Date()
-        await pause(2)
-        let used = cpuSeconds() - start, wall = Date().timeIntervalSince(clock)
-        let share = used / wall
-        print("LOOK-PERF idle still: \(String(format: "%.1f", share * 100))% of one core over \(String(format: "%.1f", wall)) s")
-        XCTAssertLessThan(share, 0.1, "An idle still should cost near zero")
+        await pause(seconds)
+        return (cpuSeconds() - start) / Date().timeIntervalSince(clock)
     }
 
     /// The still renderer draws once and stops; live mode runs at the cap.

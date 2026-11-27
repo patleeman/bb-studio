@@ -73,10 +73,11 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
             XCTAssertTrue(workbench.exists, "\(posture): a page tab the phone can show takes the Workbench pane")
             XCTAssertFalse(element("homeColumn").exists, "\(posture): Home doesn't fit beside both")
             // The panes share the inner screen's width (it has no status column; `DuoDemo.innerScreenInsets`).
-            let share = conversation.frame.width / landscape.width
-            XCTAssertEqual(share, 0.58, accuracy: 0.02, "\(posture): the conversation keeps the larger share")
-            XCTAssertEqual(workbench.frame.minX, conversation.frame.maxX, accuracy: 1, "\(posture): the Workbench beside it")
-            XCTAssertGreaterThanOrEqual(conversation.frame.width, 481, "about 60 characters a line")
+            let pages = app.pages()
+            XCTAssertEqual(pages.home + pages.conversation + pages.side, landscape.width, accuracy: 1, "\(posture): the whole width")
+            XCTAssertEqual(pages.conversation / landscape.width, 0.58, accuracy: 0.02, "\(posture): the conversation keeps the larger share")
+            XCTAssertGreaterThan(pages.side, 0, "\(posture): the Workbench beside it")
+            XCTAssertGreaterThanOrEqual(pages.conversation, 481, "about 60 characters a line")
             capture("\(posture)-landscape-default")
         }
         // Home from the conversation's bar comes over it, and goes again.
@@ -99,9 +100,11 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
             XCTAssertFalse(element("workbenchPage").exists, "\(posture): a VS Code tab claims no pane")
             let home = element("homeColumn")
             XCTAssertTrue(home.exists, "\(posture): Home fits beside the conversation")
-            XCTAssertGreaterThanOrEqual(home.frame.width, 269, "a name and its time on one line")
-            XCTAssertGreaterThanOrEqual(element("conversationColumn").frame.width, 481)
-            XCTAssertLessThanOrEqual(app.textViews["Message"].frame.maxX, element("conversationColumn").frame.maxX, "the composer in its column")
+            let pages = app.pages()
+            XCTAssertGreaterThanOrEqual(pages.home, 269, "a name and its time on one line")
+            XCTAssertGreaterThanOrEqual(pages.conversation, 481)
+            XCTAssertEqual(pages.side, 0)
+            XCTAssertLessThanOrEqual(app.textViews["Message"].frame.maxX, pages.conversationX.upperBound, "the composer in its page")
             capture("\(posture)-landscape-default-mac-tab")
         }
         XCTAssertTrue(element("workbenchTabs").exists, "no Workbench pane: its tab menu in the conversation's bar")

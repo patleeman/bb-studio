@@ -22,6 +22,7 @@ struct ConversationScreen: View {
     @State private var addingTab = false
     @Environment(\.botConversation) private var shell
     @Environment(\.shellPaneAtEdge) private var atEdge
+    @Environment(\.shellPosture) private var posture
     @EnvironmentObject private var app: AppModel
 
     init(threadId: String, pane: Bool = false) {
@@ -49,6 +50,9 @@ struct ConversationScreen: View {
             .ignoresSafeArea(.container, edges: pane && !atEdge ? .trailing : [])
             .navigationTitle(title)
             .toolbar { toolbar }
+            // On the iPhone a conversation has the screen to itself, as in a messaging app: the
+            // composer at the bottom, no tab bar under it. The Duo keeps the system's column.
+            .toolbar(posture == .phone ? .hidden : .automatic, for: .tabBar)
             .sensoryFeedback(.selection, trigger: session.showsWorkbench)
             .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
             .task(id: threadId) {

@@ -37,9 +37,10 @@ final class ViewersDuoUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(onEitherPage("pageScroll"), "the page opens")
         XCTAssertTrue(app.buttons["pageCommentMark-aaaa0004"].waitForExistence(timeout: 10), "comment marks")
         shot("duo-unfolded-page")
-        // The page spans both halves; its bar's Comments is on the right one.
-        page("right")
-        app.screenAction("comments").tap()
+        // Pushed over the conversation; its bar's Comments is where the system puts the bar's buttons.
+        let comments = app.screenAction("comments")
+        XCTAssertTrue(comments.waitForExistence(timeout: 10), "Comments in the page's bar")
+        app.press(comments, id: "screenAction-comments")
         XCTAssertTrue(onEitherPage("Add the press kit."), "the comments")
         shot("duo-unfolded-page-comments")
     }
