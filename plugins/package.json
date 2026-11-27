@@ -12,6 +12,7 @@
     "clean": "pnpm -r --if-present clean",
     "plugins:install": "bash scripts/install-all.sh",
     "test": "pnpm -r --if-present test",
+    "test:visual": "BB_STUDIO_VISUAL_LAYOUT_TESTS=1 pnpm --filter @bb-studio/studio-visual-chat exec vitest run --config vitest.config.mts src/ui/wall-layout.test.ts",
     "check:docs": "node scripts/check-docs.mjs",
     "check:marketplace": "node scripts/check-marketplace.mjs",
     "check": "pnpm typecheck && pnpm test && pnpm check:compat && pnpm check:docs && pnpm check:marketplace && pnpm check:icons && pnpm check:contracts && pnpm check:native-payloads",
