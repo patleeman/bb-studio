@@ -19,6 +19,7 @@ final class ServerIsolationTests: XCTestCase {
             return (200, Data(#"{"ok":true,"result":{"markdown":"A confidential page"}}"#.utf8))
         }
         await modelA.load(client)
+        PageModel.cacheQueue.sync {}  // the cache is written off the main thread
         let modelB = PageModel(pageId: id)
         XCTAssertNil(modelB.markdown)
         XCTAssertEqual(DiskCache.load(String.self, key: "page-blocks-\(id)", serverURL: a), "A confidential page")
