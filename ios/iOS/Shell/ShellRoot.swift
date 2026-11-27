@@ -287,6 +287,8 @@ private struct ShellPages: View {
     var body: some View {
         let panes = panes
         let overlaid = !panes.homeFits && router.homePane.overlaid
+        // Not over a pushed screen: its Back is the rail's, and Home over it would hide it.
+        let edgeSwipe = panes.home == 0 && !overlaid && !pushed
         HStack(spacing: 0) {
             if panes.home > 0 {
                 homeColumn.frame(width: panes.home)
@@ -295,8 +297,7 @@ private struct ShellPages: View {
                 .frame(width: panes.conversation)
                 .environment(\.shellPaneAtRail, panes.side == 0)
                 .overlay(alignment: .leading) { if panes.home > 0 { Divider() } }
-                // Not while something is pushed: the stack's own swipe goes back.
-                .gesture(HomeEdgePan(enabled: panes.home == 0 && !overlaid && !pushed, fits: panes.homeFits))
+                .gesture(HomeEdgePan(enabled: edgeSwipe, fits: panes.homeFits))
             if panes.side > 0 {
                 ShellSidePane(threadId: conversation, companion: companion)
                     .frame(width: panes.side)
@@ -307,7 +308,7 @@ private struct ShellPages: View {
         // Under Home (both panes): out of VoiceOver's reach, the transcript's UIKit views too.
         .environment(\.shellCovered, overlaid)
         #if DEBUG
-        .overlay(alignment: .topLeading) { HomeEdgeMarker(enabled: panes.home == 0 && !overlaid && !pushed) }
+        .overlay(alignment: .topLeading) { HomeEdgeMarker(enabled: edgeSwipe) }
         #endif
         .overlay(alignment: .leading) {
             if overlaid {
@@ -499,9 +500,8 @@ private struct ShellSidePane: View {
     }
 }
 
-/// A pane under Home over the conversation: out of VoiceOver's reach. (Home
-/// over it is modal too, which keeps VoiceOver in it; this is for the
-/// accessibility tree others read.)
+/// A pane under Home over the conversation: hidden from VoiceOver, besides
+/// being outside Home's modal (the pane's own hiding: a container's doesn't reach it).
 private struct ShellCovered: ViewModifier {
     @Environment(\.shellCovered) private var covered
 
