@@ -72,8 +72,9 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
             XCTAssertTrue(conversation.waitForExistence(timeout: 10), "\(posture): the conversation")
             XCTAssertTrue(workbench.exists, "\(posture): a page tab the phone can show takes the Workbench pane")
             XCTAssertFalse(element("homeColumn").exists, "\(posture): Home doesn't fit beside both")
-            // The panes share the room between the safe areas.
-            let share = conversation.frame.width / (conversation.frame.width + workbench.frame.width)
+            // The panes share the room between the safe areas; the simulator's stretched window keeps
+            // the outer screen's 84 pt status column as its trailing one (the side pane's bar runs under it).
+            let share = conversation.frame.width / (landscape.width - 84)
             XCTAssertEqual(share, 0.58, accuracy: 0.02, "\(posture): the conversation keeps the larger share")
             XCTAssertEqual(workbench.frame.minX, conversation.frame.maxX, accuracy: 1, "\(posture): the Workbench beside it")
             XCTAssertGreaterThanOrEqual(conversation.frame.width, 481, "about 60 characters a line")
