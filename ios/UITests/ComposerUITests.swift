@@ -11,7 +11,7 @@ final class ComposerUITests: ServerIsolatedUITestCase {
         let app = XCUIApplication()
         app.launchArguments += ["-skipPushPrompt", "YES", "-serverURL", server, "-openURL", "bbstudio://new"]
         app.launchStaged(server: qaServer)
-        let field = app.textViews["What should the agent do?"]
+        let field = app.textViews.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 20))
         field.tap()
         field.typeText("Typed first")
@@ -108,9 +108,26 @@ final class ComposerUITests: ServerIsolatedUITestCase {
         add(attachment)
     }
 
+    private func firstProjectId() -> String? {
+        var request = URLRequest(url: URL(string: "\(qaServer)/api/v1/projects")!)
+        request.httpMethod = "GET"
+        let done = expectation(description: "projects")
+        var projectId: String?
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            if let data, let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                projectId = list.first(where: { ($0["id"] as? String) != "proj_personal" })?["id"] as? String
+                    ?? list.first?["id"] as? String
+            }
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 15)
+        return projectId
+    }
+
     private func scratchThread() -> String? {
+        guard let projectId = firstProjectId() else { return nil }
         let json = api("POST", "/threads", [
-            "projectId": "proj_8ztiq6dkh5", "origin": "app", "title": "QA iOS1 composer",
+            "projectId": projectId, "origin": "app", "title": "QA iOS1 composer",
             "environment": ["type": "project-default"], "sendAt": 1_924_992_000_000,
             "input": [["type": "text", "text": "Scratch composer thread. Do nothing.", "mentions": [String]()]],
         ])
