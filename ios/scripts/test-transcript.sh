@@ -29,38 +29,58 @@ isolate() {
 }
 
 isolate "$phone"
-xcodebuild build-for-testing -scheme BBStudio -destination "id=$phone" -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -quiet
-
-failed=""
-step() {
-  name="$1"
-  shift
-  "$@" || failed="$failed
-  - $name"
-}
-
-report="${TRANSCRIPT_REPORT_DIR:-}"
-step "phone: state machine, replay, TranscriptV2UITests" env TEST_RUNNER_TRANSCRIPT_REPORT_DIR="$report" xcodebuild test-without-building -scheme BBStudio -destination "id=$phone" \
-  -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO \
-  -only-testing:BBStudioTests/TranscriptFollowTests -only-testing:BBStudioTests/TranscriptReplayTests \
-  -only-testing:BBStudioUITests/TranscriptV2UITests
-# Taps never move the transcript (a user, Oct 27), on the new one.
-step "phone: TranscriptScrollHoldUITests" env TEST_RUNNER_TRANSCRIPT_V2=1 xcodebuild test-without-building -scheme BBStudio -destination "id=$phone" \
-  -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/TranscriptScrollHoldUITests
-
-if [ -n "$duo" ]; then
-  isolate "$duo"
-  for layout in outer outer-room split; do
-    step "duo $layout: TranscriptV2UITests" env TEST_RUNNER_TRANSCRIPT_LAYOUT="$layout" xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
-      -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/TranscriptV2UITests
-  done
-  # The Duo's composer, pill and content-edge checks, on the new transcript.
-  step "duo: DuoSplitComposerUITests" env TEST_RUNNER_TRANSCRIPT_V2=1 xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
-    -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/DuoSplitComposerUITests
+if [ "${SKIP_BUILD:-0}" != 1 ]; then
+  xcodegen generate -q
+  xcodebuild build-for-testing -scheme BBStudio -destination "id=$phone" -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -quiet
 fi
 
-if [ -n "$failed" ]; then
-  echo "Transcript tests failed:$failed" >&2
+run_phone() {
+  phone_failed=""
+  report="${TRANSCRIPT_REPORT_DIR:-}"
+  env TEST_RUNNER_TRANSCRIPT_REPORT_DIR="$report" xcodebuild test-without-building -scheme BBStudio -destination "id=$phone" \
+    -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO \
+    -only-testing:BBStudioTests/TranscriptFollowTests -only-testing:BBStudioTests/TranscriptReplayTests \
+    -only-testing:BBStudioUITests/TranscriptV2UITests -only-testing:BBStudioUITests/TranscriptScrollHoldUITests \
+    || phone_failed="$phone_failed
+  - phone: transcript unit, replay, and UI tests"
+  if [ -n "$phone_failed" ]; then
+    echo "Phone transcript failures:$phone_failed" >&2
+    return 1
+  fi
+}
+
+run_duo() {
+  duo_failed=""
+  isolate "$duo"
+  for layout in outer outer-room split; do
+    env TEST_RUNNER_TRANSCRIPT_LAYOUT="$layout" xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
+      -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/TranscriptV2UITests \
+      || duo_failed="$duo_failed
+  - duo $layout: TranscriptV2UITests"
+  done
+  xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
+    -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/DuoSplitComposerUITests \
+    || duo_failed="$duo_failed
+  - duo: DuoSplitComposerUITests"
+  if [ -n "$duo_failed" ]; then
+    echo "Duo transcript failures:$duo_failed" >&2
+    return 1
+  fi
+}
+
+rc=0
+if [ -n "$duo" ]; then
+  run_phone &
+  pid_phone=$!
+  run_duo &
+  pid_duo=$!
+  wait "$pid_phone" || rc=1
+  wait "$pid_duo" || rc=1
+else
+  run_phone || rc=1
+fi
+
+if [ "$rc" -ne 0 ]; then
   exit 1
 fi
 echo "Transcript tests passed."

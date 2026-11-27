@@ -27,12 +27,13 @@ jobs:
           ls -d /Applications/Xcode*.app
           xcodebuild -version
           brew install xcodegen
-      - name: Swift 6 check (the transcript folder alone)
+      - name: Swift 6 checks (transcript and voice-live)
         run: |
           echo "DEVELOPER_DIR=$(xcode-select -p)" >> "$GITHUB_ENV"
           DEVELOPER_DIR="$(xcode-select -p)" scripts/check-transcript-swift6.sh
-      - name: Type-check times (nothing over 1.5 s)
-        run: scripts/check-type-check-times.sh
+          DEVELOPER_DIR="$(xcode-select -p)" scripts/check-voice-live-swift6.sh
+      - name: Build once and check type-check times (nothing over 1.5 s)
+        run: TYPE_CHECK_DERIVED_DATA=build/ci/DerivedData scripts/check-type-check-times.sh
       - name: Simulators
         run: |
           xcrun simctl list -j devicetypes runtimes > "$RUNNER_TEMP/sim.json"
@@ -65,10 +66,10 @@ jobs:
             echo "BB_TEST_DUO_SIMULATOR_ID=$duo_id" >> "$GITHUB_ENV"
           fi
           echo "phone=$phone on $phone_runtime, duo=$duo on $duo_runtime"
-      - name: Unit tests (with the replay harness)
-        run: scripts/test.sh CODE_SIGNING_ALLOWED=NO
-      - name: Transcript tests (state machine, replay, flag-on UI tests)
-        run: scripts/test-transcript.sh
+      - name: Smoke suite (unit tests without replay + core offline UI suites)
+        run: SKIP_BUILD=1 SMOKE_DERIVED_DATA=build/ci/DerivedData scripts/test-smoke.sh
+      - name: Transcript tests (state machine, replay, UI tests on phone + duo)
+        run: SKIP_BUILD=1 TRANSCRIPT_DERIVED_DATA=build/ci/DerivedData scripts/test-transcript.sh
       - name: Keep the results
         if: failure()
         uses: actions/upload-artifact@v4
