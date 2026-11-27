@@ -305,7 +305,6 @@ private struct ShellPages: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         // Under Home (both panes): out of VoiceOver's reach, the transcript's UIKit views too.
-        .accessibilityHidden(overlaid)
         .environment(\.shellCovered, overlaid)
         #if DEBUG
         .overlay(alignment: .topLeading) { HomeEdgeMarker(enabled: panes.home == 0 && !overlaid && !pushed) }
@@ -360,6 +359,7 @@ private struct ShellPages: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("conversationColumn")
+        .modifier(ShellCovered())
     }
 
     /// What's pushed over the column's conversation: the stack past it.
@@ -495,6 +495,18 @@ private struct ShellSidePane: View {
         .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("workbenchPage")
+        .modifier(ShellCovered())
+    }
+}
+
+/// A pane under Home over the conversation: out of VoiceOver's reach. (Home
+/// over it is modal too, which keeps VoiceOver in it; this is for the
+/// accessibility tree others read.)
+private struct ShellCovered: ViewModifier {
+    @Environment(\.shellCovered) private var covered
+
+    func body(content: Content) -> some View {
+        content.accessibilityHidden(covered)
     }
 }
 

@@ -281,6 +281,16 @@ enum DuoDemo {
         case "attach":
             NotificationCenter.default.post(name: Notification.Name("qa-attach"), object: nil)
             return true
+        case "covered":
+            // Whether VoiceOver reaches a UIKit view (`?composerField`): hidden if it or a view above it is.
+            guard let id = url.query() else { return false }
+            func named(_ view: UIView) -> UIView? {
+                view.accessibilityIdentifier == id ? view : view.subviews.lazy.compactMap(named).first
+            }
+            guard let found = named(window) else { return false }
+            let hidden = sequence(first: found, next: \.superview).contains { $0.accessibilityElementsHidden }
+            window.accessibilityValue = hidden ? "hidden" : "shown"
+            return true
         case "inspect":
             NotificationCenter.default.post(name: Notification.Name("duo-qa-inspect"), object: nil)
             return true

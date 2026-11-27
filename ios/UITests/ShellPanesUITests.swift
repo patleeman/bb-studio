@@ -126,9 +126,14 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
 
         command("activate?rail-home")
         XCTAssertTrue(element("homeColumn").waitForExistence(timeout: 10), "Home over the conversation")
-        XCTAssertTrue(message.waitForNonExistence(timeout: 5), "the transcript and composer leave VoiceOver")
-        XCTAssertFalse(element("workbenchPage").exists, "so does the dimmed Workbench")
-        XCTAssertFalse(element("conversationColumn").exists)
+        // Modal (XCUITest reads it as an alert): VoiceOver stays in it, off its siblings, the panes.
+        let modal = app.alerts.firstMatch
+        XCTAssertTrue(modal.exists, "Home over the conversation is modal")
+        XCTAssertTrue(modal.descendants(matching: .any)["homeColumn"].exists)
+        XCTAssertFalse(modal.descendants(matching: .any)["conversationColumn"].exists, "the conversation is outside it")
+        XCTAssertFalse(modal.descendants(matching: .any)["workbenchPage"].exists, "the Workbench is outside it")
+        XCTAssertEqual(covered("composerField"), "hidden", "the transcript's UIKit host leaves VoiceOver")
+        XCTAssertTrue(waitFor(message, focused: false), "opening Home took the composer's keyboard")
         XCTAssertTrue(element("homeOverlayScrim").exists, "the dimming closes Home")
         XCTAssertEqual(element("homeOverlayScrim").label, "Close Home")
         capture("book-home-over-modal")
@@ -138,9 +143,9 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
 
         command("activate?homeOverlayScrim")
         XCTAssertTrue(element("homeColumn").waitForNonExistence(timeout: 10), "the dimming closed Home")
-        XCTAssertTrue(message.waitForExistence(timeout: 5), "the conversation is back for VoiceOver")
-        XCTAssertTrue(element("workbenchPage").exists)
-        XCTAssertTrue(waitFor(message, focused: false), "the keyboard went with Home's opening and doesn't come back")
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        XCTAssertEqual(covered("composerField"), "shown", "the conversation is back for VoiceOver")
+        XCTAssertTrue(waitFor(message, focused: false), "the keyboard doesn't come back by itself")
     }
 
     /// The swipe from the left edge: a screen-edge pan over the conversation
@@ -168,11 +173,12 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
         XCTAssertEqual(element("homeEdge").value as? String, "off", "not again while it is over")
         command("activate?homeMemory")
         XCTAssertTrue(element("memory-page").waitForExistence(timeout: 10), "Memory, pushed in the column")
-        XCTAssertEqual(element("homeEdge").value as? String, "off", "pushed: the stack's swipe goes back")
+        XCTAssertEqual(element("homeEdge").value as? String, "off", "pushed: the edge belongs to the stack")
         swipeFromTheEdge()
-        XCTAssertTrue(element("memory-page").waitForNonExistence(timeout: 10), "the edge swipe went back")
-        XCTAssertFalse(element("homeColumn").exists, "and didn't open Home")
-        XCTAssertEqual(element("homeEdge").value as? String, "on")
+        XCTAssertFalse(element("homeColumn").exists, "the edge swipe over a pushed screen doesn't open Home")
+        command("activate?rail-back")
+        XCTAssertTrue(element("memory-page").waitForNonExistence(timeout: 10), "Back in the rail")
+        XCTAssertEqual(element("homeEdge").value as? String, "on", "the conversation again: the swipe opens Home")
     }
 
     /// Review SF4: Home over the conversation closes when the last tab the
@@ -216,6 +222,12 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 260, dy: 0)), withVelocity: .default,
                     thenHoldForDuration: 0.05)
         sleep(1)
+    }
+
+    /// `qa-duo/covered`: whether VoiceOver reaches a UIKit view.
+    private func covered(_ id: String) -> String? {
+        command("covered?" + id)
+        return app.windows.firstMatch.value as? String
     }
 
     private func waitFor(_ field: XCUIElement, focused: Bool) -> Bool {
