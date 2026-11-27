@@ -1,8 +1,10 @@
 import type { SystemMachineProvider } from "@bb/server-contract";
-import modalLogoUrl from "../../../../../../plugins/environment-modal-sandbox/modal-logo.svg?url";
 import { StoryCard, StoryRow } from "../../../../.ladle/story-card";
 import { ResponsiveStage } from "./banner-story-stages";
 import { ThreadMachineStatusBanner } from "./ThreadMachineStatus";
+
+const modalLogoUrl =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E";
 
 export default {
   title: "promptbox/banner/Machine Status",

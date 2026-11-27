@@ -191,8 +191,7 @@ Editing a sent message:
   replacement history. If the thread is running,
   submission stops the current turn and waits for it to settle. Provider-owned
   background commands, agents, and workflows are stopped before replacing the
-  session, and retained task cards keep their terminal status. Durable runs
-  managed by the Workflows plugin continue independently. It then
+  session, and retained task cards keep their terminal status. It then
   replaces the selected turn and every later turn while retaining workspace
   changes. Unsent queued messages remain in the queue and dispatch after the
   replacement turn when their waits clear. An already-sending queued message
