@@ -1,14 +1,12 @@
 import XCTest
 
 final class NewSurfacesUITests: StagedServerUITestCase {
-    private let projectId = "proj_8ztiq6dkh5"
-
     func testSearch() throws {
         guard rpcRaw("studio", "searchAll", ["query": "QA iOS7", "limit": 10]) is [[String: Any]] else {
             throw XCTSkip("Updated Studio search is not installed")
         }
         let app = launch()
-        app.tabBars.buttons["Studio"].tap()
+        app.open(URL(string: "bbstudio://studio")!)
         let search = studioSearch(app)
         XCTAssertTrue(search.exists)
         search.tap()
@@ -19,7 +17,8 @@ final class NewSurfacesUITests: StagedServerUITestCase {
     /// The collection's search field sits in the navigation drawer, hidden until the list is pulled down.
     private func studioSearch(_ app: XCUIApplication) -> XCUIElement {
         let search = app.searchFields["Search Studio"]
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10)
+            || app.staticTexts["Studio"].waitForExistence(timeout: 5))
         if !search.waitForExistence(timeout: 3) {
             let window = app.windows.firstMatch
             window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))

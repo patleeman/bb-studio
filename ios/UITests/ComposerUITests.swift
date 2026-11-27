@@ -11,7 +11,7 @@ final class ComposerUITests: ServerIsolatedUITestCase {
         let app = XCUIApplication()
         app.launchArguments += ["-skipPushPrompt", "YES", "-serverURL", server, "-openURL", "bbstudio://new"]
         app.launchStaged(server: qaServer)
-        let field = app.textViews["What should the agent do?"]
+        let field = app.textViews.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 20))
         field.tap()
         field.typeText("Typed first")
@@ -85,15 +85,20 @@ final class ComposerUITests: ServerIsolatedUITestCase {
         if app.buttons["Continue"].exists { app.buttons["Continue"].tap() }
         snapshot("command-inserted")
 
-        app.buttons["More"].tap()
-        XCTAssertTrue(app.buttons["Context usage"].waitForExistence(timeout: 5))
-        app.buttons["Context usage"].tap()
+        XCTAssertTrue(app.screenMore.waitForExistence(timeout: 5))
+        app.screenMore.tap()
+        let contextMenu = app.buttons["Context"].firstMatch
+        if contextMenu.waitForExistence(timeout: 3) { contextMenu.tap() }
+        let contextUsage = app.buttons["Context usage"].firstMatch
+        XCTAssertTrue(contextUsage.waitForExistence(timeout: 5))
+        contextUsage.tap()
         XCTAssertTrue(app.navigationBars["Context usage"].waitForExistence(timeout: 5))
         snapshot("context")
         app.buttons["Done"].tap()
 
-        app.buttons["More"].tap()
-        app.buttons["Clear context"].tap()
+        app.screenMore.tap()
+        if app.buttons["Context"].firstMatch.waitForExistence(timeout: 3) { app.buttons["Context"].firstMatch.tap() }
+        app.buttons["Clear context"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Clear context"].waitForExistence(timeout: 5))
         snapshot("clear-confirmation")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.4)).tap()
@@ -108,9 +113,26 @@ final class ComposerUITests: ServerIsolatedUITestCase {
         add(attachment)
     }
 
+    private func firstProjectId() -> String? {
+        var request = URLRequest(url: URL(string: "\(qaServer)/api/v1/projects")!)
+        request.httpMethod = "GET"
+        let done = expectation(description: "projects")
+        var projectId: String?
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            if let data, let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                projectId = list.first(where: { ($0["id"] as? String) != "proj_personal" })?["id"] as? String
+                    ?? list.first?["id"] as? String
+            }
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 15)
+        return projectId
+    }
+
     private func scratchThread() -> String? {
+        guard let projectId = firstProjectId() else { return nil }
         let json = api("POST", "/threads", [
-            "projectId": "proj_8ztiq6dkh5", "origin": "app", "title": "QA iOS1 composer",
+            "projectId": projectId, "origin": "app", "title": "QA iOS1 composer",
             "environment": ["type": "project-default"], "sendAt": 1_924_992_000_000,
             "input": [["type": "text", "text": "Scratch composer thread. Do nothing.", "mentions": [String]()]],
         ])

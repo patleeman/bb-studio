@@ -67,7 +67,7 @@ started_staged_port=""
 cleanup() {
   if [[ -n "$started_staged_dir" ]]; then
     BB_STAGED_DIR="$started_staged_dir" BB_STAGED_PORT="$started_staged_port" \
-      node ../plugins/scripts/staged-bb.mjs stop >/dev/null 2>&1 || true
+      node scripts/staged-server.mjs stop >/dev/null 2>&1 || true
     rm -rf "$started_staged_dir" >/dev/null 2>&1 || true
   fi
   if [[ -n "$created_sim" ]]; then
@@ -105,10 +105,14 @@ PY
   )"
   echo "Starting isolated staged BB in $started_staged_dir on port $started_staged_port..."
   BB_STAGED_DIR="$started_staged_dir" BB_STAGED_PORT="$started_staged_port" \
-    node ../plugins/scripts/staged-bb.mjs start
+    node scripts/staged-server.mjs start
   # shellcheck disable=SC1090
   . "$started_staged_dir/capture.env"
   server="$BB_SERVER_URL"
+  mini_ids="${mini_ids:-${TEST_RUNNER_BBGO_QA_MINI_IDS:-}}"
+  qa_mini="${TEST_RUNNER_BBGO_QA_MINI:-}"
+  qa_thread="${TEST_RUNNER_BBGO_QA_THREAD:-}"
+  qa_page="${TEST_RUNNER_BBGO_QA_PAGE:-}"
 fi
 
 validate_server_url "$server"
@@ -166,10 +170,13 @@ mkdir -p "$(dirname "$result_bundle")"
 set +e
 env TEST_RUNNER_BBGO_QA_SERVER="$server" \
     TEST_RUNNER_BBGO_QA_MINI_IDS="$mini_ids" \
+    TEST_RUNNER_BBGO_QA_MINI="${qa_mini:-${TEST_RUNNER_BBGO_QA_MINI:-}}" \
+    TEST_RUNNER_BBGO_QA_THREAD="${qa_thread:-${TEST_RUNNER_BBGO_QA_THREAD:-}}" \
+    TEST_RUNNER_BBGO_QA_PAGE="${qa_page:-${TEST_RUNNER_BBGO_QA_PAGE:-}}" \
     xcodebuild test-without-building -scheme BBStudio -destination "id=$device_id" \
     -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO \
     -resultBundlePath "$result_bundle" \
-    "${only[@]}" "${extra_args[@]}"
+    "${only[@]}" ${extra_args[@]+"${extra_args[@]}"}
 status=$?
 set -e
 
