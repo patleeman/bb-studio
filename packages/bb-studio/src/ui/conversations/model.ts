@@ -145,18 +145,6 @@ export function secondLine(row: Pick<ConversationLine, "needsYou" | "latest" | "
   return { tone: "quiet", text: row.latest ?? "" };
 }
 
-/**
- * Workers split for the sidebar and the line above a conversation's
- * composer: the active ones (needing the user first, then running) shown one
- * by one, and the rest (done, failed): the sidebar folds them into one
- * "N done"; the composer line leaves them to their strands.
- */
-export function splitWorkers<Worker extends { status: WorkerRow["status"] }>(workers: readonly Worker[]): { active: Worker[]; done: Worker[] } {
-  const needs = workers.filter((worker) => worker.status === "needs-you");
-  const running = workers.filter((worker) => worker.status === "running");
-  return { active: [...needs, ...running], done: workers.filter((worker) => worker.status !== "needs-you" && worker.status !== "running") };
-}
-
 /** "3 done": the sidebar's folded workers row. */
 export const doneLabel = (count: number): string => `${count} done`;
 

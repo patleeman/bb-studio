@@ -1,7 +1,7 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
-export { ACCOUNTS_CHANNEL, WARNINGS_WINDOW_ID, WARN_AT } from "./shared";
+export { ACCOUNTS_CHANNEL } from "./shared";
 
 export const accountSourceSchema = z.enum(["studio", "bb", "local"]);
 export type AccountSource = z.infer<typeof accountSourceSchema>;

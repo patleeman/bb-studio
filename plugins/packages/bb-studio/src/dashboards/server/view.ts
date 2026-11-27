@@ -1,6 +1,6 @@
 // A dashboard as clients and agents see it: the view the app renders, and a
 // readable summary for agent tools, mentions and search.
-import { ago, dashboardHref, WIDGETS, type DashboardMeta, type DashboardView, type DataView, type Widget, type WidgetTypeView } from "../shared";
+import { ago, dashboardHref, type DashboardMeta, type DashboardView, type DataView, type Widget, type WidgetTypeView } from "../shared";
 import { scriptHash } from "./sources";
 import { isApproved } from "./refresh";
 import type { DashboardRow, DashboardStore, DataRow, TypeRow } from "./store";
@@ -131,20 +131,4 @@ export function summary(store: DashboardStore, row: DashboardRow, now = Date.now
   const json = JSON.stringify(compact);
   lines.push(json.length <= 40_000 ? `Widgets JSON: ${json}` : `Widgets JSON is ${json.length} characters; ask for one widget at a time.`);
   return lines.join("\n");
-}
-
-/** Words on a dashboard, for search and studio_read: its name, widget titles and notes. */
-export function dashboardText(store: DashboardStore, row: DashboardRow): string {
-  const doc = store.doc(row.id);
-  const parts = [displayName(row)];
-  for (const widget of doc.widgets) {
-    if (widget.title) parts.push(widget.title);
-    if (widget.type === "note" && typeof widget.options.markdown === "string") parts.push(widget.options.markdown);
-    if (typeof widget.options.label === "string") parts.push(widget.options.label);
-  }
-  return parts.join("\n");
-}
-
-export function widgetLabel(widget: Widget): string {
-  return widget.title || WIDGETS[widget.type].label;
 }

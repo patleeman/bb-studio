@@ -6,13 +6,11 @@ import type { JsonValue } from "@get-bb/plugin-sdk/app";
 import { builtinItemAt } from "../builtins";
 import { typeHref, typeOfId } from "../item-model";
 import { STUDIO_PLUGIN_ID } from "../kit/contract";
-import { THREAD_TAB, type WorkbenchOpen } from "../kit/app/workbench";
-import { STUDIO_TAB, tabKind } from "./studio-tab/model";
+import { THREAD_TAB } from "../kit/app/workbench";
+import { STUDIO_TAB } from "./studio-tab/model";
 
 /** What a drag or a link shows. An item id is a Studio item id (page, whiteboard, app, design…). */
 export type TabTarget = { kind: "thread"; id: string } | { kind: "item"; id: string };
-
-export const sameTarget = (a: TabTarget | null | undefined, b: TabTarget | null | undefined): boolean => !!a && !!b && a.kind === b.kind && a.id === b.id;
 
 const THREAD_PATH = /^\/(?:projects\/[^/?#]+\/)?threads\/([^/?#]+)(?:\/|$)/;
 
@@ -45,14 +43,6 @@ export function pathForTarget(target: TabTarget): string | null {
 /** The item kind name (page, drawing, design, mini, artifact) an item id has, for its icon. */
 export function itemKindOf(id: string): string | null {
   return typeOfId(id)?.kind ?? null;
-}
-
-/** The workbench tab that shows a thread or an item beside a conversation; null for an item with no workbench view. */
-export function workbenchOpenFor(target: TabTarget, title: string): WorkbenchOpen | null {
-  if (target.kind === "thread") return { tabId: THREAD_TAB, params: { threadId: target.id }, title: title || "Conversation" };
-  const type = typeOfId(target.id);
-  const kind = type ? tabKind(type.kind, target.id) : null;
-  return kind ? { tabId: STUDIO_TAB, params: { kind: kind.kind, id: target.id }, title: title || "Untitled" } : null;
 }
 
 const field = (params: JsonValue | null | undefined, key: string): string | null => {

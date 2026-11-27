@@ -2,29 +2,21 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import type { z } from "zod";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
-import type { act as loopAct, hold, ownerInfo } from "../loops/contract";
+import type { hold, ownerInfo } from "../loops/contract";
 import { threadOwner } from "../loops/register";
-import { isClosed, needsYou, USER_OWNER, type Task, type TaskEvent } from "./contract";
-import { tasksContract, type TaskActInput, type TaskView } from "./rpc-contract";
+import { isClosed, USER_OWNER, type Task, type TaskEvent } from "./contract";
+import { tasksContract, type TaskView } from "./rpc-contract";
 import { checkTasks, legacyCardsWithoutTask } from "./check";
-import { flightClearedAt } from "./cleared";
-import { stalledTasks } from "./stalled";
 import { ThreadDirectory, type ThreadFact } from "./links";
-import { boardRows, dayStart, flightRows, workerRows, type RowContext, type Rows } from "./rows";
+import { dayStart, type RowContext } from "./rows";
 import { guardTasks, TaskStore } from "./store";
-import { inLoopView, toLoop } from "./views";
-import type { Loop } from "../loops/contract";
+import { inLoopView } from "./views";
 
 type ThreadInfo = z.infer<typeof ownerInfo>;
 type ThreadLike = Parameters<typeof threadOwner>[1];
 
 export type UserTaskDeps = {
-  post(text: string): Promise<void>;
-  send(threadId: string, text: string): Promise<void>;
   thread(threadId: string): Promise<ThreadLike | null>;
-  loopAct(input: z.infer<typeof loopAct>): Promise<unknown>;
-  reopenLoop(id: string): unknown;
-  snoozeLoopUntil(id: string, at: number): unknown;
   held(): z.infer<typeof hold>[];
   zone?(): string;
   dir?: ThreadDirectory;
@@ -32,26 +24,6 @@ export type UserTaskDeps = {
 };
 
 const DONE_LIST_MS = 8 * 86_400_000;
-const AGENT = /^(cos|thread:.+)$/;
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
-export function handedBy(history: readonly TaskEvent[]): string | null {
-  for (let i = history.length - 1; i >= 0; i--) {
-    const event = history[i]!;
-    if (event.type !== "handed_off") continue;
-    let data: { owner?: string; from?: string; by?: string | null };
-    try { data = JSON.parse(event.data || "{}") as typeof data; } catch { continue; }
-    if (data.by === USER_OWNER) continue;
-    if (data.owner !== USER_OWNER) return null;
-    return data.from && AGENT.test(data.from) ? data.from : null;
-  }
-  return null;
-}
-
-export function inFlightOrder(tasks: readonly Task[]): Task[] {
-  const rank = (t: Task) => (isClosed(t) ? 3 : t.owner === USER_OWNER ? (needsYou(t) ? 0 : 1) : 2);
-  return [...tasks].sort((a, b) => rank(a) - rank(b) || (isClosed(a) ? (b.closedAt ?? 0) - (a.closedAt ?? 0) : a.createdAt - b.createdAt) || a.id.localeCompare(b.id));
-}
 
 const THREAD_CACHE_MS = 10_000;
 
@@ -70,40 +42,6 @@ export class UserTasks {
     const value = this.deps.thread(id).catch(() => null);
     this.cache.set(id, { at: now, value });
     return value;
-  }
-
-  private facts: { at: number; value: Promise<ThreadFact[]> } | null = null;
-
-  threadFacts(): Promise<ThreadFact[]> {
-    if (!this.deps.facts) return Promise.resolve([]);
-    const now = Date.now();
-    if (this.facts && now - this.facts.at < THREAD_CACHE_MS) return this.facts.value;
-    const value = this.deps.facts().catch(() => []);
-    this.facts = { at: now, value };
-    return value;
-  }
-
-  startedAt(ids: readonly string[]): Map<string, number> {
-    const out = new Map<string, number>();
-    if (!ids.length) return out;
-    const marks = ids.map(() => "?").join(", ");
-    const events = this.store.db.prepare(`SELECT task_id AS id, type, at, data FROM task_events WHERE task_id IN (${marks}) AND type IN ('state', 'reopened', 'started', 'created') ORDER BY seq`).all(...ids) as { id: string; type: string; at: number; data: string }[];
-    const running = (e: { type: string; data: string }) => {
-      if (e.type === "started") return true;
-      if (e.type !== "state" && e.type !== "created") return false;
-      try { return (JSON.parse(e.data || "{}") as { state?: string }).state === "in_progress"; } catch { return false; }
-    };
-    const since = new Map<string, number>();
-    for (const e of events) {
-      if (e.type === "reopened") {
-        since.set(e.id, e.at);
-        out.delete(e.id);
-        try { if ((JSON.parse(e.data || "{}") as { status?: string }).status === "in_progress") out.set(e.id, e.at); } catch { continue; }
-        continue;
-      }
-      if (running(e) && !out.has(e.id) && e.at >= (since.get(e.id) ?? 0)) out.set(e.id, e.at);
-    }
-    return out;
   }
 
   async names(tasks: readonly Task[], history: readonly TaskEvent[] = []): Promise<ThreadInfo[]> {
@@ -154,216 +92,11 @@ export class UserTasks {
     return { since: this.today(), dir: this.deps.dir ?? new ThreadDirectory(this.store.db) };
   }
 
-  async workerInfo(ids: readonly string[]) {
-    return Promise.all([...new Set(ids)].map(async (threadId) => {
-      const thread = await this.lookup(threadId) as (ThreadLike & { status?: string | null }) | null;
-      return { threadId, name: (thread?.title || thread?.titleFallback || "").trim() || "A worker thread", status: thread?.status ?? null, archived: !!thread?.archivedAt || !!thread?.deletedAt };
-    }));
-  }
-
-  private async rowsView(rows: Rows) {
-    const byId = new Map(rows.tasks.map((t) => [t.id, t]));
-    const started = this.startedAt(rows.rows.filter((r) => r.open && byId.get(r.id)?.state === "in_progress").map((r) => r.id));
-    const stalled = rows.rows.some((r) => r.open && byId.get(r.id)?.state === "in_progress") ? stalledTasks(rows.tasks, await this.threadFacts(), Date.now()) : new Set<string>();
-    const withStart = rows.rows.map((r) => ({ ...r, ...(started.has(r.id) ? { startedAt: started.get(r.id)! } : {}), ...(stalled.has(r.id) ? { stalled: true } : {}) }));
-    return { ...rows, rows: withStart, threads: await this.names(rows.tasks), workers: await this.workerInfo(rows.rows.flatMap((r) => r.workers)) };
-  }
-
-  async flight(threadId: string) {
-    const rows = flightRows(this.store.all(), threadId, this.context(), flightClearedAt(this.store.db, threadId));
-    const done = rows.rows.filter((r) => r.under === null && !r.open).map((r) => r.id);
-    return { ...await this.rowsView(rows), done };
-  }
-
-  async workers() {
-    const out = workerRows(this.store.all(), this.context());
-    const view = await this.rowsView(out);
-    const groups = await Promise.all(out.groups.map(async (g) => ({
-      conversation: g.conversation, ids: g.ids,
-      name: g.conversation ? threadOwner(`thread:${g.conversation}`, await this.lookup(g.conversation)).name : "No conversation",
-    })));
-    return { ...view, groups };
-  }
-
-  async board() {
-    return this.rowsView(boardRows(this.store.all(), this.context()));
-  }
-
   async check() {
     const facts = this.deps.facts ? await this.deps.facts() : [];
     return { problems: checkTasks(this.store.all(), facts, this.context(), legacyCardsWithoutTask(this.store.db)) };
   }
-
-  async inFlight(threadId: string) {
-    const since = this.today();
-    const rows = this.store.rows("SELECT record FROM tasks WHERE conversation = ? AND (closed_at IS NULL OR closed_at > ?) ORDER BY rowid", threadId, since)
-      .filter((t) => t.state !== "dropped" && (t.card ? t.card.dismissedAt === null : !isClosed(t)) && !(t.stale && !isClosed(t) && t.updatedAt < since));
-    const tasks = inFlightOrder(rows);
-    return { tasks, threads: await this.names(tasks) };
-  }
-
-  private async tell(owner: string, text: string): Promise<string | null> {
-    try {
-      if (owner === "cos") await this.deps.post(text);
-      else await this.deps.send(owner.slice("thread:".length), text);
-      return null;
-    } catch (error) {
-      if (owner === "cos") return `The Bot chat could not be told: ${errorText(error)}`;
-      try { await this.deps.post(`${text}\n\nThat thread (${owner}) could not be reached, so pass this on to it.`); return null; }
-      catch (again) { return `It could not be told: ${errorText(again)}`; }
-    }
-  }
-
-  private brief(t: Task) {
-    return [`${JSON.stringify(t.title)} (${t.id})`, t.why ? ` Why: ${t.why}` : "", t.progress.line ? ` Last update: ${t.progress.line}.` : ""].join("");
-  }
-
-  private async label(owner: string): Promise<string> {
-    if (owner === "cos") return "the Bot";
-    if (owner === USER_OWNER) return "the user";
-    const thread = await this.deps.thread(owner.slice(7)).catch(() => null);
-    const title = (thread?.title || thread?.titleFallback || "").trim();
-    return title ? `the thread ${JSON.stringify(title)} (${owner})` : owner;
-  }
-
-  async handOff(id: string, to: string) {
-    if (!AGENT.test(to)) throw new Error("Hand a task to the Bot (cos) or a thread (thread:<id>).");
-    const before = this.store.get(id);
-    if (isClosed(before)) throw new Error("This task is closed. Reopen it first.");
-    if (before.owner === to && before.state !== "todo") return { task: before, note: null };
-    if (before.owner === to) {
-      // Start work: a queued task handed to the owner it already has starts now.
-      const task = this.store.change(id, (t) => { t.state = "in_progress"; t.attention.queue = null; t.timing.snoozed = false; }, USER_OWNER);
-      this.store.event(id, "acted", { action: "start" });
-      const failed = await this.tell(to, `The user asked you to start task ${this.brief(task)} now. Report in your chat as you go; when you need the user, tell them there and call bot_needs_you.`);
-      return { task, note: failed };
-    }
-    if (to.startsWith("thread:")) {
-      const thread = await this.deps.thread(to.slice(7)).catch(() => null);
-      if (!thread || thread.deletedAt || thread.archivedAt) throw new Error("That thread is gone or archived. Hand the task to someone else.");
-    }
-    const asked = before.owner === USER_OWNER ? handedBy(this.store.history(id)) : null;
-    const task = this.store.change(id, (t) => {
-      t.owner = to;
-      t.state = "in_progress";
-      t.needs = null;
-      t.attention.queue = null;
-      t.timing.snoozed = false;
-    }, USER_OWNER);
-    const failed = await this.tell(to, `The user handed you a task: ${this.brief(task)} Carry it out now. Report in your chat as you go; when you need the user, tell them there and call bot_needs_you.`);
-    const toName = await this.label(to);
-    const previous = AGENT.test(before.owner) ? before.owner : asked;
-    const told = previous && previous !== to
-      ? await this.tell(previous, before.owner === previous
-        ? `The user handed task ${this.brief(before)} to ${toName}. Stop working on it; they have it now.`
-        : `The user handed your question on task ${this.brief(before)} to ${toName}, who has the task now. Don't wait for the user's answer on it.`)
-      : null;
-    return { task, note: failed ?? told };
-  }
-
-  async takeBack(id: string) {
-    const before = this.store.get(id);
-    if (isClosed(before)) throw new Error("This task is closed. Reopen it first.");
-    if (before.owner === USER_OWNER) return { task: before, note: null };
-    const task = this.store.change(id, (t) => {
-      t.owner = USER_OWNER;
-      t.state = t.kind === "waiting-outside" ? "waiting" : "todo";
-      t.attention.queue = "surfaced";
-      t.timing.snoozed = false;
-      t.progress = { step: null, line: null };
-    }, USER_OWNER);
-    const failed = await this.tell(before.owner, `The user took task ${this.brief(task)} back to do it themselves. Stop working on it.`);
-    return { task, note: failed };
-  }
-
-  async answer(id: string, option: string, from: string) {
-    const before = this.store.get(id);
-    if (!before.options.includes(option)) throw new Error("Choose an existing option");
-    const task = this.store.change(id, (t) => {
-      t.owner = from;
-      t.state = "in_progress";
-      t.needs = null;
-      t.progress.line = `Chose: ${option}`.slice(0, 300);
-      t.options = [];
-      if (t.kind === "decide") t.kind = "do";
-    }, USER_OWNER);
-    this.store.event(id, "acted", { action: "choose", option });
-    const failed = await this.tell(from, `The user chose ${JSON.stringify(option)} for task ${this.brief(before)} Carry on with that choice.`);
-    return { task, note: failed };
-  }
-
-  private close(id: string, state: "done" | "dropped") {
-    return this.store.change(id, (t) => { t.state = state; }, USER_OWNER);
-  }
-
-  async act(x: TaskActInput) {
-    const before = this.store.get(x.id);
-    const todo = inLoopView(before);
-    const from = handedBy(this.store.history(x.id));
-    if (x.action === "hand_off") return this.handOff(x.id, x.to ?? "cos");
-    if (x.action === "take_back") return this.takeBack(x.id);
-    if (x.action === "choose" && from && !isClosed(before) && before.owner === USER_OWNER) return this.answer(x.id, x.option ?? "", from);
-    if (x.action === "reopen") {
-      if (!isClosed(before)) return { task: before, note: null };
-      const asked = before.owner === USER_OWNER && !!from && !!before.needs;
-      if (todo) this.deps.reopenLoop(x.id);
-      this.store.change(x.id, (t) => {
-        t.stale = false;
-        if (AGENT.test(t.owner)) { t.state = "in_progress"; t.needs = null; return; }
-        t.attention.queue = "surfaced";
-        t.timing.snoozed = false;
-        if (asked) t.state = "waiting";
-        else { t.state = t.kind === "waiting-outside" ? "waiting" : "todo"; t.needs = null; }
-      }, USER_OWNER);
-      const task = this.store.get(x.id);
-      const note = AGENT.test(task.owner)
-        ? await this.tell(task.owner, `The user reopened task ${this.brief(task)} It is yours again; carry on.`)
-        : asked && from ? await this.tell(from, `The user reopened task ${this.brief(task)} Your question is back with them; wait for their answer.`) : null;
-      return { task, note };
-    }
-    if (x.action === "snooze" && todo && x.at !== undefined && !x.snooze) {
-      this.deps.snoozeLoopUntil(x.id, x.at);
-      return { task: this.store.get(x.id), note: null };
-    }
-    if (todo) await this.deps.loopAct({ id: x.id, action: x.action as z.infer<typeof loopAct>["action"], ...(x.option ? { option: x.option } : {}), ...(x.snooze ? { snooze: x.snooze } : {}) });
-    else if (["done", "got_it", "choose", "drop"].includes(x.action)) {
-      if (!isClosed(before)) this.close(x.id, x.action === "drop" ? "dropped" : "done");
-    } else throw new Error("Only your own to-dos can be snoozed or nudged.");
-    const task = this.store.get(x.id);
-    let note: string | null = null;
-    const closedNow = isClosed(task) && !isClosed(before);
-    const verb = task.state === "done" ? "finished" : "dismissed";
-    if (closedNow && from && before.owner === USER_OWNER) {
-      note = await this.tell(from, `The user ${verb} task ${this.brief(task)}${x.option ? ` They chose ${JSON.stringify(x.option)}.` : ""}`);
-    } else if (closedNow && AGENT.test(before.owner)) {
-      note = await this.tell(before.owner, `The user ${verb} task ${this.brief(task)} Stop working on it, and don't reopen it unless they ask.`);
-    }
-    return { task, note };
-  }
 }
-
-type PhoneAct = z.infer<typeof loopAct>;
-
-export function phoneActs(tasks: UserTasks): (x: PhoneAct) => Promise<Loop | null> {
-  const store = tasks.store;
-  return async (x) => {
-    const task = store.find(x.id);
-    if (!task) return null;
-    if (!inLoopView(task)) {
-      if (x.action === "snooze" || x.action === "nudge" || x.action === "keep") {
-        store.event(x.id, x.action === "snooze" ? "snoozed" : "acted", { action: x.action, by: USER_OWNER, ...(x.snooze ? { snooze: x.snooze } : {}) });
-        return toLoop(store.get(x.id));
-      }
-      await tasks.act({ id: x.id, action: x.action === "hand_off" ? "hand_off" : x.action, ...(x.option ? { option: x.option } : {}), ...(x.owner && /^(cos|thread:.+)$/.test(x.owner) ? { to: x.owner } : {}) });
-      return toLoop(store.get(x.id));
-    }
-    if (!["choose", "done", "drop", "got_it"].includes(x.action) || task.owner !== USER_OWNER || isClosed(task) || !handedBy(store.history(x.id))) return null;
-    await tasks.act({ id: x.id, action: x.action as "choose" | "done" | "drop" | "got_it", ...(x.option ? { option: x.option } : {}) });
-    return toLoop(store.get(x.id));
-  };
-}
-
-const EMPTY_ROWS = { rows: [], tasks: [], counts: { open: 0, running: 0, waiting: 0, todo: 0, needsYou: 0, done: 0, workers: 0 }, threads: [], workers: [] };
 
 export function registerUserTasks(bb: BbPluginApi, db: Database.Database, deps: UserTaskDeps) {
   const store = new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
@@ -372,11 +105,6 @@ export function registerUserTasks(bb: BbPluginApi, db: Database.Database, deps: 
     "tasks.get": ({ id }: { id: string }) => tasks.view(id),
     "tasks.getMany": ({ ids }: { ids: string[] }) => tasks.views(ids),
     "tasks.list": () => tasks.list(),
-    "tasks.act": (x: TaskActInput) => tasks.act(x),
-    // Older phone builds still call these (In flight and the Tasks screen before strands): strands replaced them, so they answer empty.
-    "tasks.inFlight": () => ({ tasks: [], threads: [] }),
-    "tasks.flight": () => ({ ...EMPTY_ROWS, done: [] }),
-    "tasks.board": () => EMPTY_ROWS,
   }, false, (message) => bb.log.warn(message)) as never);
   return tasks;
 }

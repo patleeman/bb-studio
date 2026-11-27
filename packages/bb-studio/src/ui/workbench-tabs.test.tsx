@@ -28,7 +28,6 @@ vi.mock("../kit/app/index", () => ({ Icon: () => null }));
 vi.mock("./bot/ThreadsSection", () => ({ compactAge: () => "1h" }));
 
 import { registerWorkbenchTabs, targetForHit, WorkbenchPicker, type WorkbenchTarget } from "./workbench-tabs";
-import { workbenchOpenFor } from "./item-target";
 
 let root: Root;
 let container: HTMLElement;
@@ -45,7 +44,6 @@ it("opens a thread as a thread tab and an item as the Studio tab, and skips what
 
 it("names an untitled conversation's tab Conversation, not Thread", () => {
   expect(targetForHit({ kind: "thread", title: "", href: "/threads/thr_x", ref: { pluginId: "bb", id: "thr_x" } } as never)?.title).toBe("Conversation");
-  expect(workbenchOpenFor({ kind: "thread", id: "thr_x" } as never, "")?.title).toBe("Conversation");
 });
 
 it("lists Bots in their own section as cards, apart from threads and items", async () => {

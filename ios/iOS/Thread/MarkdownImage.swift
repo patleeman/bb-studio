@@ -7,6 +7,7 @@ struct MarkdownImage: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.threadId) private var threadId
     @Environment(\.pageId) private var pageId
+    @Environment(\.pageImages) private var pageImages
     let alt: String
     let src: String
     @State private var url: URL?
@@ -30,7 +31,7 @@ struct MarkdownImage: View {
                     .accessibilityLabel(alt.isEmpty ? "Image" : alt)
                     .accessibilityAddTraits(.isButton)
                     .accessibilityIdentifier("markdownImage")
-                    .fullScreenCover(isPresented: $viewing) { ImageViewer(url: url) }
+                    .fullScreenCover(isPresented: $viewing) { viewer(url) }
             } else if failed {
                 placeholder("photo.badge.exclamationmark")
             } else if resolved && url == nil {
@@ -70,6 +71,15 @@ struct MarkdownImage: View {
         }
     }
 
+    /// In a page, the lightbox steps through all of the page's images; elsewhere this one image.
+    @ViewBuilder private func viewer(_ url: URL) -> some View {
+        if let gallery = PageImageGallery.urls(pageImages, tapped: src, client: app.client, pageId: pageId), gallery.urls.count > 1 {
+            PageImageGallery(urls: gallery.urls, index: gallery.start)
+        } else {
+            ImageViewer(url: url)
+        }
+    }
+
     private func placeholder(_ symbol: String) -> some View {
         Label(alt.isEmpty ? src : alt, systemImage: symbol)
             .font(.footnote)
@@ -104,6 +114,9 @@ extension BBClient {
     /// the page's threads or shows as "Image not available". Nil otherwise.
     func serverImageURL(src: String, pageId: String?) -> URL? {
         let trimmed = src.trimmingCharacters(in: .whitespaces)
+        #if DEBUG
+        if let demo = PageDemo.imageURL(trimmed) { return demo }
+        #endif
         if let url = URL(string: trimmed), ["http", "https"].contains(url.scheme?.lowercased()) { return url }
         if trimmed.hasPrefix("/api/") { return URL(string: trimmed, relativeTo: baseURL)?.absoluteURL }
         guard let pageId, trimmed.lowercased().hasPrefix("file://") || (trimmed.hasPrefix("/") && !trimmed.hasPrefix("//")) else { return nil }

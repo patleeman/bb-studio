@@ -24,16 +24,6 @@ export type TabKind = "page" | "drawing" | "design" | "mini" | "artifact" | "rec
 export type { ItemFamily };
 export const ITEM_FAMILIES: readonly { id: ItemFamily; label: string; types: readonly string[]; kinds: readonly string[] }[] =
   MODEL_FAMILIES.map((family) => ({ id: family.id, label: family.plural, types: family.types, kinds: family.types.map((type) => itemType(type)!.kind) }));
-/** The family of a type or of the kind name it had ("doc" or "page", "whiteboard" or "drawing"), or null (recordings, kinds from add-ons). */
-export function familyOf(kind: string): ItemFamily | null {
-  return typeNamed(kind)?.family ?? null;
-}
-/** `selected` types after toggling a whole family: all of its present types on, or all off when they were all on. */
-export function toggleFamily(selected: readonly string[], family: ItemFamily, present: readonly string[]): string[] {
-  const types = (ITEM_FAMILIES.find((each) => each.id === family)?.types ?? []).filter((type) => present.includes(type));
-  const allOn = types.length > 0 && types.every((type) => selected.includes(type));
-  return allOn ? selected.filter((type) => !types.includes(type)) : [...new Set([...selected, ...types])];
-}
 
 export interface TabKindInfo {
   kind: TabKind;

@@ -51,6 +51,8 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
     var onEmptyTap: (() -> Void)?
     var onPage: ((CGFloat, CGFloat?) -> Void)?
     var rowsHidden = false
+    /// Over the rows, from the header to the composer (the Workbench); nil shows the rows.
+    var cover: (() -> AnyView)? = nil
     var onPillChange: ((TranscriptPillState) -> Void)?
     var log: ((String) -> Void)?
     var dismissKeyboard: ((UIWindow) -> Void)?
@@ -76,6 +78,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         var topMounted = false
         var topVersion: AnyHashable?
         var hasTop = false
+        var covered = false
         var colorScheme: ColorScheme?
         var dynamicTypeSize: DynamicTypeSize?
         var legibilityWeight: LegibilityWeight?
@@ -216,6 +219,10 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
             coordinator.hasTop = nextHasTop
             coordinator.topVersion = topVersion
             controller.setTop(top.map { AnyView($0().environment(\.self, environment)) })
+        }
+        if (cover != nil) != coordinator.covered || (cover != nil && (!diff.rowsChanged || envChanged)) {
+            coordinator.covered = cover != nil
+            controller.setCover(cover.map { AnyView($0().environment(\.self, environment)) })
         }
     }
 }

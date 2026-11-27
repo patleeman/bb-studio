@@ -15,7 +15,7 @@ enum NotificationActions {
         let center = UNUserNotificationCenter.current()
         center.getNotificationCategories { existing in
             center.setNotificationCategories(fixed.union(existing.filter {
-                $0.identifier.hasPrefix("BB_CHOICE.") || $0.identifier.hasPrefix(LoopCategories.category + ".decide.")
+                $0.identifier.hasPrefix("BB_CHOICE.")
             }))
         }
     }
@@ -51,11 +51,11 @@ enum NotificationActions {
             // The extension swaps in a per-options category; this is the fallback if it doesn't run.
             UNNotificationCategory(identifier: "BB_CHOICE", actions: [answer], intentIdentifiers: []),
         ]
-        return fixed.union(LoopCategories.fixed())
+        return fixed
     }
 
     /// Categories that ask something of the user.
-    static let askCategories = ["BB_APPROVAL", "BB_PLAN", "BB_QUESTION", "BB_CHOICE", LoopCategories.category]
+    static let askCategories = ["BB_APPROVAL", "BB_PLAN", "BB_QUESTION", "BB_CHOICE"]
 
     /// How a push shows while the app is open. A plain reply (`turn-finished`
     /// without an ask's category) goes to the list only: the user is already in
@@ -73,16 +73,9 @@ enum NotificationActions {
         return asks ? [.banner, .sound] : [.list]
     }
 
-    static func taskRoute(_ info: [AnyHashable: Any]) -> (id: String, conversation: String?)? {
-        guard let id = info["loopId"] as? String, !id.isEmpty else { return nil }
-        let conversation = [info["conversationId"], info["threadId"]].lazy.compactMap { $0 as? String }.first { !$0.isEmpty }
-        return (id, conversation)
-    }
-
     /// Runs a lock-screen action. Returns false when the app should open the thread instead.
     static func handle(_ response: UNNotificationResponse) async -> Bool {
         let info = response.notification.request.content.userInfo
-        if response.actionIdentifier.hasPrefix(LoopCategories.prefix) { return await LoopNotifications.handle(response) }
         guard let threadId = info["threadId"] as? String else { return false }
         let interactionId = info["interactionId"] as? String
         guard [approve, deny, reply].contains(response.actionIdentifier) || response.actionIdentifier.hasPrefix(choicePrefix) else { return false }

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { ConversationRow, WorkerRow } from "../../bot-threads-contract";
-import { conversationLines, staleFailure, landingThread, olderBotFromPath, olderPath, secondLine, shortAge, spaceDots, summarySections, swipeStep, switchTarget, SWIPE_IDLE_MS, SWIPE_START, SWIPE_THRESHOLD, workerLines, splitWorkers, doneLabel, hiddenThreadTarget, workerNests, foldLevel, subtree, nestLabel, type WorkerNode } from "./model";
+import { conversationLines, staleFailure, landingThread, olderBotFromPath, olderPath, secondLine, shortAge, spaceDots, summarySections, swipeStep, switchTarget, SWIPE_IDLE_MS, SWIPE_START, SWIPE_THRESHOLD, workerLines, doneLabel, hiddenThreadTarget, workerNests, foldLevel, subtree, nestLabel, type WorkerNode } from "./model";
 
 const bots = [
   { id: "cos", name: "Chief of Staff", needsYou: false },
@@ -88,11 +88,7 @@ it("keeps the server's state for a thread mirrored from bb: the live view only k
   expect(conversationLines([conversation({ threadId: "main", isMain: true, running: true, mirrored: true })], live, null)[0]!.running).toBe(true);
 });
 
-it("splits workers into the active ones, needing the user first, and the done ones; and says how old a row is", () => {
-  const workers = [{ id: "a", status: "done" }, { id: "b", status: "running" }, { id: "c", status: "failed" }, { id: "d", status: "needs-you" }] as const;
-  const split = splitWorkers(workers);
-  expect(split.active.map((worker) => worker.id)).toEqual(["d", "b"]);
-  expect(split.done.map((worker) => worker.id)).toEqual(["a", "c"]);
+it("says how many are done and how old a row is", () => {
   expect(doneLabel(12)).toBe("12 done");
   const now = 10 * 24 * 60 * 60_000;
   expect([now - 10_000, now - 4 * 60_000, now - 2 * 60 * 60_000, now - 3 * 24 * 60 * 60_000, now - 9 * 24 * 60 * 60_000].map((at) => shortAge(at, now))).toEqual(["now", "4m", "2h", "3d", "1w"]);

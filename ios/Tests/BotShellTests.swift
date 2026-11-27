@@ -91,102 +91,54 @@ final class BotShellTests: XCTestCase {
     }
 
     @MainActor
-    func testLaunchLandsOnMainOnce() throws {
+    func testLaunchLandsOnHomeWithMainAsTheConversationOnce() throws {
         let store = BotSpacesStore(serverURL: server)
         let shell = Router()
-        shell.land(store)
+        shell.land(store) { _, main in main }
         XCTAssertFalse(shell.landed, "nothing to land on before spaces load")
         store.seedForDemo(try Self.spaces(), views: [:])
-        shell.land(store)
-        XCTAssertEqual(shell.selection, .conversation("thr_a_main"))
-        XCTAssertEqual(shell.compactColumn, .detail, "Main is pushed over the list")
-        shell.selection = nil
-        shell.compactColumn = .sidebar
-        shell.land(store)
-        XCTAssertNil(shell.selection, "Back to the list stays on the list")
+        shell.land(store) { _, main in main }
+        XCTAssertEqual(shell.path, [], "the app opens on Home")
+        XCTAssertEqual(shell.conversation, "thr_a_main", "Main is the open Duo's conversation")
+        shell.openConversation("thr_other")
+        shell.path = []
+        shell.land(store) { _, main in main }
+        XCTAssertEqual(shell.conversation, "thr_other", "landing happens once")
     }
 
     // MARK: Rows
 
-    func testForksHaveNoRowsOfTheirOwn() throws {
-        let view = try Self.view("bot_a", [
-            Self.conversation("thr_a_main", "Main", main: true),
-            Self.conversation("thr_other", "Other"),
-            Self.conversation("thr_reply", "Reply", parent: "thr_a_main"),
-            Self.conversation("thr_deep", "Deeper", parent: "thr_reply", parentTitle: "Reply"),
-            Self.conversation("thr_orphan", "Orphan", parent: "thr_gone", parentTitle: "Gone"),
-        ])
-        let lines = BotShell.lines(view)
-        XCTAssertEqual(lines.map(\.depth), [0, 0, 0, 0, 0], "Studio leaves forks out; any it sends are plain rows")
-        XCTAssertTrue(lines.allSatisfy { $0.forkedFrom == nil }, "no ⑂ label")
-    }
-
-    func testNeedsYouRowShowsTheReasonOnLineTwo() throws {
+    func testRowsShowRunningAndTheLatestWords() throws {
         let view = try Self.view("bot_a", [
             Self.conversation("thr_n", "Main", main: true, latest: "Done", running: true, needs: "Push to origin?"),
             Self.conversation("thr_r", "Busy", latest: nil, running: true),
             Self.conversation("thr_q", "Quiet", latest: "Last reply"),
         ])
         let lines = BotShell.lines(view)
-        XCTAssertEqual(lines[0].tone, .needsYou)
-        XCTAssertEqual(lines[0].text, "Push to origin?")
-        XCTAssertEqual(lines[1].tone, .running)
+        XCTAssertEqual(lines.map(\.running), [true, true, false])
+        XCTAssertEqual(lines[0].text, "Done", "no needs-you reason: the latest words")
         XCTAssertEqual(lines[1].text, "Working…")
-        XCTAssertEqual(lines[2].tone, .quiet)
         XCTAssertEqual(lines[2].text, "Last reply")
-    }
-
-    func testWorkersSplitActiveFromDone() throws {
-        let view = try Self.view("bot_a", [], workers: [Self.worker("w_done", "done"), Self.worker("w_run", "running"),
-                                                        Self.worker("w_need", "needs-you"), Self.worker("w_fail", "failed")])
-        let split = BotShell.splitWorkers(view.workers)
-        XCTAssertEqual(split.active.map(\.threadId), ["w_need", "w_run"])
-        XCTAssertEqual(split.done.map(\.threadId), ["w_done", "w_fail"])
-    }
-
-    // MARK: Dots
-
-    func testDotTurnsAmberWhenItsBotNeedsYou() throws {
-        let spaces = try Self.spaces(bNeeds: true)
-        var dots = BotShell.dots(spaces, shown: nil, views: [:])
-        XCTAssertEqual(dots.map(\.active), [true, false, false])
-        XCTAssertEqual(dots.map(\.amber), [false, true, false])
-        XCTAssertEqual(dots[1].label, "Bea, needs you")
-        let view = try Self.view("bot_a", [Self.conversation("thr_a_main", "Main", main: true, needs: "Approve?")])
-        dots = BotShell.dots(spaces, shown: "bot_c", views: ["bot_a": view])
-        XCTAssertEqual(dots.map(\.amber), [true, true, false], "a needs-you conversation turns its Bot's dot amber")
-        XCTAssertEqual(dots.map(\.active), [false, false, true])
     }
 
     // MARK: Switching
 
-    func testStepMovesOneBotWithoutWrapping() throws {
-        let spaces = try Self.spaces()
-        XCTAssertEqual(BotShell.step(spaces, from: "bot_a", by: 1), "bot_b")
-        XCTAssertEqual(BotShell.step(spaces, from: "bot_b", by: -1), "bot_a")
-        XCTAssertNil(BotShell.step(spaces, from: "bot_a", by: -1))
-        XCTAssertNil(BotShell.step(spaces, from: "bot_c", by: 1))
-    }
-
     @MainActor
-    func testSwitchingWatchesTheShownBotAndUnwatchesTheLastOne() throws {
+    func testSwitchingWatchesTheShownBotAndOpensItsHome() throws {
         let store = BotSpacesStore(serverURL: server)
         store.seedForDemo(try Self.spaces(), views: [:])
         let shell = Router()
-        shell.land(store)
-        shell.show("bot_b", store: store, compact: true)
+        shell.land(store) { _, main in main }
+        shell.openConversation("thr_a_main")
+        shell.show("bot_b", store: store)
         XCTAssertEqual(shell.shownBotId, "bot_b")
-        XCTAssertNil(shell.selection, "on a phone it stays on the list")
-        XCTAssertEqual(shell.compactColumn, .sidebar)
+        XCTAssertEqual(shell.path, [], "another Bot opens on its Home")
+        XCTAssertNil(shell.conversation)
         XCTAssertEqual(store.watched, ["bot_a", "bot_b"])
-        shell.step(1, store: store, compact: false)
-        XCTAssertEqual(shell.shownBotId, "bot_c")
+        shell.show("bot_c", store: store)
         XCTAssertEqual(store.watched, ["bot_a", "bot_c"], "the current Bot stays watched")
-        XCTAssertNil(shell.selection, "Cy has no Main yet")
-        shell.step(-1, store: store, compact: false)
-        XCTAssertEqual(shell.selection, .conversation("thr_b_main"), "a split view opens the Bot's Main")
-        shell.show("bot_gone", store: store, compact: false)
-        XCTAssertEqual(shell.shownBotId, "bot_b")
+        shell.show("bot_gone", store: store)
+        XCTAssertEqual(shell.shownBotId, "bot_c")
     }
 
     @MainActor
@@ -196,12 +148,15 @@ final class BotShellTests: XCTestCase {
         let shell = Router()
         shell.follow(.bot(nil), store: store)
         XCTAssertEqual(shell.shownBotId, "bot_a")
-        XCTAssertEqual(shell.selection, .conversation("thr_a_main"))
+        XCTAssertEqual(shell.path, [.conversation(id: "thr_a_main")])
         shell.follow(.bot("bot_b"), store: store)
-        XCTAssertEqual(shell.selection, .conversation("thr_b_main"))
+        XCTAssertEqual(shell.path, [.conversation(id: "thr_b_main")])
         shell.follow(.list, store: store)
-        XCTAssertNil(shell.selection)
-        XCTAssertEqual(shell.compactColumn, .sidebar)
+        XCTAssertEqual(shell.path, [], "the list is Home")
+        shell.follow(.settings, store: store)
+        XCTAssertEqual(shell.path, [.settings], "Settings is pushed, not a sheet")
+        shell.follow(.place(.memory, botId: nil), store: store)
+        XCTAssertEqual(shell.path, [.place(.memory)])
     }
 
     func testShortAge() {

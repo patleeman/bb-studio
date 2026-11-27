@@ -475,7 +475,6 @@ describe("the Bot's space (round 7)", () => {
   });
 
   it("has no Strands row or count, for any Bot", async () => {
-    state.live["strands.overview"] = { conversations: [], needs: 2, running: 1 };
     await mount();
     expect($('[data-testid="space-page-strands"]')).toBeNull();
     expect($('[data-testid="space-strands-count"]')).toBeNull();

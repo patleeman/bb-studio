@@ -21,18 +21,6 @@ public struct BotWorkerNode: Hashable, Sendable, Identifiable {
 
 public struct BotWorkerNest: Hashable, Sendable {
     public var nodes: [BotWorkerNode] = []
-    public var total = 0
-    public var running = 0
-    public var needsYou = 0
-
-    /// The toggle's spoken label: "3 workers, 1 running, 1 needs you".
-    public var label: String {
-        [
-            "\(total) \(total == 1 ? "worker" : "workers")",
-            running > 0 ? "\(running) running" : "",
-            needsYou > 0 ? "\(needsYou) \(needsYou == 1 ? "needs" : "need") you" : "",
-        ].filter { !$0.isEmpty }.joined(separator: ", ")
-    }
 }
 
 public enum BotWorkerNests {
@@ -69,11 +57,6 @@ public enum BotWorkerNests {
             let home = root.worker.home.flatMap { listed.contains($0) ? $0 : nil }
             var nest = home.flatMap { nests[$0] } ?? (home == nil ? other : nil) ?? BotWorkerNest()
             nest.nodes.append(root)
-            for each in root.subtree {
-                nest.total += 1
-                if each.status == .running { nest.running += 1 }
-                if each.status == .needsYou { nest.needsYou += 1 }
-            }
             if let home { nests[home] = nest } else { other = nest }
         }
         return (nests, other)

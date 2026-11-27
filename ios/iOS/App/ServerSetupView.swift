@@ -10,7 +10,7 @@ struct ServerGate: View {
                 .frame(width: ServerGate.page(window)?.width, height: ServerGate.page(window)?.height)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
-                .background(WindowGeometry { size, _, _, _ in window = size })
+                .background(ShellGeometryReader { window = $0.window })
         } else {
             RootView()
         }

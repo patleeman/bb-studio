@@ -4,8 +4,10 @@ struct ThreadView: View {
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
-    @StateObject private var model: ThreadModel
-    @StateObject private var talk: HoldToTalk
+    /// The open thread: its model, hold-to-talk, and its menu's commands.
+    @ObservedObject private var session: ConversationSession
+    @ObservedObject private var model: ThreadModel
+    @ObservedObject private var talk: HoldToTalk
     /// Send waits while dictation (the mic, a talk, or the keyboard's) has words on the way.
     @StateObject private var dictation = DictationGate()
     /// "Expand to page": the thread's open note and its editor.
@@ -26,7 +28,6 @@ struct ThreadView: View {
     /// A handoff to another provider in flight, or a switch just done, over the composer.
     @State private var handoffStatus: (text: String, working: Bool)?
     @State private var attachments: [PendingAttachment] = []
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var showingWeb = false
     @State private var editingFull = false
     @State private var finding = false
@@ -52,14 +53,10 @@ struct ThreadView: View {
     @State private var scroller = TranscriptScroller()
     @State private var resizeAnchor = TranscriptResizeAnchor()
     @State private var resizeRestore: Task<Void, Never>?
-    @Environment(\.duoLayout) private var duoLayout
-    @Environment(\.duoPage) private var duoPage
     @State private var pickingSendTime = false
     @State private var showingFiles = false
     @State private var showingHistory = false
     @State private var savingFiles: SaveToStudioRequest?
-    /// The page this thread was started from with "Work with this page".
-    @State private var sourcePage: PageMeta?
     @State private var confirmingCompact = false
     @State private var confirmingClearContext = false
     @State private var showingContext = false
@@ -71,35 +68,26 @@ struct ThreadView: View {
     @State private var editing = false
     @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     @Environment(\.botConversation) private var shell
-    @Environment(\.roomChat) private var roomEnvironment
     @Environment(\.look) private var look
-    private let roomSession: RoomSession?
-    private var inRoom: Bool { roomSession != nil }
-    private var roomChat: RoomChat? { inRoom ? roomEnvironment : nil }
-    private var lying: Bool { roomChat?.away == true }
+    @Environment(\.shellPosture) private var posture
+    @Environment(\.shellInnerScreen) private var innerScreen
+    @ObservedObject private var router = Router.shared
+    /// The Workbench over the rows (between the title and the composer); nil shows the chat.
+    private let workbench: (() -> AnyView)?
+    /// One column: a sideways swipe on the chat flips to the Workbench.
+    private let flips: Bool
     @State private var sideThreads: [String: BotSideThread] = [:]
     /// Forks made here this session, kept on their message until Studio lists them.
     @State private var madeForks: [String: String] = [:]
-    @State private var replyThread: ReplyThreadSheet?
     @State private var conversationModel: ConversationModel?
-    @State private var finishing = false
     @State private var confirmingDelete = false
     @State private var workerFetched: WorkerInfo?
     @State private var askingWorker = false
     @State private var workerAskError: String?
     @State private var answeringHere = false
     @StateObject private var approvals = ConversationApprovals()
-    /// The slot's approval pages: the one shown, and those put away (⌄).
-    @State private var approvalPage = 0
-    @State private var approvalPageId: String?
-    @State private var hiddenApprovals: Set<String> = []
     /// A Bot conversation's queue and todos, from their composer chips.
     @State private var showingQueue = false
-    /// A Bot conversation's Workspace sheet (iPhone, folded Duo), from the title.
-    @State private var showingWorkspace = false
-    @State private var workspaceDetent: PresentationDetent = .medium
-    /// More (the rest of the old ⋯), asked for by the unfolded Duo's Info.
-    @State private var showingMore = false
     @State private var showingTodos = false
     @AppStorage(ServerScope.key("dismissedFallbacks")) private var dismissedFallbacks = ""
     /// Permissions chosen in Model & permissions, waiting for the next message.
@@ -116,10 +104,6 @@ struct ThreadView: View {
         return runningPlugins.split(separator: ",").contains("studio")
     }
 
-    /// Hides the tab bar on iPhone, for a thread pushed from a list; a tab's
-    /// own thread keeps it.
-    private let hidesTabBar: Bool
-
     /// Counts sends, for the send haptic.
     @State private var sends = 0
     /// The new chat transcript's requests, when it's on (Settings ▸ Diagnostics).
@@ -130,13 +114,14 @@ struct ThreadView: View {
     /// re-assigning `composerHost`/`topHost` rootViews.
     @State private var chromeTick = ChromeTick()
 
-    init(threadId: String, hidesTabBar: Bool = true, session: RoomSession? = nil) {
-        self.hidesTabBar = hidesTabBar
-        roomSession = session
-        _talk = StateObject(wrappedValue: session?.talk ?? HoldToTalk(threadId: threadId))
-        _model = StateObject(wrappedValue: session?.model ?? ThreadModel(threadId: threadId))
-        _notes = StateObject(wrappedValue: ThreadNotes(threadId: threadId))
-        _pendingPermission = AppStorage(ServerScope.key("permissionMode.\(threadId)"), store: AppGroup.defaults)
+    init(session: ConversationSession, workbench: (() -> AnyView)? = nil, flips: Bool = false) {
+        self.session = session
+        self.flips = flips
+        model = session.model
+        talk = session.talk
+        self.workbench = workbench
+        _notes = StateObject(wrappedValue: ThreadNotes(threadId: session.threadId))
+        _pendingPermission = AppStorage(ServerScope.key("permissionMode.\(session.threadId)"), store: AppGroup.defaults)
     }
 
     var body: some View {
@@ -144,17 +129,10 @@ struct ThreadView: View {
         let _ = RenderCount.bump("thread.body")
         #endif
         withTalk
-        .focusedSceneValue(\.thread, actions)
-        .sensoryFeedback(.success, trigger: model.confirmations)
-        .sensoryFeedback(.impact(weight: .medium), trigger: sends)
-        .sensoryFeedback(.warning, trigger: model.interactions.count, condition: Self.grew)
-        .sensoryFeedback(.error, trigger: model.error) { (_: String?, new: String?) in new != nil }
-        .sensoryFeedback(.selection, trigger: attachments.count, condition: Self.grew)
-        .userActivity(Spotlight.threadActivityType, isActive: model.thread != nil, describeActivity)
+        .modifier(ThreadFeedback(actions: actions, confirmations: model.confirmations, sends: sends,
+                                 interactions: model.interactions.count, error: model.error, attachments: attachments.count,
+                                 hasThread: model.thread != nil, describe: describeActivity))
     }
-
-    /// For the haptics on a count: it went up.
-    private static func grew(_ old: Int, _ new: Int) -> Bool { new > old }
 
     /// Handoff and Spotlight: the thread's title and web link.
     private func describeActivity(_ activity: NSUserActivity) {
@@ -167,27 +145,26 @@ struct ThreadView: View {
     /// Dictation and hold to talk.
     private var withTalk: some View {
         withLoading
-        .onChange(of: canUseNotes) { _, can in if can { notes.attach(app) } }
         .modifier(TalkLifecycle(talk: talk))
-        .onAppear {
-            ScrollLog.observeKeyboard()
-            talk.send = { [model] text in
-                if isWorker { return askWorker(text) }
-                Task { if await !model.send(text, mentions: [], attachments: []) { restoreDraft(text, []) } }
-            }
-            talk.insert = { [model] text in
-                let next = TalkDraft.finished(text, typed: &talkTyped, draft: draft)
-                draft = next
-                // Saved here too: a dictation finished as the thread closes lands after its view is gone.
-                Drafts.save(model.threadId, text: next, mentions: mentions, serverURL: model.serverURL)
-            }
-        }
-        .onChange(of: talk.error) { _, error in
-            if let error { app.flash(error) }
-        }
-        .onChange(of: roomChat?.focusRequests, initial: true) { _, requests in
-            if let requests, requests > 0, roomChat?.away == false { composerFocused = true }
-        }
+        .modifier(ThreadHooks(
+            canUseNotes: canUseNotes, talkError: talk.error, focusRequests: router.focusRequests, command: session.command,
+            notesAllowed: { notes.attach(app) },
+            appear: {
+                ScrollLog.observeKeyboard()
+                talk.send = { [model] text in
+                    if isWorker { return askWorker(text) }
+                    Task { if await !model.send(text, mentions: [], attachments: []) { restoreDraft(text, []) } }
+                }
+                talk.insert = { [model] text in
+                    let next = TalkDraft.finished(text, typed: &talkTyped, draft: draft)
+                    draft = next
+                    // Saved here too: a dictation finished as the thread closes lands after its view is gone.
+                    Drafts.save(model.threadId, text: next, mentions: mentions, serverURL: model.serverURL)
+                }
+            },
+            talkFailed: { app.flash($0) },
+            focus: { if router.conversation == model.threadId { composerFocused = true } },
+            take: { if let command = session.take() { perform(command) } }))
     }
 
     // `body` in parts, so each type-checks in well under a second (as one
@@ -196,18 +173,6 @@ struct ThreadView: View {
 
     private var withConversation: some View {
         screen
-        .sheet(item: $replyThread, onDismiss: { Task { await loadSideThreads() } }) { sheet in
-            NavigationStack {
-                ThreadView(threadId: sheet.id)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { replyThread = nil }.accessibilityIdentifier("replyThreadDone")
-                        }
-                    }
-            }
-            .environment(\.botConversation, shell?.reply(sheet.id) { replyThread = nil })
-            .presentationDragIndicator(.visible)
-        }
         .task(id: conversation?.threadId) {
             guard conversation != nil else { return }
             while !Task.isCancelled {
@@ -259,44 +224,6 @@ struct ThreadView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingWorkspace) {
-            NavigationStack {
-                workspace()
-                    .navigationTitle((model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Conversation") + " · Workspace")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar { Button("Done") { showingWorkspace = false }.accessibilityIdentifier("workspaceDone") }
-            }
-            // Medium for Info and Strands, large for a document (round 5).
-            .presentationDetents([.medium, .large], selection: $workspaceDetent)
-            .onChange(of: WorkspaceStore.shared.selected[model.threadId]) { _, id in
-                let local = id == nil || id == WorkspaceStore.info || id == WorkspaceStore.strands
-                withAnimation(.snappy) { workspaceDetent = local ? .medium : .large }
-            }
-        }
-        .sheet(isPresented: $showingMore) {
-            NavigationStack {
-                List { menuItems }
-                    .navigationTitle("More")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar { Button("Done") { showingMore = false } }
-            }
-            .presentationDetents([.medium, .large])
-        }
-        .onChange(of: WorkspaceRequests.shared.pending[model.threadId]) { _, action in
-            guard action != nil, conversation != nil, let action = WorkspaceRequests.shared.take(model.threadId) else { return }
-            infoAction(action)
-        }
-        .onChange(of: approvals.cards, initial: true) { _, cards in
-            ApprovalSlots.shared.setWaiting(cards.filter { $0.approval.state.waiting }, for: model.threadId)
-        }
-        .onAppear { if conversation != nil { WorkspaceShown.shared.show(model.threadId) } }
-        .task(id: conversation != nil ? model.threadId : "") {
-            // The title's tab count, before the Workspace is opened.
-            guard conversation != nil else { return }
-            WorkspaceStore.shared.attach(app.realtime)
-            await WorkspaceStore.shared.load(model.threadId)
-        }
-        .onDisappear { if conversation != nil { WorkspaceShown.shared.hide(model.threadId) } }
         .sheet(isPresented: $showingQueue) {
             NavigationStack {
                 ScrollView {
@@ -452,7 +379,6 @@ struct ThreadView: View {
             #if DEBUG
             if let demo = NotesDemo.draft { draft = demo }
             #endif
-            if !inRoom { model.attach(app) }
             if canUseNotes { notes.attach(app) }
             #if DEBUG
             if TalkIndicator.qaDictating {
@@ -464,10 +390,15 @@ struct ThreadView: View {
             Task { await muted.refresh() }
             Task { reactionSettings = (try? await client.reactionSettings()) ?? .defaults }
             if runningPlugins.split(separator: ",").contains("studio") {
-                Task { sourcePage = try? await client.chatPage(model.threadId) }
+                Task { session.sourcePage = try? await client.chatPage(model.threadId) }
             }
+            session.attach(app)
             await model.load()
         }
+        // Attached as it appears, in step with `onDisappear`'s stop: a screen
+        // that replaces another in the same update takes over before the
+        // deferred detach looks (no async start racing it).
+        .onAppear { session.hold(app) }
         // Open where the reader left off. Waits a beat for the rows to be laid out.
         .task(id: model.unreadFrom) {
             guard model.unreadFrom != nil else { return }
@@ -478,7 +409,7 @@ struct ThreadView: View {
             saveDraftLocally()
             resizeRestore?.cancel()
             resizeAnchor.cancel()
-            if !inRoom { model.detach() }
+            session.stop()
             notes.detach()
         }
     }
@@ -494,150 +425,42 @@ struct ThreadView: View {
         AnyView(transcriptV2Screen)
     }
 
-    /// A plain thread's header actions. A Bot conversation's header is its
-    /// title alone (round 5): the title opens these as a menu, Stop sits
-    /// beside Send, and hands-free is in the "+" menu and here.
-    @ViewBuilder private var threadActions: some View {
-        if conversation == nil {
-            if model.thread?.isRunning == true, !isWorker {
-                Button { Task { await model.stop() } } label: { Image(systemName: "stop.circle") }
-                    .accessibilityLabel("Stop")
-            }
-            // On iPad there's room for Find beside the menu.
-            if sizeClass == .regular {
-                Button { finding = true } label: { Image(systemName: "magnifyingglass") }
-                    .accessibilityLabel("Find")
-            }
-            // One menu rather than a row of buttons, so the title has room.
-            Menu { menuItems } label: {
-                Image(systemName: "ellipsis").modifier(DuoHeaderMenuLabel())
-            }
-            .accessibilityLabel("More")
-            .accessibilityIdentifier("conversationMore")
-        }
-    }
-
-    /// The folded Duo's rail for a Bot conversation: hands-free and the conversation's menu, as round buttons.
-    @ViewBuilder private var railActions: some View {
-        Button { startHandsFree() } label: { Label("Talk hands-free", systemImage: "waveform") }
-            .accessibilityIdentifier("conversationHandsFree")
-        Button { openWorkspace() } label: { Label("Workspace", systemImage: "square.on.square") }
-            .overlay(alignment: .topTrailing) {
-                let count = WorkspaceStore.shared.count(model.threadId)
-                if count > 0 {
-                    Text("\(count)").font(.caption2.weight(.bold)).monospacedDigit()
-                        .padding(.horizontal, 5).frame(minWidth: 18, minHeight: 18)
-                        .background(look.ink, in: .capsule).foregroundStyle(look.canvas)
-                        .offset(x: 4, y: -4).allowsHitTesting(false)
-                }
-            }
-            .accessibilityLabel("Workspace")
-            .accessibilityValue("\(WorkspaceStore.shared.count(model.threadId)) tabs")
-            .accessibilityIdentifier("conversationMore")
-    }
-
     /// Hands-free voice speaks as this conversation (its identity comes from the thread).
     private func startHandsFree() { Router.shared.sheet = .handsFree(threadId: model.threadId) }
 
-    /// The thread's menu: the header's ⋯ in a plain thread, the title's menu in a Bot conversation.
-    @ViewBuilder private var menuItems: some View {
-        if conversation != nil {
-            Button { run { startHandsFree() } } label: { Label("Talk hands-free", systemImage: "waveform") }
-                .accessibilityIdentifier("menuHandsFree")
-        }
-        Button { run { finding = true } } label: { Label("Find in thread", systemImage: "magnifyingglass") }
-        if let conversation, conversation.mainThreadId != model.threadId {
-            Button { run { makeMain(conversation) } } label: { Label("Make this the Main", systemImage: "star") }
-                .accessibilityIdentifier("makeMain")
-        }
-        Button { run {
+    /// What the conversation's menu asked for (`ConversationMenuItems`, in the shell's bar or rail).
+    private func perform(_ command: ConversationCommand) {
+        switch command {
+        case .find: finding = true
+        case .rename:
             newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
             renaming = true
-        } } label: { Label("Rename", systemImage: "pencil") }
-        Button { run { choosingModel = true } } label: {
-            Label(conversation != nil ? "Model" : "Model & permissions", systemImage: "cpu")
-        }
-        .accessibilityIdentifier("menuModel")
-        if let terminals = TerminalScope.forThread(model.threadId, environmentId: model.thread?.environmentId) {
-            Button { run { showingFiles = true } } label: { Label("Files & changes", systemImage: "folder") }
-            Button { run { push(.terminals(scope: terminals, title: "Terminals")) } } label: {
-                Label("Terminals", systemImage: "apple.terminal")
+        case .model: choosingModel = true
+        case .files: showingFiles = true
+        case .terminals:
+            if let scope = TerminalScope.forThread(model.threadId, environmentId: model.thread?.environmentId) {
+                push(.terminals(scope: scope, title: "Terminals"))
             }
-        }
-        Button { run { showingHistory = true } } label: { Label("Recent prompts", systemImage: "clock.arrow.circlepath") }
-        if canSaveFiles {
-            Button { run { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: nil) } } label: {
-                Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
-            }
-        }
-        if let sourcePage {
-            Button { run { push(.page(id: sourcePage.id)) } } label: {
-                Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")
-            }
-        }
-        if ConversationFinish.canRemove(conversation?.conversation, running: model.thread?.isRunning == true) {
-            Button { run { finish() } } label: {
-                Label(finishing ? "Archiving…" : "Archive", systemImage: "archivebox")
-                Text(ConversationFinish.archiveHint)
-            }
-            .disabled(finishing)
-            .accessibilityIdentifier("menuArchive")
-            Button(role: .destructive) { run { confirmingDelete = true } } label: {
-                Label("Delete conversation…", systemImage: "trash")
-            }
-            .disabled(finishing)
-            .accessibilityIdentifier("menuDelete")
-        }
-        if compactHeader {
-            Menu { contextItems } label: { Label("Context", systemImage: "chart.bar") }
-            Menu { shareItems } label: { Label("Share & notifications", systemImage: "square.and.arrow.up") }
-        } else {
-            Section { contextItems }
-            shareItems
-        }
-    }
-
-    @ViewBuilder private var contextItems: some View {
-        if conversation == nil {
-            Button { run {
-                Task { if let id = await model.fork() { open(.thread(id: id)) } }
-            } } label: { Label("Fork thread", systemImage: "arrow.triangle.branch") }
-        }
-        Button { run { showingContext = true } } label: {
-            Label("Context usage", systemImage: "chart.bar")
-        }
-        Button { run { confirmingCompact = true } } label: { Label("Compact context", systemImage: "rectangle.compress.vertical") }
-        Button { run { confirmingClearContext = true } } label: { Label("Clear context", systemImage: "eraser") }
-    }
-
-    @ViewBuilder private var shareItems: some View {
-        let isMuted = muted.ids.contains(model.threadId)
-        Button { run {
+        case .history: showingHistory = true
+        case .saveFiles: savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: nil)
+        case .sourcePage: if let page = session.sourcePage { push(.page(id: page.id)) }
+        case .makeMain: if let conversation { makeMain(conversation) }
+        case .archive: finish()
+        case .delete: confirmingDelete = true
+        case .fork: Task { if let id = await model.fork() { open(.thread(id: id)) } }
+        case .contextUsage: showingContext = true
+        case .compact: confirmingCompact = true
+        case .clearContext: confirmingClearContext = true
+        case .toggleMute:
+            let isMuted = muted.ids.contains(model.threadId)
             Task {
-                do {
-                    try await muted.set(model.threadId, muted: !isMuted)
-                } catch {
+                do { try await muted.set(model.threadId, muted: !isMuted) } catch {
                     model.error = BBClient.describe(error, server: client.baseURL)
                 }
             }
-        } } label: {
-            Label(isMuted ? "Unmute notifications" : "Mute notifications", systemImage: isMuted ? "bell" : "bell.slash")
+        case .openWeb: showingWeb = true
+        case .copyId: UIPasteboard.general.string = model.threadId
         }
-        Button { run { showingWeb = true } } label: { Label("Open in BB web", systemImage: "safari") }
-        if let thread = model.thread {
-            ShareLink(item: client.webURL(forThread: thread).absoluteURL) {
-                Label("Share link", systemImage: "square.and.arrow.up")
-            }
-        }
-        Button { run { UIPasteboard.general.string = model.threadId } } label: { Label("Copy Thread ID", systemImage: "number") }
-    }
-
-    /// An action from the Workspace sheet (Info, More): the sheet goes first, so
-    /// what the action presents (a sheet, an alert, a push) can show.
-    private func run(_ action: @escaping () -> Void) {
-        guard showingWorkspace else { return action() }
-        showingWorkspace = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { action() }
     }
 
     @ViewBuilder private var jumpButton: some View {
@@ -1048,13 +871,13 @@ struct ThreadView: View {
             .modifier(BotComposerGlass(active: true))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("workerAsk")
-            .modifier(InlineJump(state: jumpInRail ? nil : jumpState) { transcriptV2.jumpToLatest() })
+            .modifier(InlineJump(state: jumpState) { transcriptV2.jumpToLatest() })
         }
         .modifier(TalkDraft(talk: talk, draft: $draftText.value, typed: $talkTyped))
         .onChange(of: draft) { _, _ in draftText.saveSoon(saveDraftLocally) }
-        .padding(.horizontal, duoLayout.twoPages ? Self.margin : 12)
+        .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .frame(maxWidth: Self.readableWidth)
+        .frame(maxWidth: readableWidth)
         .frame(maxWidth: .infinity)
     }
 
@@ -1090,12 +913,12 @@ struct ThreadView: View {
     }
 
     private func replyInThread(_ row: TimelineRow) {
-        if let id = ConversationReplies.existing(sideThreads, messageId: row.id) { return showThread(id) }
+        if let id = ConversationReplies.existing(sideThreads, messageId: row.id) { return showReply(id) }
         let threadId = model.threadId
         Task {
             do {
                 let opened = try await client.threadReply(threadId: threadId, messageId: row.id, sourceSeqEnd: row.sourceSeqEnd)
-                showThread(opened.threadId)
+                showReply(opened.threadId)
                 await loadSideThreads()
                 if opened.created { shell?.refresh() }
             } catch {
@@ -1104,8 +927,15 @@ struct ThreadView: View {
         }
     }
 
+    /// A side thread (a reply thread or a fork) opens over the conversation.
     private func showThread(_ id: String) {
-        if shell?.splitsThreads == true { shell?.push(.thread(id: id)) } else { replyThread = ReplyThreadSheet(id: id) }
+        push(.thread(id: id))
+    }
+
+    /// A reply thread: its composer says Reply….
+    private func showReply(_ id: String) {
+        Router.shared.replyThreads.insert(id)
+        showThread(id)
     }
 
     private func forkConversation(_ row: TimelineRow) {
@@ -1135,7 +965,7 @@ struct ThreadView: View {
     }
 
     private func finish() {
-        finishing = true
+        session.finishing = true
         let threadId = model.threadId
         Task {
             do {
@@ -1145,12 +975,12 @@ struct ThreadView: View {
             } catch {
                 model.error = BBClient.describe(error, plugin: "Studio", server: client.baseURL)
             }
-            finishing = false
+            session.finishing = false
         }
     }
 
     private func delete() {
-        finishing = true
+        session.finishing = true
         let threadId = model.threadId
         Task {
             do {
@@ -1160,15 +990,8 @@ struct ThreadView: View {
             } catch {
                 model.error = BBClient.describe(error, server: client.baseURL)
             }
-            finishing = false
+            session.finishing = false
         }
-    }
-
-    private var conversationTitle: some View {
-        ConversationTitle(title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? conversation?.conversation?.title ?? "Conversation",
-                          model: conversationModel?.chip ?? executionLabel, writing: model.thread?.isRunning == true,
-                          tabs: WorkspaceStore.shared.count(model.threadId),
-                          pages: roomChat?.pages, open: openWorkspace)
     }
 
     /// Replaces the `@word` being typed with the mention.
@@ -1220,10 +1043,6 @@ struct ThreadView: View {
         }
     }
 
-    private var stackLine: Bool { conversation != nil }
-
-    private var strands: StrandsModel { StrandsModel.shared }
-
     /// The thread Hand off continued in: a conversation of the Bot pages to it, any other thread opens over this one.
     private func openRouterThread(_ threadId: String) {
         guard let conversation else { return }
@@ -1245,168 +1064,37 @@ struct ThreadView: View {
         }
     }
 
-    /// A strand's worker, or the thread a worker's question waits in.
-    private func openStrandThread(_ threadId: String) {
-        if let conversation { conversation.push(.thread(id: threadId)) } else { open(.thread(id: threadId)) }
-    }
 
-    private var stackClear: CGFloat { duoLayout.twoPages ? duoLayout.statusColumn : 0 }
+    // MARK: Above a Bot conversation's composer
 
-    // MARK: The Workspace (round 5, change 3)
-
-    /// The Workspace: Info and Strands, then the conversation's tabs.
-    @ViewBuilder private func workspace(trailingClear: CGFloat = 0) -> some View {
-        WorkspaceView(threadId: model.threadId, trailingClear: trailingClear,
-                      openThread: { id in run { conversation?.openConversation(id) } },
-                      webURL: model.thread.map { client.webURL(forThread: $0) }) {
-            workspaceInfo
-        } strands: {
-            ScrollView {
-                StrandsBox(threadId: model.threadId, panel: true, openThread: { id in run { openStrandThread(id) } })
-                    .padding(12)
-            }
-        }
-    }
-
-    /// Info, in the Workspace sheet: the actions run here, after the sheet goes.
-    private var workspaceInfo: some View {
-        WorkspaceInfoView(thread: model.thread, modelLabel: conversationModel?.chip ?? executionLabel,
-                              cards: approvals.cards.filter { $0.approval.state.waiting },
-                              muted: muted.ids.contains(model.threadId),
-                              canArchive: ConversationFinish.canRemove(conversation?.conversation, running: model.thread?.isRunning == true),
-                              archiving: finishing, shareURL: model.thread.map { client.webURL(forThread: $0).absoluteURL },
-                              act: infoAction) {
-                NavigationLink {
-                    List { menuItems }
-                        .navigationTitle("More")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar { Button("Done") { showingWorkspace = false }.accessibilityIdentifier("workspaceDone") }
-                } label: {
-                    LabeledContent("More", value: "Main, context, files, web, ID")
-                }
-                .accessibilityIdentifier("workspaceMore")
-            }
-    }
-
-    /// What Info asks for, from the sheet or (on the unfolded Duo) from the right screen.
-    private func infoAction(_ action: WorkspaceInfoAction) {
-        switch action {
-        case .approval(let id):
-            run {
-                hiddenApprovals.remove(id)
-                ApprovalSlots.shared.bringUp(id, in: model.threadId)
-            }
-        case .model: run { choosingModel = true }
-        case .notifications:
-            let isMuted = muted.ids.contains(model.threadId)
-            Task {
-                do { try await muted.set(model.threadId, muted: !isMuted) } catch {
-                    model.error = BBClient.describe(error, server: client.baseURL)
-                }
-            }
-        case .find: run { finding = true }
-        case .rename:
-            run {
-                newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
-                renaming = true
-            }
-        case .handsFree: run { startHandsFree() }
-        case .archive: run { finish() }
-        case .more: showingMore = true
-        }
-    }
-
-    /// The title: on the unfolded Duo it shows Info on the right screen; elsewhere it opens the Workspace sheet.
-    private func openWorkspace() {
-        WorkspaceStore.shared.selected[model.threadId] = WorkspaceStore.info
-        if let show = roomChat?.showWorkspace { show() } else {
-            workspaceDetent = .medium
-            showingWorkspace = true
-        }
-    }
-
-    // MARK: A Bot conversation's slot, chips and notices
-
-    /// The approval card's pages: actionable approvals, then desktop-only Tool Gateway asks.
-    private var slotPages: [ComposerSlot.Page] {
-        ComposerSlot.pages(approvals.cards, gateway: ComposerSlot.gatewayAsks(strands.list(model.threadId)), hidden: hiddenApprovals)
-    }
-
-    /// The one thing above a Bot conversation's composer (`ComposerSlot`).
-    @ViewBuilder private func conversationSlot(_ conversation: BotConversationContext) -> some View {
-        let pages = slotPages
-        let notice = RouterNotices.shared.notices[model.threadId]?.text.map { !$0.isEmpty } ?? false
-        let pick = ComposerSlot.pick(.init(
-            approvals: pages.count, routerNotice: notice, planReview: model.planReview != nil && !editing,
-            onlyStrand: strands.only[model.threadId] != nil,
-            strands: roomChat?.strandsBeside != true && StrandsBoxModel.shown(strands.list(model.threadId))))
-        Group {
-            switch pick {
-            case .approval:
-                approvalSlot(pages, conversation)
-            case .routerNotice:
-                RouterNoticeBanner(threadId: model.threadId, openThread: openRouterThread)
-            case .planReview:
-                if let review = model.planReview {
-                    ShelfCard(icon: "doc.text.magnifyingglass", tint: look.needsYou) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Plan ready for review").fontWeight(.medium)
-                            if let title = review.title, !title.isEmpty {
-                                Text(title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                            }
-                        }
-                    } trailing: {
-                        Button("Review") { reviewingPlan = review }
-                            .font(.footnote.weight(.semibold))
-                            .frame(minWidth: 44, minHeight: 44)
+    /// The one thing above a Bot conversation's composer: the model router's
+    /// offer to hand off, else a plan to review. Approvals are in the
+    /// transcript; states that last are chips, and the running time and the
+    /// queue are the composer's own status line.
+    @ViewBuilder private var conversationSlot: some View {
+        if RouterNotices.shared.notices[model.threadId]?.text.map({ !$0.isEmpty }) ?? false {
+            RouterNoticeBanner(threadId: model.threadId, openThread: openRouterThread)
+        } else if let review = model.planReview, !editing {
+            ShelfCard(icon: "doc.text.magnifyingglass", tint: look.accent) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Plan ready for review").fontWeight(.medium)
+                    if let title = review.title, !title.isEmpty {
+                        Text(title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
-            case .onlyStrand:
-                if let only = strands.only[model.threadId] {
-                    StrandFilterBar(title: strands.title(only, in: model.threadId)) {
-                        withAnimation(.snappy) { strands.only[model.threadId] = nil }
-                    }
-                }
-            case .strands:
-                StrandsBox(threadId: model.threadId, typing: composerFocused, openThread: openStrandThread)
-            case .none:
-                EmptyView()
+            } trailing: {
+                Button("Review") { reviewingPlan = review }
+                    .font(.footnote.weight(.semibold))
+                    .frame(minWidth: 44, minHeight: 44)
             }
         }
-        .onChange(of: approvals.cards.map(\.id), initial: true) { _, ids in
-            ApprovalSlots.shared.set(Set(ids), for: model.threadId)
-        }
-        .onChange(of: pages.map(\.id)) { _, _ in
-            approvalPage = ComposerSlot.page(approvalPage, previousId: approvalPageId, in: slotPages)
-        }
-        .onChange(of: ApprovalSlots.shared.requests[model.threadId]) { _, request in
-            guard request != nil, let id = ApprovalSlots.shared.take(model.threadId) else { return }
-            hiddenApprovals.remove(id)
-            if let index = slotPages.firstIndex(where: { $0.id == id }) {
-                approvalPage = index
-                approvalPageId = id
-            }
-        }
-        .onDisappear { ApprovalSlots.shared.clear(model.threadId) }
     }
 
-    @ViewBuilder private func approvalSlot(_ pages: [ComposerSlot.Page], _ conversation: BotConversationContext) -> some View {
-        let index = min(max(0, approvalPage), pages.count - 1)
-        let next = {
-            approvalPage = (index + 1) % pages.count
-            approvalPageId = pages[approvalPage].id
-        }
-        switch pages[index] {
-        case .approval(let card):
-            ApprovalSlotCard(card: card, index: index, count: pages.count, next: next,
-                             hide: { withAnimation(.snappy) { _ = hiddenApprovals.insert(card.id) } },
-                             openWorker: { conversation.push(.thread(id: card.approval.worker.threadId)) },
-                             decide: { decideApproval(card.id, $0) })
-        case .gateway(let ask):
-            let id = pages[index].id
-            GatewaySlotCard(ask: ask, index: index, count: pages.count, next: next,
-                            hide: { withAnimation(.snappy) { _ = hiddenApprovals.insert(id) } })
-        }
+    /// The composer's status line: working and for how long, and the queue.
+    private var composerStatus: ComposerStatus? {
+        ComposerStatus(running: model.thread?.isRunning == true && !isWorker,
+                       since: model.rows.last { $0.isConversation && $0.isUser }?.createdAt,
+                       queued: model.queued.count)
     }
 
     /// A Bot conversation's lasting states, as chips in the composer's top row.
@@ -1414,7 +1102,7 @@ struct ThreadView: View {
         guard let conversation else { return [] }
         return ComposerChip.chips(
             pause: conversation.botPause, planning: model.shelf.isPlanning, goal: model.shelf.goal?.objective,
-            todos: model.shelf.todos, background: model.shelf.background.count, queued: model.queued.count,
+            todos: model.shelf.todos, background: model.shelf.background.count,
             note: notes.note != nil && !editing, editing: editing, permission: editing ? nil : pendingPermission,
             handingOff: handoffStatus?.working == true)
     }
@@ -1434,7 +1122,6 @@ struct ThreadView: View {
         case .planMode: Task { await model.perform { try await $0.exitPlanMode($1) } }
         case .goal: Task { await model.perform { try await $0.clearGoal($1) } }
         case .todos: showingTodos = true
-        case .queued: showingQueue = true
         case .notes: if let note = notes.note { notes.editing = note }
         case .permission: choosingModel = true
         case .editing, .background, .handingOff: break
@@ -1472,14 +1159,10 @@ struct ThreadView: View {
 
     private var threadComposer: some View {
         VStack(spacing: 8) {
-            if let conversation {
-                conversationSlot(conversation)
-                    .padding(.trailing, stackClear)
+            if conversation != nil {
+                conversationSlot
             } else {
-                if !(composerFocused && stackLine) {
-                    ThreadShelf(model: model, shelf: model.shelf, queued: model.queued, showsBackground: true)
-                        .padding(.trailing, stackClear)
-                }
+                ThreadShelf(model: model, shelf: model.shelf, queued: model.queued, showsBackground: true)
                 if let error = outbox.storageError {
                     ShelfCard(icon: "exclamationmark.triangle", tint: .red) {
                         Text(error).lineLimit(3)
@@ -1496,7 +1179,7 @@ struct ThreadView: View {
                 if let status = handoffStatus {
                     ShelfCard(icon: status.working ? "arrow.triangle.2.circlepath" : "checkmark.circle", tint: status.working ? .secondary : .green) {
                         HStack(spacing: 6) {
-                            if status.working { ProgressView().controlSize(.mini) }
+                            if status.working { RunningGlyph().accessibilityHidden(true) }
                             Text(status.text).lineLimit(1)
                         }
                     } trailing: { EmptyView() }
@@ -1573,8 +1256,7 @@ struct ThreadView: View {
                 compact: true, prominentMic: compactInput, micTint: compactInput ? look.micTint : nil,
                 stop: conversation != nil && model.thread?.isRunning == true && !isWorker ? { Task { await model.stop() } } : nil,
                 handsFree: conversation != nil ? { startHandsFree() } : nil,
-                top: conversation != nil && !composerChips.isEmpty
-                    ? AnyView(ComposerChipsRow(chips: composerChips, goal: model.shelf.goal?.objective, tap: tapChip, close: closeChip)) : nil
+                top: composerTop
             ) {
                 if !compactInput {
                     Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
@@ -1614,7 +1296,7 @@ struct ThreadView: View {
             .modifier(BotComposerGlass(active: true))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("threadComposer")
-            .modifier(InlineJump(state: jumpInRail ? nil : jumpState) { transcriptV2.jumpToLatest() })
+            .modifier(InlineJump(state: jumpState) { transcriptV2.jumpToLatest() })
         }
         .animation(.smooth(duration: 0.25), value: model.interactions.first?.id)
         // Kept with the draft text, for when the thread opens again.
@@ -1628,9 +1310,9 @@ struct ThreadView: View {
         }
         // Floats over the transcript, as in the Bot chat: no bar behind it.
         // Beside two pages it has the transcript's margins.
-        .padding(.horizontal, duoLayout.twoPages ? Self.margin : 12)
+        .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .frame(maxWidth: Self.readableWidth)
+        .frame(maxWidth: readableWidth)
         .frame(maxWidth: .infinity)
         // A `bbstudio://reply/<id>` link lands here.
         .onReceive(Router.shared.$replyThreadId) { id in
@@ -1643,17 +1325,32 @@ struct ThreadView: View {
             guard conversation != nil else { return }
             await RouterNotices.shared.poll(model.threadId)
         }
-        .onChange(of: StrandsModel.shared.flash[model.threadId]) { _, seq in
-            if let seq { showReply(seq) }
-        }
         .task(id: conversation != nil ? model.threadId : "") {
             guard conversation != nil else { return }
-            await StrandsModel.shared.poll(model.threadId)
+            await StrandTagStore.shared.poll(model.threadId)
         }
     }
 
+    /// The composer's top: its status line (working, the queue), then the chips of a Bot conversation.
+    private var composerTop: AnyView? {
+        let status = conversation != nil ? composerStatus : nil
+        let chips = conversation != nil ? composerChips : []
+        guard status?.shown == true || !chips.isEmpty else { return nil }
+        return AnyView(VStack(alignment: .leading, spacing: 0) {
+            if let status, status.shown { ComposerStatusLine(status: status) { showingQueue = true } }
+            if !chips.isEmpty {
+                ComposerChipsRow(chips: chips, goal: model.shelf.goal?.objective, tap: tapChip, close: closeChip)
+            }
+        })
+    }
+
+    /// A swipe this far (or flung this far) flips Chat and Workbench.
+    static let flipDistance: CGFloat = 60
+
     /// Lines past this get hard to follow on an iPad or a wide window.
     private static let readableWidth: CGFloat = 760
+    /// The vertical Duo's measure (9f): its larger type keeps lines near 560 pt of text.
+    private var readableWidth: CGFloat { posture.largeType ? 600 : Self.readableWidth }
     /// The transcript's side margins: the Bot chat's bubbles sit closer to the edges.
     private static let margin: CGFloat = 16
 }
@@ -1722,7 +1419,8 @@ struct WorkingIndicator: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            ProgressView().controlSize(.small)
+            // Still, not a spinner: a turn can run for many minutes.
+            RunningGlyph().accessibilityHidden(true)
             Text(summary)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -1737,6 +1435,57 @@ struct WorkingIndicator: View {
         guard let line, !line.trimmingCharacters(in: .whitespaces).isEmpty else { return "Working…" }
         return line.replacingOccurrences(of: "**", with: "")
     }
+}
+
+/// A thread's hooks: Notes once allowed, talk's wiring, its failures, focus
+/// requests and the menu's commands. One level of the view's type.
+private struct ThreadHooks: ViewModifier {
+    let canUseNotes: Bool
+    let talkError: String?
+    let focusRequests: Int
+    let command: ConversationCommand?
+    let notesAllowed: @MainActor () -> Void
+    let appear: @MainActor () -> Void
+    let talkFailed: @MainActor (String) -> Void
+    let focus: @MainActor () -> Void
+    let take: @MainActor () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: canUseNotes) { _, can in if can { notesAllowed() } }
+            .onAppear(perform: appear)
+            .onChange(of: talkError) { _, error in if let error { talkFailed(error) } }
+            .onChange(of: focusRequests) { _, _ in focus() }
+            .onChange(of: command) { _, _ in take() }
+    }
+}
+
+/// A thread's haptics, its keyboard commands and its Handoff activity: one
+/// modifier, one level of the view's type rather than seven (the Release
+/// main-thread stack, `LaunchStackUITests`).
+private struct ThreadFeedback: ViewModifier {
+    let actions: ThreadActions
+    let confirmations: Int
+    let sends: Int
+    let interactions: Int
+    let error: String?
+    let attachments: Int
+    let hasThread: Bool
+    let describe: (NSUserActivity) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .focusedSceneValue(\.thread, actions)
+            .sensoryFeedback(.success, trigger: confirmations)
+            .sensoryFeedback(.impact(weight: .medium), trigger: sends)
+            .sensoryFeedback(.warning, trigger: interactions, condition: Self.grew)
+            .sensoryFeedback(.error, trigger: error) { (_: String?, new: String?) in new != nil }
+            .sensoryFeedback(.selection, trigger: attachments, condition: Self.grew)
+            .userActivity(Spotlight.threadActivityType, isActive: hasThread, describe)
+    }
+
+    /// For the haptics on a count: it went up.
+    private static func grew(_ old: Int, _ new: Int) -> Bool { new > old }
 }
 
 /// Where the reader left off: everything below arrived since they last looked.
@@ -1903,60 +1652,8 @@ extension ThreadView {
                                         findQuery: findQuery))
             .environment(\.threadId, model.threadId)
             .environment(\.openURL, transcriptV2OpenURL)
-            .navigationTitle(model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(duoLayout.twoPages || (sizeClass == .compact && hidesTabBar) ? .hidden : .automatic, for: .tabBar)
-            .toolbar(duoLayout.twoPages || compactHeader ? .hidden : .automatic, for: .navigationBar)
-            .toolbar {
-                if !duoLayout.twoPages {
-                    ToolbarItemGroup(placement: .topBarTrailing) { AnyView(threadActions) }
-                }
-                if conversation != nil && !duoLayout.twoPages {
-                    ToolbarItem(placement: .principal) { conversationTitle }
-                }
-                if conversation == nil && !duoLayout.twoPages, let worker {
-                    ToolbarItem(placement: .principal) { WorkerTitle(info: worker) }
-                }
-            }
-            .overlay { if compactHeader && !lying { FoldedColumn { AnyView(compactActions) } } }
-            .onAppear { roomSession?.transcript = transcriptV2 }
+            .onAppear { session.transcript = transcriptV2 }
     }
-
-    /// The folded Duo's header: its buttons in the right column and a one-line title (`FoldedChrome`).
-    fileprivate var compactHeader: Bool { (FoldedChrome.columnHeader || duoPage) && !duoLayout.twoPages }
-
-    @ViewBuilder fileprivate var compactActions: some View {
-        // Back out of whichever stack it's on, and the thread's own actions.
-        if let showList = roomChat?.showList {
-            Button(action: showList) { Label("Conversations", systemImage: "list.bullet") }
-                .accessibilityIdentifier("roomList")
-        } else if let roomChat {
-            Button { roomChat.layDown() } label: { Label("Back to the room", systemImage: "chevron.down") }
-                .accessibilityIdentifier("roomLayDown")
-        } else {
-            FoldedBackButton()
-        }
-        if conversation != nil { AnyView(railActions) } else { AnyView(threadActions) }
-        // The ↓ joins the rail's round buttons, so it never narrows the composer. With the
-        // keyboard up the rail has no room under ⋯; sending jumps to the end anyway.
-        if jumpState.shown && !composerFocused {
-            Button { transcriptV2.jumpToLatest() } label: {
-                Label(jumpState.note.map { "Jump to latest, \($0)" } ?? (jumpState.unseen > 0 ? "Jump to latest, new messages" : "Jump to latest"),
-                      systemImage: jumpState.note != nil ? "questionmark.bubble" : "arrow.down")
-            }
-            .overlay(alignment: .topTrailing) {
-                if jumpState.unseen > 0, jumpState.note == nil {
-                    Circle().fill(look.accent).frame(width: 9, height: 9).offset(x: -6, y: 6).allowsHitTesting(false)
-                }
-            }
-            .tint(jumpState.note != nil ? look.needsYou : nil)
-            .transition(.opacity.combined(with: .scale(scale: 0.8)))
-            .accessibilityIdentifier("jumpToLatest")
-        }
-    }
-
-    /// The folded Duo's rail is drawn: the ↓ is one of its buttons, not beside the composer.
-    fileprivate var jumpInRail: Bool { compactHeader && !lying }
 
     private var transcriptV2Body: some View {
         let chrome = transcriptV2Chrome
@@ -1974,13 +1671,15 @@ extension ThreadView {
             TranscriptContainer(
                 items: transcriptV2Rows, chrome: chrome, handle: transcriptV2,
                 row: { row in ThreadTranscriptRowView(row: row, actions: actions) },
-                composer: { Isolated { composer }.opacity(lying ? 0 : 1).allowsHitTesting(!lying).accessibilityHidden(lying) },
+                composer: { Isolated { composer } },
                 top: hasTop ? { transcriptV2Top } : nil,
                 pill: { state, jump in transcriptV2Pill(state, jump: jump) },
                 onNearTop: { transcriptV2LoadOlder() },
-                onEmptyTap: roomChat?.layDown,
-                onPage: lying || composerFocused ? nil : roomChat?.page,
-                rowsHidden: lying,
+                onPage: composerFocused || !flips ? nil : { [session] _, predicted in
+                    guard let predicted, predicted < -ThreadView.flipDistance else { return }
+                    withAnimation(.snappy(duration: 0.25)) { session.showsWorkbench = true }
+                },
+                cover: workbench,
                 onPillChange: { state in
                     let next = TranscriptPillState(shown: state.shown, unseen: min(state.unseen, 1), note: state.note)
                     Task { @MainActor in if jumpState != next { jumpState = next } }
@@ -2011,8 +1710,6 @@ extension ThreadView {
         }
         // Beside two pages the header owns the status-bar strip: the
         // transcript's scroll view mustn't take its taps as scroll-to-top.
-        .onAppear { StatusBarStrip.schedule() }
-        .onChange(of: model.loaded) { _, _ in StatusBarStrip.schedule() }
         #if DEBUG
         .onDisappear { DuoDemo.surfaces["transcript-" + model.threadId] = nil }
         #endif
@@ -2084,32 +1781,21 @@ extension ThreadView {
     fileprivate var transcriptV2Rows: [ThreadTranscriptRow] {
         guard model.loaded else { return [] }
         let pending = outbox.messages(for: model.threadId)
-        let items = inRoom ? RoomText.clean(model.shownItems) : model.shownItems
+        let items = conversation != nil ? ConversationText.clean(model.shownItems) : model.shownItems
         let rows = ThreadTranscriptRow.thread(items: items, hasOlder: model.hasOlder, unread: unreadItem(in: items), match: currentMatch,
             editableId: worker == nil ? lastUserRowId : nil, pending: pending, interactions: shownInteractions,
             working: showsWorking, thinking: model.shelf.thinking, sideThreads: conversation != nil ? sideThreads : [:])
-        let shown = inRoom ? RoomText.rows(rows) : rows
-        // Strands in a Bot conversation: dividers where the strand changes, or only one strand.
-        guard conversation != nil else { return shown }
-        return ThreadTranscriptRow.strands(shown, tags: strands.tags[model.threadId], only: strands.only[model.threadId],
-                                           flash: strands.flash[model.threadId])
+        guard conversation != nil else { return rows }
+        // A Bot conversation: its strand tags in the footers, its workers' approvals and its notices at the end.
+        return ThreadTranscriptRow.strandTags(ConversationText.rows(rows), tags: StrandTagStore.shared.tags[model.threadId])
+            + approvals.cards.map(ThreadTranscriptRow.approval)
             + transcriptNotices.map(ThreadTranscriptRow.notice)
-    }
-
-    /// Jump to reply (the strands box): the reply that asks comes into view while its sentence flashes.
-    fileprivate func showReply(_ seq: Double) {
-        guard let row = transcriptV2Rows.first(where: { row in
-            if case .item(_, let state) = row { return state.ask?.seq == seq }
-            return false
-        }) else { return }
-        transcriptV2.scrollTo(row.id, position: .center, animated: true)
     }
 
     fileprivate var transcriptV2Actions: ThreadTranscriptActions {
         let inConversation = conversation != nil
         let threadId = model.threadId
         return ThreadTranscriptActions(
-            onlyStrand: inConversation ? { strandId in withAnimation(.snappy) { StrandsModel.shared.only[threadId] = strandId } } : nil,
             projectId: model.thread?.projectId, reactionItems: reactionSettings.items, cached: model.showsCache,
             draftReply: { draftReply($0) }, sendReply: { send(text: $0) }, quote: { quote($0) },
             select: { selecting = SelectionText(text: $0) }, edit: startEditing,
@@ -2121,6 +1807,7 @@ extension ThreadView {
             replier: conversation?.look,
             resolve: { await model.resolve($0, $1) }, cancel: { await model.cancel($0) }, openWeb: { showingWeb = true },
             notice: { act($0) },
+            decide: { decideApproval($0, $1) },
             threadTitle: { [conversation] id in
                 guard let conversation else { return nil }
                 if id == conversation.mainThreadId { return "Main" }
@@ -2134,26 +1821,27 @@ extension ThreadView {
         // The composer's own 8 pt padding is the gap above the keyboard or the edge.
         chrome.composerGap = 0
         // The Duo's inner screen draws no home indicator (its 34-point inset is reported anyway).
-        chrome.composerIgnoresBottomSafeArea = duoLayout.innerScreen
+        chrome.composerIgnoresBottomSafeArea = innerScreen && UIDevice.current.userInterfaceIdiom == .phone
         // Over a home indicator alone (the folded Duo, a phone's thread),
         // the card rests on its inset: its own 8 pt padding goes inside it.
         chrome.composerRestDrop = 8
         chrome.restingBackdrop = look.showsScene ? UIColor(look.canvas) : .systemBackground
         chrome.stackBand = look.showsScene ? UIColor(look.canvas) : .systemBackground
-        chrome.composerIgnoresTrailingSafeArea = duoLayout.twoPages
         chrome.rows.margin = Self.margin
         chrome.rows.spacing = 10
-        chrome.rows.readableWidth = Self.readableWidth
-        if duoLayout.twoPages {
-            chrome.rowsTrailingClear = RegularScrollingSurface.inset(column: duoLayout.statusColumn, width: duoLayout.detailWidth,
-                readableWidth: Self.readableWidth)
+        chrome.rows.readableWidth = readableWidth
+        if posture.splitsWorkbench {
+            // The left page of two: its stack still hands the transcript the
+            // window's trailing inset (the status column, a screen away).
+            chrome.composerIgnoresTrailingSafeArea = true
+            chrome.rowsTrailingClear = 0
         }
         chrome.pill = .inline
         chrome.nearEnd = 120
         return chrome
     }
 
-    fileprivate var transcriptV2HasTop: Bool { finding || duoLayout.twoPages || compactHeader }
+    fileprivate var transcriptV2HasTop: Bool { finding }
 
     /// Monotonic token bumped only when `ThreadView.body` runs, never on pure `rowsBox` ticks.
     fileprivate final class ChromeTick {
@@ -2169,59 +1857,11 @@ extension ThreadView {
         var matchCount: Int
     }
 
-    /// The Duo's header beside two pages, and the find bar under it.
+    /// The find bar, over the top of the rows.
     fileprivate var transcriptV2Top: some View {
-        VStack(spacing: 0) {
-            if compactHeader {
-                Group {
-                    if let worker {
-                        // A worker: its name and state, as the navigation bar's WorkerTitle says them.
-                        TimelineView(.periodic(from: .now, by: 60)) { context in
-                            FoldedChatTitle(avatar: nil, title: worker.displayTitle, status: worker.headerLabel(now: context.date))
-                                .accessibilityElement(children: .ignore)
-                                .accessibilityLabel("\(worker.displayTitle), \(worker.stateLabel)")
-                                .accessibilityValue(worker.status.rawValue)
-                                .accessibilityIdentifier("workerTitle")
-                        }
-                    } else {
-                        FoldedChatTitle(avatar: nil, title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread", status: nil)
-                    }
-                }
-                    .background(roomChat == nil ? AnyShapeStyle(.bar) : AnyShapeStyle(.clear))
-                    .background {
-                        if roomChat != nil {
-                            // In the room, the frost's own tone fading out below
-                            // the title: the rows pass under it, not under a box.
-                            LinearGradient(stops: [.init(color: look.canvas.opacity(0.85), location: 0),
-                                                   .init(color: look.canvas.opacity(0.85), location: 0.55),
-                                                   .init(color: look.canvas.opacity(0), location: 1)],
-                                           startPoint: .top, endPoint: .bottom)
-                                .padding(.bottom, -18)
-                                .ignoresSafeArea(edges: .top)
-                        }
-                    }
-                    .opacity(lying ? 0 : 1)
-                    .accessibilityHidden(lying)
-            }
-            if duoLayout.twoPages {
-                DuoHeader {
-                    if conversation != nil {
-                        conversationTitle
-                    } else if let worker {
-                        WorkerTitle(info: worker)
-                    } else {
-                        Text(model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
-                            .font(.headline).lineLimit(1).accessibilityIdentifier("duoThreadTitle")
-                    }
-                } actions: { threadActions }
-            }
-            if finding {
-                FindBar(query: $findQuery, index: $findIndex, count: findMatches.count, loading: model.loadingAll) {
-                    finding = false
-                    findQuery = ""
-                }
-                .padding(.trailing, duoLayout.statusColumn)
-            }
+        FindBar(query: $findQuery, index: $findIndex, count: findMatches.count, loading: model.loadingAll) {
+            finding = false
+            findQuery = ""
         }
     }
 
@@ -2265,11 +1905,7 @@ extension ThreadView {
         .padding(12)
         .accessibilityLabel(label.map { "Jump to latest, \($0)" } ?? "Jump to latest")
         .accessibilityIdentifier("jumpToLatest")
-        if duoLayout.twoPages {
-            button.frame(maxWidth: .infinity)
-        } else {
-            button
-        }
+        button
     }
 
     /// Older pages while the top is near: the container keeps the reader's

@@ -458,3 +458,8 @@ struct SelectableText: UIViewRepresentable {
         }
     }
 }
+
+extension Look {
+    /// The mic's and "+"'s tint in a Bot conversation: the Bot's presence colour.
+    var micTint: Color { Color(lookHex: tokens.presence.palette.first ?? tokens.accent) }
+}

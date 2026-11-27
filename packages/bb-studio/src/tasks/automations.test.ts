@@ -79,11 +79,10 @@ function setup(deps: Partial<AutomationTaskDeps> = {}) {
     sdk: { threads: { get: async () => null, update: vi.fn(async () => ({})), timeline: vi.fn(async () => ({ rows: [] })) } },
   };
   const post = async (text: string) => { posts.push(text); };
-  const loops = registerLoops(bb as never, db, post, () => "UTC");
+  const loops = registerLoops(bb as never, db);
   withTaskTools(tools, db, registerTasks(bb as never, db, post, async (threadId, text) => { sent.push({ threadId, text }); }));
   registerUserTasks(bb as never, db, {
-    post, send: async (threadId, text) => { sent.push({ threadId, text }); }, thread: async () => null,
-    loopAct: (x) => loops.actDirect(x), reopenLoop: () => {}, snoozeLoopUntil: () => {}, held: () => [],
+    thread: async () => null, held: () => [],
   });
   const tool = async (name: string, input: unknown, threadId: string) => JSON.parse(await tools[name]!.execute(input, { threadId }));
   const exec = (name: string, input: unknown, threadId: string) => tools[name]!.execute(input, { threadId });
@@ -326,10 +325,10 @@ it("a finding closes when its condition clears: no repeat for 30 hours and a run
 
 it("a finding the user dismissed stays quiet while it repeats, and comes back as new once it has cleared", async () => {
   seed();
-  const { store, tasks, handlers } = setup();
+  const { store, tasks } = setup();
   tasks.watcherRun("aut_silent", "Spend $5.10 over budget", null, NOW);
   const [spend] = children(store, "aut_silent");
-  await handlers["tasks.act"]!({ id: spend!.id, action: "drop" });
+  store.change(spend!.id, (t) => { t.state = "dropped"; }, "patrick");
   expect(tasks.watcherRun("aut_silent", "Spend $5.90 over budget", null, NOW + 10 * HOUR)).toBe("quiet");
   expect(store.get(spend!.id)).toMatchObject({ state: "dropped", automation: { count: 2 } });
   tasks.watcherRun("aut_silent", null, "", NOW + 50 * HOUR);
@@ -559,10 +558,10 @@ it("P3: the Bot's own check-in matches its scheduled item; tools refuse to chang
 it("re-review: a dismissed finding that turns critical reopens and posts; [info] on a finding with no severity is not worse; a worse post goes to the finding's owner", async () => {
   seed();
   runner("run_lead", "Kensico lead", "thr_kensico");
-  const { store, tasks, handlers } = setup();
+  const { store, tasks } = setup();
   tasks.watcherRun("aut_silent", "[warn] Spend $5.10 over budget", null, NOW);
   const [spend] = children(store, "aut_silent");
-  await handlers["tasks.act"]!({ id: spend!.id, action: "drop" });
+  store.change(spend!.id, (t) => { t.state = "dropped"; }, "patrick");
   expect(tasks.watcherRun("aut_silent", "[warn] Spend $5.40 over budget", null, NOW + HOUR)).toBe("quiet");
   const critical = tasks.watcherRun("aut_silent", "[critical] Spend $9.90 over budget", null, NOW + 2 * HOUR);
   expect(critical).toMatchObject({ post: "Spend $9.90 over budget", taskId: spend!.id });

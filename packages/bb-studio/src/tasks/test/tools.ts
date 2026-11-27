@@ -5,7 +5,11 @@
 import type Database from "better-sqlite3";
 import type { registerTasks } from "../register";
 import { guardTasks } from "../store";
+import { randomUUID } from "node:crypto";
 import { LoopStore } from "../../loops/store";
+import type { Loop } from "../../loops/contract";
+import { TaskStore } from "../store";
+import { taskFromLoop } from "../views";
 import { closedByUser, KEPT_CLOSED } from "../contract";
 
 type Ctx = { threadId?: string | null };
@@ -54,13 +58,31 @@ export function withWorkTools<T extends WorkApi>(tools: Record<string, TestTool>
   return work;
 }
 
-/** An old to-do the user typed (the phone's and desktop's add are gone): theirs, surfaced, as loops.add made it. */
-export function addTodo(db: Database.Database, text: string) {
-  const store = new LoopStore(db);
-  const loop = store.add({ title: text, status: "surfaced", owner: "patrick" });
-  store.event(loop.id, "added_by_you");
+/** An old to-do row, written in its old shape (nothing adds to-dos any more; old ones stay in the tasks table). */
+export function seedTodo(db: Database.Database, input: Partial<Loop> & { title: string }): Loop {
+  const now = Date.now();
+  const loop: Loop = { why: "", source: null, kind: "do", options: [], owner: "patrick", trigger: { type: "none" }, priority: "normal", push: false, status: "queued", due: null, area: null, ...input, id: input.id ?? `loop_${randomUUID()}`, createdAt: now, updatedAt: now, closedAt: null, closedBy: null };
+  new TaskStore(db).write(taskFromLoop(loop));
   return loop;
 }
 
-/** The old to-do groups, read straight from the store now that loops.list answers empty. */
-export const todoGroups = (db: Database.Database) => new LoopStore(db).groups();
+/** An old to-do the user typed (the phone's and desktop's add are gone): theirs, surfaced, as loops.add made it. */
+export function addTodo(db: Database.Database, text: string) {
+  const loop = seedTodo(db, { title: text, status: "surfaced", owner: "patrick" });
+  new TaskStore(db).event(loop.id, "added_by_you");
+  return loop;
+}
+
+/** The old to-do groups (loops.list's), read from the old to-do rows. */
+export function todoGroups(db: Database.Database) {
+  const g = { needsYouNow: [] as Loop[], comingUp: [] as Loop[], agentsOnIt: [] as Loop[], waitingOnOthers: [] as Loop[], done: [] as Loop[] };
+  const waits = (l: Loop) => !l.closedAt && (l.status === "queued" || l.status === "snoozed");
+  for (const l of new LoopStore(db).all()) {
+    if (l.closedAt) { if (l.closedAt > Date.now() - 7 * 86400000) g.done.push(l); }
+    else if (l.kind === "waiting") g.waitingOnOthers.push(l);
+    else if (l.owner !== "patrick" && !waits(l)) g.agentsOnIt.push(l);
+    else if (l.owner === "patrick" && l.status === "surfaced") g.needsYouNow.push(l);
+    else g.comingUp.push(l);
+  }
+  return g;
+}

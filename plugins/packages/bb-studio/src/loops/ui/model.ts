@@ -4,11 +4,10 @@
 // Everything here is pure; times read in Todos' time zone when one is
 // passed (the todosTimeZone setting), else in the browser's.
 import type { Loop } from "../contract";
-import { addDays, dayNumber, wall, zoneOption } from "../clock";
+import { dayNumber, wall, zoneOption } from "../clock";
 
 export type LoopKind = Loop["kind"];
 export type Trigger = Loop["trigger"];
-export type SnoozePreset = "later_today" | "tonight" | "tomorrow_morning" | "this_weekend" | "home";
 
 export const KIND: Record<LoopKind, { label: string; icon: string }> = {
   do: { label: "Do", icon: "Circle" },
@@ -17,16 +16,6 @@ export const KIND: Record<LoopKind, { label: string; icon: string }> = {
   waiting: { label: "Waiting on others", icon: "TimeSchedule" },
 };
 
-export function areaChips(areas: readonly string[] | undefined, selected: string | null): (string | null)[] {
-  const names = [...(areas ?? [])];
-  if (selected && !names.includes(selected)) names.push(selected);
-  return [null, ...names];
-}
-
-/** Inline decide options; past this many, the card shows "Choose…". */
-export const INLINE_OPTIONS = 3;
-
-const DAY = 86_400_000;
 // toLocale*String builds a new Intl.DateTimeFormat on every call, which is slow
 // in a list of cards that re-renders; one formatter per shape and zone instead.
 const formatters = new Map<string, Intl.DateTimeFormat>();
@@ -85,7 +74,7 @@ export function placeLabel(place: string, direction: "arrive" | "leave" = "arriv
   return direction === "arrive" ? (key === "home" ? "When you get home" : `When you get to ${where}`) : `When you leave ${where}`;
 }
 
-/** Why a due todo still waits (loops.list `held`): the day's budget is spent, or it's low priority. */
+/** Why a due todo still waits (tasks.list `held`): the day's budget is spent, or it's low priority. */
 export type Hold = "budget" | "morning";
 
 /** What releases a todo, in words, with its chip icon. A held todo says what it waits for instead. */
@@ -113,36 +102,7 @@ export function eventLabel(event: string, label?: string): string {
   return rest.length ? `${head}: ${rest.join(" ")}` : head;
 }
 
-/** A decide option, "Bayside Decks · $4,200 · starts Nov 9": its name and the rest. */
-export function optionParts(option: string): { label: string; detail: string } {
-  const at = option.indexOf(" · ");
-  return at < 0 ? { label: option, detail: "" } : { label: option.slice(0, at), detail: option.slice(at + 3) };
-}
-
-/** Snooze presets in menu order (decision 3). Times match the server's (src/loops/scheduler.ts). */
-export const SNOOZE: { id: SnoozePreset; label: string; icon: string }[] = [
-  { id: "later_today", label: "Later today", icon: "Clock" },
-  { id: "tonight", label: "Tonight", icon: "Clock" },
-  { id: "tomorrow_morning", label: "Tomorrow", icon: "Calendar" },
-  { id: "this_weekend", label: "This weekend", icon: "Calendar" },
-  { id: "home", label: "When I’m home", icon: "Pin" },
-];
-
-/** When a preset fires, for the menu's right column. */
-export function snoozeHint(preset: SnoozePreset, now = Date.now(), zone?: string): string {
-  if (preset === "home") return "Home";
-  if (preset === "later_today") { const later = now + 3 * 3_600_000; return daysFrom(now, later, zone) === 0 ? time(later, zone) : `${weekday(later, zone)} ${time(later, zone)}`; }
-  const clock = wall(now, zone);
-  if (preset === "tonight") { const at = addDays(now, clock.hour >= 19 ? 1 : 0, 19, 0, zone); return at - now < DAY ? time(at, zone) : `${weekday(at, zone)} ${time(at, zone)}`; }
-  if (preset === "tomorrow_morning") { const at = addDays(now, 1, 8, 0, zone); return `${weekday(at, zone)} ${time(at, zone)}`; }
-  let days = (6 - clock.weekday + 7) % 7;
-  if (!days && clock.hour >= 10) days = 7;
-  return `Sat ${time(addDays(now, days, 10, 0, zone), zone)}`;
-}
-
-export const isClosed = (loop: Pick<Loop, "closedAt">) => loop.closedAt !== null;
-
-/** A thread owner as the server resolved it (loops.list `owners`, loops.get `owner`). */
+/** A thread owner as the server resolved it (loops.get `owner`). */
 export type OwnerInfo = { owner: string; name: string; threadId: string | null };
 
 /** The owner's name: "You", the Bot, a lead by its project, the thread's title, or "An agent". */
@@ -160,44 +120,6 @@ export function ownerThread(owner: string, botThreadId: string | null, resolved?
   return resolved ? resolved.threadId : owner.slice("thread:".length);
 }
 
-type History = { type: string; at: number; data: string }[];
-const parse = (data: string): Record<string, unknown> => { try { return JSON.parse(data) as Record<string, unknown>; } catch { return {}; } };
-
-/** How a closed todo ended: "Done", "Got it", "Dismissed", or the option chosen. */
-export function closedVerb(loop: Loop, history: History): string {
-  const closed = [...history].reverse().find((each) => each.type === "closed");
-  const data = closed ? parse(closed.data) : {};
-  if (data.action === "choose" && typeof data.option === "string") return optionParts(data.option).label;
-  if (data.action === "got_it") return "Got it";
-  if (loop.status === "dropped" || data.action === "drop") return "Dismissed";
-  return "Done";
-}
-
-/** When the todo was last released into the chat or handed off. */
-export function lastEvent(history: History, type: string): number | null {
-  return [...history].reverse().find((each) => each.type === type)?.at ?? null;
-}
-
-/** "12 min", "2 h", "3 d". */
-export function elapsed(since: number, now = Date.now()): string {
-  const minutes = Math.max(1, Math.round((now - since) / 60_000));
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.round(minutes / 60);
-  return hours < 24 ? `${hours} h` : `${Math.round(hours / 24)} d`;
-}
-
-/** The label above a released card: what released it, and when. */
-export function releaseLabel(loop: Loop, history: History, zone?: string): { text: string; icon: string } {
-  const handedOff = loop.owner !== "patrick" ? lastEvent(history, "handed_off") : null;
-  if (handedOff !== null) return { text: `Handed off · ${time(handedOff, zone)}`, icon: "ArrowTurnForward" };
-  const at = lastEvent(history, "surfaced") ?? loop.updatedAt;
-  const when = time(at, zone);
-  if (loop.trigger.type === "place" && loop.trigger.place) return { text: `${loop.trigger.direction === "leave" ? "Left" : "Arrived at"} ${loop.trigger.place} · ${when}`, icon: "Pin" };
-  if (loop.trigger.type === "event" && loop.trigger.event) return { text: `${eventLabel(loop.trigger.event, loop.trigger.label)} · ${when}`, icon: "Zap" };
-  if (loop.trigger.type === "time" && loop.trigger.at !== undefined && Math.abs(loop.trigger.at - at) < 5 * 60_000) return { text: `${weekday(loop.trigger.at, zone)} ${time(loop.trigger.at, zone)} trigger · ${when}`, icon: "Clock" };
-  if (loop.source && loop.source.kind !== "interaction") return { text: `from ${loop.source.kind} · ${when}`, icon: "Mail" };
-  return { text: when, icon: "Clock" };
-}
 
 /** The source link's text, or null when there's nothing to show. */
 export function sourceText(source: Loop["source"]): string | null {
@@ -205,9 +127,6 @@ export function sourceText(source: Loop["source"]): string | null {
   if (source.kind === "thread") return "Thread";
   return source.ref.length > 60 ? `${source.ref.slice(0, 57)}…` : source.ref;
 }
-
-/** The ranking used for the Todos tab's first section and the morning rows. */
-export const PRIORITY_RANK: Record<Loop["priority"], number> = { urgent: 0, normal: 1, low: 2 };
 
 /** Whether a URL is safe to open from a card (http, https or mailto). */
 export const safeUrl = (url: string | undefined): string | null => url && /^(https?:|mailto:)/i.test(url) ? url : null;

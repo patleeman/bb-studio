@@ -12,9 +12,9 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
     private var duo: Bool { ProcessInfo.processInfo.environment["ROUND2_DUO"] != nil }
 
-    private func launch() {
+    private func launch(_ extra: [String] = []) {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list",
-                               "-qaRoomConversation", "thr_botdemo01"]
+                               "-qaConversation", "thr_botdemo01"] + extra
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")
     }
@@ -27,16 +27,16 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
     }
 
     private func openNewConversation() {
-        app.buttons["roomList"].tap()
-        // Round 5: Home's composer is the one way in (no "+ New conversation" row).
-        let row = app.buttons["roomNewConversation"]
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "Home's composer")
+        app.goHome()
+        // New: in Home's bar on the iPhone, in the rail on the Duo.
+        let row = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["homeNew", "rail-new"])).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "New conversation")
         shot("1-list")
         row.tap()
         XCTAssertTrue(any("newConversationWith").waitForExistence(timeout: 10), "the New conversation sheet")
     }
 
-    /// The phone's, and the folded Duo's (Patrick's) too.
+    /// The phone's, and the folded Duo's (the main device) too.
     func testNewConversationSaysWhoItIsWithAndStartsOnThePickedModel() throws {
         launch()
         openNewConversation()
@@ -62,8 +62,8 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
         type("Plan the Lisbon dinner", in: "Message Juniper")
         app.buttons["newConversationStart"].tap()
         XCTAssertTrue(app.staticTexts["Plan the Lisbon dinner"].waitForExistence(timeout: 15), "the new conversation opens")
-        app.buttons["roomList"].tap()
-        let started = app.buttons["roomConversation-thr_demo_new1"]
+        app.goHome()
+        let started = app.buttons["homeConversation-thr_demo_new1"]
         XCTAssertTrue(started.waitForExistence(timeout: 15), "it's Juniper's conversation")
     }
 
@@ -73,7 +73,7 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
         openNewConversation()
         app.buttons["newConversationBot"].tap()
         // The Bot named Home, not the header's Home button (round 5).
-        let home = app.buttons.matching(NSPredicate(format: "label == 'Home' AND identifier != 'roomList'")).firstMatch
+        let home = app.buttons.matching(NSPredicate(format: "label == 'Home' AND NOT (identifier BEGINSWITH 'rail-')")).firstMatch
         XCTAssertTrue(home.waitForExistence(timeout: 5), "every Bot, to pick from")
         XCTAssertTrue(app.buttons["No Bot: a thread in a project"].exists, "or a plain thread")
         shot("4-bots")
@@ -84,8 +84,8 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
         type("Water the plants on Friday", in: "Message Home")
         app.buttons["newConversationStart"].tap()
         XCTAssertTrue(app.staticTexts["Water the plants on Friday"].waitForExistence(timeout: 15), "it opens, in Home")
-        app.buttons["roomList"].tap()
-        XCTAssertTrue(waitFor(any("roomListHeader"), label: "Home"), "the list is Home's now")
+        app.goHome()
+        XCTAssertTrue(waitFor(app.buttons["botSwitcher"], label: "Home"), "the list is Home's now")
     }
 
     func testNoBotStartsAPlainThread() throws {
@@ -108,7 +108,7 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
     func testTheBotsNameSwitchesBots() throws {
         try XCTSkipIf(duo, "the phone's test")
         launch()
-        app.buttons["roomList"].tap()
+        app.goHome()
         let switcher = app.buttons["botSwitcher"]
         XCTAssertTrue(switcher.waitForExistence(timeout: 10), "the Bot's name is a menu")
         switcher.tap()
@@ -116,57 +116,28 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(research.waitForExistence(timeout: 5), "with every Bot")
         shot("7-switcher")
         research.tap()
-        XCTAssertTrue(any("RoomSheet-conversations").waitForNonExistence(timeout: 10), "the list closes")
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 20), "on Research's conversation")
-        app.buttons["roomList"].tap()
-        XCTAssertTrue(waitFor(any("roomListHeader"), label: "Research"), "Research's list")
+        // Another Bot opens on its Home.
+        XCTAssertTrue(waitFor(app.buttons["botSwitcher"], label: "Research"), "Research's list")
         shot("8-research")
     }
 
-    func testTheFoldedDuosJumpButtonIsOnTheRail() throws {
+    func testTheFlatDuoSwitchesBotsAndStartsConversationsFromHomesColumn() throws {
         try XCTSkipUnless(duo, "needs the iPhone Duo simulator")
-        launch()
-        let list = app.buttons["roomList"]
-        XCTAssertTrue(list.waitForExistence(timeout: 10))
-        let window = app.windows.firstMatch.frame
-        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: window.width * 0.4, dy: window.height * 0.25))
-        let jump = app.buttons["jumpToLatest"]
-        for _ in 0..<6 where !jump.exists {
-            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: window.height * 0.3)), withVelocity: .slow, thenHoldForDuration: 0.2)
-            sleep(1)
-        }
-        XCTAssertTrue(jump.waitForExistence(timeout: 5), "reading up shows the ↓")
-        let composer = any("threadComposer").frame
-        XCTAssertEqual(jump.frame.midX, list.frame.midX, accuracy: 2, "the ↓ is on the rail, under the list button")
-        XCTAssertGreaterThan(jump.frame.minY, list.frame.maxY, "below the rail's other buttons")
-        XCTAssertEqual(jump.frame.intersection(composer).width, 0, "and never over the composer")
-        XCTAssertLessThan(composer.maxX, jump.frame.minX, "the composer ends before the rail")
-        shot("9-duo-rail")
-        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/capture?round2-rail")!)
-        sleep(3)
-        jump.tap()
-        XCTAssertTrue(jump.waitForNonExistence(timeout: 10), "it jumps to the end")
-    }
-
-    func testTheUnfoldedDuoSwitchesBotsAndStartsConversationsOnTheLeft() throws {
-        try XCTSkipUnless(duo, "needs the iPhone Duo simulator")
-        launch()
+        launch(["-qaPosture", "flat"])
         XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/landscape")!)
         sleep(3)
-        XCTAssertTrue(any("roomContext").waitForExistence(timeout: 15), "the left screen")
-        XCTAssertTrue(app.buttons["contextNewConversation"].waitForExistence(timeout: 10), "+ New conversation on the left")
-        XCTAssertTrue(app.buttons["botSwitcher"].exists, "and the Bot switcher")
+        XCTAssertTrue(any("homeColumn").waitForExistence(timeout: 15), "Home's column on the left screen")
+        XCTAssertTrue(app.buttons["botSwitcher"].exists, "with the Bot switcher")
         shot("10-duo")
-        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/capture?round2-duo")!)
-        sleep(3)
-        app.buttons["contextNewConversation"].tap()
-        XCTAssertTrue(waitFor(any("newConversationWith"), label: "Juniper"), "New conversation with Juniper")
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/activate?rail-new")!)
+        XCTAssertTrue(waitFor(any("newConversationWith"), label: "Juniper"), "New conversation with Juniper, from the rail")
         app.buttons["Cancel"].tap()
         app.buttons["botSwitcher"].tap()
         let home = app.buttons["Home"]
         XCTAssertTrue(home.waitForExistence(timeout: 5))
         home.tap()
-        XCTAssertTrue(waitFor(any("roomListHeader"), label: "Home"), "the left screen is Home's")
+        XCTAssertTrue(waitFor(app.buttons["botSwitcher"], label: "Home"), "Home's column is Home's")
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/outer")!)
     }
 
     /// The sheet's field (its placeholder names the Bot), not the conversation's under it.

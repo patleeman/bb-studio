@@ -12,7 +12,7 @@ import { tabKind } from "./studio-tab/model";
 
 import { THREAD_KIND } from "./item-icons";
 
-export { hostIcon, THREAD_KIND } from "./item-icons";
+export { THREAD_KIND } from "./item-icons";
 
 export function ItemIcon({ kind, icon, emoji = false, className = "text-muted-foreground" }: { kind: string; icon?: string | null; emoji?: boolean; className?: string }) {
   if (emoji && kind !== THREAD_KIND && icon) return <span aria-hidden className="w-4 shrink-0 text-center text-[13px] leading-none">{icon}</span>;

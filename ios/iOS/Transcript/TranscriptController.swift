@@ -133,6 +133,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private let composerHost = TranscriptHost()
     private let topHost = TranscriptHost()
     private let pillHost = TranscriptHost()
+    /// Over the rows, from the header to the composer: the Workbench, with the composer kept below it.
+    private let coverHost = TranscriptCoverHost()
+    /// Active only while the cover shows: hidden, it must not hold the composer up.
+    private var coverConstraints: [NSLayoutConstraint] = []
     private var composerHeight: NSLayoutConstraint!
     private var topHeight: NSLayoutConstraint!
     private var composerBottom: NSLayoutConstraint!
@@ -245,8 +249,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             NotificationCenter.default.addObserver(self, selector: #selector(accessibilityDidTurnOn), name: name, object: nil)
         }
 
-        // The pill under the composer, the header over all.
-        for host in [pillHost, composerHost, topHost] {
+        // The cover over the rows, the pill under the composer, the header over all.
+        for host in [coverHost, pillHost, composerHost, topHost] as [UIViewController] {
             addChild(host)
             host.view.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(host.view)
@@ -264,6 +268,12 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         band.translatesAutoresizingMaskIntoConstraints = false
         view.insertSubview(band, aboveSubview: collectionView)
         bandToComposer = band.topAnchor.constraint(equalTo: composerHost.view.topAnchor)
+        coverConstraints = [
+            coverHost.view.topAnchor.constraint(equalTo: topHost.view.bottomAnchor),
+            coverHost.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            coverHost.view.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            coverHost.view.bottomAnchor.constraint(equalTo: composerHost.view.topAnchor),
+        ]
         bandToPill = band.topAnchor.constraint(equalTo: pillHost.view.topAnchor)
 
         // The keyboard: the container's bottom is the keyboard's top. Its
@@ -334,6 +344,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        // Off screen: no scroll to finish (and no display link left ticking).
+        stopAnimation()
         appearedAt = nil
         if let spotKey { TranscriptReadingSpots.disappeared(spotKey) }
     }
@@ -425,6 +437,19 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     private func resizing(_ content: AnyView) -> AnyView {
         AnyView(content.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { [weak self] _ in self?.view.setNeedsLayout() })
+    }
+
+    /// Over the rows, between the header and the composer (the Workbench);
+    /// nil shows the rows. The rows stay loaded underneath, at their place.
+    func setCover(_ cover: AnyView?) {
+        let covered = cover != nil
+        coverHost.rootView = cover ?? AnyView(EmptyView())
+        guard coverHost.view.isHidden == covered else { return }
+        coverHost.view.isHidden = !covered
+        if covered { NSLayoutConstraint.activate(coverConstraints) } else { NSLayoutConstraint.deactivate(coverConstraints) }
+        collectionView.isHidden = covered
+        collectionView.accessibilityElementsHidden = covered || rowsHidden
+        pillHost.view.isHidden = covered
     }
 
     /// Above the transcript's top (a find bar, a header); rows scroll under it.
@@ -545,7 +570,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         // Its ideal height, as a lazy stack proposes: a row with a flexible
         // `frame(maxHeight:)` (a clamped long message) otherwise grows to
         // whatever height the sizing pass offers.
-        cell.contentConfiguration = UIHostingConfiguration { view.fixedSize(horizontal: false, vertical: true).id(id) }
+        // The layout's metrics already keep rows clear of the sides' safe area.
+        cell.contentConfiguration = UIHostingConfiguration {
+            view.fixedSize(horizontal: false, vertical: true).id(id).ignoresSafeArea(.container, edges: .horizontal)
+        }
             .margins(.all, 0)
             .minSize(width: 0, height: 0)
     }
@@ -752,7 +780,11 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         animating = true
         animationStart = CACurrentMediaTime()
         animationDistance = distance
-        let link = CADisplayLink(target: TranscriptDisplayLinkTarget { [weak self] in self?.animationFrame() }, selector: #selector(TranscriptDisplayLinkTarget.tick))
+        let link = CADisplayLink(target: TranscriptDisplayLinkTarget { [weak self] in
+            guard let self else { return false }
+            self.animationFrame()
+            return true
+        }, selector: #selector(TranscriptDisplayLinkTarget.tick(_:)))
         link.add(to: .main, forMode: .common)
         animation = link
     }
@@ -1102,10 +1134,26 @@ struct TranscriptRowID: Hashable, @unchecked Sendable {
 }
 
 /// A display link holds its target strongly; this breaks the cycle.
-private final class TranscriptDisplayLinkTarget: NSObject {
-    let frame: () -> Void
-    init(_ frame: @escaping () -> Void) { self.frame = frame }
-    @objc func tick() { frame() }
+/// A display link's target. `frame` answers whether its owner is still
+/// there: once it's gone (a conversation closed mid-scroll), the link stops
+/// itself. Left running, it ticked every frame for the rest of the launch,
+/// keeping the phone awake and the app from ever going idle.
+final class TranscriptDisplayLinkTarget: NSObject {
+    let frame: () -> Bool
+    #if DEBUG
+    /// Targets alive, so links alive (a link holds its target until invalidated): `qa-duo/counts`.
+    nonisolated(unsafe) static var live = 0
+    deinit { Self.live -= 1 }
+    #endif
+    init(_ frame: @escaping () -> Bool) {
+        self.frame = frame
+        #if DEBUG
+        Self.live += 1
+        #endif
+    }
+    @objc func tick(_ link: CADisplayLink) {
+        if !frame() { link.invalidate() }
+    }
 }
 
 /// Lays out, then tells the controller, which keeps the view in range.
@@ -1161,6 +1209,27 @@ enum AccessibilityTurnOn {
             }
         }
         return ProcessInfo.processInfo.systemUptime
+    }
+}
+
+/// The cover's host: as big as its constraints, not its content.
+final class TranscriptCoverHost: UIHostingController<AnyView> {
+    init() {
+        super.init(rootView: AnyView(EmptyView()))
+        sizingOptions = []
+        safeAreaRegions = []
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+        view.isHidden = true
+        // Its size is its constraints': it never pulls the composer toward the header.
+        view.setContentHuggingPriority(.fittingSizeLevel, for: .vertical)
+        view.setContentCompressionResistancePriority(.fittingSizeLevel, for: .vertical)
     }
 }
 

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
-import { areaChips, dueLabel, eventLabel, fullWhen, ownerName, ownerThread, shortWhen, snoozeHint, triggerLabel } from "./model";
-import { fromInputValue, inputValue, zonedTime } from "../clock";
+import { dueLabel, eventLabel, fullWhen, ownerName, ownerThread, shortWhen, triggerLabel } from "./model";
+import { zonedTime } from "../clock";
 
 const NOW = new Date("2026-10-31T22:26:00").getTime();
 const names = { bot: "Chief of Staff", leads: new Map([["thr_lead", "Larkspur lead"]]) };
@@ -39,12 +39,6 @@ it("links the Bot's chat for the CoS, a thread while it exists, and nothing once
   expect(ownerThread("thread:thr_x", "thr_bot", { owner: "thread:thr_x", name: "A thread that was removed", threadId: null })).toBeNull();
 });
 
-it("builds area chips from data only, keeping a chosen area with no loops left", () => {
-  expect(areaChips(["Alpha", "Beta"], null)).toEqual([null, "Alpha", "Beta"]);
-  expect(areaChips(undefined, null)).toEqual([null]);
-  expect(areaChips(["Alpha"], "Beta")).toEqual([null, "Alpha", "Beta"]);
-});
-
 it("reads times in Todos' time zone when one is set: a 9:00 AM Pacific call is 9:00 AM in Pacific and 12:00 PM in Eastern", () => {
   const now = zonedTime(2026, 11, 13, 18, 0, "America/New_York");
   const due = zonedTime(2026, 11, 16, 9, 0, "America/Los_Angeles");
@@ -63,13 +57,3 @@ it("finds today, tomorrow and the week by the zone's calendar, not the computer'
   expect(dueLabel(soon, now, "Europe/London")?.text).toBe("Due today, 7:30 AM");
 });
 
-it("names snooze times in the zone and reads a picked time in it", () => {
-  const now = zonedTime(2026, 11, 13, 9, 0, "America/Los_Angeles");
-  expect(snoozeHint("tonight", now, "America/Los_Angeles")).toBe("7:00 PM");
-  expect(snoozeHint("tomorrow_morning", now, "America/Los_Angeles")).toBe("Sat 8:00 AM");
-  expect(snoozeHint("this_weekend", now, "America/Los_Angeles")).toBe("Sat 10:00 AM");
-  expect(inputValue(zonedTime(2026, 11, 16, 9, 0, "America/Los_Angeles"), "America/Los_Angeles")).toBe("2026-11-16T09:00");
-  expect(fromInputValue("2026-11-16T09:00", "America/Los_Angeles")).toBe(Date.UTC(2026, 10, 16, 17, 0));
-  expect(fromInputValue("2026-03-08T02:30", "America/Los_Angeles")).toBe(Date.UTC(2026, 2, 8, 10, 30));
-  expect(fromInputValue("nonsense", "America/Los_Angeles")).toBeNull();
-});

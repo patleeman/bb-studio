@@ -135,7 +135,6 @@ const reasoningLevel = z.enum(["none", "low", "medium", "high", "xhigh", "max", 
 const permissionMode = z.enum(["accept-edits", "auto", "full"]);
 /** A model a thread runs on, with its display name ("Opus 5.5") from the provider's catalog (src/model-names.ts). */
 const threadModel = z.object({ providerId: z.string(), model: z.string(), reasoningLevel: reasoningLevel.nullable(), modelName: z.string() });
-export type ThreadModelView = z.infer<typeof threadModel>;
 const bot = z.object({
   id: z.string(),
   name: z.string(),
@@ -333,7 +332,6 @@ const botActivity = z.object({
 });
 export type BotActivityView = z.infer<typeof botActivity>;
 const botPageState = z.object({ groupNames: z.record(z.string(), z.string()), dismissed: z.array(z.string()) });
-export type BotPageStateView = z.infer<typeof botPageState>;
 /** A Bot's runner (src/runners.ts): a long-lived thread on its own schedule that reports only through runner_report. */
 const runnerSchedule = heartbeatRunSchema.omit({ enabled: true, time: true }).extend({ time: heartbeatRunSchema.shape.time.default("09:00") });
 const runnerLevel = z.enum(["log", "tell", "urgent"]);

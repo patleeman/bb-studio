@@ -21,9 +21,18 @@ enum Route: Hashable {
     /// Visual Chat (the studio-visual-chat plugin): its chats, and one chat (nil: a new one).
     case visualChats
     case visualChat(threadId: String?)
-    case memoryRecord(id: String)
-    /// A Bot's place (Strands, Memory, Library…) pushed in Home's list; only the list draws it.
-    case roomPlace(String)
+    /// A Bot conversation, over Home (in Chat or its Workbench).
+    case conversation(id: String)
+    /// One of the Bot's places: Memory, Library, Schedules, Archive.
+    case place(BotPage)
+    /// A Memory skill, or a new one: pushed on the shell's stack (the rail's Back and actions on the Duo).
+    case memorySkill(botId: String?, name: String)
+    case memoryNewSkill(botId: String?)
+    /// Studio's list of everything made.
+    case studio
+    case settings
+    /// The Bot's theme picker.
+    case theme
 }
 
 extension Route {
@@ -74,7 +83,6 @@ enum Sheet: Identifiable, Hashable {
     /// Hands-free voice (iOS/VoiceLive); `autoStart` starts the session as it opens (Talk to Bot).
     /// `threadId`: the thread it was launched from, which the session speaks as; none means the Chief of Staff.
     case handsFree(autoStart: Bool = false, threadId: String? = nil)
-    case task(id: String)
 
     var id: String {
         switch self {
@@ -83,7 +91,6 @@ enum Sheet: Identifiable, Hashable {
         case .recording: "recording"
         case .write: "write"
         case .handsFree(_, let threadId): "hands-free:\(threadId ?? "")"
-        case .task(let id): "task:\(id)"
         }
     }
 }
@@ -219,7 +226,7 @@ final class AppModel: ObservableObject {
         case "visual-chat":
             // The list under the chat, so Back goes to it.
             open(.studio(kind: nil, .visualChats))
-            if let id { router.studioPath.append(.visualChat(threadId: id == "new" ? nil : id)) }
+            if let id { router.open(.route(.visualChat(threadId: id == "new" ? nil : id))) }
         default:
             if let destination = Self.destination(url, id: id) { open(destination) }
             if url.host() == "reply", let id { router.replyThreadId = id }
@@ -251,7 +258,6 @@ final class AppModel: ObservableObject {
         case "new": .compose("")
         case "studio", "talk": .studio(kind: nil, nil)
         case "bots": .list
-        case "loops", "strands": .place(.strands, botId: nil)
         case "chief", "web": .bot(nil)
         case "bot-talk", "chief-talk": nil
         case "settings": .settings
@@ -298,12 +304,6 @@ final class AppModel: ObservableObject {
             open(.place(page, botId: botId))
         case .automation:
             open(.place(.automations, botId: nil))
-        case .todo(let id):
-            // An old card's link: its read-only card over the room.
-            open(id.isEmpty ? .place(.strands, botId: nil) : .sheet(.task(id: id)))
-        case .record:
-            // Memory records are retired (Links.destination sends old record links to Memory); kept for older callers.
-            open(.place(.memory, botId: nil))
         case .route(let route):
             if let push { push(route) } else { open(.route(route)) }
         case .safari(let url):

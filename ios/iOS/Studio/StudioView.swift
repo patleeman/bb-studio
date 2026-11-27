@@ -451,7 +451,6 @@ struct StudioView: View {
     var selectsDetail = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var app: AppModel
-    @Environment(\.duoLayout) private var duoLayout
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
     @ObservedObject private var store = StudioStore.shared
@@ -592,16 +591,12 @@ struct StudioView: View {
         .safeAreaInset(edge: .bottom) {
             if selecting { selectionBar }
         }
-        .containerBackground(Color(uiColor: duoLayout.twoPages ? .systemGroupedBackground : .systemBackground), for: .navigation)
+        .containerBackground(Color(uiColor: .systemBackground), for: .navigation)
         .environment(\.editMode, $editMode)
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(selecting ? .inline : .automatic)
-        .modifier(DuoSearch(query: $query, unfolded: duoLayout.twoPages, prompt: "Search Studio"))
-        .toolbar(duoLayout.twoPages ? .hidden : .automatic, for: .navigationBar)
-        .safeAreaInset(edge: .top, spacing: 0) { duoHeader }
+        .shellSearchable(text: $query, prompt: "Search Studio")
         // Keep Select reachable, so search results can be acted on together.
         .searchPresentationToolbarBehavior(.avoidHidingContent)
-        .toolbar { toolbarItems }
+        .screenToolbar(title, actions: actions, displayMode: selecting ? .inline : .automatic)
     }
 
     private var title: String {
@@ -609,59 +604,39 @@ struct StudioView: View {
         return showArchived ? "Archived" : "Studio"
     }
 
-    /// Select All, or Deselect All once everything shown is selected.
-    private var selectAllButton: some View {
-        let all = Set(visible.map(\.id))
-        let everything = all.isSubset(of: selection) && !all.isEmpty
-        return Button(everything ? "Deselect All" : "Select All") {
-            selection = all.isSubset(of: selection) ? [] : all
+    /// The bar's items as one list (the iPhone's bar, the Duo's rail): Done and Select All
+    /// while selecting; else New and Select first, then the project filter.
+    private var actions: [ScreenAction] {
+        if selecting {
+            let all = Set(visible.map(\.id))
+            let everything = all.isSubset(of: selection) && !all.isEmpty
+            return [
+                ScreenAction(id: "done", title: "Done", systemImage: "checkmark", run: { endSelecting() }),
+                // Read when tapped: the shown items can change while the title stays the same.
+                ScreenAction(id: "selectAll", title: everything ? "Deselect All" : "Select All",
+                             systemImage: everything ? "circle" : "checkmark.circle", run: {
+                                 let shown = Set(visible.map(\.id))
+                                 selection = shown.isSubset(of: selection) && !shown.isEmpty ? [] : shown
+                             }),
+            ]
         }
-    }
-
-    /// Beside two pages: the sidebar's header, its actions and search.
-    @ViewBuilder private var duoHeader: some View {
-        if duoLayout.twoPages && selectsDetail {
-            VStack(spacing: 0) {
-                DuoHeader(sidebar: true) {
-                    Text(title).font(.title2.bold())
-                } actions: {
-                    if selecting {
-                        selectAllButton
-                        Button("Done") { endSelecting() }
-                    } else {
-                        if !store.creatable.isEmpty { newMenu }
-                        projectMenu
-                        if store.viaStudio, !visible.isEmpty {
-                            Button("Select") { withAnimation { editMode = .active } }
-                        }
-                    }
-                }
-                SidebarSearchField(prompt: "Search Studio", text: $query)
-            }.background(Color(uiColor: .systemGroupedBackground))
-            .ignoresSafeArea(.container, edges: .trailing)
+        var list: [ScreenAction] = []
+        if !store.creatable.isEmpty {
+            list.append(ScreenAction(id: "new", title: "New", systemImage: "plus", children: store.creatable.map { kind in
+                ScreenAction(id: "new-\(kind.id)", title: "New \(kind.label)", systemImage: StudioKind.of(kind.id).symbol,
+                             run: { Task { await create(kind) } })
+            }))
         }
-    }
-
-    /// On one page, the navigation bar's items.
-    @ToolbarContentBuilder private var toolbarItems: some ToolbarContent {
-        if !duoLayout.twoPages {
-            if selecting {
-                ToolbarItem(placement: .topBarLeading) { selectAllButton }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { endSelecting() }.fontWeight(.semibold)
-                }
-            } else {
-                if !store.creatable.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) { newMenu }
-                }
-                ToolbarItem(placement: .topBarTrailing) { projectMenu }
-                if store.viaStudio, !visible.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Select") { withAnimation { editMode = .active } }
-                    }
-                }
-            }
+        if store.viaStudio, !visible.isEmpty {
+            list.append(ScreenAction(id: "select", title: "Select", systemImage: "checkmark.circle", run: { withAnimation { editMode = .active } }))
         }
+        let choices = [("", "All Projects"), ("none", "No Project")] + projects.map { ($0.id, $0.name) }
+        list.append(ScreenAction(id: "project", title: "Project", systemImage: project.isEmpty ? "folder" : "folder.fill",
+                                 children: choices.map { choice in
+                                     ScreenAction(id: "project-\(choice.0.isEmpty ? "all" : choice.0)", title: choice.1, systemImage: "folder",
+                                                  checked: project == choice.0, run: { project = choice.0 })
+                                 }))
+        return list
     }
 
     // MARK: Pages
@@ -789,7 +764,6 @@ struct StudioView: View {
                 }
             }
         }
-        .modifier(SidebarListMargins(enabled: duoLayout.twoPages && selectsDetail))
         .listSectionSpacing(.compact)
         .overlay {
             if !store.loaded {
@@ -832,7 +806,7 @@ struct StudioView: View {
 
     /// Visual Chat (its own plugin): its chats and New chat.
     private var visualChatCard: some View {
-        Button { router.studioPath.append(.visualChats) } label: {
+        Button { router.path.append(.visualChats) } label: {
             HStack(spacing: 12) {
                 Image(systemName: "rectangle.3.group.bubble").font(.title2).foregroundStyle(.purple)
                 VStack(alignment: .leading, spacing: 2) {
@@ -918,49 +892,17 @@ struct StudioView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .foregroundStyle(selected ? Color.white : .primary)
-            // On the grouped sidebar, the secondary background matches the
-            // page in light mode; use the search field's fill there instead.
-            .background(selected ? AnyShapeStyle(Color.accentColor)
-                : duoLayout.twoPages && selectsDetail ? AnyShapeStyle(Color(uiColor: .tertiarySystemFill))
-                : AnyShapeStyle(.background.secondary), in: .capsule)
+            .background(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.background.secondary), in: .capsule)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
         .sensoryFeedback(.selection, trigger: selected)
     }
 
-    private var newMenu: some View {
-        Menu {
-            ForEach(store.creatable, id: \.id) { kind in
-                Button { Task { await create(kind) } } label: {
-                    Label("New \(kind.label)", systemImage: StudioKind.of(kind.id).symbol)
-                }
-            }
-        } label: {
-            Image(systemName: "plus").modifier(DuoHeaderMenuLabel())
-        }
-        .accessibilityLabel("New")
-    }
-
     /// Tags on at least one item, plus the one being filtered by.
     private var usedTags: [StudioTag] {
         let used = Set(store.items.flatMap { $0.tags ?? [] })
         return store.tags.filter { used.contains($0.id) || $0.id == tagFilter }
-    }
-
-    private var projectMenu: some View {
-        Menu {
-            Picker("Project", selection: $project) {
-                Text("All Projects").tag("")
-                Text("No Project").tag("none")
-                ForEach(projects, id: \.id) { project in
-                    Text(project.name).tag(project.id)
-                }
-            }
-        } label: {
-            Image(systemName: project.isEmpty ? "folder" : "folder.fill").modifier(DuoHeaderMenuLabel())
-        }
-        .accessibilityLabel("Project")
     }
 
     private var projects: [(id: String, name: String)] {
@@ -996,7 +938,6 @@ struct StudioView: View {
             }
         }
         .contextMenu { menu(item) }
-        .modifier(SidebarRowContent(enabled: duoLayout.twoPages && selectsDetail))
     }
 
     /// Opens the item the way every Studio row does: pushed on the phone,
@@ -1005,11 +946,11 @@ struct StudioView: View {
     private func opener(_ item: StudioItem, id: String, @ViewBuilder content: () -> some View) -> some View {
         if !selecting, let route = item.route {
             if selectsDetail {
-                Button { router.studioPath = [route] } label: {
+                Button { router.path.append(route) } label: {
                     content().frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .listRowBackground(SidebarSelectionBackground(selected: router.studioPath.first == route))
+                .listRowBackground(SidebarSelectionBackground(selected: router.path.last == route))
                 .accessibilityIdentifier(id)
             } else {
                 NavigationLink(value: route) { content() }
@@ -1045,8 +986,7 @@ struct StudioView: View {
         return opener(item, id: "studioStarred") { StudioStarredRow(item: item) }
             .swipeActions(edge: .trailing) { starButton(item) }
             .contextMenu { menu(item) }
-            .modifier(SidebarRowContent(enabled: duoLayout.twoPages && selectsDetail))
-    }
+        }
 
     private func starButton(_ item: StudioItem) -> some View {
         let starred = store.isStarred(item)
@@ -1208,7 +1148,7 @@ struct StudioView: View {
     private func createPage(_ text: String) async {
         do {
             let page = try await client.createPage(title: PageTitle.from(text), markdown: text)
-            operation.complete(on: app) { router.studioPath.append(.page(id: page.id)) }
+            operation.complete(on: app) { router.path.append(.page(id: page.id)) }
             await store.load(client)
         } catch {
             store.error = BBClient.describe(error, server: client.baseURL)
@@ -1219,7 +1159,7 @@ struct StudioView: View {
         let projectId = project.isEmpty || project == "none" ? nil : project
         do {
             let item = try await store.create(kind, projectId: projectId, client: client)
-            if let route = item.route { operation.complete(on: app) { router.studioPath.append(route) } }
+            if let route = item.route { operation.complete(on: app) { router.path.append(route) } }
         } catch {
             flash(BBClient.describe(error, server: client.baseURL))
         }
@@ -1458,71 +1398,21 @@ struct StudioRow: View {
     var snippet: String?
     var highlight = ""
 
+    // In parts, each a struct: the row's view type stays shallow (the 1 MB stack).
     var body: some View {
         let kind = StudioKind.of(item.kind)
         HStack(alignment: .top, spacing: 12) {
-            Group {
-                if let path = item.thumbnailUrl {
-                    StudioThumbnail(item: item, path: path, kind: kind)
-                } else if let emoji = item.emoji {
-                    Text(emoji).font(.title3)
-                } else {
-                    Image(systemName: kind.symbol).font(.body.weight(.medium)).foregroundStyle(kind.tint)
-                }
-            }
-            .frame(width: item.thumbnailUrl == nil ? 36 : 52, height: item.thumbnailUrl == nil ? 36 : 52)
-            .background(kind.tint.opacity(0.12), in: .rect(cornerRadius: 9))
-            .clipShape(.rect(cornerRadius: 9))
+            StudioRowIcon(item: item, kind: kind)
             VStack(alignment: .leading, spacing: 3) {
-                (dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3))
-                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline))) {
-                    Text(item.displayTitle)
-                        .fontWeight(.medium)
-                        .foregroundStyle(item.title.isEmpty ? .secondary : .primary)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                    if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 4) }
-                    Text(Date(timeIntervalSince1970: item.updatedAt / 1000), format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                        .font(.caption)
-                        .foregroundStyle(Color.primary.opacity(0.75))
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                StudioRowTitle(item: item)
                 if let snippet {
                     Text(Self.highlighted(snippet, highlight)).font(.subheadline).foregroundStyle(Color.primary.opacity(0.75)).lineLimit(3)
                         .accessibilityIdentifier("studioSnippet")
                 } else if let preview = item.preview, !preview.isEmpty {
-                    Text(preview).font(.subheadline).foregroundStyle(Color.primary.opacity(0.75)).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    Text(preview).font(.subheadline).foregroundStyle(Color.primary.opacity(0.75))
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 }
-                (dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-                    : AnyLayout(HStackLayout(spacing: 4))) {
-                    // Empty facts, like a task with no due day, and ones the badge already says, are left out.
-                    let facts = item.facts.map(\.display).filter { !$0.isEmpty && $0 != item.badge?.label }
-                    Text(([kind.label] + [project].compactMap { $0 } + facts).joined(separator: " · "))
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let badge = item.badge {
-                        Text(badge.label)
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .foregroundStyle(tone(badge.tone))
-                            .background(tone(badge.tone).opacity(0.15), in: .capsule)
-                    }
-                    ForEach(tags) { tag in
-                        Text(tag.name)
-                            .font(.caption2.weight(.medium))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .foregroundStyle(Color(hex: tag.color))
-                            .background(Color(hex: tag.color).opacity(0.15), in: .capsule)
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(Color.primary.opacity(0.75))
+                StudioRowFacts(item: item, kind: kind, project: project, tags: tags)
             }
         }
         .padding(.vertical, 2)
@@ -1541,8 +1431,79 @@ struct StudioRow: View {
         }
         return result
     }
+}
 
-    private func tone(_ tone: String) -> Color {
+/// The row's picture: a thumbnail, the item's emoji, or its kind's symbol.
+private struct StudioRowIcon: View {
+    let item: StudioItem
+    let kind: StudioKind
+
+    var body: some View {
+        Group {
+            if let path = item.thumbnailUrl {
+                StudioThumbnail(item: item, path: path, kind: kind)
+            } else if let emoji = item.emoji {
+                Text(emoji).font(.title3)
+            } else {
+                Image(systemName: kind.symbol).font(.body.weight(.medium)).foregroundStyle(kind.tint)
+            }
+        }
+        .frame(width: item.thumbnailUrl == nil ? 36 : 52, height: item.thumbnailUrl == nil ? 36 : 52)
+        .background(kind.tint.opacity(0.12), in: .rect(cornerRadius: 9))
+        .clipShape(.rect(cornerRadius: 9))
+    }
+}
+
+/// The title and when it changed, side by side, or stacked at accessibility sizes.
+private struct StudioRowTitle: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let item: StudioItem
+
+    var body: some View {
+        let large = dynamicTypeSize.isAccessibilitySize
+        (large ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3)) : AnyLayout(HStackLayout(alignment: .firstTextBaseline))) {
+            Text(item.displayTitle)
+                .fontWeight(.medium)
+                .foregroundStyle(item.title.isEmpty ? .secondary : .primary)
+                .lineLimit(large ? nil : 2)
+            if !large { Spacer(minLength: 4) }
+            Text(Date(timeIntervalSince1970: item.updatedAt / 1000), format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                .font(.caption)
+                .foregroundStyle(Color.primary.opacity(0.75))
+                .lineLimit(large ? nil : 1)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// Kind, project and facts, then the badge and the tags.
+private struct StudioRowFacts: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let item: StudioItem
+    let kind: StudioKind
+    let project: String?
+    let tags: [StudioTag]
+
+    var body: some View {
+        let large = dynamicTypeSize.isAccessibilitySize
+        (large ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 4))) {
+            // Empty facts, like a task with no due day, and ones the badge already says, are left out.
+            let facts = item.facts.map(\.display).filter { !$0.isEmpty && $0 != item.badge?.label }
+            Text(([kind.label] + [project].compactMap { $0 } + facts).joined(separator: " · "))
+                .lineLimit(large ? nil : 1)
+                .fixedSize(horizontal: false, vertical: true)
+            if let badge = item.badge {
+                StudioChip(text: badge.label, color: Self.tone(badge.tone), weight: .semibold)
+            }
+            ForEach(tags) { tag in
+                StudioChip(text: tag.name, color: Color(hex: tag.color), weight: .medium)
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(Color.primary.opacity(0.75))
+    }
+
+    static func tone(_ tone: String) -> Color {
         switch tone {
         case "live": .red
         case "progress": .blue
@@ -1551,6 +1512,25 @@ struct StudioRow: View {
         case "success": .green
         default: .secondary
         }
+    }
+}
+
+/// A badge or a tag: a word in its colour on a pale capsule.
+private struct StudioChip: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let text: String
+    let color: Color
+    let weight: Font.Weight
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(weight))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .foregroundStyle(color)
+            .background(color.opacity(0.15), in: .capsule)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

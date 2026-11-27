@@ -43,7 +43,7 @@ extension XCUIApplication {
             if index < arguments.count { arguments.remove(at: index) }
         }
         // Each launch opens on Main, not on a conversation an earlier suite left open.
-        if !arguments.contains("-qaRoomRemember"), !arguments.contains("-qaRoomForget") { arguments.append("-qaRoomForget") }
+        if !arguments.contains("-qaRememberConversation"), !arguments.contains("-qaForgetConversation") { arguments.append("-qaForgetConversation") }
         launchArguments = arguments + ["-serverURL", server]
         launch()
     }

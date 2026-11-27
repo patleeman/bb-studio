@@ -119,22 +119,8 @@ export function countRoots(roots: readonly Pick<Node, "task" | "needsYou" | "dee
   };
 }
 
-export const clearedAway = (t: Task, clearedAt: number) => clearedAt > 0 && (isClosed(t) || t.stale) && Math.max(t.closedAt ?? 0, t.updatedAt) <= clearedAt;
-
-export function flightRows(all: readonly Task[], threadId: string, ctx: RowContext, clearedAt = 0): Rows {
-  return flatten(buildRows(all, ctx).roots.filter((r) => r.home === threadId && !clearedAway(r.task, clearedAt)));
-}
-
-export function workerRows(all: readonly Task[], ctx: RowContext): Rows & { groups: { conversation: string | null; ids: string[] }[] } {
-  const roots = buildRows(all, ctx).roots.filter((r) => !isClosed(r.task) && r.deep.size > 0);
-  const order: (string | null)[] = [];
-  const by = new Map<string | null, Node[]>();
-  for (const r of roots) {
-    if (!by.has(r.home)) { by.set(r.home, []); order.push(r.home); }
-    by.get(r.home)!.push(r);
-  }
-  const grouped = order.flatMap((home) => by.get(home)!);
-  return { ...flatten(grouped), groups: order.map((home) => ({ conversation: home, ids: by.get(home)!.map((r) => r.task.id) })) };
+export function flightRows(all: readonly Task[], threadId: string, ctx: RowContext): Rows {
+  return flatten(buildRows(all, ctx).roots.filter((r) => r.home === threadId));
 }
 
 export function boardRows(all: readonly Task[], ctx: RowContext): Rows {

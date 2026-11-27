@@ -1,6 +1,6 @@
 import XCTest
 
-/// Patrick, Oct 25: attach a photo in the Bot chat, go back, open the chat
+/// A user, Oct 25: attach a photo in the Bot chat, go back, open the chat
 /// again, and the photo is gone; the draft text survives. Attachments wait
 /// in the composer with the draft, per thread.
 @MainActor

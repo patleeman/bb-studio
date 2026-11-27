@@ -4,112 +4,81 @@ import SwiftUI
 /// quick actions, the Watch and the app's own buttons all go through
 /// `Router.open`, so the same thing opens the same way from anywhere.
 enum Destination: Hashable {
-    /// A Bot's conversation, or any BB thread: shown in the room (a thread
-    /// that isn't one of the Bot's conversations is pushed over it).
+    /// A Bot's conversation, or any BB thread: pushed over Home.
     case conversation(String)
-    /// A worker's thread, pushed over its conversation.
+    /// A worker's thread, pushed over Home.
     case worker(String)
-    /// One of the Bot's places (Strands, Memory, Library, Schedules, Archive).
+    /// One of the Bot's places (Memory, Library, Schedules, Archive).
     case place(BotPage, botId: String?)
-    /// A screen pushed in the room: a page, an automation, a memory record…
+    /// A screen pushed on what shows: a page, an automation, a memory record…
     case route(Route)
-    /// The one conversation list, over the conversation.
+    /// Home.
     case list
     /// New conversation, its message prefilled.
     case compose(String)
-    /// A Bot's room, on its Main (nil: the current Bot).
+    /// A Bot's Home, on its Main (nil: the current Bot).
     case bot(String?)
-    /// Studio over the room: its list (with a kind filter), or one item.
+    /// Studio's list (with a kind filter), or one item over it.
     case studio(kind: String?, Route?)
-    /// Settings over the room.
     case settings
     /// A sheet over everything (capture, dictation, hands-free voice…).
     case sheet(Sheet)
 }
 
-/// What the room should do next, set by `Router.follow` and taken by the room.
-enum RoomRequest: Equatable {
-    /// A Bot's place, as a sheet on the phone or a spread on the unfolded Duo.
-    case place(BotPage)
-    /// Show this conversation (and focus its composer when it's Main).
-    case focus(String)
-    /// The one conversation list.
-    case list
-    /// New conversation with this message.
-    case compose(String)
-}
-
-enum Tab: Hashable {
-    case studio, bot, settings
-}
-
-/// All of the app's navigation state in one place: what shows over the room
-/// (Studio, Settings, a sheet), what waits for Studio's Bots to load, the
-/// shown Bot and conversation, what's pushed over it, and the room's open
-/// place. One model, so every way in lands the same way.
+/// All of the app's navigation in one place (round 7): Home is the root and
+/// everything else is pushed on its one stack (`path`). Beside two Duo
+/// pages the conversation is a column of its own: `conversation` is the
+/// one it shows, and `path` past it is what's pushed over it.
 @MainActor
 final class Router: ObservableObject {
     static let shared = Router()
 
-    // MARK: Over the room
-
-    /// The room (`.bot`) is home; Studio and Settings open as sheets over it.
-    @Published var tab: Tab = .bot
-    @Published var studioPath: [Route] = []
-    /// Studio's kind filter; nil for everything.
-    @Published var studioKind: String?
+    /// Home's stack: a conversation, Memory, Library, a page…
+    /// The one stack over Home. Anything pushed takes the book's left page
+    /// back from Home (it shows over the conversation column there).
+    @Published var path: [Route] = [] {
+        didSet { if !path.isEmpty, homePane.shownInBook { homePane.pushed() } }
+    }
+    /// The conversation on screen (or last on screen): the conversation
+    /// column beside two pages, and where Home's "You're here" points.
+    @Published private(set) var conversation: String?
     @Published var sheet: Sheet?
     /// Set by `bbstudio://reply/<id>`; that thread focuses its composer.
     @Published var replyThreadId: String?
-    /// A destination that came before Studio's Bots loaded: the room takes it once they have.
+    /// Reply threads opened from their conversation's messages: pushed, they say Reply….
+    var replyThreads: Set<String> = []
+    /// New conversation over Home, its message prefilled.
+    @Published var compose: String?
+    /// Studio's kind filter; nil for everything.
+    @Published var studioKind: String?
+    /// A destination that came before Studio's Bots loaded: taken once they have.
     @Published private(set) var pending: Destination?
-
-    // MARK: The Bot and its conversation
-
     @Published var shownBotId: String? {
         didSet { BotSpacesStore.shared.shownBotId = shownBotId }
     }
-    @Published var selection: BotShellItem?
-    @Published var compactColumn: NavigationSplitViewColumn = .sidebar
-    /// What's pushed over the conversation.
-    @Published var detailPath: [Route] = []
-    /// For the room to act on (a place, a conversation, the list, New conversation).
-    @Published var request: RoomRequest?
     @Published var themeOverride: [String: String] = [:]
-    @Published var botToast: String?
-
-    // MARK: The room
-
-    /// The place open over the conversation (the list is `.conversations`).
-    @Published var place: RoomPlace?
+    /// Home's pane beside the conversation on the open Duo.
+    @Published var homePane = ShellHomePane()
     /// Bumped to put the keyboard in the conversation's composer.
     @Published private(set) var focusRequests = 0
+    /// Bumped to put the keyboard in Home's search (the Duo rail's Search).
+    @Published private(set) var searchRequests = 0
 
     private(set) var landed = false
-    private var landing = false
-    private var pendingPush: Route?
 
     /// The one way in: everything that opens something calls this.
     func open(_ destination: Destination) {
         switch destination {
-        case .studio(let kind, let route):
-            tab = .studio
-            if let kind { studioKind = StudioKind.family(kind) }
-            studioPath = route.map { [$0] } ?? []
-        case .settings:
-            tab = .settings
         case .sheet(let next):
             sheet = next
         default:
-            if tab != .bot { tab = .bot }
-            if case .task? = sheet { sheet = nil }
             pending = destination
         }
     }
 
     /// Onto the stack showing, so Back returns where you were.
     func push(_ route: Route) {
-        if tab == .studio { studioPath.append(route) } else { open(.route(route)) }
+        path.append(route)
     }
 
     /// Takes the waiting destination once Studio's Bots are loaded. True when one was followed.
@@ -122,140 +91,110 @@ final class Router: ObservableObject {
     }
 
     func follow(_ destination: Destination, store: BotSpacesStore) {
+        landed = true
         switch destination {
         case .conversation(let id):
-            open(item: .conversation(id))
+            if Self.isConversation(id, store: store) { openConversation(id) } else { path = [.thread(id: id)] }
         case .worker(let id):
-            open(item: .worker(id))
+            path = [.thread(id: id)]
         case .place(let page, let botId):
-            if let botId, botId != BotShell.shownBot(store.spaces, chosen: shownBotId)?.id, store.spaces?.bots.contains(where: { $0.id == botId }) == true {
-                show(botId, store: store, compact: true)
-            }
-            open(item: .page(page))
+            if let botId, store.spaces?.bots.contains(where: { $0.id == botId }) == true { show(botId, store: store) }
+            path = [.place(page)]
         case .route(let route):
-            landed = true
-            compactColumn = .detail
-            if selection == nil, let bot = BotShell.shownBot(store.spaces, chosen: shownBotId),
-               let main = BotShell.mainThreadId(bot, view: store.view(for: bot.id)) {
-                pendingPush = route
-                selection = .conversation(main)
-            } else {
-                detailPath.append(route)
-            }
+            path.append(route)
         case .list:
-            landed = true
-            showList()
-            request = .list
+            path = []
         case .compose(let text):
-            landed = true
-            request = .compose(text)
+            path = []
+            compose = text
         case .bot(let id):
             let botId = id ?? store.spaces?.bots.first(where: \.primary)?.id ?? store.spaces?.current?.id
             guard let botId, let bot = store.spaces?.bots.first(where: { $0.id == botId }) else { return }
-            if bot.id != BotShell.shownBot(store.spaces, chosen: shownBotId)?.id {
-                show(bot.id, store: store, compact: false)
+            show(bot.id, store: store)
+            if let main = BotShell.mainThreadId(bot, view: store.view(for: bot.id)) {
+                openConversation(main)
+                focusInput()
             }
-            landed = true
-            selection = BotShell.mainThreadId(bot, view: store.view(for: bot.id)).map(BotShellItem.conversation)
-            compactColumn = .detail
-            if case .conversation(let id)? = selection { request = .focus(id) }
-        case .studio, .settings, .sheet:
-            open(destination)
+        case .studio(let kind, let route):
+            if let kind { studioKind = StudioKind.family(kind) }
+            path = [.studio] + (route.map { [$0] } ?? [])
+        case .settings:
+            path = [.settings]
+        case .sheet(let next):
+            sheet = next
         }
     }
 
-    // MARK: The shell
+    /// One of the shown Bot's conversations (else any thread, pushed as one).
+    static func isConversation(_ id: String, store: BotSpacesStore) -> Bool {
+        store.views.values.contains { $0.conversations.contains { $0.threadId == id } }
+    }
 
+    /// A conversation over Home, which Back returns to.
     func openConversation(_ threadId: String) {
-        open(item: .conversation(threadId))
-    }
-
-    func open(item: BotShellItem) {
         landed = true
-        detailPath = []
-        selection = item
-        compactColumn = .detail
-        // The room may show another conversation while this one is still the
-        // selection (it opened on the last one): ask it to show this one.
-        if case .conversation(let id) = item { request = .focus(id) }
+        conversation = threadId
+        path = [.conversation(id: threadId)]
     }
 
-    func takeLanding() -> Bool {
-        defer { landing = false }
-        return landing
+    /// Memory, Library, a worker…: from Home's rows and the Bot's pages.
+    func open(item: BotShellItem) {
+        switch item {
+        case .conversation(let id): openConversation(id)
+        case .worker(let id): path = [.thread(id: id)]
+        case .page(let page): path = [.place(page)]
+        }
     }
 
-    func takePendingPush() -> [Route] {
-        defer { pendingPush = nil }
-        return pendingPush.map { [$0] } ?? []
+    /// The conversation a stack shows, for the column beside two pages.
+    func shown(_ threadId: String) {
+        if conversation != threadId { conversation = threadId }
     }
 
-    func showList() {
-        detailPath = []
-        selection = nil
-        compactColumn = .sidebar
-    }
-
-    /// The first conversation once the Bots load: the shown Bot's Main.
-    func land(_ store: BotSpacesStore) {
+    /// Once the Bots load: Home, with the conversation the app was last on
+    /// (or the Bot's Main) as the open Duo's conversation column.
+    func land(_ store: BotSpacesStore, opening: (BotSpace, String) -> String) {
         guard !landed, let bot = BotShell.shownBot(store.spaces, chosen: shownBotId),
-            let main = BotShell.mainThreadId(bot, view: store.view(for: bot.id))
+              let main = BotShell.mainThreadId(bot, view: store.view(for: bot.id))
         else { return }
         landed = true
         shownBotId = bot.id
-        landing = true
-        selection = .conversation(main)
-        compactColumn = .detail
+        conversation = opening(bot, main)
     }
 
-    func show(_ botId: String, store: BotSpacesStore, compact: Bool) {
+    /// Another Bot: its Home.
+    func show(_ botId: String, store: BotSpacesStore) {
         let previous = BotShell.shownBot(store.spaces, chosen: shownBotId)?.id
         guard botId != previous, store.spaces?.bots.contains(where: { $0.id == botId }) == true else { return }
         if let previous, previous != store.spaces?.current?.id { store.unwatch(previous) }
         store.watch(botId)
         shownBotId = botId
         landed = true
-        if compact {
-            selection = nil
-            compactColumn = .sidebar
-        } else {
-            let bot = BotShell.shownBot(store.spaces, chosen: botId)
-            selection = BotShell.mainThreadId(bot, view: store.view(for: botId)).map(BotShellItem.conversation)
-        }
-    }
-
-    func step(_ step: Int, store: BotSpacesStore, compact: Bool) {
-        guard let next = BotShell.step(store.spaces, from: BotShell.shownBot(store.spaces, chosen: shownBotId)?.id, by: step) else { return }
-        show(next, store: store, compact: compact)
-    }
-
-    // MARK: The room
-
-    func showPlace(_ place: RoomPlace) {
-        self.place = place
-    }
-
-    func closePlace() {
-        place = nil
+        conversation = nil
+        path = []
     }
 
     func focusInput() {
         focusRequests += 1
     }
 
+    func focusSearch() {
+        path = []
+        searchRequests += 1
+    }
+
     /// Another server: nothing of the last one's navigation carries over.
     func reset() {
         studioKind = nil
         sheet = nil
-        studioPath = []
+        compose = nil
         replyThreadId = nil
         pending = nil
         shownBotId = nil
-        selection = nil
-        detailPath = []
-        request = nil
-        place = nil
+        conversation = nil
+        path = []
         landed = false
-        pendingPush = nil
+        homePane = ShellHomePane()
     }
 }
+

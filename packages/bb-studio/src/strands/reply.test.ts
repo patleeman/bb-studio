@@ -311,7 +311,7 @@ describe("strands.list", () => {
     await x.svc.idle(x.thread.id);
     const list = strandList.parse(await x.svc.list(x.thread.id));
     expect(list.strands[0]!.asks).toEqual([{ id: `reply:${furnace.seq + 2}`, kind: "reply", threadId: "thr_main", label: "Please sign in to the Ace portal so I can book it.", details: [], decisions: [], turnId: furnace.turnId, seq: furnace.seq + 2 }]);
-    expect((await x.svc.overview("bot")).needs).toBe(1);
+    expect(list.strands.filter((strand) => strand.state === "needs-you")).toHaveLength(1);
   });
 });
 

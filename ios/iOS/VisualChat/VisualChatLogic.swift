@@ -267,7 +267,7 @@ struct VisualChatClient: Equatable {
 
     /// From the screen (which device and how it's folded) and the board's size in points.
     static func of(screen: CGSize, phone: Bool, board: CGSize) -> VisualChatClient {
-        let kind: Kind = DuoLayout.isInnerScreen(screen, phone: phone) ? .duoUnfolded
+        let kind: Kind = ShellGeometry.isInnerScreen(screen, phone: phone) ? .duoUnfolded
             : phone && isDuoFolded(screen) ? .duoFolded : phone ? .phone : .desktop
         let clamp = { (value: CGFloat) in Int(min(10000, max(200, value.rounded()))) }
         return VisualChatClient(kind: kind, width: clamp(board.width), height: clamp(board.height))

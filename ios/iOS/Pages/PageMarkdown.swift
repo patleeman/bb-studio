@@ -1,21 +1,35 @@
 import Charts
 import SwiftUI
 
-/// A page's Markdown: BB Pages' extensions (mentions, callouts, and ```chart /
-/// ```stats / ```embed data blocks) mapped onto `MarkdownText` and a few native views.
+/// A page's Markdown: BB Pages' extensions (mentions, callouts, toggles, and
+/// ```chart / ```stats / ```embed / ```html / ```mermaid blocks) mapped onto
+/// `MarkdownText` and native views.
 struct PageMarkdown: View {
     let source: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(Array(PageSegment.parse(source).enumerated()), id: \.offset) { _, segment in
-                switch segment {
-                case .markdown(let text): MarkdownText(text)
-                case .stats(let items): StatsGrid(items: items)
-                case .chart(let chart): PageChart(chart: chart)
-                case .embed(let embed): EmbedCard(embed: embed)
-                }
+                PageSegmentView(segment: segment)
             }
+        }
+    }
+}
+
+/// One segment's view; a struct of its own keeps `PageMarkdown`'s type shallow.
+struct PageSegmentView: View {
+    let segment: PageSegment
+
+    var body: some View {
+        switch segment {
+        case .markdown(let text): MarkdownText(text)
+        case .stats(let items): StatsGrid(items: items)
+        case .chart(let chart): PageChart(chart: chart)
+        case .embed(let embed): EmbedCard(embed: embed)
+        case .callout(let tone, let text): PageCallout(tone: tone, text: text)
+        case .toggle(let summary, let level, let body): PageToggle(summary: summary, level: level, body: body)
+        case .html(let html): PageHTMLBlock(html: html)
+        case .mermaid(let source): PageMermaidBlock(source: source)
         }
     }
 }
@@ -25,6 +39,14 @@ enum PageSegment {
     case stats([StatItem])
     case chart(ChartSpec)
     case embed(Embed)
+    /// `> [!NOTE] …`: a tone (info, success, warning, danger) and the callout's Markdown.
+    case callout(tone: String, String)
+    /// `<details><summary>…</summary> … </details>`: a toggle, a toggle heading when the summary starts with `#`s.
+    case toggle(summary: String, level: Int?, body: String)
+    /// ```` ```html ````: drawn as HTML, as on the desktop.
+    case html(String)
+    /// ```` ```mermaid ````: a diagram.
+    case mermaid(String)
 
     private final class Box {
         let segments: [PageSegment]
@@ -37,7 +59,10 @@ enum PageSegment {
         cache.countLimit = 100
         return cache
     }()
-    nonisolated(unsafe) private static let dataFenceRegex = /```(chart|stats|embed)\s*/
+    nonisolated(unsafe) private static let dataFenceRegex = /```(chart|stats|embed|html|mermaid)\s*/
+    nonisolated(unsafe) private static let calloutStartRegex = /\s{0,3}>\s*\[!(\w+)\]\s*(.*)/
+    nonisolated(unsafe) private static let summaryRegex = /<summary[^>]*>(.*?)<\/summary\s*>/
+    nonisolated(unsafe) static let blockIdRegex = /\s*<!--\s*\^([\w-]+)\s*-->\s*/
     nonisolated(unsafe) private static let mentionRegex = /@\[((?:\\.|[^\]\\])*)\]\(([a-z]+):([^)\s]+)\)/
     nonisolated(unsafe) private static let calloutRegex = /(\s*>\s*)\[!(\w+)\]\s*(.*)/
     private static let jsonDecoder = JSONDecoder()
@@ -71,6 +96,25 @@ enum PageSegment {
                 text.append(line)
                 continue
             }
+            if line.wholeMatch(of: Self.blockIdRegex) != nil { continue }
+            if trimmed.lowercased().hasPrefix("<details") {
+                flush()
+                index = toggle(lines, from: index - 1, into: &segments)
+                continue
+            }
+            if let callout = line.wholeMatch(of: Self.calloutStartRegex) {
+                flush()
+                var body = [String(callout.2)]
+                while index < lines.count, lines[index].trimmingCharacters(in: .whitespaces).hasPrefix(">") {
+                    var quoted = lines[index].trimmingCharacters(in: .whitespaces).dropFirst()
+                    if quoted.first == " " { quoted = quoted.dropFirst() }
+                    body.append(String(quoted))
+                    index += 1
+                }
+                let text = body.map(prepare).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                segments.append(.callout(tone: Self.tone(String(callout.1)), text))
+                continue
+            }
             if line.first == "`", let kind = trimmed.wholeMatch(of: Self.dataFenceRegex)?.1 {
                 var body: [String] = []
                 while index < lines.count, !lines[index].trimmingCharacters(in: .whitespaces).hasPrefix("```") {
@@ -97,6 +141,85 @@ enum PageSegment {
         return segments
     }
 
+    /// A mention as Markdown: a link the app opens (page, thread, agent, item),
+    /// a date as Today / Tomorrow / Yesterday when it is one, a Bot's name in bold.
+    static func mention(kind: String, target: String, label: String, today: Date = .now) -> String {
+        let label = label.replacing("\\]", with: "]")
+        let name = label.isEmpty ? target : label
+        switch kind {
+        case "page": return "[\(name)](bbstudio://page/\(target))"
+        case "thread": return "[\(name)](bbstudio://conversation/\(target))"
+        case "agent": return "[\(label.isEmpty ? "Agent" : label)](bbstudio://conversation/\(target))"
+        case "item":
+            guard let split = target.firstIndex(of: ":"),
+                  let host = itemHosts[String(target[..<split])] else { return "**\(name)**" }
+            return "[\(name)](bbstudio://\(host)/\(target[target.index(after: split)...]))"
+        case "date": return "**\(relativeDay(target, today: today) ?? name)**"
+        default: return "**\(name)**"
+        }
+    }
+
+    /// Studio plugin ids to link kinds (`bbstudio://<kind>/<id>`, `Links`).
+    private static let itemHosts = ["pages": "page", "design": "design", "excalidraw": "whiteboard", "artifacts": "artifact",
+                                    "talk": "recording", "minis": "app"]
+
+    /// "Today", "Tomorrow" or "Yesterday" for a `YYYY-MM-DD` that is one, as the desktop's date chip says.
+    static func relativeDay(_ value: String, today: Date) -> String? {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: value) else { return nil }
+        let calendar = Calendar.current
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: today), to: calendar.startOfDay(for: date)).day
+        switch days {
+        case 0: return "Today"
+        case 1: return "Tomorrow"
+        case -1: return "Yesterday"
+        default: return date.formatted(.dateTime.month(.abbreviated).day().year())
+        }
+    }
+
+    /// Desktop's ALERT_TONES: the tone a callout's `[!KIND]` draws in.
+    static func tone(_ kind: String) -> String {
+        switch kind.uppercased() {
+        case "TIP": "success"
+        case "WARNING": "warning"
+        case "CAUTION": "danger"
+        default: "info"
+        }
+    }
+
+    /// From `<details>` to its matching `</details>`: the summary (a toggle
+    /// heading when it starts with `#`s) and the body between. Returns the next line.
+    private static func toggle(_ lines: [String], from start: Int, into segments: inout [PageSegment]) -> Int {
+        var depth = 0
+        var index = start
+        var collected: [String] = []
+        while index < lines.count {
+            let line = lines[index]
+            let lower = line.lowercased()
+            depth += lower.components(separatedBy: "<details").count - 1
+            depth -= lower.components(separatedBy: "</details").count - 1
+            collected.append(line)
+            index += 1
+            if depth <= 0 { break }
+        }
+        var text = collected.joined(separator: "\n")
+        var summary = ""
+        if let match = text.firstMatch(of: Self.summaryRegex) {
+            summary = String(match.1).trimmingCharacters(in: .whitespaces)
+            text.removeSubrange(match.range)
+        }
+        if let open = text.range(of: #"<details[^>]*>"#, options: [.regularExpression, .caseInsensitive]) { text.removeSubrange(open) }
+        if let close = text.range(of: #"</details\s*>"#, options: [.regularExpression, .caseInsensitive, .backwards]) { text.removeSubrange(close) }
+        let hashes = summary.prefix { $0 == "#" }.count
+        let level = (1...6).contains(hashes) && summary.dropFirst(hashes).first == " " ? hashes : nil
+        if let level { summary = String(summary.dropFirst(level + 1)) }
+        segments.append(.toggle(summary: prepare(summary), level: level, body: text.trimmingCharacters(in: .whitespacesAndNewlines)))
+        return index
+    }
+
     private static func data(_ kind: String, _ json: String) -> PageSegment? {
         let data = Data(json.utf8)
         let decoder = Self.jsonDecoder
@@ -104,6 +227,8 @@ enum PageSegment {
         case "stats": return (try? decoder.decode([StatItem].self, from: data)).flatMap { $0.isEmpty ? nil : .stats($0) }
         case "chart": return (try? decoder.decode(ChartSpec.self, from: data)).flatMap { $0.data.isEmpty ? nil : .chart($0) }
         case "embed": return (try? decoder.decode(Embed.self, from: data)).map { .embed($0) }
+        case "html": return json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : .html(json)
+        case "mermaid": return json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : .mermaid(json)
         default: return nil
         }
     }
@@ -114,12 +239,7 @@ enum PageSegment {
         var line = line
         if line.contains("@[") {
             line = line.replacing(Self.mentionRegex) { match in
-                let label = match.1.isEmpty ? String(match.3) : String(match.1)
-                switch match.2 {
-                case "page": return "[\(label)](bbstudio://page/\(match.3))"
-                case "thread": return "[\(label)](bbstudio://thread/\(match.3))"
-                default: return "**\(label)**"
-                }
+                mention(kind: String(match.2), target: String(match.3), label: String(match.1))
             }
         }
         if line.contains("[!"), let callout = line.wholeMatch(of: Self.calloutRegex) {
@@ -218,6 +338,7 @@ struct Embed: Decodable {
     var id: String?
     var title: String?
     var description: String?
+    var image: String?
 }
 
 // MARK: Views
@@ -303,6 +424,7 @@ struct EmbedCard: View {
     let embed: Embed
     @EnvironmentObject private var app: AppModel
     @ObservedObject private var studio = StudioStore.shared
+    @State private var preview: LinkPreview?
 
     /// Embeds of other add-ons' items, by the add-on that makes them.
     private static let studioPlugins = ["drawing": "excalidraw", "artifact": "artifacts", "recording": "talk", "mini": "minis"]
@@ -323,19 +445,35 @@ struct EmbedCard: View {
             Image(systemName: symbol(kind)).foregroundStyle(.secondary).frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title(kind, target)).font(.subheadline.weight(.semibold)).lineLimit(2)
-                Text(embed.description.flatMap { $0.isEmpty ? nil : $0 } ?? subtitle(kind, target))
+                Text(nonEmpty(embed.description) ?? nonEmpty(preview?.description) ?? subtitle(kind, target))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
             Spacer(minLength: 0)
+            if let image = (nonEmpty(embed.image) ?? nonEmpty(preview?.image)).flatMap({ URL(string: $0) }) {
+                AsyncImage(url: image) { $0.resizable().scaledToFill() } placeholder: { Color.clear }
+                    .frame(width: 56, height: 56)
+                    .clipShape(.rect(cornerRadius: 8))
+                    .accessibilityHidden(true)
+            }
         }
         .padding(12)
         .background(.fill.tertiary, in: .rect(cornerRadius: 12))
+        // Unfurled like the desktop's link card, when the page didn't keep a title.
+        .task(id: target) {
+            guard kind == "bookmark", nonEmpty(embed.description) == nil || nonEmpty(embed.title) == nil,
+                  let url = URL(string: target), url.scheme?.hasPrefix("http") == true else { return }
+            preview = try? await app.client.linkPreview(url)
+        }
 
         if let url = link(kind, target) {
             Link(destination: url) { content }.buttonStyle(.plain)
         } else {
             content
         }
+    }
+
+    private func nonEmpty(_ text: String?) -> String? {
+        text.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
     }
 
     /// A drawing, artifact, recording or any Studio item: its row from Studio, opening natively.
@@ -407,13 +545,14 @@ struct EmbedCard: View {
     private func link(_ kind: String, _ target: String) -> URL? {
         switch kind {
         case "page": URL(string: "bbstudio://page/\(target)")
-        case "thread": URL(string: "bbstudio://thread/\(target)")
+        case "thread": URL(string: "bbstudio://conversation/\(target)")
         default: URL(string: target).flatMap { $0.scheme?.hasPrefix("http") == true ? $0 : nil }
         }
     }
 
     private func title(_ kind: String, _ target: String) -> String {
         if let title = embed.title, !title.isEmpty { return title }
+        if let title = preview?.title, !title.isEmpty { return title }
         if kind == "page" { return PagesStore.shared.page(target)?.displayTitle ?? "Page" }
         if kind == "bookmark" { return URL(string: target)?.host() ?? target }
         return target.isEmpty ? "Embed" : target

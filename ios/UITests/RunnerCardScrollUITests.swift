@@ -1,7 +1,7 @@
 import XCTest
 
-/// The room's list of conversations with their workers and runners: the
-/// conversation list on a phone, the left page on the Duo's inner screen. It
+/// Home's list of conversations with their workers and runners: on a phone,
+/// and on the Duo's inner screen (Home brought back on the book's left page). It
 /// scrolls in one scroll view with one indicator at its edge. No scroll view
 /// nests inside it, so no second indicator is drawn over a row. Offline, on
 /// the local Bot demo. See docs/ios/runner-card-scroll.
@@ -20,9 +20,8 @@ final class RunnerCardScrollUITests: ServerIsolatedUITestCase {
             + (layout == "split" ? ["-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles"] : [])
         app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
-        // The phone's list over the conversation; the Duo's left page is already showing.
-        if layout != "split" { app.openRoomPlace("conversations") }
-        let runner = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomWorker-' OR identifier BEGINSWITH 'contextWorker-'")).firstMatch
+        app.openRoomPlace("conversations")
+        let runner = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'homeWorker-'")).firstMatch
         XCTAssertTrue(runner.waitForExistence(timeout: 15), "a worker's row shows")
         Thread.sleep(forTimeInterval: 1)
         let list = try XCTUnwrap(listScroll(containing: runner.frame), "the list's scroll view")

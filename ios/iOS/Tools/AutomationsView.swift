@@ -178,7 +178,7 @@ struct RunStatusIcon: View {
             case "succeeded": Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
             case "failed", "timed_out", "timedOut": Image(systemName: "xmark.octagon.fill").foregroundStyle(.red)
             case "skipped": Image(systemName: "forward.fill").foregroundStyle(.secondary)
-            case "running", "queued", "pending": ProgressView().controlSize(.mini)
+            case "running", "queued", "pending": RunningGlyph().accessibilityLabel("Running")
             default: Image(systemName: "circle.dashed").foregroundStyle(.secondary)
             }
         }

@@ -18,8 +18,8 @@ struct MessageBubble: View {
     var fork: (() -> Void)? = nil
     /// Opens an existing side thread (a fork made at this message).
     var openSideThread: ((String) -> Void)? = nil
-    /// A reply that needs the user: its asking sentence marked in place.
-    var ask: ReplyAskMark? = nil
+    /// The strand its turn is in, on the turn's last reply: a small tag in its footer.
+    var strand: String? = nil
     @EnvironmentObject private var app: AppModel
 
     private var text: String { row.text ?? "" }
@@ -44,7 +44,7 @@ struct MessageBubble: View {
             QuietCheckMarker()
         } else {
             VStack(alignment: .leading, spacing: 10) {
-                MarkdownText(text, mark: ask)
+                MarkdownText(text)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(.contextMenuPreview, .rect(cornerRadius: 8))
                     .contextMenu { menu }
@@ -60,6 +60,7 @@ struct MessageBubble: View {
                 if let replyInThread, ConversationReplyRow.shows(thread, forks: openSideThread != nil) {
                     ConversationReplyRow(messageId: row.id, thread: thread, look: replier, open: replyInThread, openFork: openSideThread)
                 }
+                if let strand { MessageFooter(createdAt: row.createdAt, strand: strand) }
             }
         }
     }
@@ -77,14 +78,6 @@ struct MessageBubble: View {
         if let createdAt = row.createdAt {
             Section {
                 Text(Self.sentLabel(createdAt))
-            }
-        }
-        if ask != nil {
-            // Done is the user's own, from BB Studio's app on the Mac; answering here clears it too.
-            Section {
-                Button {} label: { Label("Mark done in BB Studio on your Mac", systemImage: "checkmark.circle") }
-                    .disabled(true)
-                    .accessibilityIdentifier("replyAskDone")
             }
         }
         Button { UIPasteboard.general.string = plainText } label: { Label("Copy", systemImage: "doc.on.doc") }
@@ -574,7 +567,7 @@ struct ActivityGroup: View {
         } label: {
             HStack(spacing: 6) {
                 if running {
-                    ProgressView().controlSize(.mini)
+                    RunningGlyph().accessibilityHidden(true)
                 } else if failed {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
                 }
@@ -748,4 +741,31 @@ struct ActivityStep: View {
 
 private extension String {
     var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+}
+
+/// A reply's footer (round 7): its time and the strand its turn is in, the
+/// only place strands show.
+struct MessageFooter: View {
+    let createdAt: Double?
+    let strand: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let createdAt {
+                Text(Date(timeIntervalSince1970: createdAt / 1000), format: .dateTime.hour().minute())
+            }
+            Text("#" + strand)
+                .font(.caption)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 1)
+                .background(.fill.tertiary, in: .rect(cornerRadius: 6))
+                .lineLimit(1)
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .frame(minHeight: 28)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Strand \(strand)")
+        .accessibilityIdentifier("strandTag")
+    }
 }

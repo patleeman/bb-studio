@@ -24,7 +24,7 @@ export interface StrandsRegisterDeps {
   decisions: StrandsDecisions;
   /** A conversation strands run in (a Bot's, Main included; not a worker, not archived): its Bot and last activity. */
   conversation(threadId: string): { botId: string; lastActiveAt: number } | null;
-  /** A Bot's conversations, for the overview. */
+  /** A Bot's conversations, for the needs-you push's check. */
   conversationsOf(botId: string): Promise<{ threadId: string; title: string; isMain: boolean; lastActiveAt: number }[]>;
   workers(threadId: string): Promise<WorkerFact[]>;
   /** Who may see which conversation's strands from `bb studio strands`. */
@@ -112,7 +112,6 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
       return { ok: service.resolveReply(threadId, seq) };
     },
     "strands.replyPush": ({ threadId, waitMs, requestSeq }) => service.replyPush(threadId, waitMs ?? 20_000, requestSeq ?? null),
-    "strands.overview": ({ botId }) => service.overview(botId),
     "strands.move": ({ threadId, seq, strandId }) => ({ ok: service.move(threadId, seq, strandId) }),
     "strands.split": ({ threadId, seq }) => { const strandId = service.split(threadId, seq); return { ok: !!strandId, strandId }; },
     "strands.rename": ({ strandId, title }) => ({ ok: service.rename(strandId, title) }),

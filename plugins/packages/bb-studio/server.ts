@@ -10,7 +10,7 @@ import { registerStudioRpc } from "./src/server/rpc";
 import { setupHubWiring } from "./src/server/hub-wiring";
 import { registerWorkCards } from "./src/work/register";
 import { STRAND_NOTE_TOOL } from "./src/strands/contract";
-import { phoneActs, registerUserTasks } from "./src/tasks/user";
+import { registerUserTasks } from "./src/tasks/user";
 import { registerTasks } from "./src/tasks/register";
 import { adoptAtStart } from "./src/tasks/migrate";
 import { retireAgentTasks } from "./src/tasks/retire";
@@ -721,7 +721,7 @@ export default async function plugin(bb: BbPluginApi) {
   };
   // When a strand's "needs you" push went out, by Bot: Main's own reply push stays quiet for a few minutes after it.
   const taskPushedAt = new Map<string, number>();
-  const loops = registerLoops(bb, db, postToBot, () => loopTimeZone(process.env, studioSettings.current().todosTimeZone));
+  const loops = registerLoops(bb, db);
   // Old work cards' RPCs, for older phones. A task handed to the user doesn't push: a strand turning "needs you" does (src/strands/push.ts).
   registerWorkCards(bb, db);
   const taskThreads = new ThreadDirectory(db);
@@ -744,15 +744,9 @@ export default async function plugin(bb: BbPluginApi) {
     zone: () => loopTimeZone(process.env, studioSettings.current().todosTimeZone),
     dir: taskThreads,
     facts: threadFacts,
-    post: postToBot,
-    send: async (threadId, text) => { await bb.sdk.threads.send({threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never); },
     thread: async (threadId) => (await bb.sdk.threads.get({ threadId })) as never,
-    loopAct: (x) => loops.actDirect(x),
-    reopenLoop: (id) => loops.store.update(id, { status: 'surfaced' }),
-    snoozeLoopUntil: (id, at) => loops.store.update(id, { status: 'snoozed', trigger: { type: 'time', at } }),
     held: () => [],
   });
-  loops.routeActs(phoneActs(userTasks));
   const automationTasks = new AutomationTasks(new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); }), {
     sources: () => readSources(db, bots.list().map((bot) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, heartbeatKey: bots.heartbeatKey(bot.id) }))),
     log: (message) => bb.log.warn(message),

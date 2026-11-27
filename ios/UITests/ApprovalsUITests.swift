@@ -12,18 +12,24 @@ final class ApprovalsUITests: ServerIsolatedUITestCase {
     private func launch() {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "needs"]
         app.launchOffline()
-        XCTAssertTrue(app.waitForRoom(), "the app opens on the room")
+        XCTAssertTrue(app.waitForRoom(), "Main opens from Home")
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
-    private func openWorker() {
+    /// The worker's row on Home says its state first ("Running", "Waiting").
+    private func workerRow() -> XCUIElement {
         app.openRoomPlace("conversations")
-        let row = app.buttons["roomWorker-thr_demo_w1"]
+        let row = app.buttons["homeWorker-thr_demo_w1"]
         XCTAssertTrue(row.waitForExistence(timeout: 15))
-        row.tap()
-        XCTAssertTrue(any("workerTitle").waitForExistence(timeout: 15), "the worker opens")
+        return row
+    }
+
+    private func openWorker() {
+        workerRow().tap()
+        let title = app.conversationTitle
+        XCTAssertTrue(title.waitForExistence(timeout: 15) && title.label.contains("Studio-native BB fork"), "the worker opens")
     }
 
     func testApproveInTheConversationResolvesAndTheWorkerRuns() {
@@ -46,16 +52,18 @@ final class ApprovalsUITests: ServerIsolatedUITestCase {
         shot("approved")
         XCTAssertTrue(card.waitForNonExistence(timeout: 15), "then it goes")
 
+        let row = workerRow()
+        let running = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label BEGINSWITH 'Running'"), object: row)
+        XCTAssertEqual(XCTWaiter.wait(for: [running], timeout: 15), .completed, "the worker runs again: \(row.label)")
         openWorker()
-        XCTAssertEqual(any("workerTitle").value as? String, "running", "the worker runs again")
         XCTAssertFalse(app.buttons["workerPendingOpen"].exists)
     }
 
     func testTheWorkerPointsAtTheCardInItsConversation() {
         launch()
         XCTAssertTrue(any("workerApproval").waitForExistence(timeout: 15))
+        XCTAssertTrue(workerRow().label.hasPrefix("Waiting"), "the worker waits on it")
         openWorker()
-        XCTAssertEqual(any("workerTitle").value as? String, "needs-you")
         let marker = app.buttons["workerPendingOpen"]
         XCTAssertTrue(marker.waitForExistence(timeout: 15), "the pending approval is marked")
         XCTAssertTrue(marker.label.contains("Main"), marker.label)

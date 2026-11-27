@@ -6,10 +6,6 @@ import { z } from "zod";
 export const PLUGIN_ID = "dashboards";
 /** Studio's panel sub-path: /plugins/studio/studio/dashboards/<id> shows one dashboard. */
 export const ROUTE_SEGMENT = "dashboards";
-export const DASHBOARD_KIND = "dashboard";
-
-/** The thread workbench's Dashboards tab. */
-export const DASHBOARD_TAB = "dashboards";
 /** Realtime channel: dashboard edits and fresh widget data. */
 export const REALTIME_CHANNEL = "dashboards";
 /** Both event types invalidate the full view, even at the same document updatedAt. */
@@ -68,8 +64,6 @@ export const BREAKPOINTS: Record<Breakpoint, number> = { lg: 1100, md: 700, sm: 
 /** The breakpoint react-grid-layout picks for a container this wide. */
 export const breakpointFor = (width: number): Breakpoint => (width >= BREAKPOINTS.lg ? "lg" : width >= BREAKPOINTS.md ? "md" : "sm");
 export const COLS: Record<Breakpoint, number> = { lg: 12, md: 8, sm: 4 };
-export const ROW_HEIGHT = 36;
-export const GRID_MARGIN = 12;
 
 // ---------------------------------------------------------------------------
 // Widget types.
@@ -165,10 +159,6 @@ export const WIDGETS: Record<WidgetType, WidgetInfo> = {
   },
 };
 
-export function isWidgetType(value: string): value is WidgetType {
-  return (WIDGET_TYPES as readonly string[]).includes(value);
-}
-
 // ---------------------------------------------------------------------------
 // Schemas. Kept flat and plain, so the generated Swift types read naturally.
 
@@ -190,7 +180,6 @@ const isHttpUrl = (value: string) => {
 };
 
 export const SOURCE_KINDS = ["none", "static", "url", "script", "push"] as const;
-export type SourceKind = (typeof SOURCE_KINDS)[number];
 
 /** Where a widget's data comes from. Fields apply per kind; others are ignored. */
 export const sourceSchema = z.object({
@@ -327,24 +316,6 @@ export const approvalPromptSchema = z.object({
     at: z.number(),
   }).nullable(),
 });
-export type ApprovalPrompt = z.infer<typeof approvalPromptSchema>;
-
-/** "Every 5 minutes", "Every hour", "Every 2 days". */
-export function describeEvery(seconds: number): string {
-  const units: [number, string][] = [[86_400, "day"], [3600, "hour"], [60, "minute"], [1, "second"]];
-  for (const [size, name] of units) {
-    if (seconds >= size && seconds % size === 0) {
-      const n = seconds / size;
-      return n === 1 ? `Every ${name}` : `Every ${n} ${name}s`;
-    }
-  }
-  return `Every ${seconds} seconds`;
-}
-
-/** "1 MB", "512 KB". */
-export function describeBytes(bytes: number): string {
-  return bytes >= 1024 * 1024 && bytes % (1024 * 1024) === 0 ? `${bytes / 1024 / 1024} MB` : `${Math.round(bytes / 1024)} KB`;
-}
 
 export const widgetViewSchema = widgetSchema.extend({
   /** For script sources: whether the exact command is approved. */
@@ -422,7 +393,6 @@ export const versionViewSchema = z.object({
   label: z.string(),
   widgetCount: z.number(),
 });
-export type VersionView = z.infer<typeof versionViewSchema>;
 
 /** Reads `a.b[0].c` out of a value; undefined when the path doesn't exist. */
 export function selectPath(value: unknown, path: string | undefined): unknown {

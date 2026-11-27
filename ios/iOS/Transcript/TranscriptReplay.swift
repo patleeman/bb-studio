@@ -149,7 +149,7 @@ final class TranscriptReplay {
 
         // A fling up from the end that UIKit cuts short without saying so,
         // then anything that lays out (here the keyboard): the reader stays
-        // where the fling left them (Patrick, Oct 27: "I scroll up, touch
+        // where the fling left them (a user, Oct 27: "I scroll up, touch
         // something and it scrolls down").
         await step("a fling up from the end, cut short", expectReading: true, anchorAfterChange: true) {
             controller.simulateFlingCutShort(to: controller.collectionView.contentOffset.y - 1500)
@@ -214,7 +214,7 @@ final class TranscriptReplay {
 
     // MARK: A busy turn
 
-    /// Patrick, Oct 27, the Chief of Staff mid-turn: "I can't scroll up. It
+    /// A user, Oct 27, the Chief of Staff mid-turn: "I can't scroll up. It
     /// keeps pulling the chat transcript to the end", and a blank screen,
     /// scrolled past the end, with "Thinking" up and a running task above the
     /// composer. A reply growing every step, a task card that ticks, comes

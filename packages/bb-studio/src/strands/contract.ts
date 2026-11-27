@@ -151,11 +151,6 @@ export const rpcContract = defineRpcContract({
       opening: z.object({ seq: z.number(), replySeq: z.number().nullable() }).nullable().default(null),
     }),
   },
-  "strands.overview": {
-    experimental_description: "Every conversation of a Bot with open strands, needs you first: the phone's Strands screen.",
-    input: z.object({ botId: z.string().min(1).max(200) }).strict(),
-    output: z.object({ conversations: z.array(overviewConversation), needs: z.number(), running: z.number() }),
-  },
   "strands.move": {
     experimental_description: "Move a message's turn to another strand (the user's choice; never re-sorted).",
     input: z.object({ threadId, seq: z.number().int().min(0), strandId }).strict(),
@@ -208,10 +203,9 @@ export const rpcContract = defineRpcContract({
   },
 });
 
-/** What the phone reads: a conversation's strands and its tags, "opened", and the overview (its Strands screen). The rest stays desktop-only. */
+/** What the phone reads: a conversation's strands, its tags and "opened". The rest stays desktop-only. */
 export const strandsPublicContract = defineRpcContract({
   "strands.list": rpcContract["strands.list"],
-  "strands.overview": rpcContract["strands.overview"],
   "strands.tags": rpcContract["strands.tags"],
   "strands.opened": rpcContract["strands.opened"],
 });

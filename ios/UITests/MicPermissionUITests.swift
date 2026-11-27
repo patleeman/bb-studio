@@ -13,7 +13,8 @@ final class MicPermissionUITests: ServerIsolatedUITestCase {
         guard let answer = ProcessInfo.processInfo.environment["MIC_ANSWER"] else { throw XCTSkip("run on a fresh simulator with the microphone reset") }
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list"]
         app.launchOffline()
-        let mic = app.buttons["roomMic"]
+        XCTAssertTrue(app.waitForRoom(timeout: 60), "Main opens from Home")
+        let mic = app.buttons["composerMic"]
         XCTAssertTrue(mic.waitForExistence(timeout: 60))
         mic.tap()
         answerTheMicPrompt(answer)
@@ -24,10 +25,11 @@ final class MicPermissionUITests: ServerIsolatedUITestCase {
         }
         sleep(3)
         XCTAssertEqual(app.state, .runningForeground, "the app is still running")
-        if mic.exists, app.otherElements["roomWave"].exists { mic.tap() }
+        // Still listening: the same button stops it.
+        if mic.exists, mic.label != "Dictate" { mic.tap() }
         sleep(2)
         XCTAssertEqual(app.state, .runningForeground)
-        XCTAssertTrue(mic.waitForExistence(timeout: 10), "back to the room")
+        XCTAssertTrue(mic.waitForExistence(timeout: 10), "back in the conversation")
         try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/mic-\(answer.hasPrefix("Don") ? "denied" : "allowed").png"))
     }
 }

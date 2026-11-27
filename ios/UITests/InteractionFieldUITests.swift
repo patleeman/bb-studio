@@ -1,6 +1,6 @@
 import XCTest
 
-/// Patrick, Nov 1: he couldn't type into a secret request's field in the Bot
+/// A user, Nov 1: they couldn't type into a secret request's field in the Bot
 /// chat. A tap on a field in a pending interaction (a secret request, a
 /// question's typed answer, the ask-user-question plugin's form) takes the
 /// keyboard and keeps it, and what's typed stays. A tap on the transcript's
@@ -62,7 +62,7 @@ final class InteractionFieldUITests: ServerIsolatedUITestCase {
 
     /// Taps the field, checks it kept the keyboard, and types.
     private func type(_ text: String, into field: XCUIElement) {
-        // As Patrick had it: the composer has the keyboard, then the field is tapped.
+        // As a user had it: the composer has the keyboard, then the field is tapped.
         let composer = app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
         if !app.keyboards.firstMatch.exists {
             composer.tap()
@@ -95,9 +95,14 @@ final class InteractionFieldUITests: ServerIsolatedUITestCase {
             }
             app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.width - 12, dy: (headerBottom + label.frame.minY) / 2)).tap()
         } else {
-            let text = texts.map { app.staticTexts[$0].firstMatch }.first { $0.exists && $0.frame.minY > headerBottom }
-            XCTAssertNotNil(text, "Some of the card's text is clear of the header")
-            text?.tap()
+            // On the folded Duo (678 points) the card with the keyboard up
+            // fills the page under the title line: no transcript to tap.
+            guard let text = texts.map({ app.staticTexts[$0].firstMatch }).first(where: { $0.exists && $0.frame.minY > headerBottom }) else {
+                XCTAssertTrue(app.isFoldedDuo, "Some of the card's text is clear of the header")
+                print("INTERACTION-FIELD no card text under the title line (\(headerBottom)); tap skipped")
+                return
+            }
+            text.tap()
         }
         let gone = NSPredicate { _, _ in !self.app.keyboards.firstMatch.exists }
         expectation(for: gone, evaluatedWith: nil)

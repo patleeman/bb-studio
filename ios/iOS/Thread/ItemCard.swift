@@ -389,10 +389,7 @@ private struct DesignScreenThumb: View {
         let size = screen.size
         let scale = Self.height / size.height
         VStack(alignment: .leading, spacing: 4) {
-            StaticWebView(url: url)
-                .frame(width: size.width, height: size.height)
-                .scaleEffect(scale, anchor: .topLeading)
-                .frame(width: size.width * scale, height: Self.height, alignment: .topLeading)
+            DesignThumbnailImage(url: url, size: CGSize(width: size.width, height: size.height), height: Self.height)
                 .clipShape(.rect(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
             Text(screen.caption ?? screen.title ?? screen.id ?? "Screen")
@@ -406,25 +403,3 @@ private struct DesignScreenThumb: View {
     }
 }
 
-/// A page shown without touches, so the card around it takes them.
-private struct StaticWebView: UIViewRepresentable {
-    let url: URL
-
-    func makeUIView(context: Context) -> WKWebView {
-        let view = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
-        view.isUserInteractionEnabled = false
-        view.scrollView.contentInsetAdjustmentBehavior = .never
-        view.isOpaque = false
-        view.load(URLRequest(url: url))
-        context.coordinator.loaded = url
-        return view
-    }
-
-    func updateUIView(_ view: WKWebView, context: Context) {
-        guard context.coordinator.loaded != url else { return }
-        context.coordinator.loaded = url
-        view.load(URLRequest(url: url))
-    }
-
-    func makeCoordinator() -> WebView.Coordinator { WebView.Coordinator() }
-}

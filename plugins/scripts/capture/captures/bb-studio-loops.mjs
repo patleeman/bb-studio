@@ -130,7 +130,6 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       const thread = await json(["thread", "spawn", "--project", larkspur.id, "--title", "Larkspur lead", "--prompt", "Larkspur lead.", "--send-at", "30d"]);
       lead = (await pluginRpc("studio", "project_set_lead", { projectId: larkspur.id, threadId: thread.id })).leadThreadId;
     }
-    if (!BEFORE) await pluginRpc("studio", "loops.setPlaces", { names: ["Home", "Office", "Mom’s", "Gym"] });
     writeLoops(loops({ larkspurLead: lead }));
     fixture = { bot, lead };
     return fixture;

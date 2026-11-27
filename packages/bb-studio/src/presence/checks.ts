@@ -5,7 +5,6 @@ export interface CheckLine { id: string; pass: boolean; reason: string }
 export interface CheckReport { pass: boolean; results: CheckLine[]; presence: PresencePackage | null }
 
 export const CHECK_SIZES = [24, 36, 160] as const;
-export const MEASURED_CHECKS = ["runs", "render:24", "render:36", "render:160", "frame-time", "states", "light", "states:24", "motion", "still"] as const;
 export const LIGHT_CHECK_SIZE = 24;
 export const FRAME_BUDGET_MS = 6;
 export const SLOWEST_FRAME_MS = 60;

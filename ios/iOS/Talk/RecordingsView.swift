@@ -15,6 +15,8 @@ struct RecordingDetailView: View {
     @State private var segments: [Segment] = []
     @StateObject private var player = RecordingPlayer()
     @State private var transcript = ""
+    /// The transcript as a text file, for Share (a screen action shares a URL); written when it changes.
+    @State private var transcriptFile: URL?
     @State private var loaded = false
     @State private var error: String?
     @State private var creatingThread = false
@@ -75,44 +77,49 @@ struct RecordingDetailView: View {
         }
     }
 
-    private var moreMenu: some View {
-        Menu {
-            Button { creatingThread = true } label: { Label("New Thread", systemImage: "square.and.pencil") }
-            StudioChatMenuButton(isPresented: $chatting)
-            Button { showingRelated = true } label: { Label("Related", systemImage: "link") }
-            Button { UIPasteboard.general.string = transcript } label: { Label("Copy Transcript", systemImage: "doc.on.doc") }
-            Button {
-                newTitle = recording?.title ?? ""
-                renaming = true
-            } label: { Label("Rename", systemImage: "pencil") }
-            if let recording, recording.failedCount > 0 {
-                Button { Task { await perform { try await $0.retryRecording(id) } } } label: {
-                    Label("Retry Transcription", systemImage: "arrow.clockwise")
-                }
-            }
-            Button(role: .destructive) { confirmingDelete = true } label: { Label("Delete", systemImage: "trash") }
-        } label: {
-            Image(systemName: "ellipsis")
+    /// Share and New Thread first; the rest under ⋯ (the Duo: the rail and its More).
+    private var actions: [ScreenAction] {
+        guard let recording else { return [] }
+        var list: [ScreenAction] = []
+        if let file = transcriptFile {
+            list.append(ScreenAction(id: "share", title: "Share Transcript", systemImage: "square.and.arrow.up", share: file))
         }
+        list.append(ScreenAction(id: "newThread", title: "New Thread", systemImage: "square.and.pencil", run: { creatingThread = true }))
+        if StudioStore.shared.plugins.contains("studio") {
+            list.append(ScreenAction(id: "chat", title: "Chat About This", systemImage: "bubble.left.and.text.bubble.right", run: { chatting = true }))
+        }
+        list.append(ScreenAction(id: "related", title: "Related", systemImage: "link", run: { showingRelated = true }))
+        list.append(ScreenAction(id: "copy", title: "Copy Transcript", systemImage: "doc.on.doc", disabled: transcript.isEmpty,
+                                 run: { UIPasteboard.general.string = transcript }))
+        list.append(ScreenAction(id: "rename", title: "Rename", systemImage: "pencil", run: {
+            newTitle = self.recording?.title ?? ""
+            renaming = true
+        }))
+        if recording.failedCount > 0 {
+            list.append(ScreenAction(id: "retry", title: "Retry Transcription", systemImage: "arrow.clockwise", run: {
+                Task { await perform { try await $0.retryRecording(id) } }
+            }))
+        }
+        list.append(ScreenAction(id: "delete", title: "Delete", systemImage: "trash", role: .destructive, run: { confirmingDelete = true }))
+        return list
+    }
+
+    private func writeTranscriptFile() {
+        guard !transcript.isEmpty else { transcriptFile = nil; return }
+        let name = (recording?.title ?? "Recording").replacingOccurrences(of: "/", with: "-")
+        let url = FileManager.default.temporaryDirectory.appending(path: "\(name).txt")
+        transcriptFile = (try? transcript.write(to: url, atomically: true, encoding: .utf8)) != nil ? url : nil
     }
 
     var body: some View {
         content
         .overlay { if !loaded { ProgressView() } }
-        .modifier(RegularScrollingSurface())
         .safeAreaInset(edge: .bottom) {
             if player.durationMs > 0 { RecordingPlayerBar(player: player) }
         }
         .onDisappear { player.stop() }
-        .navigationTitle(recording?.title ?? "Recording")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                ShareLink(item: transcript).disabled(transcript.isEmpty)
-                moreMenu
-                .disabled(recording == nil)
-            }
-        }
+        .screenToolbar(recording?.title ?? "Recording", actions: actions)
+        .onChange(of: transcript) { _, _ in writeTranscriptFile() }
         .sheet(isPresented: $creatingThread) { NewThreadView(text: transcript) }
         .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "talk", itemId: id) }
         .studioChat(isPresented: $chatting, pluginId: "talk", itemId: id, title: recording?.title ?? "Recording", projectId: recording?.projectId)

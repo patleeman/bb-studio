@@ -1,6 +1,6 @@
 import XCTest
 
-/// Patrick, Oct 26, the Duo's inner screen split with Safari: "the input
+/// A user, Oct 26, the Duo's inner screen split with Safari: "the input
 /// keeps hovering". The composer floated 500 points up with no keyboard on
 /// screen: a keyboard's inset kept after the keyboard had gone. Focus the
 /// composer, take the focus away (another app, the background, a window

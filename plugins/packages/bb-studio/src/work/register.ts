@@ -1,4 +1,3 @@
-import { clearFlight } from "../tasks/cleared";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
@@ -151,7 +150,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     "work.update": ({ id, ...rest }) => update(id, rest),
     "work.anchor": async ({ id, threadId, messageId }) => await place(store.anchor(id, threadId, messageId)),
     "work.dismiss": ({ id }) => store.dismiss(id),
-    "work.clear": ({ threadId }) => { const cleared = store.clearFinished(threadId); clearFlight(db, threadId, store.now()); store.changed(); return { cleared }; },
+    "work.clear": ({ threadId }) => { const cleared = store.clearFinished(threadId); store.changed(); return { cleared }; },
   }, false, (message) => bb.log.warn(message)));
 
 

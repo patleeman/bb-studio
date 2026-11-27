@@ -1,7 +1,5 @@
-// Shared Excalidraw scene helpers, dark-mode detection, and scene→PNG
-// rendering (pure data in, image out — no editor mount required).
+// Shared Excalidraw scene helpers and dark-mode detection.
 import { useEffect, useState } from "react";
-import { exportToBlob } from "@excalidraw/excalidraw";
 
 export type StoredScene = {
   elements: unknown[];
@@ -70,22 +68,6 @@ export function serializeSceneWithTombstones(
     null,
     2,
   );
-}
-
-/** Render a stored scene to a PNG blob (runs headless of the editor). */
-export async function renderSceneToPng(scene: StoredScene | null): Promise<Blob> {
-  const elements = (scene?.elements ?? []).filter(
-    (el) => !(el as { isDeleted?: boolean }).isDeleted,
-  );
-  const appState = sanitizeAppStateForStorage(scene?.appState ?? {});
-  const files = scene?.files ?? {};
-  return exportToBlob({
-    elements: elements as never,
-    appState: appState as never,
-    files: files as never,
-    mimeType: "image/png",
-    exportBackground: true,
-  });
 }
 
 export function blobToBase64(blob: Blob): Promise<string> {

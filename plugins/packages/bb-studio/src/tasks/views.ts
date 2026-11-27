@@ -42,34 +42,6 @@ export function taskFromLoop(loop: Loop): Task {
   };
 }
 
-export function applyLoop(before: Task, next: Loop): Task {
-  const was = toLoop(before);
-  const t: Task = structuredClone(before);
-  const changed = <K extends keyof Loop>(key: K) => !same(was[key], next[key]);
-  if (changed("title")) t.title = next.title;
-  if (changed("why")) t.why = next.why;
-  if (changed("source")) t.source = next.source;
-  if (changed("options")) t.options = next.options;
-  if (changed("owner")) t.owner = next.owner;
-  if (changed("priority")) t.priority = next.priority;
-  if (changed("area")) t.area = next.area;
-  if (changed("trigger")) t.timing.trigger = next.trigger;
-  if (changed("due")) t.timing.due = next.due;
-  if (changed("push")) t.attention.push = next.push;
-  if (changed("createdAt")) t.createdAt = next.createdAt;
-  if (changed("updatedAt")) t.updatedAt = next.updatedAt;
-  if (changed("closedAt")) t.closedAt = next.closedAt;
-  if (changed("closedBy")) t.closedBy = next.closedBy;
-  if (changed("kind")) t.kind = taskKind(next.kind);
-  if (changed("status")) {
-    const s = fromStatus(next.status, next.kind);
-    t.state = s.state; t.attention.queue = s.queue; t.timing.snoozed = s.snoozed;
-  } else if (changed("kind") && !isClosed(t) && t.attention.queue !== null) {
-    t.state = next.kind === "waiting" ? "waiting" : "todo";
-  }
-  return t;
-}
-
 export const agentOwner = (task: Pick<Task, "workers" | "conversation">) =>
   task.workers[0] ? `thread:${task.workers[0]}` : task.conversation ? `thread:${task.conversation}` : "cos";
 

@@ -2,7 +2,7 @@ import XCTest
 
 /// `bbstudio://<kind>/<id>` links in the Bot's shell, offline (`-qaSpacesDemo
 /// list` with `-qaBotDemo chat`; `BotSpacesDemo.State` answers
-/// `links.resolve`): a Bot page, a worker, a memory record, and a link to a
+/// `links.resolve`): a Bot page, a worker, Memory, and a link to a
 /// conversation that isn't there. `TEST_RUNNER_STEP9_OUT` keeps PNGs.
 final class LinksUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
@@ -16,27 +16,26 @@ final class LinksUITests: ServerIsolatedUITestCase {
 
     func testABotPageLinkOpensThePage() {
         launch("bbstudio://archive")
-        XCTAssertTrue(app.navigationBars["Archive"].waitForExistence(timeout: 30), "the Archive page")
+        XCTAssertTrue(any("archive-page").waitForExistence(timeout: 30), "the Archive page")
         XCTAssertTrue(app.buttons["archive-finished-thr_demo_lisbon"].waitForExistence(timeout: 15))
         shot("archive-link")
-        app.closeRoomSheet()
-        XCTAssertTrue(app.waitForRoom(timeout: 15), "pulling down shows the room")
+        app.goHome()
     }
 
     func testAWorkerLinkOpensTheWorkerReadOnly() {
         launch("bbstudio://worker/thr_demo_w3")
-        XCTAssertTrue(any("workerTitle").waitForExistence(timeout: 30), "the worker")
-        XCTAssertTrue(any("workerTitle").label.hasPrefix("Mock question bank"), any("workerTitle").label)
+        let title = app.conversationTitle
+        XCTAssertTrue(title.waitForExistence(timeout: 30), "the worker")
+        XCTAssertTrue(title.label.hasPrefix("Mock question bank"), title.label)
         XCTAssertFalse(app.textViews["Message"].exists, "read-only")
         shot("worker-link")
     }
 
-    func testAnOldRecordLinkOpensMemory() {
-        // Memory records are retired: an old record link opens Memory, which shows the always-on skill.
-        launch("bbstudio://record/mem_3")
-        XCTAssertTrue(app.navigationBars["Memory"].waitForExistence(timeout: 30), "Memory")
-        XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 15))
-        XCTAssertFalse(any("memoryRecordText").exists, "no record screen")
+    /// Old `bb://record/…` links in replies open Memory too (LinksTests); `bbstudio://record` is the recorder.
+    func testAMemoryLinkOpensMemory() {
+        launch("bbstudio://memory")
+        XCTAssertTrue(any("memory-page").waitForExistence(timeout: 30), "the Memory page")
+        XCTAssertTrue(any("memoryBudget").waitForExistence(timeout: 15), "on Core")
     }
 
     func testAMissingConversationSaysNotFound() {

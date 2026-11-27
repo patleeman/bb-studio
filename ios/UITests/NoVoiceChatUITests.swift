@@ -20,7 +20,6 @@ final class NoVoiceChatUITests: ServerIsolatedUITestCase {
         let composer = app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
         XCTAssertTrue(composer.waitForExistence(timeout: 30))
         if duo { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/outer")!) }
-        XCTAssertTrue(app.buttons["roomList"].waitForExistence(timeout: 10), "The list stays")
         XCTAssertTrue(app.conversationMore.exists, "The ⋯ menu stays")
         sleep(2)
         shot("bot-rail")
@@ -38,9 +37,9 @@ final class NoVoiceChatUITests: ServerIsolatedUITestCase {
         if duo { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/outer")!) }
         sleep(2)
         shot("thread")
-        // A Bot conversation's menu is its title (round 5); a plain thread's is ⋯.
+        // ⋯ in the iPhone's bar, More in the Duo's rail.
         app.openConversationMenu()
-        XCTAssertTrue(app.buttons["Find in thread"].waitForExistence(timeout: 5), "The thread menu opened")
+        XCTAssertTrue(app.buttons["Find in conversation"].waitForExistence(timeout: 5), "The menu opened")
         sleep(1)
         shot("thread-menu")
         XCTAssertFalse(app.buttons["New Voice Chat"].exists, "No New Voice Chat in the thread menu")

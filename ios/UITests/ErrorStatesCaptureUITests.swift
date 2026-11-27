@@ -20,14 +20,15 @@ final class ErrorStatesCaptureUITests: ServerIsolatedUITestCase {
     }
 
     func testOutboxSaveError() {
-        launch("-qaBotDemo", "chat", "-qaOutboxUnreadable")
+        launch("-qaBotDemo", "chat", "-qaOutboxUnreadable", "-openURL", "bbstudio://bot")
         XCTAssertTrue(text(containing: "queued messages").waitForExistence(timeout: 20))
         shot("outbox-save-error")
     }
 
     func testStopFailure() {
-        launch("-qaBotDemo", "working")
-        let stop = app.buttons["Stop Juniper"]
+        launch("-qaBotDemo", "working", "-openURL", "bbstudio://bot")
+        // The composer's Stop, while the Bot works.
+        let stop = app.buttons.matching(NSPredicate(format: "label == 'Stop'")).firstMatch
         XCTAssertTrue(stop.waitForExistence(timeout: 20))
         shot("stop-running")
         stop.tap()
@@ -58,53 +59,6 @@ final class ErrorStatesCaptureUITests: ServerIsolatedUITestCase {
         app.buttons.matching(NSPredicate(format: "label == 'Send' OR label == 'Send Reply'")).firstMatch.tap()
         XCTAssertTrue(text(containing: unreachable).waitForExistence(timeout: 40))
         shot("related-reply-failed")
-    }
-
-    func testBotSkills() {
-        launch("-qaBotDemo", "chat", "-qaBotSheet", "skills")
-        XCTAssertTrue(text(containing: "weekly-digest").waitForExistence(timeout: 20))
-        sleep(1)
-        shot("bot-skills")
-    }
-
-    /// The Bot's Running, Runners and Recurring rows on the phone. Set
-    /// `TEST_RUNNER_BBGO_STATES_MOTION=reduced` for the Reduce Motion look and
-    /// `TEST_RUNNER_BBGO_STATES_HOLD=<s>` to keep it on screen for a recording.
-    func testBotRowsPhone() throws {
-        guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("Phone only") }
-        // A running ring never lets the app idle, so nothing here scrolls:
-        // the second launch closes the top groups to bring Runners up.
-        for (name, closed) in [("bot-rows-phone", "earlier"), ("bot-rows-phone-runners", "earlier,needs,running,waiting")] {
-            launch(["-qaBotDemo", "chat", "-qaBotSheet", "activity", "-bot.threads.closed", closed] + motion)
-            let runners = app.staticTexts["Runners"]
-            XCTAssertTrue(runners.waitForExistence(timeout: 20))
-            sleep(1)
-            fullHeight()
-            shot(name + suffix)
-            app.terminate()
-        }
-        if ProcessInfo.processInfo.environment["BBGO_STATES_HOLD"] != nil {
-            launch(["-qaBotDemo", "chat", "-qaBotSheet", "activity", "-bot.threads.closed", "earlier"] + motion)
-            XCTAssertTrue(app.staticTexts["Runners"].waitForExistence(timeout: 20))
-            sleep(1)
-            fullHeight()
-            hold()
-        }
-    }
-
-    /// The same rows in the unfolded Duo's sidebar, a 951×669 window on the iPad simulator.
-    func testBotRowsDuo() throws {
-        guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad only") }
-        launch(["-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoLong", "-qaDuoColdWide", "-openURL", "bbstudio://bot"] + motion)
-        XCTAssertTrue(text(containing: "Lisbon offsite options").waitForExistence(timeout: 30))
-        sleep(2)
-        shot("bot-rows-duo" + suffix)
-        let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
-        origin.withOffset(CGVector(dx: 250, dy: 600)).press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: 250, dy: 240)))
-        XCTAssertTrue(text(containing: "metrics digest").waitForExistence(timeout: 10))
-        sleep(1)
-        shot("bot-rows-duo-runners" + suffix)
-        hold()
     }
 
     /// Chat About This when the project's defaults can't be read: it starts
@@ -154,11 +108,12 @@ final class ErrorStatesCaptureUITests: ServerIsolatedUITestCase {
         guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad only") }
         launch(["-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoLong", "-openURL", "bbstudio://bot"])
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
-        duo("tab?threads")
-        let thread = app.buttons["inbox-thread-thr_botdemo01"]
+        // Main, as any conversation opens: from Home.
+        app.goHome()
+        let thread = app.buttons["homeConversation-thr_botdemo01"]
         XCTAssertTrue(thread.waitForExistence(timeout: 20))
-        thread.tap()
-        XCTAssertTrue(app.staticTexts["duoThreadTitle"].waitForExistence(timeout: 15))
+        app.press(thread, id: "homeConversation-thr_botdemo01")
+        XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 15))
         sleep(3)
         shot("composer-duo-bottom")
         let jump = app.buttons["Jump to latest"]
@@ -171,20 +126,6 @@ final class ErrorStatesCaptureUITests: ServerIsolatedUITestCase {
     }
 
     private func duo(_ path: String) { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/" + path)!) }
-
-    /// Drags the sheet's grabber to the top.
-    private func fullHeight() {
-        let window = app.windows.firstMatch
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.485))
-            .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)))
-        sleep(2)
-    }
-
-    private var motion: [String] { ProcessInfo.processInfo.environment["BBGO_STATES_MOTION"] == "reduced" ? ["-qaReduceMotion"] : [] }
-    private var suffix: String { motion.isEmpty ? "" : "-reduced-motion" }
-    private func hold() {
-        if let seconds = ProcessInfo.processInfo.environment["BBGO_STATES_HOLD"].flatMap(UInt32.init) { sleep(seconds) }
-    }
 
     private func launch(_ arguments: [String]) {
         app.launchArguments = ["-skipPushPrompt", "YES"] + arguments

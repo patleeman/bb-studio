@@ -59,23 +59,7 @@ struct NewThreadView: View {
     /// most conversations need only a message.
     var body: some View {
         NavigationStack {
-            VStack(spacing: 8) {
-                Spacer()
-                if let bot {
-                    BotAvatar(BotLook(shape: bot.shape, color: bot.color, emoji: bot.avatar), size: 44)
-                    Text("New conversation with \(bot.name)")
-                        .font(.title2.weight(.semibold))
-                        .multilineTextAlignment(.center)
-                        .accessibilityIdentifier("newConversationWith")
-                } else {
-                    Text("What should we work on?")
-                        .font(.title2.weight(.semibold))
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("newConversationWith")
-                }
-                Spacer()
-            }
+            NewConversationGreeting(bot: bot)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 32)
             .contentShape(.rect)
@@ -96,29 +80,29 @@ struct NewThreadView: View {
             .modifier(TalkDraft(talk: talk, draft: $text, typed: $talkTyped))
             .modifier(TalkLifecycle(talk: talk))
             .onChange(of: talk.error) { _, error in if let error { self.error = error } }
-            .task {
-                // Like desktop, a thread needs no project: it starts in the personal one.
-                if botId.isEmpty, projectId.isEmpty { projectId = NewThreadProject.resolve(saved: savedProjectId, projects: []) }
-                guard let loaded = try? await client.projects() else { return }
-                projects = loaded
-                if botId.isEmpty { projectId = NewThreadProject.resolve(saved: projectId, projects: loaded) }
-            }
-            .task(id: botId) { await choseBot() }
-            .task(id: projectId) {
-                guard !projectId.isEmpty else { return }
-                workspace = "default"
-                environments = (try? await client.threadEnvironments(projectId: projectId)) ?? []
-                projectDefaults = (try? await client.projectDefaults(projectId)) ?? nil
-            }
-            .task(id: defaults?.providerId ?? "") {
-                if providerId.isEmpty { await loadOptions() }
-            }
-            .task(id: providerId) {
-                modelId = ""
-                reasoning = ""
-                await loadOptions()
-                matchModelOption()
-            }
+            // Its loads, one level of the view's type (`NewThreadLoads`).
+            .modifier(NewThreadLoads(botId: botId, projectId: projectId, defaultsProvider: defaults?.providerId ?? "", providerId: providerId,
+                start: {
+                    // Like desktop, a thread needs no project: it starts in the personal one.
+                    if botId.isEmpty, projectId.isEmpty { projectId = NewThreadProject.resolve(saved: savedProjectId, projects: []) }
+                    guard let loaded = try? await client.projects() else { return }
+                    projects = loaded
+                    if botId.isEmpty { projectId = NewThreadProject.resolve(saved: projectId, projects: loaded) }
+                },
+                bot: { await choseBot() },
+                project: {
+                    guard !projectId.isEmpty else { return }
+                    workspace = "default"
+                    environments = (try? await client.threadEnvironments(projectId: projectId)) ?? []
+                    projectDefaults = (try? await client.projectDefaults(projectId)) ?? nil
+                },
+                defaults: { if providerId.isEmpty { await loadOptions() } },
+                provider: {
+                    modelId = ""
+                    reasoning = ""
+                    await loadOptions()
+                    matchModelOption()
+                }))
         }
     }
 
@@ -407,5 +391,53 @@ struct NewThreadView: View {
 
     private var worktreeHostId: String? {
         environments.first { $0.status == "ready" && $0.isGitRepo == true && $0.environmentProviderId == "project-checkout" }?.hostId
+    }
+}
+
+/// Who the new conversation is with: the Bot's avatar and name, or the open question.
+private struct NewConversationGreeting: View {
+    let bot: BotSpace?
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Spacer()
+            if let bot {
+                BotAvatar(BotLook(shape: bot.shape, color: bot.color, emoji: bot.avatar), size: 44)
+                Text("New conversation with \(bot.name)")
+                    .font(.title2.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("newConversationWith")
+            } else {
+                Text("What should we work on?")
+                    .font(.title2.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("newConversationWith")
+            }
+            Spacer()
+        }
+    }
+}
+
+/// New thread's loads, each keyed as before: the projects, the Bot, the
+/// project's environments, the provider's options.
+private struct NewThreadLoads: ViewModifier {
+    let botId: String
+    let projectId: String
+    let defaultsProvider: String
+    let providerId: String
+    let start: @MainActor () async -> Void
+    let bot: @MainActor () async -> Void
+    let project: @MainActor () async -> Void
+    let defaults: @MainActor () async -> Void
+    let provider: @MainActor () async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .task { await start() }
+            .task(id: botId) { await bot() }
+            .task(id: projectId) { await project() }
+            .task(id: defaultsProvider) { await defaults() }
+            .task(id: providerId) { await provider() }
     }
 }
