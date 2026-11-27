@@ -145,7 +145,7 @@ struct RouteDestination: View {
     var body: some View {
         switch route {
         case .page: threadsAndTools.studioStar(route)
-        case .thread, .pages, .automations, .automation, .usage, .archived: threadsAndTools
+        case .thread, .pages, .automations, .automation, .botAutomation, .usage, .archived: threadsAndTools
         case .visualChats, .visualChat: visualChat
         case .terminals: studioItems
         default: studioItems.studioStar(route)
@@ -159,6 +159,7 @@ struct RouteDestination: View {
         case .page(let id): PageView(pageId: id).id(id)
         case .automations: AutomationsView()
         case .automation(let automation): AutomationView(automation: automation).id(automation.id)
+        case .botAutomation(let botId, let automation, let active): BotAutomationDetail(automation: automation, botId: botId, active: active).id(automation.id)
         case .usage: UsageView()
         case .archived: ArchivedView()
         default: EmptyView()
