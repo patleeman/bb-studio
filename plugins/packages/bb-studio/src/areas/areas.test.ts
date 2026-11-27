@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MIGRATIONS } from "../migrations";
+import { migratedSqlDb } from "../test/migrated-db";
 import { AutomationTasks, parentIdOf, readSources, type AutomationBotInfo } from "../tasks/automations";
 import { TaskStore } from "../tasks/store";
 import { Areas, fileStat, leadsFrom, ownNameWords, readText, runnersFrom, type AreaCaller, type AreaDeps, type AreaLead } from "./areas";
@@ -22,8 +22,7 @@ let dir: string;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
-  db = new Database(":memory:");
-  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
+  db = migratedSqlDb();
   dir = mkdtempSync(join(tmpdir(), "areas-"));
 });
 afterEach(() => {

@@ -5,6 +5,7 @@ import { defaultAppearance } from "./theme/appearance";
 import { NORD } from "./theme/builtin/classic";
 import { GRID } from "./theme/builtin/grid";
 import { testScheduler } from "./test/scheduler-fixture";
+import { migratedPluginDb } from "./test/migrated-db";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -93,8 +94,16 @@ async function setup(migrations = MIGRATIONS) {
     projects: { defaultExecutionOptions: (async () => projectDefault.current) as never } as never,
   } });
   dispose.push(() => harness.lifecycle.dispose());
-  const db = bb.storage.database();
-  bb.storage.migrate(db, migrations);
+  let db: ReturnType<typeof bb.storage.database>;
+  if (migrations === MIGRATIONS) {
+    const mem = migratedPluginDb();
+    db = mem as unknown as ReturnType<typeof bb.storage.database>;
+    bb.storage.database = () => db;
+    dispose.push(async () => { mem.close(); });
+  } else {
+    db = bb.storage.database();
+    bb.storage.migrate(db, migrations);
+  }
   const bots = { current: null as Bots | null };
   const clock = { now: Date.now() };
   const { engine, scheduler } = testScheduler(db, bb.sdk, clock);

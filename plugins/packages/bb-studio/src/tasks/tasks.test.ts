@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "../migrations";
+import { migratedSqlDb } from "../test/migrated-db";
 import { registerLoops } from "../loops/register";
 import { LoopStore } from "../loops/store";
 import { registerWorkCards } from "../work/register";
@@ -26,8 +27,7 @@ const migrate = (target: Database.Database) => { for (const sql of MIGRATIONS.fi
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
-  db = new Database(":memory:");
-  migrate(db);
+  db = migratedSqlDb();
 });
 afterEach(() => {
   if (db.open) db.close();

@@ -3,7 +3,7 @@ import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { MIGRATIONS } from "../migrations";
+import { migratedSqlDb, migratedSqlFileDb } from "../test/migrated-db";
 import { registerLoops } from "../loops/register";
 import { AutomationTasks, type AutomationTaskDeps, alwaysPrints, CLEAR_AFTER_MS, findingKey, KEEP_RUNS, parentIdOf, readSources, splitControl, URGENT_RUN_NOTE, type AutomationBotInfo } from "./automations";
 import { isClosed, type Task } from "./contract";
@@ -22,8 +22,7 @@ const BOTS: AutomationBotInfo[] = [{ id: "bot_main", name: "Dot", threadId: "thr
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
-  db = new Database(":memory:");
-  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
+  db = migratedSqlDb();
 });
 afterEach(() => {
   if (db.open) db.close();
@@ -132,8 +131,7 @@ it("the mapping is idempotent: a second run writes nothing, and a db with nothin
 it("backs up the db file once, before the first mapping, and never again", () => {
   dir = mkdtempSync(join(tmpdir(), "auto-tasks-"));
   db.close();
-  db = new Database(join(dir, "data.db"));
-  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
+  db = migratedSqlFileDb(join(dir, "data.db"));
   seed();
   const { tasks } = setup();
   const first = tasks.sync({ backup: true });

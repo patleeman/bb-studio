@@ -1,7 +1,7 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
 import { BotMaintenance, archiveAge, finished, maintenanceDefaults, maintenanceDryRun, memoryNeedsTidy, pullRequestMerged, readWorkspaceStatus, workspaceBlock } from "./bot-maintenance";
-import { MIGRATIONS } from "./migrations";
+import { migratedPluginDb } from "./test/migrated-db";
 import { testScheduler } from "./test/scheduler-fixture";
 import { SkillLearning, type SkillState } from "./skill-learning";
 const DAY = 86_400_000;
@@ -34,7 +34,10 @@ async function setup() {
     }) as never },
   } });
   dispose.push(() => harness.lifecycle.dispose());
-  const db = bb.storage.database(); bb.storage.migrate(db, MIGRATIONS);
+  const mem = migratedPluginDb();
+  const db = mem as unknown as ReturnType<typeof bb.storage.database>;
+  bb.storage.database = () => db;
+  dispose.push(async () => { mem.close(); });
   const bot = { id: "bot", state: "active", threadId: "main" };
   let memory: { id: string; markdown: string; updatedAt: number; totalChars: number; migrated?: boolean; askedAt?: number | null } | null = null;
   const owned = new Set(["child"]);

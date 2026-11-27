@@ -1,6 +1,6 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
-import { MIGRATIONS } from "./migrations";
+import { migratedPluginDb } from "./test/migrated-db";
 import { fromHeartbeat, localZone, type Weekday } from "./schedule";
 import { nextRun } from "./triggers/next-run";
 import { testScheduler } from "./test/scheduler-fixture";
@@ -51,8 +51,10 @@ async function setup(off: Off | null = null, extra: Partial<AutomationDeps> = {}
     plugins: { callRpc: callRpc as never, list: async () => ({ plugins: [{ id: "automations", enabled: !off }] }), experimental_discoverRpc: async () => [] },
   } });
   dispose.push(() => harness.lifecycle.dispose());
-  const db = bb.storage.database();
-  bb.storage.migrate(db, MIGRATIONS);
+  const mem = migratedPluginDb();
+  const db = mem as unknown as ReturnType<typeof bb.storage.database>;
+  bb.storage.database = () => db;
+  dispose.push(async () => { mem.close(); });
   const bot = { id: "bot_main", name: "Dot", threadId: "bot1" as string | null, state: "active", primary: true, kind: "studio" };
   let heartbeat: HeartbeatRun | null = { enabled: true, cadence: "weekdays", time: "08:00" };
   const setHeartbeat = vi.fn(async (_botId: string, run: HeartbeatRun) => { heartbeat = run; });

@@ -2,7 +2,7 @@ import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/tes
 import { afterEach, expect, it, vi } from "vitest";
 import { AutomationTasks, parentIdOf, readSources, URGENT_RUN_NOTE } from "./tasks/automations";
 import { TaskStore } from "./tasks/store";
-import { MIGRATIONS } from "./migrations";
+import { migratedPluginDb } from "./test/migrated-db";
 import { localZone } from "./schedule";
 import { nextRun } from "./triggers/next-run";
 import { testScheduler } from "./test/scheduler-fixture";
@@ -60,8 +60,10 @@ async function setup(extra: Partial<RunnerDeps> = {}) {
     plugins: { callRpc: callRpc as never, list: async () => ({ plugins: [{ id: "automations", enabled: true }] }), experimental_discoverRpc: async () => [] },
   } });
   dispose.push(() => harness.lifecycle.dispose());
-  const db = bb.storage.database();
-  bb.storage.migrate(db, MIGRATIONS);
+  const mem = migratedPluginDb();
+  const db = mem as unknown as ReturnType<typeof bb.storage.database>;
+  bb.storage.database = () => db;
+  dispose.push(async () => { mem.close(); });
   const bot = { id: "bot_main", name: "Jarvis", threadId: "bot1" as string | null, state: "active" };
   const started: { id: string; title: string; projectId: string | null; parentThreadId?: string | null }[] = [];
   add({ id: "bot2", title: "Scout" });
