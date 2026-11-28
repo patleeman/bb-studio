@@ -1,7 +1,7 @@
 import Foundation
 
-/// New conversation's unsent message, one per Bot (and one for a plain
-/// thread), kept in the same stores as a conversation's draft (`Drafts`,
+/// New conversation's unsent message, one per Bot it's with (and one for a
+/// plain thread), kept in the same stores as a conversation's draft (`Drafts`,
 /// `DraftAttachments`): it survives Back, another tab and a relaunch, and
 /// goes only when it's sent or its text and photos are cleared.
 enum NewConversationDraft {
@@ -31,6 +31,21 @@ enum NewConversationDraft {
 
     static func save(attachments: [PendingAttachment], botId: String?, serverURL: URL) {
         DraftAttachments.save(attachments, threadId: key(botId: botId), serverURL: serverURL)
+    }
+
+    /// The With chip moved from one Bot to another: the message goes with
+    /// it, after any draft the new Bot already had, so neither is lost, and
+    /// the old Bot keeps none. Returns what the composer shows now.
+    static func switched(text: String, attachments: [PendingAttachment], from old: String?, to new: String?,
+                         serverURL: URL) -> (text: String, attachments: [PendingAttachment]) {
+        guard key(botId: old) != key(botId: new) else { return (text, attachments) }
+        let waiting = load(botId: new, serverURL: serverURL)
+        let merged = opening(saved: waiting.text, prefill: text)
+        let files = waiting.attachments + attachments.filter { item in !waiting.attachments.contains { $0.id == item.id } }
+        clear(botId: old, serverURL: serverURL)
+        save(text: merged, botId: new, serverURL: serverURL)
+        save(attachments: files, botId: new, serverURL: serverURL)
+        return (merged, files)
     }
 
     /// Sent: nothing waits for the next New conversation.

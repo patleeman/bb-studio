@@ -199,6 +199,41 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
         XCTAssertNotEqual(empty.value as? String, draft, "a sent draft is gone")
     }
 
+    /// A double tap on Send starts one conversation, not two.
+    func testADoubleTapOnSendStartsOneConversation() throws {
+        launch()
+        openNewConversation()
+        type("Book the table", in: "Message Juniper")
+        app.buttons["newConversationStart"].doubleTap()
+        XCTAssertTrue(app.staticTexts["Book the table"].waitForExistence(timeout: 15), "it starts")
+        app.goHome()
+        XCTAssertTrue(app.buttons["homeConversation-thr_demo_new1"].waitForExistence(timeout: 15), "the conversation")
+        XCTAssertFalse(app.buttons["homeConversation-thr_demo_new2"].waitForExistence(timeout: 3), "and no second one")
+    }
+
+    /// The With chip's Bot owns the message: switched to another Bot and
+    /// back out, it waits under that Bot, not the one New opened for.
+    func testTheDraftGoesWithTheBotItsFor() throws {
+        launch()
+        openNewConversation()
+        app.buttons["newConversationBot"].tap()
+        let research = app.buttons["Research"]
+        XCTAssertTrue(research.waitForExistence(timeout: 5))
+        research.tap()
+        type("For Research", in: "Message Research")
+        app.goHome()
+        app.homeNew.tap()
+        let juniper = app.textViews["Message Juniper"]
+        XCTAssertTrue(juniper.waitForExistence(timeout: 10))
+        XCTAssertNotEqual(juniper.value as? String, "For Research", "not left under Juniper")
+        app.buttons["newConversationBot"].tap()
+        XCTAssertTrue(research.waitForExistence(timeout: 5))
+        research.tap()
+        let field = app.textViews["Message Research"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertEqual(field.value as? String, "For Research", "it waits under Research")
+    }
+
     /// A conversation's draft, in the round-8 navigation: Back to Home and
     /// in again, and another tab and back, keep it.
     func testAConversationsDraftSurvivesBackAndAnotherTab() throws {

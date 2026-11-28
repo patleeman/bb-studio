@@ -8,7 +8,7 @@ import SwiftUI
 /// model (Auto when that is its default) in its Main's project; a plain
 /// thread on the project's defaults. A screen of its own: Home pushes it
 /// (`Route.newConversation`), and `NewThreadSheet` holds it for the sheets.
-/// With `keepsDraft`, its message is kept per Bot (`NewConversationDraft`).
+/// With `keepsDraft`, its message is kept under the Bot it's with (`NewConversationDraft`).
 struct NewThreadView: View {
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
@@ -38,10 +38,11 @@ struct NewThreadView: View {
     @State private var error: String?
     /// A Bot's conversation from its list: the room opens it there. Else the app opens what started.
     private let started: ((String, String?) -> Void)?
-    /// Home's New conversation keeps its message (`NewConversationDraft`) under the Bot it opened for.
+    /// Home's New conversation keeps its message (`NewConversationDraft`) under the Bot it's with.
     private let keepsDraft: Bool
-    private let draftBotId: String?
     @State private var restored = false
+    /// Sent: nothing is kept any more, even a save still waiting.
+    @State private var sent = false
 
     // Execution options. Empty means the default (the Bot's, else the project's).
     @State private var options: ExecutionOptions?
@@ -54,7 +55,6 @@ struct NewThreadView: View {
         _text = State(initialValue: text)
         _botId = State(initialValue: botId ?? "")
         self.keepsDraft = keepsDraft
-        draftBotId = botId
         self.started = started
     }
 
@@ -84,7 +84,8 @@ struct NewThreadView: View {
                 talk.insert = insert
                 talk.send = insert
             }
-            .modifier(NewThreadDraftSaving(text: text, attachments: attachments.map(\.id)) { saveDraft() })
+            .modifier(NewThreadDraftSaving(text: text, attachments: attachments.map(\.id), botId: botId,
+                                           saveText: saveDraftText, saveAttachments: saveDraftAttachments, switchBot: moveDraft))
             .modifier(TalkDraft(talk: talk, draft: $text, typed: $talkTyped))
             .modifier(TalkLifecycle(talk: talk))
             .onChange(of: talk.error) { _, error in if let error { self.error = error } }
@@ -118,15 +119,29 @@ struct NewThreadView: View {
         guard !restored else { return }
         restored = true
         guard keepsDraft else { return }
-        let saved = NewConversationDraft.load(botId: draftBotId, serverURL: client.baseURL)
+        let saved = NewConversationDraft.load(botId: botId, serverURL: client.baseURL)
         text = NewConversationDraft.opening(saved: saved.text, prefill: text)
         if attachments.isEmpty { attachments = saved.attachments }
     }
 
-    private func saveDraft() {
-        guard restored, keepsDraft else { return }
-        NewConversationDraft.save(text: text, botId: draftBotId, serverURL: client.baseURL)
-        NewConversationDraft.save(attachments: attachments, botId: draftBotId, serverURL: client.baseURL)
+    private var keepingDraft: Bool { keepsDraft && restored && !sent }
+
+    private func saveDraftText() {
+        guard keepingDraft else { return }
+        NewConversationDraft.save(text: text, botId: botId, serverURL: client.baseURL)
+    }
+
+    private func saveDraftAttachments() {
+        guard keepingDraft else { return }
+        NewConversationDraft.save(attachments: attachments, botId: botId, serverURL: client.baseURL)
+    }
+
+    /// The With chip picked another Bot: the message goes with it (`NewConversationDraft.switched`).
+    private func moveDraft(from old: String, to new: String) {
+        guard keepingDraft else { return }
+        let moved = NewConversationDraft.switched(text: text, attachments: attachments, from: old, to: new, serverURL: client.baseURL)
+        text = moved.text
+        attachments = moved.attachments
     }
 
     /// A Bot: its default model and its Main's project, as the desktop's New conversation seeds its composer. No Bot: the project last used.
@@ -181,7 +196,7 @@ struct NewThreadView: View {
             ) {
                 agentMenu
             } send: {
-                Button { Task { await create() } } label: {
+                Button(action: start) {
                     Group {
                         if creating { ProgressView() } else { Image(systemName: "arrow.up.circle.fill").font(.title) }
                     }
@@ -364,10 +379,18 @@ struct NewThreadView: View {
 
     private func permissionLabel(_ mode: String) -> String { PermissionMode.label(mode) }
 
-    private func create() async {
-        guard !dictation.blocksSend else { return }
+    /// Send, once: `creating` is set before the work starts, so a second tap
+    /// or ⌘↩ in the meantime finds Send disabled and this guard closed.
+    private func start() {
+        guard canStart else { return }
         creating = true
-        defer { creating = false }
+        Task {
+            await create()
+            creating = false
+        }
+    }
+
+    private func create() async {
         let botId = bot?.id
         if botId == nil { savedProjectId = projectId }
         do {
@@ -392,7 +415,10 @@ struct NewThreadView: View {
                 return try await client.createThread(
                     projectId: projectId, text: text, attachments: inputs, options: choice, workspace: selectedWorkspace).id
             }, completion: { threadId in
-                if keepsDraft { NewConversationDraft.clear(botId: draftBotId, serverURL: client.baseURL) }
+                if keepsDraft {
+                    sent = true
+                    NewConversationDraft.clear(botId: botId, serverURL: client.baseURL)
+                }
                 dismiss()
                 if let started { started(threadId, botId) } else { app.open(.conversation(threadId)) }
             })
@@ -470,16 +496,46 @@ private struct NewThreadChips<Content: View>: View {
     }
 }
 
-/// Keeps the draft as it changes: the text, and the photos and files by id.
+/// Keeps the draft as it changes, off the keystroke: the text half a
+/// second after typing stops (as `ThreadView`'s `DraftText`), at once when
+/// the screen goes or the app leaves the foreground; photos and files when
+/// they change; and the message moves with a change of Bot.
 private struct NewThreadDraftSaving: ViewModifier {
     let text: String
     let attachments: [UUID]
-    let save: () -> Void
+    let botId: String
+    let saveText: () -> Void
+    let saveAttachments: () -> Void
+    let switchBot: (String, String) -> Void
+    @State private var pending: Task<Void, Never>?
+    @Environment(\.scenePhase) private var phase
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: text) { _, _ in save() }
-            .onChange(of: attachments) { _, _ in save() }
+            .onChange(of: text) { _, _ in
+                pending?.cancel()
+                pending = Task {
+                    do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
+                    pending = nil
+                    saveText()
+                }
+            }
+            .onChange(of: attachments) { _, _ in saveAttachments() }
+            .onChange(of: botId) { old, new in
+                // Not saved first: `botId` is the new Bot's already, and the switch saves the message there.
+                pending?.cancel()
+                pending = nil
+                switchBot(old, new)
+            }
+            .onChange(of: phase) { _, phase in if phase != .active { flush() } }
+            .onDisappear { flush() }
+    }
+
+    private func flush() {
+        guard let waiting = pending else { return }
+        waiting.cancel()
+        pending = nil
+        saveText()
     }
 }
 

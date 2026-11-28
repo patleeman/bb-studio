@@ -58,4 +58,31 @@ final class NewConversationDraftTests: XCTestCase {
                        "Plan the trip\n\n[Page](/p) ", "opened again with the same link: not twice")
         XCTAssertEqual(NewConversationDraft.opening(saved: "  ", prefill: "hello"), "hello")
     }
+
+    func testSwitchingBotsMovesTheMessageWithoutLosingTheOtherBotsDraft() {
+        let other = bot + "-other"
+        defer { NewConversationDraft.clear(botId: other, serverURL: a) }
+        let file = PendingAttachment(data: Data("notes".utf8), name: "notes.txt", mimeType: "text/plain")
+        NewConversationDraft.save(text: "for the first Bot", botId: bot, serverURL: a)
+
+        // Switched to a Bot with nothing waiting: the message moves, the first Bot keeps none.
+        var shown = NewConversationDraft.switched(text: "for the first Bot", attachments: [file], from: bot, to: other, serverURL: a)
+        XCTAssertEqual(shown.text, "for the first Bot")
+        XCTAssertEqual(shown.attachments.map(\.id), [file.id])
+        XCTAssertNil(NewConversationDraft.load(botId: bot, serverURL: a).text, "not left under the Bot it was opened for")
+        XCTAssertTrue(NewConversationDraft.load(botId: bot, serverURL: a).attachments.isEmpty)
+        XCTAssertEqual(NewConversationDraft.load(botId: other, serverURL: a).text, "for the first Bot")
+        XCTAssertEqual(NewConversationDraft.load(botId: other, serverURL: a).attachments.map(\.id), [file.id])
+
+        // Back to a Bot that has a draft of its own: both are kept, its own first.
+        NewConversationDraft.save(text: "already waiting", botId: bot, serverURL: a)
+        shown = NewConversationDraft.switched(text: "typed here", attachments: [], from: other, to: bot, serverURL: a)
+        XCTAssertEqual(shown.text, "already waiting\n\ntyped here")
+        XCTAssertEqual(NewConversationDraft.load(botId: bot, serverURL: a).text, "already waiting\n\ntyped here")
+        XCTAssertNil(NewConversationDraft.load(botId: other, serverURL: a).text)
+
+        // To no Bot (a plain thread) and the same key again: nothing moves.
+        shown = NewConversationDraft.switched(text: "same", attachments: [], from: "", to: nil, serverURL: a)
+        XCTAssertEqual(shown.text, "same")
+    }
 }
