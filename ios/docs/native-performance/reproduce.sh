@@ -74,7 +74,7 @@ for target in targets: target.get('EnvironmentVariables',{}).pop('BB_PERFORMANCE
 (out/'build/Build/Products/refusal.xctestrun').write_bytes(plistlib.dumps(data))
 PY
 for run in refusal performance; do
-  xcodebuild test-without-building -xctestrun "$run_dir/build/Build/Products/$run.xctestrun" -destination "platform=iOS Simulator,id=$device_id" -only-testing:BBStudioUITests/ReviewPerformanceUITests -parallel-testing-enabled NO -resultBundlePath "$run_dir/$run.xcresult" > "$run_dir/$run.log" 2>&1
+  xcodebuild test-without-building -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 -xctestrun "$run_dir/build/Build/Products/$run.xctestrun" -destination "platform=iOS Simulator,id=$device_id" -only-testing:BBStudioUITests/ReviewPerformanceUITests -parallel-testing-enabled NO -resultBundlePath "$run_dir/$run.xcresult" > "$run_dir/$run.log" 2>&1
   xcrun xcresulttool get test-results summary --path "$run_dir/$run.xcresult" > "$run_dir/$run-summary.json"
 done
 xcrun xcresulttool get test-results metrics --path "$run_dir/performance.xcresult" > "$run_dir/metrics.json"
@@ -94,6 +94,6 @@ text=path.read_text().replace('options.iterationCount = 5','options.iterationCou
 path.write_text(text)
 PY
   xcodebuild -project "$run_dir/project/BBStudio.xcodeproj" -scheme BBStudio -configuration Debug -destination "platform=iOS Simulator,id=$device_id" -derivedDataPath "$run_dir/build" build-for-testing > "$run_dir/lifetime-build.log" 2>&1
-  xcodebuild test-without-building -xctestrun "$run_dir/build/Build/Products/performance.xctestrun" -destination "platform=iOS Simulator,id=$device_id" -only-testing:BBStudioUITests/ReviewPerformanceUITests -parallel-testing-enabled NO -resultBundlePath "$run_dir/lifetime.xcresult" > "$run_dir/lifetime.log" 2>&1
+  xcodebuild test-without-building -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 -xctestrun "$run_dir/build/Build/Products/performance.xctestrun" -destination "platform=iOS Simulator,id=$device_id" -only-testing:BBStudioUITests/ReviewPerformanceUITests -parallel-testing-enabled NO -resultBundlePath "$run_dir/lifetime.xcresult" > "$run_dir/lifetime.log" 2>&1
   xcrun simctl spawn "$device_id" log show --last 10m --style json --predicate 'subsystem == "nyc.plee.bbgo.nativeperformance"' > "$run_dir/page-lifetime.json"
 fi

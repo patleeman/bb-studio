@@ -67,7 +67,7 @@ for test_name in "${test_names[@]}"; do
   esac
   test_options+=("-only-testing:BBStudioUITests/ArtifactRuntimeUITests/$test_name")
 done
-xcodebuild test-without-building -xctestrun "$xctestrun" -destination "platform=iOS Simulator,id=$BB_ARTIFACT_QA_DEVICE" "${test_options[@]}" -parallel-testing-enabled NO -resultBundlePath "$BB_ARTIFACT_QA_RUN_DIR/results.xcresult" > "$BB_ARTIFACT_QA_RUN_DIR/test.log" 2>&1
+xcodebuild test-without-building -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 -xctestrun "$xctestrun" -destination "platform=iOS Simulator,id=$BB_ARTIFACT_QA_DEVICE" "${test_options[@]}" -parallel-testing-enabled NO -resultBundlePath "$BB_ARTIFACT_QA_RUN_DIR/results.xcresult" > "$BB_ARTIFACT_QA_RUN_DIR/test.log" 2>&1
 test_exit=$?
 set -e
 xcrun xcresulttool get test-results summary --path "$BB_ARTIFACT_QA_RUN_DIR/results.xcresult" > "$BB_ARTIFACT_QA_RUN_DIR/summary.json"

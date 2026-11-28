@@ -39,6 +39,6 @@ xcodegen generate --spec "$BB_ARTIFACT_QA_RUN_DIR/project/project.yml"
 xcodebuild -project "$BB_ARTIFACT_QA_RUN_DIR/project/BBStudio.xcodeproj" -scheme BBStudio -configuration Debug -destination "platform=iOS Simulator,id=$BB_ARTIFACT_QA_DEVICE" -derivedDataPath "$BB_ARTIFACT_QA_RUN_DIR/build" build-for-testing > "$BB_ARTIFACT_QA_RUN_DIR/build.log" 2>&1
 python3 "$qa_dir/configure.py"
 xctestrun=$(find "$BB_ARTIFACT_QA_RUN_DIR/build/Build/Products" -maxdepth 1 -name '*.xctestrun' -print)
-xcodebuild test-without-building -xctestrun "$xctestrun" -destination "platform=iOS Simulator,id=$BB_ARTIFACT_QA_DEVICE" -only-testing:BBStudioUITests/ArtifactRuntimeUITests -parallel-testing-enabled NO -resultBundlePath "$BB_ARTIFACT_QA_RUN_DIR/results.xcresult" > "$BB_ARTIFACT_QA_RUN_DIR/test.log" 2>&1
+xcodebuild test-without-building -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 -xctestrun "$xctestrun" -destination "platform=iOS Simulator,id=$BB_ARTIFACT_QA_DEVICE" -only-testing:BBStudioUITests/ArtifactRuntimeUITests -parallel-testing-enabled NO -resultBundlePath "$BB_ARTIFACT_QA_RUN_DIR/results.xcresult" > "$BB_ARTIFACT_QA_RUN_DIR/test.log" 2>&1
 xcrun xcresulttool get test-results summary --path "$BB_ARTIFACT_QA_RUN_DIR/results.xcresult" > "$BB_ARTIFACT_QA_RUN_DIR/summary.json"
 xcrun xcresulttool export attachments --path "$BB_ARTIFACT_QA_RUN_DIR/results.xcresult" --output-path "$BB_ARTIFACT_QA_RUN_DIR/attachments"

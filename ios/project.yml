@@ -28,6 +28,9 @@ targets:
       - name: Guard test server isolation
         script: /usr/bin/python3 "$SRCROOT/scripts/check-test-servers.py"
         basedOnDependencyAnalysis: false
+      - name: Guard test time limits
+        script: /usr/bin/python3 "$SRCROOT/scripts/check-test-timeouts.py"
+        basedOnDependencyAnalysis: false
     sources:
       - path: iOS
         excludes:

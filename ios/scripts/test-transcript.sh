@@ -37,7 +37,7 @@ fi
 run_phone() {
   phone_failed=""
   report="${TRANSCRIPT_REPORT_DIR:-}"
-  env TEST_RUNNER_TRANSCRIPT_REPORT_DIR="$report" xcodebuild test-without-building -scheme BBStudio -destination "id=$phone" \
+  env TEST_RUNNER_TRANSCRIPT_REPORT_DIR="$report" xcodebuild test-without-building -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 -scheme BBStudio -destination "id=$phone" \
     -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO \
     -only-testing:BBStudioTests/TranscriptFollowTests -only-testing:BBStudioTests/TranscriptReplayTests \
     -only-testing:BBStudioUITests/TranscriptV2UITests -only-testing:BBStudioUITests/TranscriptScrollHoldUITests \
@@ -53,12 +53,12 @@ run_duo() {
   duo_failed=""
   isolate "$duo"
   for layout in outer outer-room split; do
-    env TEST_RUNNER_TRANSCRIPT_LAYOUT="$layout" xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
+    env TEST_RUNNER_TRANSCRIPT_LAYOUT="$layout" xcodebuild test-without-building -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 -scheme BBStudio -destination "id=$duo" \
       -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/TranscriptV2UITests \
       || duo_failed="$duo_failed
   - duo $layout: TranscriptV2UITests"
   done
-  xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
+  xcodebuild test-without-building -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 -scheme BBStudio -destination "id=$duo" \
     -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/DuoSplitComposerUITests \
     || duo_failed="$duo_failed
   - duo: DuoSplitComposerUITests"
