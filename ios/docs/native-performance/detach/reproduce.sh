@@ -26,5 +26,5 @@ xcrun simctl boot "$sim"
 xcodegen generate --spec "$run/project/project.yml"
 xcodebuild -project "$run/project/BBStudio.xcodeproj" -scheme BBStudio -configuration Debug -destination "platform=iOS Simulator,id=$sim" -derivedDataPath "$run/build" build-for-testing > "$run/build.log" 2>&1
 python3 "$here/prepare.py" "$run" "$sim"
-xcodebuild test-without-building -xctestrun "$run/build/Build/Products/detach.xctestrun" -destination "platform=iOS Simulator,id=$sim" -only-testing:BBStudioTests/PageModelDetachTests -parallel-testing-enabled NO -resultBundlePath "$run/result.xcresult" > "$run/test.log" 2>&1
+xcodebuild test-without-building -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 -xctestrun "$run/build/Build/Products/detach.xctestrun" -destination "platform=iOS Simulator,id=$sim" -only-testing:BBStudioTests/PageModelDetachTests -parallel-testing-enabled NO -resultBundlePath "$run/result.xcresult" > "$run/test.log" 2>&1
 xcrun xcresulttool get test-results summary --path "$run/result.xcresult" > "$run/summary.json"

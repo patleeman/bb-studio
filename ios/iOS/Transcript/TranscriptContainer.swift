@@ -65,7 +65,6 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
     var dismissKeyboard: ((UIWindow) -> Void)?
     /// Shown on the pill while reading: something waiting at the end.
     var pillNote: String?
-    var probe: ((CGRect) -> Void)?
     /// How the log writes a row id.
     var describeID: ((AnyHashable) -> String)?
     /// The conversation, for its reading spot across rebuilds (`TranscriptReadingSpots`).
@@ -180,7 +179,6 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         controller.onPillChange = onPillChange
         controller.log = log
         if let dismissKeyboard { controller.dismissKeyboard = dismissKeyboard }
-        controller.probe = probe
         controller.spotKey = spotKey
         if let describeID { controller.describe = describeID }
         controller.chrome = chrome

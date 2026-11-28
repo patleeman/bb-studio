@@ -13,5 +13,5 @@ done
 # they run in scripts/test-transcript.sh, and here only with REPLAY=1.
 skip_replay="-skip-testing:BBStudioTests/TranscriptReplayTests"
 if [ "${REPLAY:-0}" = 1 ]; then skip_replay=""; fi
-xcodebuild test -scheme BBStudio -destination "id=$device_id" \
+xcodebuild test -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 -scheme BBStudio -destination "id=$device_id" \
   -derivedDataPath build/system/DerivedData -only-testing:BBStudioTests $skip_replay "$@"

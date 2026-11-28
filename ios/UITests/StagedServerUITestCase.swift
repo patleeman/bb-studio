@@ -1,16 +1,25 @@
 import XCTest
 
-/// Shared origins for tests. Offline fixtures never use the configured QA server.
+/// Every UI test class inherits this one (scripts/check-test-timeouts.py
+/// fails the build otherwise): shared origins, and the time limit.
+/// Offline fixtures never use the configured QA server.
 class ServerIsolatedUITestCase: XCTestCase {
     private(set) var qaServer = ""
 
-    /// No UI test runs for long: past this one fails (with `-test-timeouts-enabled YES`,
-    /// which the scripts pass), so a hung or crawling test can't hold a run for an hour.
+    /// No UI test runs past 5 minutes, so a hung or crawling test can't hold
+    /// a run for half an hour. With `-test-timeouts-enabled YES` (every
+    /// script passes it) XCTest fails the test at the limit and records a
+    /// spindump; the watchdog stops it anyway when a run left the flag out.
     static let timeLimit: TimeInterval = 300
+    /// The watchdog waits this much past the limit, so XCTest's own timeout
+    /// (and its spindump) comes first when it's on.
+    static let watchdogGrace: TimeInterval = 15
 
     override func setUpWithError() throws {
         try super.setUpWithError()
         executionTimeAllowance = Self.timeLimit
+        let watchdog = TestWatchdog(name: name, after: Self.timeLimit + Self.watchdogGrace)
+        addTeardownBlock { watchdog.cancel() }
     }
 
     func requireQAServer() throws {
@@ -56,4 +65,26 @@ extension XCUIApplication {
         launchArguments = arguments + ["-serverURL", server]
         launch()
     }
+}
+
+/// Ends the test runner when one test outlives its limit. XCTest's timeout
+/// works only with `-test-timeouts-enabled YES`; a run without it (a direct
+/// `xcodebuild` or Xcode's test button) would otherwise wait on a hung app
+/// for as long as it hangs. It runs off the main thread, which a test stuck
+/// waiting for the app to go idle holds. xcodebuild reports the test as
+/// failed (the runner crashed) and goes on with the next one.
+final class TestWatchdog: @unchecked Sendable {
+    private let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "ui-test-watchdog"))
+
+    init(name: String, after limit: TimeInterval) {
+        timer.schedule(deadline: .now() + limit)
+        timer.setEventHandler {
+            let message = "\(name) ran past its \(Int(limit)) s limit (ServerIsolatedUITestCase.timeLimit): stopping the test runner.\n"
+            FileHandle.standardError.write(Data(message.utf8))
+            fatalError(message)
+        }
+        timer.resume()
+    }
+
+    func cancel() { timer.cancel() }
 }
