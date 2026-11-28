@@ -95,7 +95,8 @@ final class ThreadModel: ObservableObject {
             ]
             shelf.goal = Goal(objective: "Make threads feel high quality on iPhone", status: "active", tokenBudget: 2_000_000, tokensUsed: 640_000)
             shelf.isPlanning = true
-            shelf.background = [BackgroundWork(id: "b", taskType: "local_bash", workflowName: nil, description: "Run the test suite", status: "pending")]
+            shelf.background = [BackgroundWork(id: "b", taskType: "local_bash", workflowName: nil, description: "Run the test suite", status: "pending",
+                                               startedAt: (Date().timeIntervalSince1970 - 123) * 1000)]
             // A fresh seq each launch: a Dismiss from an earlier run is remembered by seq.
             shelf.fallback = ModelFallback(sourceSeq: Double(Int(Date().timeIntervalSince1970)), originalModel: "claude-opus-5-5", fallbackModel: "claude-sonnet-5", message: nil)
             return shelf
@@ -387,6 +388,13 @@ final class ThreadModel: ObservableObject {
             interactions = demo.interactions
             // `-qaShelfDemo`: every lasting state and the model fallback, for the chips and notice lines.
             if ProcessInfo.processInfo.arguments.contains("-qaShelfDemo") { shelf = .demo }
+            // `-qaQueuedDemo`: two messages waiting, for the composer's status line.
+            if ProcessInfo.processInfo.arguments.contains("-qaQueuedDemo") {
+                queued = (try? JSONDecoder().decode([QueuedMessage].self, from: Data(#"""
+                    [{"id": "q1", "content": [{"type": "text", "text": "And the deck?"}]},
+                     {"id": "q2", "content": [{"type": "text", "text": "Then the budget."}]}]
+                    """#.utf8))) ?? []
+            }
             loaded = true
             return
         }

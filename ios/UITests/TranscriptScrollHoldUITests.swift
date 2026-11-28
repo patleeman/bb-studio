@@ -107,8 +107,8 @@ final class TranscriptScrollHoldUITests: ServerIsolatedUITestCase {
 
         // At the end through a busy turn: kept there, never past it.
         command("busy?30")
-        // A Bot conversation shows it as the composer's "1 background" chip; a plain thread, as its card.
-        let task = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'chip-background' OR label == 'Find AI-native engineering companies'")).firstMatch
+        // A Bot conversation shows it in the composer's status line ("1 in background"); a plain thread, as its card.
+        let task = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'composerBackground' OR label == 'Find AI-native engineering companies'")).firstMatch
         if !task.waitForExistence(timeout: 5) { failures.append("the running task never showed") }
         for index in 0..<4 {
             Thread.sleep(forTimeInterval: 0.7)

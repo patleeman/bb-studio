@@ -98,6 +98,25 @@ final class ShellPostureTests: XCTestCase {
         XCTAssertEqual(ComposerStatus.working(since: nil, now: now), "Working")
         XCTAssertFalse(ComposerStatus(running: false, since: nil, queued: 0).shown)
         XCTAssertTrue(ComposerStatus(running: false, since: nil, queued: 2).shown, "the queue alone shows the line")
+        let work = BackgroundWork(id: "b", taskType: "local_bash", workflowName: nil, description: "Run the test suite", status: "running",
+                                  startedAt: 1_000_000 - 123_000)
+        let idle = ComposerStatus(running: false, since: nil, queued: 0, background: [work])
+        XCTAssertTrue(idle.shown, "background work alone shows the line")
+        XCTAssertEqual(idle.backgroundText, "1 in background")
+        XCTAssertNil(ComposerStatus(running: true, since: nil, queued: 0).backgroundText)
+        XCTAssertEqual(ComposerStatus.line(work, now: now), "Run the test suite · 2m 3s")
+        var named = work
+        named.workflowName = "review"
+        named.startedAt = nil
+        XCTAssertEqual(ComposerStatus.line(named, now: now), "review", "a workflow by its name; no start, no time")
+        named.workflowName = ""
+        named.description = nil
+        XCTAssertEqual(named.name, "Background task")
+        // A server's odd start never traps.
+        XCTAssertEqual(ComposerStatus.duration(since: .nan, now: now), "0s")
+        XCTAssertEqual(ComposerStatus.duration(since: -.infinity, now: now), "0s")
+        XCTAssertEqual(ComposerStatus.duration(since: 1e30, now: now), "0s", "in the future")
+        XCTAssertEqual(ComposerStatus.duration(since: -1e30, now: now), "876000h 0m", "centuries ago: clamped")
     }
 
     /// The inner screen comes from the screen, not the window: beside another

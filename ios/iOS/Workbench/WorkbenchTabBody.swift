@@ -105,18 +105,18 @@ enum WorkbenchTabKind: Equatable {
 }
 
 /// A screen the phone already has (a drawing, an app, an artifact, a
-/// recording, the terminals), shown in the tab without its bar: its own
-/// stack keeps its toolbar from reaching the conversation's bar, and the bar
-/// is hidden. Its screen actions reach the shell's More, with Open Full
-/// Screen, which pushes it as it is everywhere else.
+/// recording, the terminals), shown in the tab with no bar of its own: in a
+/// Workbench its `screenToolbar` hands its actions to the conversation's ⋯,
+/// with Open Full Screen, which pushes it as it is everywhere else. No stack
+/// of its own: a nested stack's hidden bar hides the conversation's, its
+/// buttons in the Duo's control strip and all; what it opens pushes on the
+/// conversation's stack.
 private struct WorkbenchItemTab: View {
     let route: Route
     @EnvironmentObject private var app: AppModel
 
     var body: some View {
-        NavigationStack {
-            screen.toolbar(.hidden, for: .navigationBar)
-        }
+        screen
         // The screen's own actions come up from inside; Open Full Screen joins them.
         .transformPreference(ScreenActionsKey.self) { actions in
             actions.append(ScreenAction(id: "fullScreen", title: "Open Full Screen", systemImage: "arrow.up.left.and.arrow.down.right",

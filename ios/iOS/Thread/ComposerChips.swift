@@ -1,13 +1,12 @@
 import SwiftUI
 
 /// A state that lasts, pinned in a Bot conversation's composer top row while
-/// it is true: the Bot paused, plan mode, a goal, todos, background work,
-/// queued messages, notes in progress, editing the last message, the next
+/// it is true: the Bot paused, plan mode, a goal, todos, notes in progress, editing the last message, the next
 /// message's permissions, a hand-off running. Tapping it does its one thing;
 /// ✕ (when it has one) undoes it.
 struct ComposerChip: Identifiable, Equatable {
     enum Kind: String, Equatable {
-        case paused, planMode, goal, todos, background, notes, editing, permission, handingOff
+        case paused, planMode, goal, todos, notes, editing, permission, handingOff
     }
 
     var kind: Kind
@@ -20,7 +19,7 @@ struct ComposerChip: Identifiable, Equatable {
     var id: String { kind.rawValue }
 
     /// The chips, in a fixed order, for what holds now.
-    static func chips(pause: String?, planning: Bool, goal: String?, todos: [Todos.Item], background: Int,
+    static func chips(pause: String?, planning: Bool, goal: String?, todos: [Todos.Item],
                       note: Bool, editing: Bool, permission: String?, handingOff: Bool) -> [ComposerChip] {
         var out: [ComposerChip] = []
         if let pause {
@@ -33,7 +32,6 @@ struct ComposerChip: Identifiable, Equatable {
             let done = todos.filter { $0.status == "completed" }.count
             out.append(ComposerChip(kind: .todos, icon: "checklist", text: "\(done)/\(todos.count) todos"))
         }
-        if background > 0 { out.append(ComposerChip(kind: .background, icon: "terminal", text: "\(background) background", busy: true)) }
         if note { out.append(ComposerChip(kind: .notes, icon: "doc.text", text: "Notes", action: "Open")) }
         if editing { out.append(ComposerChip(kind: .editing, icon: "pencil", text: "Editing last message", closes: true)) }
         if let permission { out.append(ComposerChip(kind: .permission, icon: "lock.shield", text: "Next: \(PermissionMode.label(permission))", closes: true)) }
@@ -108,30 +106,50 @@ struct ComposerChipsRow: View {
         default:
             Button { tap(chip.kind) } label: { label }
                 .buttonStyle(.plain)
-                .disabled(chip.kind == .background || chip.kind == .handingOff)
+                .disabled(chip.kind == .handingOff)
                 .accessibilityLabel([chip.text, chip.action].compactMap { $0 }.joined(separator: ", "))
                 .accessibilityIdentifier("chip-\(chip.kind.rawValue)")
         }
     }
 }
 
-/// The composer's one small status line (round 7): working and for how long,
-/// and how many messages wait in the queue.
+/// The composer's one small status line (round 7): working and for how
+/// long, work running in the background, and how many messages wait in the
+/// queue. Plain text, no row of its own: "Working · 11s · 1 in background";
+/// the background part opens what runs (its name and how long), and goes
+/// where the line has no room for it.
 struct ComposerStatus: Equatable {
     var running: Bool
     /// When the running turn began (the last message sent, in ms).
     var since: Double?
     var queued: Int
+    var background: [BackgroundWork] = []
 
-    var shown: Bool { running || queued > 0 }
+    var shown: Bool { running || queued > 0 || !background.isEmpty }
+
+    /// "1 in background", or nil with nothing there.
+    var backgroundText: String? { background.isEmpty ? nil : "\(background.count) in background" }
 
     /// "Working · 1m 12s", "Working · 40s", or "Working" without a start.
     static func working(since: Double?, now: Date) -> String {
         guard let since else { return "Working" }
-        let seconds = max(0, Int(now.timeIntervalSince1970 - since / 1000))
-        if seconds < 60 { return "Working · \(seconds)s" }
-        if seconds < 3600 { return "Working · \(seconds / 60)m \(seconds % 60)s" }
-        return "Working · \(seconds / 3600)h \(seconds % 3600 / 60)m"
+        return "Working · " + duration(since: since, now: now)
+    }
+
+    /// "40s", "1m 12s", "2h 5m": how long since `since` (ms).
+    static func duration(since: Double, now: Date) -> String {
+        // A server's odd value (not finite, or centuries off) reads as 0s, never a trap.
+        let elapsed = now.timeIntervalSince1970 - since / 1000
+        let seconds = elapsed.isFinite ? Int(min(max(elapsed, 0), 100 * 365 * 86_400)) : 0
+        if seconds < 60 { return "\(seconds)s" }
+        if seconds < 3600 { return "\(seconds / 60)m \(seconds % 60)s" }
+        return "\(seconds / 3600)h \(seconds % 3600 / 60)m"
+    }
+
+    /// A background task's line in its menu: "Run the test suite · 2m 3s".
+    static func line(_ work: BackgroundWork, now: Date) -> String {
+        guard let started = work.startedAt else { return work.name }
+        return work.name + " · " + duration(since: started, now: now)
     }
 }
 
@@ -141,25 +159,70 @@ struct ComposerStatusLine: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            if status.running {
-                RunningGlyph().accessibilityHidden(true)
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(ComposerStatus.working(since: status.since, now: context.date)).monospacedDigit()
-                }
-                .accessibilityIdentifier("composerWorking")
-            }
+            if status.running || !status.background.isEmpty { RunningGlyph().accessibilityHidden(true) }
+            leading
             Spacer(minLength: 8)
             if status.queued > 0 {
                 Button(action: showQueue) { Text("\(status.queued) queued").frame(minHeight: 28).contentShape(.rect) }
                     .buttonStyle(.plain)
+                    .layoutPriority(1)
                     .accessibilityIdentifier("composerQueued")
             }
         }
         .font(.footnote)
         .foregroundStyle(.secondary)
+        .lineLimit(1)
         .padding(.horizontal, 12)
         .frame(minHeight: 28)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("composerStatus")
+    }
+
+    /// Working, then the background part where it fits: the line drops it
+    /// while working, and truncates past that (large text). Idle, the
+    /// background part is the line, truncated if it must be: never a glyph alone.
+    @ViewBuilder private var leading: some View {
+        if status.running {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 0) { working; background }.fixedSize()
+                working
+            }
+        } else {
+            background
+        }
+    }
+
+    private var working: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            Text(ComposerStatus.working(since: status.since, now: context.date)).monospacedDigit()
+        }
+        .accessibilityIdentifier("composerWorking")
+    }
+
+    @ViewBuilder private var background: some View {
+        if let text = status.backgroundText {
+            if status.running { Text(" · ") }
+            ComposerBackgroundMenu(work: status.background, text: text)
+        }
+    }
+}
+
+/// "1 in background" in the status line: a tap lists what runs, and for how long.
+private struct ComposerBackgroundMenu: View {
+    let work: [BackgroundWork]
+    let text: String
+
+    var body: some View {
+        Menu {
+            Section("In background") {
+                ForEach(work) { work in Text(ComposerStatus.line(work, now: .now)) }
+            }
+        } label: {
+            Text(text).frame(minHeight: 28).contentShape(.rect)
+        }
+        .menuOrder(.fixed)
+        .buttonStyle(.plain)
+        .accessibilityLabel(text + ". Show")
+        .accessibilityIdentifier("composerBackground")
     }
 }
