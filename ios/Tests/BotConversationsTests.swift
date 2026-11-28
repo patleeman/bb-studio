@@ -143,7 +143,11 @@ final class BotConversationsTests: XCTestCase {
         XCTAssertFalse(ConversationFinish.canRemove(nil))
         XCTAssertEqual(ConversationFinish.deleteTitle("Launch prep"), "Delete “Launch prep”?")
         XCTAssertEqual(ConversationFinish.deleteTitle(""), "Delete “Untitled”?")
-        XCTAssertTrue(ConversationFinish.deleteMessage.hasPrefix("This can't be undone."))
+        XCTAssertEqual(ConversationFinish.deleteMessage("Launch prep", workers: 12), "Deletes “Launch prep” and its 12 workers. This can't be undone.")
+        XCTAssertEqual(ConversationFinish.deleteMessage("Launch prep", workers: 1), "Deletes “Launch prep” and its 1 worker. This can't be undone.")
+        XCTAssertEqual(ConversationFinish.deleteMessage("", workers: 0), "Deletes “Untitled”. This can't be undone.")
+        XCTAssertEqual(ConversationFinish.deleteMessage("Launch prep", workers: nil), "Deletes “Launch prep” and any workers it started. This can't be undone.")
+        XCTAssertGreaterThanOrEqual(ConversationFinish.deleteArmSeconds, 2, "a pause before Delete works")
     }
 
     func testDeleteConfirmsChildThreadsOnlyWhenAsked() async throws {

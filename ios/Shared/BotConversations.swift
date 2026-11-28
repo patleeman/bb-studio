@@ -97,10 +97,29 @@ public enum ConversationFinish {
     }
 
     public static func deleteTitle(_ title: String) -> String {
-        "Delete “\(title.isEmpty ? "Untitled" : title)”?"
+        "Delete “\(named(title))”?"
     }
 
-    public static let deleteMessage = "This can't be undone. Its workers and side threads are deleted with it."
+    /// What the delete confirm says goes, and for how long. `workers` is nil
+    /// while it's being counted, or when BB couldn't count them.
+    public static func deleteMessage(_ title: String, workers: Int?) -> String {
+        "Deletes “\(named(title))”\(withWorkers(workers)). This can't be undone."
+    }
+
+    /// The pause before the confirm's Delete works: one tap can't delete.
+    public static let deleteArmSeconds = 2
+
+    private static func named(_ title: String) -> String { title.isEmpty ? "Untitled" : title }
+
+    private static func withWorkers(_ workers: Int?) -> String {
+        switch workers {
+        case nil: " and any workers it started"
+        case 0: ""
+        case 1: " and its 1 worker"
+        case let count?: " and its \(count) workers"
+        }
+    }
+
     public static let archiveHint = "Saves a summary to memory first"
 }
 
@@ -128,6 +147,17 @@ extension BBClient {
         }
         let output: Output = try await rpc("studio", Studio.Method.thread_model, ["threadId": .string(threadId)])
         return output.model.map { ConversationModel(providerId: $0.providerId, model: $0.model, reasoningLevel: $0.reasoningLevel, modelName: $0.modelName) }
+    }
+
+    /// The threads BB's delete takes with the conversation: every visible
+    /// thread below it (workers, their workers, side threads), archived too.
+    public func deleteCascadeCount(_ threadId: String) async throws -> Int {
+        struct Output: Decodable {
+            struct Thread: Decodable { var threadId: String; var cascadeThreadIds: [String] }
+            var threads: [Thread]
+        }
+        let output: Output = try await post("/api/v1/threads/cascade", ["threadIds": .array([.string(threadId)]), "action": "delete"])
+        return output.threads.first { $0.threadId == threadId }?.cascadeThreadIds.count ?? 0
     }
 
     @discardableResult

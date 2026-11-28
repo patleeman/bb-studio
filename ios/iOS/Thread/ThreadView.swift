@@ -83,7 +83,7 @@ struct ThreadView: View {
     /// Forks made here this session, kept on their message until Studio lists them.
     @State private var madeForks: [String: String] = [:]
     @State private var conversationModel: ConversationModel?
-    @State private var confirmingDelete = false
+    @State private var deleting: ConversationDeletion?
     @State private var workerFetched: WorkerInfo?
     @State private var askingWorker = false
     @State private var workerAskError: String?
@@ -303,13 +303,7 @@ struct ThreadView: View {
         } message: {
             Text("The agent summarizes the conversation so far to free up context.")
         }
-        .alert(ConversationFinish.deleteTitle(conversation?.conversation?.title ?? ""), isPresented: $confirmingDelete) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) { delete() }
-                .accessibilityIdentifier("confirmDelete")
-        } message: {
-            Text(ConversationFinish.deleteMessage)
-        }
+        .deleteConversationSheet($deleting) { _ in delete() }
         .confirmationDialog("Clear this thread's context?", isPresented: $confirmingClearContext, titleVisibility: .visible) {
             Button("Clear context", role: .destructive) {
                 Task { await model.run { try await $0.clearContext(model.threadId) } }
@@ -449,7 +443,7 @@ struct ThreadView: View {
         case .sourcePage: if let page = session.sourcePage { push(.page(id: page.id)) }
         case .makeMain: if let conversation { makeMain(conversation) }
         case .archive: finish()
-        case .delete: confirmingDelete = true
+        case .delete: deleting = ConversationDeletion(threadId: model.threadId, title: conversation?.conversation?.title ?? model.thread?.displayTitle ?? "")
         case .fork: Task { if let id = await model.fork() { open(.thread(id: id)) } }
         case .contextUsage: showingContext = true
         case .compact: confirmingCompact = true

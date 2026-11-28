@@ -401,6 +401,11 @@ enum BotSpacesDemo {
                 return studio(String(path.dropFirst(rpc.count)), input)
             }
             if method == "GET", let answer = Self.composerOptions(path) { return json(answer) }
+            if method == "POST", path == "/api/v1/threads/cascade", let ids = input["threadIds"] as? [String] {
+                return lock.withLock {
+                    json(["threads": ids.map { id in ["threadId": id, "cascadeThreadIds": workers.filter { $0.owner.threadId == id && !gone.contains($0.id) }.map(\.id)] }])
+                }
+            }
             let prefix = "/api/v1/threads/"
             guard path.hasPrefix(prefix) else { return nil }
             let rest = path.dropFirst(prefix.count).split(separator: "?").first.map(String.init) ?? ""
