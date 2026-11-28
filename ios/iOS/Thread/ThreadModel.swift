@@ -95,7 +95,8 @@ final class ThreadModel: ObservableObject {
             ]
             shelf.goal = Goal(objective: "Make threads feel high quality on iPhone", status: "active", tokenBudget: 2_000_000, tokensUsed: 640_000)
             shelf.isPlanning = true
-            shelf.background = [BackgroundWork(id: "b", taskType: "local_bash", workflowName: nil, description: "Run the test suite", status: "pending")]
+            shelf.background = [BackgroundWork(id: "b", taskType: "local_bash", workflowName: nil, description: "Run the test suite", status: "pending",
+                                               startedAt: (Date().timeIntervalSince1970 - 123) * 1000)]
             // A fresh seq each launch: a Dismiss from an earlier run is remembered by seq.
             shelf.fallback = ModelFallback(sourceSeq: Double(Int(Date().timeIntervalSince1970)), originalModel: "claude-opus-5-5", fallbackModel: "claude-sonnet-5", message: nil)
             return shelf

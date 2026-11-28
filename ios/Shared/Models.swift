@@ -209,6 +209,14 @@ public struct BackgroundWork: Codable, Hashable, Identifiable, Sendable {
     public var workflowName: String?
     public var description: String?
     public var status: String?
+    /// When it started (ms).
+    public var startedAt: Double?
+
+    /// What it is, for a person: the workflow's name, else what it does.
+    public var name: String {
+        for text in [workflowName, description] { if let text, !text.isEmpty { return text } }
+        return "Background task"
+    }
 }
 
 public struct ModelFallback: Codable, Hashable, Sendable {

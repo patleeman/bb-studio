@@ -273,7 +273,8 @@ enum BotDemo {
                         thinking = Int(elapsed) % 3 == 0 ? "Thinking" : nil
                         background = elapsed > 1 && elapsed < seconds - 2
                             ? [BackgroundWork(id: "bg1", taskType: "local_bash", workflowName: nil,
-                                              description: "Find AI-native engineering companies", status: "running")] : []
+                                              description: "Find AI-native engineering companies", status: "running",
+                                              startedAt: (start.timeIntervalSince1970 + 1) * 1000)] : []
                         let row = BotDemo.row(id: id, role: "assistant", text: String(repeating: paragraph, count: 1 + tick / 4), at: at)
                         if let index = rows.firstIndex(where: { $0.id == id }) { rows[index] = row } else { rows.append(row) }
                     }
