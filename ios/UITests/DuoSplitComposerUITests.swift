@@ -140,12 +140,11 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         let composer = app.otherElements["threadComposer"].firstMatch
         command("dismiss")
         command("bottom")
-        Thread.sleep(forTimeInterval: 2)
         XCTAssertTrue(composer.waitForExistence(timeout: 10), "\(name): composer")
-        var layout = try geometry()
-        let edge = layout.height - composer.frame.maxY
+        var (layout, composerFrame) = try settled(composer)
+        let edge = layout.height - composerFrame.maxY
         let aboveIndicator = edge - layout.safeBottom
-        print("COMPOSER GAP \(name) keyboard=down window=\(layout.width)x\(layout.height) safeBottom=\(layout.safeBottom) composer=\(composer.frame) edge=\(edge) aboveIndicator=\(aboveIndicator)")
+        print("COMPOSER GAP \(name) keyboard=down window=\(layout.width)x\(layout.height) safeBottom=\(layout.safeBottom) composer=\(composerFrame) edge=\(edge) aboveIndicator=\(aboveIndicator)")
         if innerScreen {
             XCTAssertEqual(edge, composerGap, accuracy: 1, "\(name): 8 points from the inner screen's bottom edge")
         } else {
@@ -155,10 +154,9 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
 
         command("focus?\(focus)")
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), "\(name): keyboard up")
-        Thread.sleep(forTimeInterval: 2)
-        layout = try geometry()
-        let aboveKeyboard = layout.keyboardTop - composer.frame.maxY
-        print("COMPOSER GAP \(name) keyboard=up keyboardTop=\(layout.keyboardTop) xcuiKeyboard=\(app.keyboards.firstMatch.frame) composer=\(composer.frame) aboveKeyboard=\(aboveKeyboard)")
+        (layout, composerFrame) = try settled(composer)
+        let aboveKeyboard = layout.keyboardTop - composerFrame.maxY
+        print("COMPOSER GAP \(name) keyboard=up keyboardTop=\(layout.keyboardTop) composer=\(composerFrame) aboveKeyboard=\(aboveKeyboard)")
         XCTAssertLessThan(layout.keyboardTop, layout.height, "\(name): the keyboard's frame is known")
         XCTAssertEqual(aboveKeyboard, composerGap, accuracy: 1, "\(name): 8 points above the keyboard")
         command("capture?\(capture)-up")
@@ -179,33 +177,26 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         Thread.sleep(forTimeInterval: 1)
 
         // 1. The composer has the transcript's margins, on its page.
-        var layout = try geometry()
-        func onPage(_ layout: Geometry) -> [String: Rect] {
-            layout.surfaces.filter { $0.key.hasPrefix("transcript-") && $0.value.x >= pageMinX - 1 && $0.value.maxX <= pageMaxX + 1 }
+        var (layout, composerFrame) = try settled(composer)
+        let transcripts = layout.surfaces.filter {
+            $0.key.hasPrefix("transcript-") && $0.value.x >= pageMinX - 1 && $0.value.maxX <= pageMaxX + 1
         }
-        // Its probe reports on a layout: scrolling to the end makes one.
-        for _ in 0..<5 where onPage(layout).isEmpty {
-            command("bottom")
-            Thread.sleep(forTimeInterval: 1)
-            layout = try geometry()
-        }
-        let transcripts = onPage(layout)
         XCTAssertLessThanOrEqual(transcripts.count, 1, "\(name): one transcript on the page")
         if let transcript = transcripts.first?.value {
-            print("SPLIT COMPOSER \(name) composer=\(composer.frame) transcript=\(transcript) safeRight=\(layout.safeRight) safeBottom=\(layout.safeBottom)")
+            print("SPLIT COMPOSER \(name) composer=\(composerFrame) transcript=\(transcript) safeRight=\(layout.safeRight) safeBottom=\(layout.safeBottom)")
             // The composer's 12-point margins against the transcript's 16: 4 points out, half a point either way at an odd width.
-            XCTAssertEqual(composer.frame.maxX, transcript.maxX + 4, accuracy: 1, "\(name): composer ends where the transcript does")
-            XCTAssertEqual(composer.frame.minX, transcript.x - 4, accuracy: 1, "\(name): composer starts where the transcript does")
+            XCTAssertEqual(composerFrame.maxX, transcript.maxX + 4, accuracy: 1, "\(name): composer ends where the transcript does")
+            XCTAssertEqual(composerFrame.minX, transcript.x - 4, accuracy: 1, "\(name): composer starts where the transcript does")
         } else {
-            // No probe reported (emulated inner screen on an iPhone): the composer stays on the page.
-            print("SPLIT COMPOSER \(name) composer=\(composer.frame): no transcript probe on the page")
-            XCTAssertGreaterThanOrEqual(composer.frame.minX, pageMinX + 12 - 1, "\(name): composer on the page, with its margin")
-            XCTAssertLessThanOrEqual(composer.frame.maxX, pageMaxX - 12 + 1, "\(name): composer on the page, with its margin")
+            // No rows on the page (emulated inner screen on an iPhone): the composer stays on the page.
+            print("SPLIT COMPOSER \(name) composer=\(composerFrame): no transcript rows on the page")
+            XCTAssertGreaterThanOrEqual(composerFrame.minX, pageMinX + 12 - 1, "\(name): composer on the page, with its margin")
+            XCTAssertLessThanOrEqual(composerFrame.maxX, pageMaxX - 12 + 1, "\(name): composer on the page, with its margin")
         }
 
         // 3. The composer sits as far above the window's bottom edge as a
         // phone's does above its home indicator, not above a second inset.
-        XCTAssertEqual(layout.height - composer.frame.maxY, composerGap, accuracy: 2,
+        XCTAssertEqual(layout.height - composerFrame.maxY, composerGap, accuracy: 2,
                        "\(name): the gap under the composer, with a \(layout.safeBottom)-point bottom safe area")
 
         guard history else { return command("capture?split-composer-" + name) }
@@ -217,32 +208,30 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
             _ = jump.waitForExistence(timeout: 10)
         }
         guard jump.exists else { return XCTFail("\(name): jump button shows up in the history") }
-        Thread.sleep(forTimeInterval: 1)
-        layout = try geometry()
+        (layout, composerFrame) = try settled(composer)
         let scroll = try XCTUnwrap(layout.scrolls.first { abs($0.x - pageMinX) < 2 && $0.height > 400 && $0.contentHeight > 0 },
                                    "\(name): the transcript scroll view")
         let page = (minX: pageMinX, maxX: pageMaxX)
         let visibleBottom = scroll.y + scroll.height - scroll.adjustedBottom
-        print("SPLIT JUMP \(name) jump=\(jump.frame) composer=\(composer.frame) visibleBottom=\(visibleBottom)")
+        print("SPLIT JUMP \(name) jump=\(jump.frame) composer=\(composerFrame) visibleBottom=\(visibleBottom)")
         XCTAssertLessThanOrEqual(jump.frame.maxX, page.maxX + 1, "\(name): jump button stays on the page")
-        XCTAssertGreaterThanOrEqual(jump.frame.minX, composer.frame.maxX + 7, "\(name): jump button is beside the composer")
+        XCTAssertGreaterThanOrEqual(jump.frame.minX, composerFrame.maxX + 7, "\(name): jump button is beside the composer")
         // Level with the composer's bottom row (it can be taller: an attachment).
-        XCTAssertGreaterThanOrEqual(jump.frame.minY, composer.frame.minY, "\(name): on the composer's row, not a row of its own")
-        XCTAssertEqual(jump.frame.maxY, composer.frame.maxY - 4, accuracy: 4, "\(name): level with the composer's last row")
+        XCTAssertGreaterThanOrEqual(jump.frame.minY, composerFrame.minY, "\(name): on the composer's row, not a row of its own")
+        XCTAssertEqual(jump.frame.maxY, composerFrame.maxY - 4, accuracy: 4, "\(name): level with the composer's last row")
         XCTAssertGreaterThanOrEqual(jump.frame.minY, visibleBottom - 1, "\(name): below the transcript's visible rows")
         let rows = transcriptTexts().filter { $0.maxY <= visibleBottom + 1 }
         let lastRow = try XCTUnwrap(rows.max { $0.maxY < $1.maxY }, "\(name): a visible transcript row")
         XCTAssertFalse(lastRow.intersects(jump.frame), "\(name): jump button covers the last row's text \(lastRow)")
-        XCTAssertEqual(layout.height - composer.frame.maxY, composerGap, accuracy: 2, "\(name): the gap under the composer in history")
+        XCTAssertEqual(layout.height - composerFrame.maxY, composerGap, accuracy: 2, "\(name): the gap under the composer in history")
         command("capture?split-composer-" + name + "-history")
 
         // At the end the button goes, and the last row is whole above the composer.
         command("bottom")
         XCTAssertTrue(message.waitForExistence(timeout: 10))
-        Thread.sleep(forTimeInterval: 2)
+        (layout, composerFrame) = try settled(composer)
         XCTAssertFalse(jump.exists, "\(name): no jump button at the end")
-        let top = composer.frame.minY
-        let composerFrame: CGRect = composer.frame
+        let top = composerFrame.minY
         let minX: CGFloat = pageMinX - 1, maxX: CGFloat = pageMaxX + 1
         // Typed steps: as one expression Xcode 26 couldn't type-check it.
         let frames: [CGRect] = app.staticTexts.allElementsBoundByIndex.map { $0.frame }
@@ -252,7 +241,7 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         }
         let above: [CGRect] = endRows.filter { $0.minY < top }
         let last = try XCTUnwrap(above.max { $0.maxY < $1.maxY }, "\(name): a row above the composer")
-        print("SPLIT END \(name) last=\(last) composer=\(composer.frame)")
+        print("SPLIT END \(name) last=\(last) composer=\(composerFrame)")
         XCTAssertLessThanOrEqual(last.maxY, top + 1, "\(name): the last row is whole above the composer at the end")
         command("capture?split-composer-" + name + "-end")
     }
@@ -280,17 +269,44 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         }
     }
 
+    /// The app's geometry and the composer's frame once both hold still:
+    /// two readings in a row the same. They come from two moments (the app's
+    /// layout command, then XCUI's snapshot), and under load either can land
+    /// while a resize or the keyboard is still settling.
+    private func settled(_ composer: XCUIElement, file: StaticString = #filePath, line: UInt = #line) throws -> (Geometry, CGRect) {
+        var last = (try geometry(), composer.frame)
+        for _ in 0..<20 {
+            Thread.sleep(forTimeInterval: 0.25)
+            let next = (try geometry(), composer.frame)
+            if next.0 == last.0, next.1 == last.1 { return next }
+            last = next
+        }
+        XCTFail("The layout never held still: \(last.1)", file: file, line: line)
+        return last
+    }
+
     private func geometry() throws -> Geometry {
         command("layout")
         let value = try XCTUnwrap(app.windows.firstMatch.value as? String)
         return try JSONDecoder().decode(Geometry.self, from: Data(value.utf8))
     }
 
+    /// XCTest waits up to 60 s for the app to go idle after each one. Past
+    /// half that, something keeps it busy and every later step would wait the
+    /// same (a 29-minute run once): stop here, with what is animating.
     private func command(_ path: String) {
+        let start = Date()
         XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/" + path)!)
+        guard Date().timeIntervalSince(start) > 30, path != "animations" else { return }
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/animations")!)
+        let running = app.windows.firstMatch.value as? String ?? ""
+        print("NOT IDLE after \(path):\n\(running)")
+        add(XCTAttachment(string: running))
+        continueAfterFailure = false
+        XCTFail("The app didn't go idle after qa-duo/\(path); animating: \(running.prefix(800))")
     }
 
-    private struct Geometry: Decodable {
+    private struct Geometry: Decodable, Equatable {
         let width: CGFloat
         let height: CGFloat
         let safeRight: CGFloat
@@ -299,14 +315,14 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         let surfaces: [String: Rect]
         let scrolls: [Scroll]
     }
-    private struct Rect: Decodable {
+    private struct Rect: Decodable, Equatable {
         let x: CGFloat
         let y: CGFloat
         let width: CGFloat
         let height: CGFloat
         var maxX: CGFloat { x + width }
     }
-    private struct Scroll: Decodable {
+    private struct Scroll: Decodable, Equatable {
         let x: CGFloat
         let y: CGFloat
         let height: CGFloat

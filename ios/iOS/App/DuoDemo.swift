@@ -7,7 +7,6 @@ import UIKit
 enum DuoDemo {
     nonisolated static var phone: Bool { ProcessInfo.processInfo.arguments.contains("-qaDuoPhone") }
 
-    static var surfaces: [String: CGRect] = [:]
     /// The screen the resized window stands for. The simulator's screen is
     /// the outer one (466 × 678); nil keeps it.
     static var screenSize: CGSize?
@@ -110,13 +109,19 @@ enum DuoDemo {
             if let controller = view.next as? TranscriptController, view.window != nil { return [controller.qaGeometry] }
             return view.subviews.flatMap(transcripts)
         }
+        let transcripts = transcripts(window)
+        // Each conversation's rows (`transcript-<thread>`), measured now: the composer lines up with them.
+        var surfaces: [String: Any] = [:]
+        for transcript in transcripts {
+            if let key = transcript["key"] as? String, let rows = transcript["rows"] { surfaces["transcript-" + key] = rows }
+        }
         return ["width": window.bounds.width, "height": window.bounds.height,
                 "composers": (window.windowScene?.windows ?? [window]).flatMap(composers),
-                "transcripts": transcripts(window),
+                "transcripts": transcripts,
                 "safeRight": window.safeAreaInsets.right, "safeBottom": window.safeAreaInsets.bottom,
                 "keyboardTop": keyboardTop ?? window.bounds.height,
                 "scrolls": scrolls(window),
-                "surfaces": surfaces.mapValues { ["x": $0.minX, "y": $0.minY, "width": $0.width, "height": $0.height] }]
+                "surfaces": surfaces]
     }
 
     private static func pixel(_ image: UIImage, x: CGFloat, y: CGFloat) -> [UInt8] {

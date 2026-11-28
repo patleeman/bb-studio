@@ -1662,7 +1662,6 @@ extension ThreadView {
         let actions = transcriptV2Actions
         let hasTop = transcriptV2HasTop
         let pillNote = transcriptV2PillNote
-        let probe = transcriptV2Probe
         let chromeToken = chromeTick.next()
         return Isolated {
             let _ = model.rowsBox.version
@@ -1695,7 +1694,6 @@ extension ThreadView {
                     }
                 },
                 pillNote: pillNote,
-                probe: probe,
                 describeID: { ($0.base as? String).map(ScrollLog.id) ?? "?" },
                 spotKey: model.threadId,
                 composerVersion: chromeToken,
@@ -1710,11 +1708,6 @@ extension ThreadView {
             // Nothing cached yet: the shape of a chat, not a blank screen.
             if !model.loaded { ChatSkeleton().allowsHitTesting(false) }
         }
-        // Beside two pages the header owns the status-bar strip: the
-        // transcript's scroll view mustn't take its taps as scroll-to-top.
-        #if DEBUG
-        .onDisappear { DuoDemo.surfaces["transcript-" + model.threadId] = nil }
-        #endif
     }
 
     /// As the SwiftUI transcript's: Studio paths and in-app thread links open here.
@@ -1876,16 +1869,6 @@ extension ThreadView {
         guard let first = waiting.first else { return nil }
         if waiting.count > 1 { return "\(waiting.count) waiting" }
         return first.payload.kind == "approval" ? "Approval" : "Question"
-    }
-
-    /// Debug: the rows' content edges, which the composer lines up with beside two pages.
-    fileprivate var transcriptV2Probe: ((CGRect) -> Void)? {
-        #if DEBUG
-        let key = "transcript-" + model.threadId
-        return { DuoDemo.surfaces[key] = $0 }
-        #else
-        return nil
-        #endif
     }
 
     /// The jump button: in the corner on a phone; beside two pages centred
