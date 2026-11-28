@@ -30,7 +30,7 @@ final class ShellPanesUITests: ServerIsolatedUITestCase {
 
     private func launch(_ size: TextSize, macOnly: Bool = false) {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaWorkbenchDemo",
-                               "-qaPageDemo", "-qaDark", "-qaConversation", "thr_botdemo01",
+                               "-qaPageDemo", "-qaDark", "-qaConversation", "thr_botdemo01", "-qaForgetWorkbenchPanes",
                                "-UIPreferredContentSizeCategoryName", size.rawValue]
             + (macOnly ? ["-qaWorkbenchMacOnly"] : [])
         app.launchOffline()
