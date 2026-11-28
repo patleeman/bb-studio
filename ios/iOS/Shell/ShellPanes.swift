@@ -146,6 +146,12 @@ final class WorkbenchPaneChoice {
 
     func shown(_ threadId: String) -> Bool { !hidden.contains(threadId) }
 
+    /// Shown again: a tab you opened yourself.
+    func show(_ threadId: String) {
+        guard !shown(threadId) else { return }
+        toggle(threadId)
+    }
+
     /// The Workbench button: hides the pane, or brings it back.
     func toggle(_ threadId: String) {
         if let at = hidden.firstIndex(of: threadId) {

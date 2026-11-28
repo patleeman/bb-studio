@@ -186,12 +186,14 @@ enum DuoDemo {
             }
             return true
         case "workbench":
-            // The shown conversation's Workbench (`-qaWorkbenchDemo`): `?close` its shown tab, `?open` a page tab.
+            // The shown conversation's Workbench (`-qaWorkbenchDemo`): `?close` its shown tab, `?open` a page tab, `?drawing` a drawing.
             guard let threadId = Router.shared.conversation else { return false }
             let store = WorkbenchStore.shared
             switch url.query() {
             case "close": if let shown = store.selected(threadId) { store.close(shown.id, in: threadId) }
             case "open": store.open(.init(kind: "page", id: "qa-demo"), title: "Lisbon budget", in: threadId)
+            // A screen the phone already has (`WorkbenchItemTab`): a drawing.
+            case "drawing": store.open(.init(kind: "whiteboard", id: "qa-demo-drawing"), title: "Floor plan", in: threadId)
             default: return false
             }
             return true

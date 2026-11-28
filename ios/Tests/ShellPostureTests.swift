@@ -112,6 +112,11 @@ final class ShellPostureTests: XCTestCase {
         named.workflowName = ""
         named.description = nil
         XCTAssertEqual(named.name, "Background task")
+        // A server's odd start never traps.
+        XCTAssertEqual(ComposerStatus.duration(since: .nan, now: now), "0s")
+        XCTAssertEqual(ComposerStatus.duration(since: -.infinity, now: now), "0s")
+        XCTAssertEqual(ComposerStatus.duration(since: 1e30, now: now), "0s", "in the future")
+        XCTAssertEqual(ComposerStatus.duration(since: -1e30, now: now), "876000h 0m", "centuries ago: clamped")
     }
 
     /// The inner screen comes from the screen, not the window: beside another

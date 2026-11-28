@@ -138,7 +138,9 @@ struct ComposerStatus: Equatable {
 
     /// "40s", "1m 12s", "2h 5m": how long since `since` (ms).
     static func duration(since: Double, now: Date) -> String {
-        let seconds = max(0, Int(now.timeIntervalSince1970 - since / 1000))
+        // A server's odd value (not finite, or centuries off) reads as 0s, never a trap.
+        let elapsed = now.timeIntervalSince1970 - since / 1000
+        let seconds = elapsed.isFinite ? Int(min(max(elapsed, 0), 100 * 365 * 86_400)) : 0
         if seconds < 60 { return "\(seconds)s" }
         if seconds < 3600 { return "\(seconds / 60)m \(seconds % 60)s" }
         return "\(seconds / 3600)h \(seconds % 3600 / 60)m"
@@ -158,16 +160,12 @@ struct ComposerStatusLine: View {
     var body: some View {
         HStack(spacing: 6) {
             if status.running || !status.background.isEmpty { RunningGlyph().accessibilityHidden(true) }
-            // The background part goes first where the line is too narrow.
-            ViewThatFits(in: .horizontal) {
-                leading(background: true)
-                leading(background: false)
-            }
+            leading
             Spacer(minLength: 8)
             if status.queued > 0 {
                 Button(action: showQueue) { Text("\(status.queued) queued").frame(minHeight: 28).contentShape(.rect) }
                     .buttonStyle(.plain)
-                    .fixedSize()
+                    .layoutPriority(1)
                     .accessibilityIdentifier("composerQueued")
             }
         }
@@ -180,20 +178,32 @@ struct ComposerStatusLine: View {
         .accessibilityIdentifier("composerStatus")
     }
 
-    private func leading(background: Bool) -> some View {
-        HStack(spacing: 0) {
-            if status.running {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(ComposerStatus.working(since: status.since, now: context.date)).monospacedDigit()
-                }
-                .accessibilityIdentifier("composerWorking")
+    /// Working, then the background part where it fits: the line drops it
+    /// while working, and truncates past that (large text). Idle, the
+    /// background part is the line, truncated if it must be: never a glyph alone.
+    @ViewBuilder private var leading: some View {
+        if status.running {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 0) { working; background }.fixedSize()
+                working
             }
-            if background, let text = status.backgroundText {
-                if status.running { Text(" · ") }
-                ComposerBackgroundMenu(work: status.background, text: text)
-            }
+        } else {
+            background
         }
-        .fixedSize()
+    }
+
+    private var working: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            Text(ComposerStatus.working(since: status.since, now: context.date)).monospacedDigit()
+        }
+        .accessibilityIdentifier("composerWorking")
+    }
+
+    @ViewBuilder private var background: some View {
+        if let text = status.backgroundText {
+            if status.running { Text(" · ") }
+            ComposerBackgroundMenu(work: status.background, text: text)
+        }
     }
 }
 

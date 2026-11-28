@@ -388,6 +388,13 @@ final class ThreadModel: ObservableObject {
             interactions = demo.interactions
             // `-qaShelfDemo`: every lasting state and the model fallback, for the chips and notice lines.
             if ProcessInfo.processInfo.arguments.contains("-qaShelfDemo") { shelf = .demo }
+            // `-qaQueuedDemo`: two messages waiting, for the composer's status line.
+            if ProcessInfo.processInfo.arguments.contains("-qaQueuedDemo") {
+                queued = (try? JSONDecoder().decode([QueuedMessage].self, from: Data(#"""
+                    [{"id": "q1", "content": [{"type": "text", "text": "And the deck?"}]},
+                     {"id": "q2", "content": [{"type": "text", "text": "Then the budget."}]}]
+                    """#.utf8))) ?? []
+            }
             loaded = true
             return
         }

@@ -74,7 +74,34 @@ final class ShellControlStripUITests: ServerIsolatedUITestCase {
         }
     }
 
+    /// With the Workbench beside the chat the bar's title is two: the chat's over its page, the tab's over the pane.
+    private func assertTitlesOverTheirPanes(_ state: String, file: StaticString = #filePath, line: UInt = #line) {
+        let page = element("workbenchPage").frame
+        let chat = element("conversationTitle")
+        let tab = element("workbenchTitle")
+        XCTAssertTrue(chat.exists && tab.exists, "\(state): both titles", file: file, line: line)
+        XCTAssertLessThanOrEqual(chat.frame.maxX, page.minX + 1, "\(state): the chat's title over its page", file: file, line: line)
+        XCTAssertGreaterThanOrEqual(tab.frame.minX, page.minX - 1, "\(state): the tab's title over the Workbench", file: file, line: line)
+    }
+
     // MARK: The open Duo
+
+    /// A screen the phone already has, in a tab (a drawing): no bar of its own
+    /// to hide the conversation's, its buttons stay in the strip, and its
+    /// actions are in ⋯ with Open Full Screen.
+    func testAScreenTabKeepsTheConversationsBar() throws {
+        try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
+        launch(posture: "flat")
+        window("landscape", landscape)
+        XCTAssertTrue(element("workbenchPage").waitForExistence(timeout: 10))
+        let first = strip("flat, a page tab")
+        command("workbench?drawing")
+        XCTAssertTrue(element("workbenchTitle").label.contains("Floor plan"), "the drawing's tab shows: \(element("workbenchTitle").label)")
+        XCTAssertEqual(strip("flat, a drawing tab"), first, "the strip's buttons, where they were")
+        assertTitlesOverTheirPanes("flat, a drawing tab")
+        app.press(element("conversationMore"), id: "conversationMore")
+        XCTAssertTrue(app.buttons["Open Full Screen"].waitForExistence(timeout: 5), "the drawing's actions in ⋯")
+    }
 
     func testTheWorkbenchCollapsesAndComesBack() throws {
         try XCTSkipUnless(isDuo, "an iPhone Duo simulator")
@@ -133,6 +160,7 @@ final class ShellControlStripUITests: ServerIsolatedUITestCase {
             XCTAssertFalse(element("homeColumn").exists, "\(posture): Home doesn't fit beside both")
             let first = strip("\(posture): Workbench shown, Home hidden")
             assertTheStackReachesTheEdge("\(posture): Workbench shown, Home hidden")
+            assertTitlesOverTheirPanes("\(posture): at the root")
 
             // Home over the conversation: modal, so only a tap where its button is reaches it.
             app.press(element("homePane"), id: "homePane")
@@ -172,6 +200,8 @@ final class ShellControlStripUITests: ServerIsolatedUITestCase {
             XCTAssertGreaterThan(home.minY, back.frame.maxY, "\(posture): under Back")
             XCTAssertLessThan(home.minY - back.frame.maxY, 30, "\(posture): right under it, the next slot")
             assertTheStackReachesTheEdge("\(posture): a worker pushed")
+            // Back in the strip, not the bar: the two titles keep their places.
+            assertTitlesOverTheirPanes("\(posture): a worker pushed")
             app.terminate()
         }
     }

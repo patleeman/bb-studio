@@ -57,7 +57,8 @@ struct ConversationScreen: View {
             // composer at the bottom, no tab bar under it. The Duo keeps the system's column.
             .toolbar(posture == .phone ? .hidden : .automatic, for: .tabBar)
             .sensoryFeedback(.selection, trigger: session.showsWorkbench)
-            .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
+            // A tab you add yourself is one you want to see: the pane comes back if you hid it.
+            .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) { paneChoice.show(threadId) } }
             .task(id: threadId) {
                 // A conversation is the one on screen (the open Duo's column); a worker or reply pushed over it isn't.
                 if shell?.threadId == threadId, shell?.kind == .conversation { router.shown(threadId) }

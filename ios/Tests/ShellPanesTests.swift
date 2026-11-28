@@ -190,6 +190,12 @@ final class ShellPanesTests: XCTestCase {
         XCTAssertTrue(choice.shown("thr_a"), "and brought back")
         XCTAssertTrue(WorkbenchPaneChoice(defaults: defaults).shown("thr_a"))
 
+        choice.toggle("thr_a")
+        choice.show("thr_a")
+        XCTAssertTrue(choice.shown("thr_a"), "a tab you open yourself shows the pane again")
+        choice.show("thr_a")
+        XCTAssertTrue(choice.shown("thr_a"), "and showing a shown pane keeps it shown")
+
         for n in 0...WorkbenchPaneChoice.kept { choice.toggle("thr_\(n)") }
         XCTAssertEqual(choice.hidden.count, WorkbenchPaneChoice.kept, "a bounded list")
         XCTAssertTrue(choice.shown("thr_0"), "the oldest choice goes first")
