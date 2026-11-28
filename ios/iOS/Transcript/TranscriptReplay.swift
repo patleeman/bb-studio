@@ -507,18 +507,22 @@ final class TranscriptReplay {
         return keyboard + (layout.chrome.composerIgnoresBottomSafeArea ? 0 : safeBottom)
     }
 
-    /// Lets layout, self-sizing and any animation run out.
+    /// Lets layout, self-sizing and any animation run out. Quiet means no
+    /// layout pass, write, or row resize since the last look; it ends with a
+    /// layout pass, as the next frame would draw, so a resize that came in
+    /// during the last wait is laid out (and checked) rather than pending.
     private func settle() async {
         var quiet = 0
-        var last = controller.counters
+        var last = (controller.counters, controller.resizes)
         for _ in 0..<120 {
             window.layoutIfNeeded()
             try? await Task.sleep(for: .milliseconds(realKeyboard == nil ? 16 : 40))
-            let now = controller.counters
+            let now = (controller.counters, controller.resizes)
             quiet = now == last && !controller.isAnimating ? quiet + 1 : 0
             last = now
             if quiet >= (realKeyboard == nil ? 6 : 15) { break }
         }
+        window.layoutIfNeeded()
     }
 
     private func rest() async {
