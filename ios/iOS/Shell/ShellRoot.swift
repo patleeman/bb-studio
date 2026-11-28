@@ -464,6 +464,7 @@ private struct ShellPages: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         // Under Home (both panes): out of VoiceOver's reach, the transcript's UIKit views too.
         .environment(\.shellCovered, overlaid)
+        .environment(\.transcriptCovered, overlaid)
         #if DEBUG
         .overlay(alignment: .topLeading) { HomeEdgeMarker(enabled: edgeSwipe) }
         .background(ShellPagesReport(panes: panes))
