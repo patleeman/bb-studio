@@ -10,6 +10,14 @@ extension BBClient {
         ]))
     }
 
+    /// A new page holding an empty whiteboard (Studio's New → Whiteboard): the page's id.
+    public func studioNewWhiteboardPage(projectId: String?) async throws -> String {
+        let output: Studio.DrawingsNewWhiteboardPageOutput = try await rpc(
+            "studio", Studio.Method.drawings_newWhiteboardPage, ["projectId": projectId.map(JSONValue.string) ?? .null])
+        guard let id = output.page?.id else { throw BBError(status: 0, message: "Studio made no whiteboard page") }
+        return id
+    }
+
     /// A recording with its segments, in the generated shape.
     public func recordingOutput(_ id: String) async throws -> Studio.RecordingsRecordingGetOutput {
         let input: JSONValue = ["id": .string(id)]

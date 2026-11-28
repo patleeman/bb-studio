@@ -122,10 +122,35 @@ final class WorkbenchStore {
 
     /// Opens a Studio item as a tab, and shows it.
     func open(_ ref: WorkbenchTab.Ref, title: String, in threadId: String) {
-        Task {
-            if let (_, tabId) = await mutate(threadId, op: "open", ref: ref, title: title, focus: true), let tabId {
-                select(tabId, in: threadId)
-            }
+        Task { await show(ref, title: title, in: threadId) }
+    }
+
+    /// Makes a new item (the Workbench menu's New page, New design…) and opens it as the shown tab.
+    func make(_ made: WorkbenchAdd.Made, title: String, projectId: String?, in threadId: String) async throws {
+        let ref = try await create(made, projectId: projectId, in: threadId)
+        guard await show(ref, title: title, in: threadId) else {
+            throw BBError(status: 0, message: lastError ?? "Studio didn't open the tab")
+        }
+    }
+
+    @discardableResult
+    private func show(_ ref: WorkbenchTab.Ref, title: String, in threadId: String) async -> Bool {
+        guard let (result, tabId) = await mutate(threadId, op: "open", ref: ref, title: title, focus: true),
+              result == .ok || result == .unchanged, let tabId else { return false }
+        select(tabId, in: threadId)
+        return true
+    }
+
+    /// Studio's `create` for a kind, or a page holding a new whiteboard: the tab that opens it.
+    private func create(_ made: WorkbenchAdd.Made, projectId: String?, in threadId: String) async throws -> WorkbenchTab.Ref {
+        #if DEBUG
+        if WorkbenchDemo.state(threadId) != nil { return WorkbenchDemo.made(made) }
+        #endif
+        switch made {
+        case .item(let pluginId, let kind, let tab):
+            return .init(kind: tab, id: try await client.studioCreate(pluginId: pluginId, kind: kind, projectId: projectId).itemId)
+        case .whiteboardPage:
+            return .init(kind: "page", id: try await client.studioNewWhiteboardPage(projectId: projectId))
         }
     }
 
@@ -236,6 +261,16 @@ enum WorkbenchDemo {
         states[threadId] = state
         return state
     }
+
+    /// A made item, offline: a new id each time.
+    static func made(_ made: WorkbenchAdd.Made) -> WorkbenchTab.Ref {
+        madeCount += 1
+        switch made {
+        case .item(_, _, let tab): return .init(kind: tab, id: "qa-new-\(tab)-\(madeCount)")
+        case .whiteboardPage: return .init(kind: "page", id: "qa-new-whiteboard-\(madeCount)")
+        }
+    }
+    private static var madeCount = 0
 
     static func mutate(_ store: WorkbenchStore, _ threadId: String, op: String, tabId: String?, ref: WorkbenchTab.Ref?,
                        title: String?) -> (WorkbenchResult, String?) {

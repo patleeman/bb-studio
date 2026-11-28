@@ -718,6 +718,7 @@ private struct ShellSidePane: View {
         // (a page's related item) pushes over the conversation. No stack of
         // its own: a nested stack's hidden bar hides the stack's, buttons and all.
         WorkbenchView(threadId: threadId, webURL: model.thread.map { app.client.webURL(forThread: $0) },
+                      projectId: model.thread?.projectId,
                       openThread: { router.push(.thread(id: $0)) },
                       actionsChanged: { if session.tabActions != $0 { session.tabActions = $0 } })
             .accessibilityElement(children: .contain)
