@@ -64,7 +64,23 @@ extension XCUIApplication {
         if !arguments.contains("-qaRememberConversation"), !arguments.contains("-qaForgetConversation") { arguments.append("-qaForgetConversation") }
         launchArguments = arguments + ["-serverURL", server]
         launch()
+        // xcodebuild can still be installing the app when the runner's first
+        // test launches it: the install ends that process and the one the
+        // system starts after it has none of the test's arguments (it opens on
+        // the saved `unit-tests.invalid` and waits there). By the time
+        // `launch()` returns the install is over, so a run's first launch is
+        // made again.
+        if !LaunchRace.settled {
+            LaunchRace.settled = true
+            terminate()
+            launch()
+        }
     }
+}
+
+/// Whether this run of the runner has launched the app once already.
+private enum LaunchRace {
+    nonisolated(unsafe) static var settled = false
 }
 
 /// Ends the test runner when one test outlives its limit. XCTest's timeout
