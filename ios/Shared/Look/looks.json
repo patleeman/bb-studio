@@ -125,7 +125,7 @@
      },
      "saturate": 1.4,
      "edge": "#ff4fd8",
-     "halo": 0.546,
+     "halo": 0.477,
      "radius": 6,
      "presence": {
       "palette": [
@@ -194,7 +194,7 @@
      },
      "saturate": 1.25,
      "edge": "#ffb54d",
-     "halo": 0.546,
+     "halo": 0.477,
      "radius": 6,
      "presence": {
       "palette": [
@@ -263,7 +263,7 @@
      },
      "saturate": 1.2,
      "edge": "#5ff6ff",
-     "halo": 0.546,
+     "halo": 0.477,
      "radius": 2,
      "presence": {
       "palette": [
@@ -311,8 +311,8 @@
      "sceneTone": "#bfbfbf",
      "muted": "#54504a",
      "subtle": "#54504a",
-     "errorText": "#9a3415",
-     "warningText": "#734f1a",
+     "errorText": "#983413",
+     "warningText": "#714e1a",
      "successText": "#4c6a28",
      "accentText": "#55702f",
      "selectionAlpha": 0.32,
@@ -332,7 +332,7 @@
      },
      "saturate": 1.1,
      "edge": null,
-     "halo": 0.546,
+     "halo": 0.477,
      "radius": 6,
      "presence": {
       "palette": [
@@ -358,15 +358,15 @@
      "finished": "#fff3d2",
      "ripple": "#e0442e",
      "sceneTone": "#24262b",
-     "muted": "#bcbfb5",
-     "subtle": "#bcbfb5",
+     "muted": "#bfc2b7",
+     "subtle": "#bfc2b7",
      "errorText": "#faad81",
-     "warningText": "#f2b25a",
+     "warningText": "#f2b35d",
      "successText": "#a8d672",
      "accentText": "#e8a860",
      "selectionAlpha": 0.28,
      "alpha": {
-      "sidebar": 0.2,
+      "sidebar": 0.21,
       "main": 0.03,
       "transcript": 0.22,
       "composer": 0.59,
@@ -381,7 +381,7 @@
      },
      "saturate": 1.1,
      "edge": null,
-     "halo": 0.546,
+     "halo": 0.477,
      "radius": 6,
      "presence": {
       "palette": [
@@ -435,9 +435,9 @@
      "accentText": "#e4f27c",
      "selectionAlpha": 0.24,
      "alpha": {
-      "sidebar": 0.28,
+      "sidebar": 0.29,
       "main": 0.03,
-      "transcript": 0.28,
+      "transcript": 0.29,
       "composer": 0.63,
       "hud": 0.74
      },
@@ -450,7 +450,7 @@
      },
      "saturate": 1.2,
      "edge": null,
-     "halo": 0.546,
+     "halo": 0.477,
      "radius": 6,
      "presence": {
       "palette": [
@@ -519,7 +519,7 @@
      },
      "saturate": 1.2,
      "edge": null,
-     "halo": 0.546,
+     "halo": 0.477,
      "radius": 6,
      "presence": {
       "palette": [
@@ -588,7 +588,7 @@
      },
      "saturate": 1.15,
      "edge": null,
-     "halo": 0.546,
+     "halo": 0.477,
      "radius": 6,
      "presence": {
       "palette": [
@@ -637,7 +637,7 @@
      },
      "saturate": 1.15,
      "edge": null,
-     "halo": 0.546,
+     "halo": 0.477,
      "radius": 6,
      "presence": {
       "palette": [
@@ -706,7 +706,7 @@
      },
      "saturate": 1.2,
      "edge": "#3fd8ff",
-     "halo": 0.546,
+     "halo": 0.477,
      "radius": 3,
      "presence": {
       "palette": [
@@ -775,7 +775,7 @@
      },
      "saturate": 1.2,
      "edge": "#3cc8d8",
-     "halo": 0.546,
+     "halo": 0.477,
      "radius": 6,
      "presence": {
       "palette": [
