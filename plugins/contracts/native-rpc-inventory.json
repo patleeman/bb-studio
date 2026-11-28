@@ -442,6 +442,30 @@
     {
       "file": "ios/Shared/BotConversations.swift",
       "plugin": "studio",
+      "method": "bot_delete_preview",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotConversations.swift",
+      "plugin": "studio",
+      "method": "bot_delete",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotConversations.swift",
+      "plugin": "studio",
+      "method": "bot_deleted",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotConversations.swift",
+      "plugin": "studio",
+      "method": "bot_restore",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotConversations.swift",
+      "plugin": "studio",
       "method": "bot_finish",
       "coverage": "generated method"
     },

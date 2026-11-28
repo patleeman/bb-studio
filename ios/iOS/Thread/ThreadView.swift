@@ -303,7 +303,7 @@ struct ThreadView: View {
         } message: {
             Text("The agent summarizes the conversation so far to free up context.")
         }
-        .deleteConversationSheet($deleting) { _ in delete() }
+        .deleteConversationSheet($deleting) { _, plan in delete(plan) }
         .confirmationDialog("Clear this thread's context?", isPresented: $confirmingClearContext, titleVisibility: .visible) {
             Button("Clear context", role: .destructive) {
                 Task { await model.run { try await $0.clearContext(model.threadId) } }
@@ -976,12 +976,12 @@ struct ThreadView: View {
         }
     }
 
-    private func delete() {
+    private func delete(_ plan: ConversationDeletePlan) {
         session.finishing = true
         let threadId = model.threadId
         Task {
             do {
-                try await client.delete(threadId, withChildren: true)
+                try await client.deleteConversation(threadId, plan: plan)
                 shell?.refresh()
                 shell?.showList()
             } catch {

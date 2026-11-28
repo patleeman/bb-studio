@@ -8,8 +8,9 @@ import XCTest
 final class ConversationRemoveUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
-    private func launch() {
-        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaNoDemoApprovals"]
+    /// `-qaNoSoftDelete`: a Studio without Recently deleted, where Delete is BB's, for good.
+    private func launch(_ extra: [String] = []) {
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaNoDemoApprovals"] + extra
         app.launchOffline()
         XCTAssertTrue(home.waitForExistence(timeout: 60), "the app opens on Home")
     }
@@ -141,8 +142,9 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
     }
 
     /// The confirm: it names the conversation and its workers, Cancel keeps
-    /// it, and Delete works only after the pause.
-    func testTheThreadMenuDeletesAfterASecondStep() {
+    /// it, and Delete works only after the pause. Studio keeps it in Recently
+    /// deleted, and Archive restores it.
+    func testTheThreadMenuDeletesAfterASecondStepAndArchiveRestoresIt() {
         launch()
         openConversations()
         row("thr_demo_interview").tap()
@@ -156,7 +158,8 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(sheet.waitForExistence(timeout: 5), "it asks first")
         XCTAssertTrue(app.staticTexts["Delete “Launch prep”?"].exists, "naming the conversation")
         let message = app.staticTexts["deleteMessage"]
-        XCTAssertTrue(message.waitForLabel(prefix: "Deletes “Launch prep” and its 1 worker."), "and its worker: \(message.label)")
+        XCTAssertTrue(message.waitForLabel(prefix: "Deletes “Launch prep” and its 1 worker. You can restore it from Archive for 30 days."),
+                      "its worker, and that it can come back: \(message.label)")
         let confirm = app.buttons["confirmDelete"]
         XCTAssertFalse(confirm.isEnabled, "Delete waits before it works")
         shot("6-thread-confirm")
@@ -173,6 +176,36 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         backOnHome("the deleted conversation closes")
         openConversations()
         XCTAssertFalse(row("thr_demo_interview").waitForExistence(timeout: 3), "and is gone from the list")
+
+        openArchive()
+        XCTAssertTrue(app.staticTexts["archive-deleted-thr_demo_interview"].waitForExistence(timeout: 15), "it's in Recently deleted")
+        shot("7-recently-deleted")
+        app.buttons["deletedRestore-thr_demo_interview"].tap()
+        XCTAssertTrue(app.staticTexts["archive-deleted-thr_demo_interview"].waitForNonExistence(timeout: 10), "Restore takes it out")
+        app.goHome()
+        openConversations()
+        XCTAssertTrue(row("thr_demo_interview").waitForExistence(timeout: 15), "and back in Conversations")
+    }
+
+    /// A Studio without Recently deleted: the same confirm says it's for good, and BB deletes it.
+    func testAnOlderStudioDeletesForGood() {
+        launch(["-qaNoSoftDelete"])
+        openConversations()
+        row("thr_demo_interview").tap()
+        openMore()
+        app.menuItem("Delete conversation…").tap()
+        let message = app.staticTexts["deleteMessage"]
+        XCTAssertTrue(message.waitForLabel(prefix: "Deletes “Launch prep” and its 1 worker. This can't be undone."), "for good: \(message.label)")
+        let confirm = app.buttons["confirmDelete"]
+        XCTAssertFalse(confirm.isEnabled, "Delete waits before it works")
+        let armed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: confirm)
+        XCTAssertEqual(XCTWaiter.wait(for: [armed], timeout: 6), .completed)
+        confirm.tap()
+        backOnHome("the deleted conversation closes")
+        openConversations()
+        XCTAssertFalse(row("thr_demo_interview").waitForExistence(timeout: 3), "and is gone")
+        openArchive()
+        XCTAssertFalse(app.staticTexts["archive-deleted-thr_demo_interview"].waitForExistence(timeout: 3), "with no Recently deleted")
     }
 
     func testTheThreadMenuArchives() {
@@ -218,6 +251,13 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["archiveArchive-thr_demo_kitchen"].waitForExistence(timeout: 5), "an older one can be archived")
         XCTAssertFalse(app.buttons["Delete"].exists, "but not deleted from the row")
         kitchen.swipeRight()
+        // Not in Home's list, it can still be deleted from its own ⋯.
+        kitchen.tap()
+        openMore()
+        XCTAssertTrue(app.menuItem("Delete conversation…").exists, "an older conversation's ⋯ has Delete")
+        app.goHome()
+        openConversations()
+        openArchive()
 
         let lisbon = app.buttons["archive-finished-thr_demo_lisbon"]
         XCTAssertTrue(lisbon.waitForExistence(timeout: 15))

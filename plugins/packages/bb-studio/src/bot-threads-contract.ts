@@ -167,6 +167,17 @@ const libraryItem = z.object({
   byBot: z.boolean().optional(),
 });
 
+/** A conversation in Recently deleted (src/bot-trash.ts): BB deletes it for good at `purgeAt`. */
+const deletedConversation = z.object({
+  threadId: z.string(),
+  botId: z.string(),
+  title: z.string(),
+  deletedAt: z.number(),
+  purgeAt: z.number(),
+  /** The threads that go with it (workers, side threads), counted at the delete. */
+  workers: z.number().int().min(0),
+});
+
 /** A finished conversation, for Main's card and the finished banner (src/bot-finish.ts). */
 const finished = z.object({
   threadId: z.string(),
@@ -293,6 +304,18 @@ export const botThreadsSchemas = {
   },
   /** Brings a finished conversation back to the sidebar (and unarchives it in BB). */
   bot_reopen: { input: z.object({ threadId }), output: z.object({ ok: z.boolean() }) },
+  /**
+   * Recently deleted (src/bot-trash.ts). What a delete's confirm says: the
+   * threads that go with the conversation, and the days it is kept. Not
+   * Main, not a worker. Clients feature-detect soft delete with it.
+   */
+  bot_delete_preview: { input: z.object({ threadId }), output: z.object({ workers: z.number().int().min(0), keepDays: z.number().int().min(1) }) },
+  /** Deletes a conversation softly: archived with its threads, out of every list, restorable until `purgeAt`; then BB deletes it for good. */
+  bot_delete: { input: z.object({ threadId }), output: z.object({ deleted: deletedConversation }) },
+  /** Back as it was before the delete (a finished one goes back to Archive). */
+  bot_restore: { input: z.object({ threadId }), output: z.object({ ok: z.boolean() }) },
+  /** The Bot's Recently deleted, newest first. */
+  bot_deleted: { input: z.object({ botId: botId.optional() }), output: z.object({ botId: z.string().nullable(), keepDays: z.number().int(), conversations: z.array(deletedConversation) }) },
   /** A finished conversation's summary for its card; null when it wasn't finished. */
   bot_finished: { input: z.object({ threadId }), output: z.object({ finished: finished.nullable() }) },
   /** The Bot's files: what its conversations and workers made, newest first (with the primary Bot, also what the user made themselves). */

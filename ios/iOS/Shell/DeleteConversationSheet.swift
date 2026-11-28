@@ -8,20 +8,22 @@ struct ConversationDeletion: Identifiable, Hashable {
 }
 
 /// The only way to delete a conversation (the ⋯ menu's last item, and a
-/// finished conversation's page). It names the conversation and how many
-/// workers go with it, starts on Cancel, and Delete works only after a
-/// pause, so a stray tap can't delete.
+/// finished conversation's page). It names the conversation, how many
+/// workers go with it and whether it can come back (Studio's Recently
+/// deleted, else BB's delete for good), starts on Cancel, and Delete works
+/// only after a pause, so a stray tap can't delete.
 struct DeleteConversationSheet: View {
     let deletion: ConversationDeletion
-    let delete: () -> Void
+    let delete: (ConversationDeletePlan) -> Void
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
-    @State private var workers: Int?
+    @State private var plan: ConversationDeletePlan?
+    @State private var failure: String?
     @State private var wait = ConversationFinish.deleteArmSeconds
     @FocusState private var cancelFocused: Bool
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    private var armed: Bool { wait == 0 }
+    private var armed: Bool { wait == 0 && plan != nil }
 
     var body: some View {
         // Scrolls, and opens full height at accessibility sizes: large type never clips Delete or Cancel.
@@ -31,7 +33,7 @@ struct DeleteConversationSheet: View {
             .presentationDragIndicator(.visible)
             .sensoryFeedback(.warning, trigger: armed) { _, now in now }
             .task { await arm() }
-            .task { workers = try? await app.client.deleteCascadeCount(deletion.threadId) }
+            .task { await load() }
             .onAppear { cancelFocused = true }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("deleteSheet")
@@ -48,9 +50,8 @@ struct DeleteConversationSheet: View {
                 .font(.headline)
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("deleteTitle")
-            Text(ConversationFinish.deleteMessage(deletion.title, workers: workers))
+            message
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("deleteMessage")
@@ -70,10 +71,11 @@ struct DeleteConversationSheet: View {
                 .focused($cancelFocused)
                 .accessibilityIdentifier("cancelDelete")
             Button(role: .destructive) {
+                guard let plan else { return }
                 dismiss()
-                delete()
+                delete(plan)
             } label: {
-                Text(armed ? "Delete" : "Delete (\(wait))")
+                Text(wait == 0 ? "Delete" : "Delete (\(wait))")
                     .monospacedDigit()
                     .frame(maxWidth: .infinity, minHeight: 34)
             }
@@ -81,6 +83,24 @@ struct DeleteConversationSheet: View {
             .tint(.red)
             .disabled(!armed)
             .accessibilityIdentifier("confirmDelete")
+        }
+    }
+
+    @ViewBuilder private var message: some View {
+        if let plan {
+            Text(ConversationFinish.deleteMessage(deletion.title, workers: plan.workers, keepDays: plan.keepDays)).foregroundStyle(.secondary)
+        } else if let failure {
+            Text(failure).foregroundStyle(.red)
+        } else {
+            ProgressView()
+        }
+    }
+
+    private func load() async {
+        do {
+            plan = try await app.client.deletePlan(deletion.threadId)
+        } catch {
+            if !BBClient.isCancellation(error) { failure = "It can't delete it now: " + BBClient.describe(error, server: app.client.baseURL) }
         }
     }
 
@@ -94,10 +114,10 @@ struct DeleteConversationSheet: View {
 }
 
 extension View {
-    /// Shows the delete confirm while `deletion` is set; `delete` runs only on its Delete.
-    func deleteConversationSheet(_ deletion: Binding<ConversationDeletion?>, delete: @escaping (ConversationDeletion) -> Void) -> some View {
+    /// Shows the delete confirm while `deletion` is set; `delete` runs only on its Delete, with how to delete.
+    func deleteConversationSheet(_ deletion: Binding<ConversationDeletion?>, delete: @escaping (ConversationDeletion, ConversationDeletePlan) -> Void) -> some View {
         sheet(item: deletion) { request in
-            DeleteConversationSheet(deletion: request) { delete(request) }
+            DeleteConversationSheet(deletion: request) { delete(request, $0) }
         }
     }
 }

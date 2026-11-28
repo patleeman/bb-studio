@@ -85,6 +85,51 @@ public struct WorkersLine: Equatable, Sendable {
     public var label: String { count == 1 ? "1 worker from here" : "\(count) workers from here" }
 }
 
+/// What deleting a conversation does on this server (`BBClient.deletePlan`).
+public struct ConversationDeletePlan: Equatable, Sendable {
+    /// The threads that go with it; nil when BB couldn't count them.
+    public var workers: Int?
+    /// Studio keeps it in Recently deleted this long; nil: BB deletes it for good.
+    public var keepDays: Int?
+    public var soft: Bool { keepDays != nil }
+
+    public init(workers: Int?, keepDays: Int?) {
+        self.workers = workers
+        self.keepDays = keepDays
+    }
+}
+
+/// A conversation in Studio's Recently deleted: BB deletes it for good at `purgeAt`.
+public struct DeletedConversation: Equatable, Identifiable, Sendable {
+    public var id: String { threadId }
+    public var threadId: String
+    public var title: String
+    public var deletedAt: Double
+    public var purgeAt: Double
+
+    public init(threadId: String, title: String, deletedAt: Double, purgeAt: Double) {
+        self.threadId = threadId
+        self.title = title
+        self.deletedAt = deletedAt
+        self.purgeAt = purgeAt
+    }
+
+    init?(_ wire: Studio.BotDeletedOutputConversationsItem) {
+        guard let threadId = wire.threadId, !threadId.isEmpty else { return nil }
+        self.init(threadId: threadId, title: wire.title?.isEmpty == false ? wire.title! : "Untitled", deletedAt: wire.deletedAt ?? 0, purgeAt: wire.purgeAt ?? 0)
+    }
+
+    /// How long until BB deletes it for good, in whole days.
+    public func left(now: Date = Date()) -> String {
+        let days = Int(((purgeAt / 1000) - now.timeIntervalSince1970) / 86_400)
+        switch days {
+        case ..<1: return "Less than a day left"
+        case 1: return "1 day left"
+        default: return "\(days) days left"
+        }
+    }
+}
+
 public enum ConversationFinish {
     public static func can(_ conversation: BotConversation?) -> Bool {
         guard let conversation else { return false }
@@ -101,9 +146,11 @@ public enum ConversationFinish {
     }
 
     /// What the delete confirm says goes, and for how long. `workers` is nil
-    /// while it's being counted, or when BB couldn't count them.
-    public static func deleteMessage(_ title: String, workers: Int?) -> String {
-        "Deletes “\(named(title))”\(withWorkers(workers)). This can't be undone."
+    /// when BB couldn't count them; `keepDays` is Studio's Recently deleted
+    /// (nil: BB's own delete, for good).
+    public static func deleteMessage(_ title: String, workers: Int?, keepDays: Int? = nil) -> String {
+        let after = keepDays.map { "You can restore it from Archive for \($0) days." } ?? "This can't be undone."
+        return "Deletes “\(named(title))”\(withWorkers(workers)). \(after)"
     }
 
     /// The pause before the confirm's Delete works: one tap can't delete.
@@ -147,6 +194,40 @@ extension BBClient {
         }
         let output: Output = try await rpc("studio", Studio.Method.thread_model, ["threadId": .string(threadId)])
         return output.model.map { ConversationModel(providerId: $0.providerId, model: $0.model, reasoningLevel: $0.reasoningLevel, modelName: $0.modelName) }
+    }
+
+    /// How deleting the conversation goes here: Studio's soft delete when it
+    /// has Recently deleted, else (an older Studio, or none: a 404) BB's own,
+    /// for good. Studio not running (503) or refusing throws: a restart must
+    /// never turn a recoverable delete into a permanent one.
+    public func deletePlan(_ threadId: String) async throws -> ConversationDeletePlan {
+        do {
+            let output: Studio.BotDeletePreviewOutput = try await rpc("studio", Studio.Method.bot_delete_preview, ["threadId": .string(threadId)])
+            return ConversationDeletePlan(workers: output.workers, keepDays: output.keepDays ?? 30)
+        } catch where BBClient.isUnknownRPC(error) {
+            return ConversationDeletePlan(workers: try? await deleteCascadeCount(threadId), keepDays: nil)
+        }
+    }
+
+    /// Deletes the conversation as `plan` says: into Recently deleted, or for good with its child threads.
+    public func deleteConversation(_ threadId: String, plan: ConversationDeletePlan) async throws {
+        guard plan.soft else { return try await delete(threadId, withChildren: true) }
+        let _: Studio.BotDeleteOutput = try await rpc("studio", Studio.Method.bot_delete, ["threadId": .string(threadId)])
+    }
+
+    /// The Bot's Recently deleted, newest first; nil when Studio has none (an older Studio).
+    public func recentlyDeleted(botId: String?) async throws -> [DeletedConversation]? {
+        do {
+            let output: Studio.BotDeletedOutput = try await rpc("studio", Studio.Method.bot_deleted, .object(omittingNil: ["botId": botId.map(JSONValue.string)]))
+            return (output.conversations ?? []).compactMap(DeletedConversation.init)
+        } catch where BBClient.isUnknownRPC(error) {
+            return nil
+        }
+    }
+
+    public func restoreDeleted(threadId: String) async throws {
+        let output: Studio.BotRestoreOutput = try await rpc("studio", Studio.Method.bot_restore, ["threadId": .string(threadId)])
+        guard output.ok != false else { throw BBError(status: 200, message: "It didn't restore.") }
     }
 
     /// The threads BB's delete takes with the conversation: every visible

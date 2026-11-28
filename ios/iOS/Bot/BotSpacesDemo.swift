@@ -164,6 +164,10 @@ enum BotSpacesDemo {
         private var threads: [String: Thread] = [:]
         private var finished: Set<String> = ["thr_demo_lisbon"]
         private var gone: Set<String> = []
+        /// Studio's Recently deleted: what each soft delete hid, to restore it as it was.
+        private var trashed: [String: (title: String, at: Double, wasFinished: Bool)] = [:]
+        /// `-qaNoSoftDelete`: a Studio from before Recently deleted (the phone falls back to BB's delete).
+        private static let softDelete = !ProcessInfo.processInfo.arguments.contains("-qaNoSoftDelete")
         private var finishedAt: [String: (at: Double, summary: String)] = [:]
         private var made = 0
         /// Each conversation New conversation started: the model it asked for, as the list and header name it.
@@ -600,11 +604,11 @@ enum BotSpacesDemo {
             case "bot_threads_older":
                 return lock.withLock {
                     let now = Self.now
-                    let finishedRows = conversations.values.flatMap { $0 }.filter { finished.contains($0.id) }.map { conversation -> [String: Any] in
+                    let finishedRows = conversations.values.flatMap { $0 }.filter { finished.contains($0.id) && trashed[$0.id] == nil }.map { conversation -> [String: Any] in
                         let info = finishedAt[conversation.id] ?? (now, "")
                         return ["threadId": conversation.id, "title": conversation.title, "finishedAt": info.at, "summary": info.summary]
                     }
-                    let older: [[String: Any]] = gone.contains("thr_demo_kitchen") ? [] : [[
+                    let older: [[String: Any]] = gone.contains("thr_demo_kitchen") || trashed["thr_demo_kitchen"] != nil ? [] : [[
                         "threadId": "thr_demo_kitchen", "title": "Kitchen remodel quotes", "isMain": false, "forkedFrom": NSNull(), "projectId": "proj_personal",
                         "updatedAt": now - 2_000_000_000, "latest": "Three quotes in", "running": false, "needsYou": NSNull(), "mirrored": false,
                     ]]
@@ -625,6 +629,33 @@ enum BotSpacesDemo {
                     return ok(["finished": ["threadId": threadId, "botId": "bot_juniper", "title": conversation.title, "summary": info.summary,
                                             "startedAt": info.at - 200_000_000, "finishedAt": info.at, "records": 2, "memoryHref": NSNull(), "archived": true] as [String: Any]])
                 }
+            case "bot_delete_preview" where Self.softDelete:
+                return lock.withLock { ok(["workers": workers.filter { $0.owner.threadId == threadId }.count, "keepDays": 30]) }
+            case "bot_delete" where Self.softDelete:
+                return lock.withLock {
+                    let title = conversations.values.flatMap { $0 }.first { $0.id == threadId }?.title ?? "Kitchen remodel quotes"
+                    let at = Self.now
+                    if trashed[threadId] == nil { trashed[threadId] = (title, at, finished.contains(threadId)) }
+                    finished.insert(threadId)
+                    return ok(["deleted": ["threadId": threadId, "botId": "bot_juniper", "title": title, "deletedAt": at, "purgeAt": at + 30 * 86_400_000, "workers": 0] as [String: Any]])
+                }
+            case "bot_restore" where Self.softDelete:
+                return lock.withLock {
+                    guard let entry = trashed.removeValue(forKey: threadId) else {
+                        return (400, Data(#"{"ok":false,"error":{"message":"That conversation isn't in Recently deleted."}}"#.utf8))
+                    }
+                    if !entry.wasFinished { finished.remove(threadId) }
+                    return ok(["ok": true])
+                }
+            case "bot_deleted" where Self.softDelete:
+                return lock.withLock {
+                    let list = trashed.sorted { $0.value.at > $1.value.at }.map { id, entry -> [String: Any] in
+                        ["threadId": id, "botId": "bot_juniper", "title": entry.title, "deletedAt": entry.at, "purgeAt": entry.at + 30 * 86_400_000, "workers": 0]
+                    }
+                    return ok(["botId": "bot_juniper", "keepDays": 30, "conversations": list])
+                }
+            case "bot_delete_preview", "bot_delete", "bot_restore", "bot_deleted":
+                return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8))
             case "bot_reopen":
                 return lock.withLock {
                     finished.remove(threadId)
@@ -668,7 +699,7 @@ enum BotSpacesDemo {
 
         /// The Bot's conversations as Memory's History lists them; under the lock.
         private func memoryHistory() -> [MemoryDemo.Conversation] {
-            (conversations["bot_juniper"] ?? []).filter { !gone.contains($0.id) }.map { conversation in
+            (conversations["bot_juniper"] ?? []).filter { !gone.contains($0.id) && trashed[$0.id] == nil }.map { conversation in
                 let done = finished.contains(conversation.id) ? finishedAt[conversation.id] : nil
                 let text = (threads[conversation.id]?.rows ?? []).compactMap { $0["text"] as? String }
                 return MemoryDemo.Conversation(id: conversation.id, title: conversation.title, main: conversation.main, at: conversation.at,
