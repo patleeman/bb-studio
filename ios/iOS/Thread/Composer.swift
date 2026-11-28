@@ -73,38 +73,24 @@ struct ComposerField: UIViewRepresentable {
                           height: font.lineHeight + view.textContainerInset.top + view.textContainerInset.bottom)
         }
         let font = view.font ?? .preferredFont(forTextStyle: .body)
-        let key = Coordinator.Measure(text: view.text, width: width, pointSize: font.pointSize, insets: view.textContainerInset)
-        let fitting: CGSize
-        if let measured = context.coordinator.measured, measured.key == key {
-            fitting = measured.size
-        } else {
-            fitting = view.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
-            context.coordinator.measured = (key, fitting)
-        }
+        let fitting = view.fittingHeight(width: width)
         let insets = view.textContainerInset.top + view.textContainerInset.bottom
         var limit = font.lineHeight * CGFloat(maxLines) + insets
         // Short of room (the keyboard up, large text, the folded Duo): only
-        // the height offered, never under a line, and the rest scrolls.
+        // the height offered, never under a line. The stack's minimum probe
+        // (height 0) learns the field can give way to one line this way. It
+        // only answers: whether the text scrolls is the laid-out view's call
+        // (`PastingTextView.layoutSubviews`), so a probe can't flip it.
         if let offered = proposal.height, offered.isFinite { limit = min(limit, max(offered, font.lineHeight + insets)) }
-        let scrolls = fitting.height > limit
-        if view.isScrollEnabled != scrolls { DispatchQueue.main.async { view.isScrollEnabled = scrolls } }
-        return CGSize(width: width, height: min(fitting.height, limit))
+        return CGSize(width: width, height: min(fitting, limit))
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: ComposerField
-        /// The field's last measured size, and what it was measured for.
-        var measured: (key: Measure, size: CGSize)?
         init(_ parent: ComposerField) { self.parent = parent }
 
-        struct Measure: Equatable {
-            var text: String
-            var width: CGFloat
-            var pointSize: CGFloat
-            var insets: UIEdgeInsets
-        }
 
         private var applyingFocus = false
 
@@ -391,6 +377,37 @@ final class PastingTextView: UITextView {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// The height the text needs at a width, measured once per text, width, size and insets.
+    func fittingHeight(width: CGFloat) -> CGFloat {
+        let key = Fit(text: text, width: width, pointSize: font?.pointSize ?? 0, insets: textContainerInset)
+        if let fit, fit.key == key { return fit.height }
+        let height = sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+        fit = (key, height)
+        return height
+    }
+
+    private struct Fit: Equatable {
+        var text: String
+        var width: CGFloat
+        var pointSize: CGFloat
+        var insets: UIEdgeInsets
+    }
+    private var fit: (key: Fit, height: CGFloat)?
+
+    /// Scrolls only when the text is taller than the height it was laid out
+    /// at: decided here, once a layout pass has settled the frame, and not
+    /// in SwiftUI's size probes, whose proposals (a stack's minimum is 0)
+    /// aren't the frame it gets.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        #if DEBUG
+        RenderCount.bump("composer.field.layout")
+        #endif
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        let scrolls = fittingHeight(width: bounds.width) > bounds.height + 1
+        if isScrollEnabled != scrolls { isScrollEnabled = scrolls }
+    }
 
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
         if action == #selector(paste(_:)), UIPasteboard.general.hasImages { return true }
