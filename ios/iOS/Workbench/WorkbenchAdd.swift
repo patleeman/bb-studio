@@ -44,8 +44,8 @@ enum WorkbenchAdd: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The new tab's title until Studio names it, as the desktop titles it.
-    var untitled: String { "Untitled " + title.replacingOccurrences(of: "New ", with: "") }
+    /// The new tab's title until Studio names it, as the desktop titles it; nil for what makes nothing.
+    var untitled: String? { made == nil ? nil : "Untitled " + title.replacingOccurrences(of: "New ", with: "") }
 
     var accessibilityId: String { "workbenchAdd-\(rawValue)" }
 
@@ -93,6 +93,8 @@ struct WorkbenchAdding: ViewModifier {
     @State private var askingLink = false
     @State private var link = ""
     @State private var failure: String?
+    /// A tab on its way: another pick waits, so one tap makes one item.
+    @State private var busy = false
     @EnvironmentObject private var app: AppModel
 
     func body(content: Content) -> some View {
@@ -100,14 +102,14 @@ struct WorkbenchAdding: ViewModifier {
             .onChange(of: request) { _, picked in
                 guard let picked else { return }
                 request = nil
-                run(picked)
+                if !busy { run(picked) }
             }
             .sheet(isPresented: $finding) { WorkbenchNewTab(threadId: threadId, opened: reveal) }
             .alert("Open link", isPresented: $askingLink) {
                 TextField("example.com", text: $link)
                     .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                 Button("Cancel", role: .cancel) {}
-                Button("Open") { openLink() }.disabled(WorkbenchAdd.link(link) == nil)
+                Button("Open") { openLink() }
             } message: {
                 Text("It opens as a tab here and on the desktop.")
             }
@@ -125,22 +127,33 @@ struct WorkbenchAdding: ViewModifier {
             link = ""
             askingLink = true
         default:
-            guard let made = picked.made else { return }
-            Task {
-                do {
-                    try await WorkbenchStore.shared.make(made, title: picked.untitled, projectId: projectId, in: threadId)
-                    reveal()
-                } catch {
-                    failure = BBClient.describe(error, server: app.client.baseURL)
-                }
-            }
+            guard let made = picked.made, let title = picked.untitled else { return }
+            adding { try await WorkbenchStore.shared.make(made, title: title, projectId: projectId, in: threadId) }
         }
     }
 
     private func openLink() {
-        guard let url = WorkbenchAdd.link(link) else { return }
-        WorkbenchStore.shared.open(.init(kind: "browser", url: url.absoluteString), title: url.host() ?? url.absoluteString, in: threadId)
-        reveal()
+        guard let url = WorkbenchAdd.link(link) else {
+            failure = "“\(link)” isn't a web address."
+            return
+        }
+        adding {
+            try await WorkbenchStore.shared.add(.init(kind: "browser", url: url.absoluteString), title: url.host() ?? url.absoluteString, in: threadId)
+        }
+    }
+
+    /// Adds the tab, then brings the Workbench into view; or says why not.
+    private func adding(_ work: @escaping @MainActor () async throws -> Void) {
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                try await work()
+                reveal()
+            } catch {
+                failure = BBClient.describe(error, server: app.client.baseURL)
+            }
+        }
     }
 }
 

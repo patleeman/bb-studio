@@ -64,6 +64,19 @@ final class WorkbenchMenuUITests: ServerIsolatedUITestCase {
         element("workbenchButton").tap()
         XCTAssertTrue(element("conversationTitle").waitForExistence(timeout: 10), "\(state): a tap still flips to the chat")
         XCTAssertEqual(element("workbenchButton").label, "Workbench, 5 tabs", "\(state): both made tabs counted")
+
+        // Open link: a typed address opens as a browser tab, the Workbench in view.
+        element("workbenchButton").press(forDuration: 1.0)
+        XCTAssertTrue(app.buttons["Open link…"].waitForExistence(timeout: 5))
+        app.buttons["Open link…"].tap()
+        let field = app.alerts.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "\(state): Open link asks for the address")
+        field.typeText("example.org/a")
+        app.alerts.buttons["Open"].tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 10), "\(state): the Workbench comes into view")
+        let linked = NSPredicate { _, _ in title.label.contains("example.org") }
+        expectation(for: linked, evaluatedWith: nil)
+        waitForExpectations(timeout: 10)
     }
 
     func testNewPageFromTheWorkbenchButtonOnTheIPhone() throws {

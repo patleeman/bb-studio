@@ -127,7 +127,12 @@ final class WorkbenchStore {
 
     /// Makes a new item (the Workbench menu's New page, New design…) and opens it as the shown tab.
     func make(_ made: WorkbenchAdd.Made, title: String, projectId: String?, in threadId: String) async throws {
-        let ref = try await create(made, projectId: projectId, in: threadId)
+        try await add(try await create(made, projectId: projectId, in: threadId), title: title, in: threadId)
+    }
+
+    /// Opens a tab and shows it, or says why Studio didn't.
+    func add(_ ref: WorkbenchTab.Ref, title: String, in threadId: String) async throws {
+        lastError = nil
         guard await show(ref, title: title, in: threadId) else {
             throw BBError(status: 0, message: lastError ?? "Studio didn't open the tab")
         }

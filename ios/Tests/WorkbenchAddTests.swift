@@ -25,6 +25,8 @@ final class WorkbenchAddTests: XCTestCase {
         XCTAssertEqual(WorkbenchAdd.page.untitled, "Untitled page")
         XCTAssertEqual(WorkbenchAdd.whiteboard.untitled, "Untitled whiteboard")
         XCTAssertEqual(WorkbenchAdd.app.untitled, "Untitled app")
+        XCTAssertNil(WorkbenchAdd.link.untitled, "Open link names its tab by the address")
+        XCTAssertNil(WorkbenchAdd.find.untitled)
     }
 
     func testOpenLinkTakesWebAddressesOnly() {
