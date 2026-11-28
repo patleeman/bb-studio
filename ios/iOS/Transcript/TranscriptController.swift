@@ -323,13 +323,21 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             pendingSpot = spot
             log?("v2 spot: a rebuild, opens at \(spot.row.map(describe) ?? "the end")")
             view.setNeedsLayout()
+        } else {
+            // Opened afresh, at the end: a spot from an earlier visit isn't this one's.
+            TranscriptReadingSpots.save(nil, for: spotKey)
         }
         TranscriptReadingSpots.appeared(spotKey)
     }
 
+    /// The spot isn't taken again here: on a fold the window resizes this
+    /// transcript before it goes, rewrapping its rows at the old offset, and
+    /// the row at the top then was a row or so off the reader's (the Duo's
+    /// fold test moved 22 to 36 pt). It is saved where the reader's place is
+    /// decided; only the count of rows that came in since is brought up to date.
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        saveSpot()
+        if let spotKey, pendingSpot == nil, spotHold == nil { TranscriptReadingSpots.update(unseen: unseen, for: spotKey) }
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -748,7 +756,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         guard abs(target - y) > 0.25 else { return }
         write(target, why)
         // Clamped back from past the end: the reader is at it.
-        if !atEnd, distanceToEnd <= Self.atEndSlack { atEnd = true; unseen = 0 }
+        if !atEnd, distanceToEnd <= Self.atEndSlack { atEnd = true; unseen = 0; saveSpot() }
     }
 
     /// A `v2 geo` line in the scroll log, as the old transcript's `geo`
@@ -1334,6 +1342,12 @@ enum TranscriptReadingSpots {
     private static var wentAt: [String: TimeInterval] = [:]
 
     static func save(_ spot: Spot?, for key: String) { spots[key] = spot ?? Spot() }
+
+    /// Rows that came in below a saved spot since it was saved.
+    static func update(unseen: Int, for key: String) {
+        guard spots[key]?.row != nil else { return }
+        spots[key]?.unseen = unseen
+    }
 
     /// The spot to open at when this appearance rebuilds one that's showing or just went.
     static func rebuilt(_ key: String, now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> Spot? {
