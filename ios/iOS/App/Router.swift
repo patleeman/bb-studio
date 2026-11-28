@@ -56,8 +56,6 @@ final class Router: ObservableObject {
     @Published var replyThreadId: String?
     /// Reply threads opened from their conversation's messages: pushed, they say Reply….
     var replyThreads: Set<String> = []
-    /// New conversation over Home, its message prefilled.
-    @Published var compose: String?
     /// Studio's kind filter; nil for everything.
     @Published var studioKind: String?
     /// A destination that came before Studio's Bots loaded: taken once they have.
@@ -142,8 +140,7 @@ final class Router: ObservableObject {
         case .list:
             home([])
         case .compose(let text):
-            home([])
-            compose = text
+            home([.newConversation(text: text)])
         case .bot(let id):
             let botId = id ?? store.spaces?.bots.first(where: \.primary)?.id ?? store.spaces?.current?.id
             guard let botId, let bot = store.spaces?.bots.first(where: { $0.id == botId }) else { return }
@@ -214,6 +211,12 @@ final class Router: ObservableObject {
         searchPath = []
     }
 
+    /// New conversation, pushed over what Home's stack shows: Back returns there, and its draft waits.
+    func newConversation() {
+        tab = .home
+        push(.newConversation(text: ""))
+    }
+
     func focusInput() {
         focusRequests += 1
     }
@@ -222,7 +225,6 @@ final class Router: ObservableObject {
     func reset() {
         studioKind = nil
         sheet = nil
-        compose = nil
         replyThreadId = nil
         pending = nil
         shownBotId = nil
