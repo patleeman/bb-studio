@@ -169,6 +169,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     /// Our own animated scroll ("↓") is running.
     private var animating = false
     private var nearTopArmed = true
+    /// The row a prepend keeps where it was, while its update runs.
+    private var prependAnchor: (id: AnyHashable, distance: CGFloat)?
     /// A row asked for before it was in the transcript.
     private var pendingScroll: (id: AnyHashable, position: TranscriptRowPosition)?
 
@@ -321,13 +323,21 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             pendingSpot = spot
             log?("v2 spot: a rebuild, opens at \(spot.row.map(describe) ?? "the end")")
             view.setNeedsLayout()
+        } else {
+            // Opened afresh, at the end: a spot from an earlier visit isn't this one's.
+            TranscriptReadingSpots.save(nil, for: spotKey)
         }
         TranscriptReadingSpots.appeared(spotKey)
     }
 
+    /// The spot isn't taken again here: on a fold the window resizes this
+    /// transcript before it goes, rewrapping its rows at the old offset, and
+    /// the row at the top then was a row or so off the reader's (the Duo's
+    /// fold test moved 22 to 36 pt). It is saved where the reader's place is
+    /// decided; only the count of rows that came in since is brought up to date.
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        saveSpot()
+        if let spotKey, pendingSpot == nil, spotHold == nil { TranscriptReadingSpots.update(unseen: unseen, for: spotKey) }
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -516,19 +526,29 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             let unique = next.filter { seen.insert($0).inserted }
             if unique.count != next.count { log?("v2 dropped \(next.count - unique.count) duplicate ids") }
             let appended = Self.appendedCount(old: ids, new: unique)
-            // Older rows going in above: what the reader sees stays put.
-            let kept = Self.prepended(old: ids, new: unique) ? topRow() : nil
+            // Older rows going in above: what the reader sees stays put, in
+            // the update itself. UIKit asks `targetOffset` once the new rows
+            // have frames and before any cell lays out, so none lays out at
+            // the old offset (where the new rows now are) to be measured
+            // there and moved on. The kept row is the reader's: rows above it
+            // grow upward, it and the rows below grow down.
+            if Self.prepended(old: ids, new: unique), let kept = topRow() {
+                prependAnchor = kept
+                layout.readerRow = kept.id
+            }
             var snapshot = NSDiffableDataSourceSnapshot<Int, TranscriptRowID>()
             snapshot.appendSections([0])
             snapshot.appendItems(unique.map(TranscriptRowID.init), toSection: 0)
             counters.applies += 1
             ids = unique
             dataSource.apply(snapshot, animatingDifferences: false)
-            layout.forget(keeping: seen)
-            if let kept {
+            if let kept = prependAnchor {
+                // UIKit didn't ask (no window): from the frames, once laid out.
+                prependAnchor = nil
                 collectionView.layoutIfNeeded()
-                if let frame = layout.frame(of: kept.id) { write(frame.minY - collectionView.contentInset.top - kept.distance, "prepend") }
+                if let target = keptOffset(kept) { write(target, "prepend") }
             }
+            layout.forget(keeping: seen)
             if appended > 0, !atEnd { unseen += appended }
             nearTopArmed = true
             if let pending = pendingScroll, seen.contains(pending.id) {
@@ -570,9 +590,9 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         // Its ideal height, as a lazy stack proposes: a row with a flexible
         // `frame(maxHeight:)` (a clamped long message) otherwise grows to
         // whatever height the sizing pass offers.
-        // The layout's metrics already keep rows clear of the sides' safe area.
+        // The cell has no safe area (`TranscriptCell`).
         cell.contentConfiguration = UIHostingConfiguration {
-            view.fixedSize(horizontal: false, vertical: true).id(id).ignoresSafeArea(.container, edges: .horizontal)
+            view.fixedSize(horizontal: false, vertical: true).id(id)
         }
             .margins(.all, 0)
             .minSize(width: 0, height: 0)
@@ -736,7 +756,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         guard abs(target - y) > 0.25 else { return }
         write(target, why)
         // Clamped back from past the end: the reader is at it.
-        if !atEnd, distanceToEnd <= Self.atEndSlack { atEnd = true; unseen = 0 }
+        if !atEnd, distanceToEnd <= Self.atEndSlack { atEnd = true; unseen = 0; saveSpot() }
     }
 
     /// A `v2 geo` line in the scroll log, as the old transcript's `geo`
@@ -814,12 +834,26 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         animation = nil
     }
 
+    /// The offset that puts a kept row back where it was, from the layout's frames.
+    private func keptOffset(_ kept: (id: AnyHashable, distance: CGFloat)) -> CGFloat? {
+        layout.frame(of: kept.id).map { clamp($0.minY - collectionView.contentInset.top - kept.distance) }
+    }
+
     // MARK: TranscriptLayoutAnchoring
 
     /// After rows go in or out, or the width changes: the end if at it,
-    /// else where it was, clamped.
+    /// else where it was, clamped. Older rows paged in: the kept row where
+    /// it was, even under a finger or a fling (the old offset is now rows
+    /// the reader never saw).
     func targetOffset(proposed: CGPoint, in layout: TranscriptListLayout) -> CGPoint {
-        guard collectionView != nil, collectionView.bounds.height > 0, !touching else { return proposed }
+        guard collectionView != nil, collectionView.bounds.height > 0 else { return proposed }
+        if let kept = prependAnchor, let target = keptOffset(kept) {
+            prependAnchor = nil
+            counters.offsetWrites += 1
+            log?(String(format: "v2 offset prepend from %.1f to %.1f atEnd=%@", proposed.y, target, "\(atEnd)"))
+            return CGPoint(x: proposed.x, y: target)
+        }
+        guard !touching else { return proposed }
         return CGPoint(x: proposed.x, y: atEnd ? maxOffset : clamp(proposed.y))
     }
 
@@ -885,8 +919,12 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             if abs(fitted - original.size.height) > 1 { sizes.append((indexPath.item, fitted)) }
         }
         guard !sizes.isEmpty else { return }
+        let before = layout.collectionViewContentSize.height
         let context = UICollectionViewLayoutInvalidationContext()
         context.contentOffsetAdjustment = CGPoint(x: 0, y: layout.applyHeights(sizes))
+        // The content grows with the rows now, as for one row's self-sizing:
+        // without it UIKit's content size lagged until the next pass.
+        context.contentSizeAdjustment = CGSize(width: 0, height: layout.collectionViewContentSize.height - before)
         adjusting = true
         layout.invalidateLayout(with: context)
         adjusting = false
@@ -1172,6 +1210,16 @@ final class TranscriptCollectionView: UICollectionView {
 
 /// A row: its SwiftUI content, as tall as it measures at the row's width.
 final class TranscriptCell: UICollectionViewCell {
+    /// No safe area in a row: the layout's metrics keep rows clear of the
+    /// sides' safe area (a cell on the left page of two was inset again by
+    /// the window's status column a screen away), and the content insets
+    /// clear of the header and composer.
+    /// A hosted row sized itself with the safe area it overlapped added (a
+    /// row under the 62 pt header measured 62 pt taller there), so rows
+    /// changed height as they scrolled across either edge, and those
+    /// changes, measured late, moved the reader (34 pt as older pages came in).
+    override var safeAreaInsets: UIEdgeInsets { .zero }
+
     override func preferredLayoutAttributesFitting(_ attributes: UICollectionViewLayoutAttributes) -> UICollectionViewLayoutAttributes {
         let fitted = attributes.copy() as! UICollectionViewLayoutAttributes
         // A just-set configuration lands in SwiftUI on layout; measure after it.
@@ -1294,6 +1342,12 @@ enum TranscriptReadingSpots {
     private static var wentAt: [String: TimeInterval] = [:]
 
     static func save(_ spot: Spot?, for key: String) { spots[key] = spot ?? Spot() }
+
+    /// Rows that came in below a saved spot since it was saved.
+    static func update(unseen: Int, for key: String) {
+        guard spots[key]?.row != nil else { return }
+        spots[key]?.unseen = unseen
+    }
 
     /// The spot to open at when this appearance rebuilds one that's showing or just went.
     static func rebuilt(_ key: String, now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> Spot? {

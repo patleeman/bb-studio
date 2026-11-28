@@ -27,6 +27,13 @@ final class TranscriptHandle {
     func carry<ID: Hashable>(from old: ID, to new: ID) { controller?.carry(from: AnyHashable(old), to: AnyHashable(new)) }
 }
 
+extension EnvironmentValues {
+    /// Something of the app's covers the transcript (BB: Home over it):
+    /// VoiceOver leaves its UIKit views, which SwiftUI's
+    /// `accessibilityHidden` doesn't reliably reach.
+    @Entry var transcriptCovered = false
+}
+
 /// A chat transcript and its composer, on UIKit. Generic over the row: it
 /// takes rows in order and a SwiftUI view for each, and hands back the
 /// reader's state and requests (near the top, the pill).
@@ -169,8 +176,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         controller.onEmptyTap = onEmptyTap
         controller.onPage = onPage
         controller.rowsHidden = rowsHidden
-        // SwiftUI's accessibilityHidden doesn't reliably reach a hosted UIKit view.
-        controller.view.accessibilityElementsHidden = environment.shellCovered
+        controller.view.accessibilityElementsHidden = environment.transcriptCovered
         controller.onPillChange = onPillChange
         controller.log = log
         if let dismissKeyboard { controller.dismissKeyboard = dismissKeyboard }
