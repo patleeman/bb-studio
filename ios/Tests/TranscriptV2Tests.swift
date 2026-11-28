@@ -122,8 +122,8 @@ final class TranscriptPrependTests: XCTestCase {
     /// either edge, and the replay's prepends moved the reader 34 pt.
     func testARowMeasuresTheSameUnderTheHeaderAndTheHomeIndicator() async throws {
         let view = try XCTUnwrap(controller.collectionView)
-        XCTAssertGreaterThan(window.safeAreaInsets.top, 0)
-        XCTAssertGreaterThan(window.safeAreaInsets.bottom, 0)
+        // A phone has both; the Duo's screens may have only the top.
+        XCTAssertGreaterThan(window.safeAreaInsets.top + window.safeAreaInsets.bottom, 0)
         assertRowsOnScreenAre(100, "at the end, over the home indicator")
         let r1 = try XCTUnwrap(controller.layout.frame(of: "r1"))
         controller.simulateReaderScroll(to: r1.midY - view.contentInset.top)
