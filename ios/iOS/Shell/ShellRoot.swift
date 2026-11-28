@@ -58,9 +58,6 @@ struct ShellRoot: View {
         .dynamicTypeSize(posture.largeType ? .xLarge ... .accessibility5 : .xSmall ... .accessibility5)
         .lookRoot(bot: bot, theme: bot.map(theme))
         .background(ShellGeometryReader { geometry = $0 }.accessibilityHidden(true))
-        .sheet(isPresented: Binding(get: { router.compose != nil }, set: { if !$0 { router.compose = nil } })) {
-            NewThreadView(text: router.compose ?? "", botId: bot?.id) { id, botId in started(id, botId: botId) }
-        }
         .task(id: store.spaces) { await LookExport.run(store: store, client: app.client) }
         .onAppear { land() }
         .onChange(of: store.spaces) { _, _ in land() }
@@ -88,16 +85,6 @@ struct ShellRoot: View {
         router.consume(store)
     }
 
-    /// New conversation: with this Bot it opens here; with another, that Bot's Home opens on it.
-    private func started(_ id: String, botId: String?) {
-        Task {
-            if let botId, botId != bot?.id { store.watch(botId, fetch: false) }
-            await store.refresh()
-            if let botId, botId != bot?.id { router.show(botId, store: store) }
-            router.openConversation(id)
-            router.focusInput()
-        }
-    }
 }
 
 /// Which conversation the open Duo's column shows first: the last one opened
@@ -291,6 +278,7 @@ private struct ShellNoBotDestination: View {
         case .conversation(let id), .thread(let id): ConversationScreen(threadId: id)
         case .studio: StudioView()
         case .settings: SettingsView()
+        case .newConversation(let text): NewThreadView(text: text, keepsDraft: true)
         default: RouteDestination(route: route)
         }
     }
@@ -312,7 +300,7 @@ private struct HomeScreen: View {
 /// New conversation, in Home's bar and the open Duo's conversation column.
 private struct NewConversationButton: View {
     var body: some View {
-        Button { Router.shared.compose = "" } label: { Label("New conversation", systemImage: "square.and.pencil") }
+        Button { Router.shared.newConversation() } label: { Label("New conversation", systemImage: "square.and.pencil") }
             .accessibilityIdentifier("homeNew")
     }
 }
@@ -355,10 +343,25 @@ struct ShellDestination: View {
         case .settings: SettingsView()
         case .memorySkill(let botId, let name): MemorySkillRoute(botId: botId, name: name)
         case .memoryNewSkill(let botId): NewSkillScreen(store: MemoryStore.shared(botId: botId, client: app.client))
+        case .newConversation(let text):
+            NewThreadView(text: text, botId: bot.id, keepsDraft: true) { id, botId in started(id, botId: botId) }
         default:
             RouteDestination(route: route)
                 .environment(\.botConversation, ShellContext.make(BotShell.mainThreadId(bot, view: store.view(for: bot.id)) ?? "",
                                                                  kind: .conversation, bot: bot, store: store))
+        }
+    }
+}
+
+extension ShellDestination {
+    /// New conversation started: with this Bot it opens here; with another, that Bot's Home opens on it.
+    private func started(_ id: String, botId: String?) {
+        Task {
+            if let botId, botId != bot.id { store.watch(botId, fetch: false) }
+            await store.refresh()
+            if let botId, botId != bot.id { router.show(botId, store: store) }
+            router.openConversation(id)
+            router.focusInput()
         }
     }
 }

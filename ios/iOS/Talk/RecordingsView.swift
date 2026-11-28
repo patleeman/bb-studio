@@ -120,7 +120,7 @@ struct RecordingDetailView: View {
         .onDisappear { player.stop() }
         .screenToolbar(recording?.title ?? "Recording", actions: actions)
         .onChange(of: transcript) { _, _ in writeTranscriptFile() }
-        .sheet(isPresented: $creatingThread) { NewThreadView(text: transcript) }
+        .sheet(isPresented: $creatingThread) { NewThreadSheet(text: transcript) }
         .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "talk", itemId: id) }
         .studioChat(isPresented: $chatting, pluginId: "talk", itemId: id, title: recording?.title ?? "Recording", projectId: recording?.projectId)
         .confirmationDialog("Delete this recording?", isPresented: $confirmingDelete, titleVisibility: .visible) {

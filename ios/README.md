@@ -16,7 +16,7 @@ are unchanged, and old `bbgo://` links still open.
 | Home: the BB web sidebar on the phone, following its organization (BB's Thread List preferences). Automations, Pinned, your project groups in the sidebar's order, then Threads. Running threads first, then most recent activity; child threads nest under their parent; sections collapse | `iOS/Inbox/InboxView.swift` |
 | Swipe and context-menu actions: archive, delete (with confirmation), pin, read/unread, rename | `iOS/Inbox/InboxView.swift` |
 | Search across thread titles and messages, active and archived | `iOS/Inbox/InboxView.swift` |
-| New thread is a chat: an empty conversation with the composer focused at the bottom (⌘↩ to start). There is no project picker: a thread starts in the remembered project, else BB's personal one. A chip above the composer picks the workspace (project default, project checkout, new worktree with a base branch, or an existing environment); the composer's model button picks provider, model, reasoning and permissions. All start on the project's defaults | `iOS/Inbox/NewThreadView.swift` |
+| New thread is a chat: an empty conversation with the composer focused at the bottom (⌘↩ to start). Home pushes it (`Route.newConversation`; Back returns), with the conversation's own composer (`ComposerBar`, one row until focused, on the keyboard; the field grows to the room left above it, then scrolls, so Send stays in reach at any text size). Its message, photos and files are kept per Bot (`NewConversationDraft`) across Back, tabs and relaunches until it's sent or cleared. From Quick capture, a dictation or a recording it is a sheet with Cancel (`NewThreadSheet`). There is no project picker: a thread starts in the remembered project, else BB's personal one. A chip above the composer picks the workspace (project default, project checkout, new worktree with a base branch, or an existing environment); the composer's model button picks provider, model, reasoning and permissions. All start on the project's defaults | `iOS/Inbox/NewThreadView.swift` |
 | Thread view with live updates, send, and stop. Opens at the newest message and follows new output only while you're at the bottom; a jump button brings you back. Older pages load as you reach the top, without moving what you're reading. File paths in messages (inline code like `docs/plan.md:12`, or Markdown file links) open in the file viewer, including absolute paths outside the workspace like `/tmp/shot.png`, read from the thread's host. The ⋯ menu has Find in thread, Rename, Model & permissions, Mute notifications, Open in BB web, Share link, and Copy Thread ID (also on a thread row's long-press) | `iOS/Thread/ThreadView.swift` |
 | Live updates fetch only what changed: new rows since the last sequence, and the thread or its approvals only when those changed | `iOS/Thread/ThreadModel.swift` |
 | A red "New" line where you left off; the thread opens there when there's something unread | `iOS/Thread/ThreadView.swift` |
@@ -530,8 +530,11 @@ its PNGs.
 -qaSpacesDemo list -qaBotDemo chat`): who it's with, the Bot, project,
 workspace and model chips, starting on a picked model, another Bot on its Auto
 default, No Bot as a plain thread in a project, and the Bot switcher on the
-list's header; with `TEST_RUNNER_ROUND2_DUO=1` on the iPhone Duo simulator,
-the folded Duo's ↓ and the unfolded Duo's left side.
+list's header, Send hittable above the keyboard with 3 lines and blanks, 15
+and 60 lines at large text and the default, turned sideways and on the
+vertical Duo, and the draft kept across Back, another tab and a relaunch
+(`-qaKeepDrafts`), as a conversation's is; with `TEST_RUNNER_ROUND2_DUO=1` on
+the iPhone Duo simulator, the folded Duo's ↓ and the unfolded Duo's left side.
 `TEST_RUNNER_ROUND2_OUT` keeps PNGs.
 
 `DesignZoomUITests` checks a design's player offline (`-qaDesignDemo`: one

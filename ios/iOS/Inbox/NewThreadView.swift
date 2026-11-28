@@ -1,16 +1,20 @@
 import SwiftUI
 
 /// New thread, and a Bot's New conversation: one composer. Who it's with
-/// (any Bot, or no Bot: a plain thread in a project), the project, the
-/// workspace and the model are chips above the field, as on the desktop's
-/// composer. A Bot's conversation starts on the Bot's default model (Auto
-/// when that is its default) in its Main's project; a plain thread on the
-/// project's defaults.
+/// (any Bot, or no Bot: a plain thread in a project), the project and the
+/// workspace are chips over the conversation's own composer (`ComposerBar`,
+/// as `ThreadView` sets it up), whose settings button is the model, as on
+/// the desktop's composer. A Bot's conversation starts on the Bot's default
+/// model (Auto when that is its default) in its Main's project; a plain
+/// thread on the project's defaults. A screen of its own: Home pushes it
+/// (`Route.newConversation`), and `NewThreadSheet` holds it for the sheets.
+/// With `keepsDraft`, its message is kept per Bot (`NewConversationDraft`).
 struct NewThreadView: View {
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.look) private var look
     /// The project a plain thread last started in; a Bot's conversation starts in its Main's project.
     @AppStorage(ServerScope.key("newThreadProjectId"), store: AppGroup.defaults) private var savedProjectId = ""
     @ObservedObject private var spaces = BotSpacesStore.shared
@@ -34,6 +38,10 @@ struct NewThreadView: View {
     @State private var error: String?
     /// A Bot's conversation from its list: the room opens it there. Else the app opens what started.
     private let started: ((String, String?) -> Void)?
+    /// Home's New conversation keeps its message (`NewConversationDraft`) under the Bot it opened for.
+    private let keepsDraft: Bool
+    private let draftBotId: String?
+    @State private var restored = false
 
     // Execution options. Empty means the default (the Bot's, else the project's).
     @State private var options: ExecutionOptions?
@@ -42,9 +50,11 @@ struct NewThreadView: View {
     @State private var reasoning = ""
     @State private var permissionMode = ""
 
-    init(text: String = "", botId: String? = nil, started: ((String, String?) -> Void)? = nil) {
+    init(text: String = "", botId: String? = nil, keepsDraft: Bool = false, started: ((String, String?) -> Void)? = nil) {
         _text = State(initialValue: text)
         _botId = State(initialValue: botId ?? "")
+        self.keepsDraft = keepsDraft
+        draftBotId = botId
         self.started = started
     }
 
@@ -55,28 +65,26 @@ struct NewThreadView: View {
     }
 
     /// A chat, not a form: an empty conversation with the composer at the
-    /// bottom, saying who it's with. The chips are set to the defaults, so
-    /// most conversations need only a message.
+    /// bottom, on the keyboard while it shows, saying who it's with. The
+    /// chips are set to the defaults, so most conversations need only a message.
     var body: some View {
-        NavigationStack {
-            NewConversationGreeting(bot: bot)
-            .frame(maxWidth: .infinity)
+        NewConversationGreeting(bot: bot)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 32)
             .contentShape(.rect)
             .onTapGesture { focused = false }
-            .safeAreaInset(edge: .bottom) { composer }
+            .safeAreaInset(edge: .bottom, spacing: 0) { composer }
             .navigationTitle(bot == nil ? "New thread" : "New conversation")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
-            }
             .onAppear {
+                restoreDraft()
                 focused = true
                 // There's no thread to send to yet: what you say goes in the message.
                 let insert: (String) -> Void = { spoken in text = TalkDraft.finished(spoken, typed: &talkTyped, draft: text) }
                 talk.insert = insert
                 talk.send = insert
             }
+            .modifier(NewThreadDraftSaving(text: text, attachments: attachments.map(\.id)) { saveDraft() })
             .modifier(TalkDraft(talk: talk, draft: $text, typed: $talkTyped))
             .modifier(TalkLifecycle(talk: talk))
             .onChange(of: talk.error) { _, error in if let error { self.error = error } }
@@ -103,7 +111,22 @@ struct NewThreadView: View {
                     await loadOptions()
                     matchModelOption()
                 }))
-        }
+    }
+
+    /// Once: the kept draft, with any text this screen was opened with after it.
+    private func restoreDraft() {
+        guard !restored else { return }
+        restored = true
+        guard keepsDraft else { return }
+        let saved = NewConversationDraft.load(botId: draftBotId, serverURL: client.baseURL)
+        text = NewConversationDraft.opening(saved: saved.text, prefill: text)
+        if attachments.isEmpty { attachments = saved.attachments }
+    }
+
+    private func saveDraft() {
+        guard restored, keepsDraft else { return }
+        NewConversationDraft.save(text: text, botId: draftBotId, serverURL: client.baseURL)
+        NewConversationDraft.save(attachments: attachments, botId: draftBotId, serverURL: client.baseURL)
     }
 
     /// A Bot: its default model and its Main's project, as the desktop's New conversation seeds its composer. No Bot: the project last used.
@@ -129,17 +152,17 @@ struct NewThreadView: View {
         return (try? await client.thread(main).projectId) ?? NewThreadProject.personalId
     }
 
+    /// The chips, then the conversation's composer as `ThreadView` shows it
+    /// in a Bot conversation: one row until focused, the field growing to its
+    /// line cap and then to the room left above the keyboard, Send in its row.
     private var composer: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    if !bots.isEmpty { withChip }
-                    projectChip
-                    workspaceChip
-                }
+            NewThreadChips {
+                if !bots.isEmpty { withChip }
+                projectChip
+                workspaceChip
             }
-            .scrollClipDisabled()
             if workspace == "worktree" {
                 TextField("Base branch (project default)", text: $baseBranch)
                     .font(.subheadline)
@@ -149,11 +172,12 @@ struct NewThreadView: View {
                     .frame(height: 32)
                     .background(.fill.tertiary, in: .capsule)
             }
-            TalkStatusBar(talk: talk)
+            TalkIndicator(talk: talk)
             ComposerBar(
                 text: $text, focused: $focused, attachments: $attachments,
-                placeholder: bot.map { "Message \($0.name)" } ?? "What should the agent do?", maxLines: 10,
-                dictate: { talk.startDictation() }, talk: talk, dictation: dictation
+                placeholder: TalkIndicator.placeholder(talk) ?? bot.map { "Message \($0.name)" } ?? "What should the agent do?",
+                dictate: { talk.startDictation() }, talk: talk, clear: true, dictation: dictation,
+                compact: true, micTint: look.micTint
             ) {
                 agentMenu
             } send: {
@@ -161,17 +185,20 @@ struct NewThreadView: View {
                     Group {
                         if creating { ProgressView() } else { Image(systemName: "arrow.up.circle.fill").font(.title) }
                     }
-                    .frame(width: 36, height: 36)
+                    .frame(width: ComposerRow.button, height: ComposerRow.button).contentShape(.rect)
                 }
                 .disabled(!canStart)
                 .keyboardShortcut(.return, modifiers: .command)
                 .accessibilityLabel("Start")
                 .accessibilityIdentifier("newConversationStart")
             }
+            .modifier(BotComposerGlass(active: true))
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.bar)
+        // A conversation's readable measure (`ThreadView.readableWidth`).
+        .frame(maxWidth: 760)
+        .frame(maxWidth: .infinity)
     }
 
     private var canStart: Bool {
@@ -365,6 +392,7 @@ struct NewThreadView: View {
                 return try await client.createThread(
                     projectId: projectId, text: text, attachments: inputs, options: choice, workspace: selectedWorkspace).id
             }, completion: { threadId in
+                if keepsDraft { NewConversationDraft.clear(botId: draftBotId, serverURL: client.baseURL) }
                 dismiss()
                 if let started { started(threadId, botId) } else { app.open(.conversation(threadId)) }
             })
@@ -394,28 +422,64 @@ struct NewThreadView: View {
     }
 }
 
-/// Who the new conversation is with: the Bot's avatar and name, or the open question.
+/// Who the new conversation is with, in the room the composer leaves: the
+/// Bot's avatar and name, or the open question. The bar holds the one
+/// title; where the keyboard and a long message leave too little room, none
+/// of it shows, rather than running under the bar.
 private struct NewConversationGreeting: View {
     let bot: BotSpace?
 
     var body: some View {
+        ViewThatFits(in: .vertical) {
+            greeting
+            Color.clear
+        }
+    }
+
+    private var greeting: some View {
         VStack(spacing: 8) {
-            Spacer()
             if let bot {
                 BotAvatar(BotLook(shape: bot.shape, color: bot.color, emoji: bot.avatar), size: 44)
-                Text("New conversation with \(bot.name)")
-                    .font(.title2.weight(.semibold))
+                Text(bot.name)
+                    .font(.title3.weight(.semibold))
                     .multilineTextAlignment(.center)
-                    .accessibilityIdentifier("newConversationWith")
             } else {
                 Text("What should we work on?")
-                    .font(.title2.weight(.semibold))
+                    .font(.title3.weight(.semibold))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("newConversationWith")
             }
-            Spacer()
         }
+        .padding(.vertical, 16)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(bot.map { "New conversation with \($0.name)" } ?? "What should we work on?")
+        .accessibilityIdentifier("newConversationWith")
+    }
+}
+
+/// The chips over the composer, in one row that scrolls sideways when they
+/// don't fit, inside the composer's margins.
+private struct NewThreadChips<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) { content }
+        }
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+    }
+}
+
+/// Keeps the draft as it changes: the text, and the photos and files by id.
+private struct NewThreadDraftSaving: ViewModifier {
+    let text: String
+    let attachments: [UUID]
+    let save: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: text) { _, _ in save() }
+            .onChange(of: attachments) { _, _ in save() }
     }
 }
 
@@ -439,5 +503,19 @@ private struct NewThreadLoads: ViewModifier {
             .task(id: projectId) { await project() }
             .task(id: defaultsProvider) { await defaults() }
             .task(id: providerId) { await provider() }
+    }
+}
+
+/// New thread over a sheet (Quick capture, a dictation, a recording's
+/// transcript): its own bar, with Cancel. Home pushes `NewThreadView` instead.
+struct NewThreadSheet: View {
+    let text: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            NewThreadView(text: text)
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+        }
     }
 }
