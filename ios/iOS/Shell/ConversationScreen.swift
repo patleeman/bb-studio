@@ -24,7 +24,7 @@ struct ConversationScreen: View {
     @State private var addingTab = false
     @Environment(\.botConversation) private var shell
     @Environment(\.shellPaneAtEdge) private var atEdge
-    @Environment(\.shellSideWidth) private var sideWidth
+    @Environment(\.shellSplit) private var split
     @Environment(\.shellPosture) private var posture
     @EnvironmentObject private var app: AppModel
 
@@ -75,15 +75,15 @@ struct ConversationScreen: View {
         ToolbarItem(placement: .principal) {
             if showsWorkbench {
                 WorkbenchTitleMenu(threadId: threadId, subtitle: title) { addingTab = true }
-            } else if sideWidth > 0 {
-                PaneTitles(title: title, threadId: threadId, side: sideWidth) { addingTab = true }
+            } else if split.side > 0 {
+                PaneTitles(title: title, threadId: threadId, split: split) { addingTab = true }
             } else {
                 Text(title).font(.headline).lineLimit(1).accessibilityAddTraits(.isHeader).accessibilityIdentifier("conversationTitle")
             }
         }
         if !pane {
             ToolbarItem(placement: .topBarTrailing) { workbenchButton }
-        } else if sideWidth > 0 || (workbench.selected(threadId) != nil && !paneChoice.shown(threadId)) {
+        } else if split.side > 0 || (workbench.selected(threadId) != nil && !paneChoice.shown(threadId)) {
             // The pane beside the chat, or hidden by hand: its button. No pane to hide: the tab menu.
             ToolbarItem(placement: .topBarTrailing) { workbenchPaneButton }
         } else {
@@ -151,17 +151,19 @@ struct ConversationScreen: View {
 private struct PaneTitles: View {
     let title: String
     let threadId: String
-    let side: CGFloat
+    let split: ShellSplit
     let newTab: () -> Void
 
     var body: some View {
+        // As wide as the stack: centred in its bar, each title sits over its own page.
         HStack(spacing: 0) {
             Text(title).font(.headline).lineLimit(1).accessibilityAddTraits(.isHeader).accessibilityIdentifier("conversationTitle")
-                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 16)
+                .frame(width: split.conversation)
             WorkbenchTitleMenu(threadId: threadId, subtitle: nil, newTab: newTab)
-                .frame(width: side)
+                .padding(.horizontal, 16)
+                .frame(width: split.side)
         }
-        .frame(maxWidth: .infinity)
     }
 }
 

@@ -37,13 +37,19 @@ extension EnvironmentValues {
     /// A pane beside others whose trailing edge is the window's (`ShellPages`):
     /// the window's trailing inset is really its own there.
     @Entry var shellPaneAtEdge = false
-    /// The Workbench's width beside this screen on the open Duo's stack (`PaneSplit`): the
-    /// stack's bar spans both, and the screen's title centres over its own page.
-    @Entry var shellSideWidth: CGFloat = 0
+    /// This screen's page and the Workbench's beside it on the open Duo's stack
+    /// (`PaneSplit`): the stack's bar spans both, and each gets its title over it.
+    @Entry var shellSplit = ShellSplit()
     /// The window is on the Duo's inner screen (see `ShellGeometry.innerScreen`).
     @Entry var shellInnerScreen = false
     /// Home is over this screen (`ShellPages`): VoiceOver leaves it, its UIKit views too.
     @Entry var shellCovered = false
+}
+
+/// A screen's page and its Workbench's widths on the open Duo's stack; no Workbench: 0.
+struct ShellSplit: Equatable {
+    var conversation: CGFloat = 0
+    var side: CGFloat = 0
 }
 
 enum ShellQA {

@@ -533,7 +533,7 @@ private struct ShellPages: View {
 /// a worker with its Workbench beside it (when it has a tab the phone can
 /// show and isn't hidden by hand), anything else alone. The stack's bar
 /// spans both: the conversation's title is two, its own over its page and
-/// the Workbench's tab menu over the pane (`shellSideWidth`).
+/// the Workbench's tab menu over the pane (`shellSplit`).
 private struct PaneSplit: View {
     let route: Route
     let bot: BotSpace
@@ -561,10 +561,11 @@ private struct PaneSplit: View {
         let side = Self.showsSide(route, workbench: workbench, choice: choice) ? Self.thread(route) : nil
         let split = ShellPanes.split(stack: stack, body: bodySize, side: side != nil)
         HStack(spacing: 0) {
+            // The page fills what the Workbench leaves: the stack's room, whatever its insets.
             ShellDestination(route: route, bot: bot, store: store, pane: true)
-                .frame(width: split.conversation)
+                .frame(maxWidth: .infinity)
                 .environment(\.shellPaneAtEdge, split.side == 0)
-                .environment(\.shellSideWidth, split.side)
+                .environment(\.shellSplit, ShellSplit(conversation: split.conversation, side: split.side))
             if let side, split.side > 0 {
                 ShellSidePane(threadId: side)
                     .id(side)
