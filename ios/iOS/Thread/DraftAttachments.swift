@@ -19,9 +19,11 @@ enum DraftAttachments {
 
     #if DEBUG
     /// An offline demo launch (`-qaBotDemo`) starts with none: UI tests
-    /// share the demo's server, and one test's photo would wait in the next's composer.
+    /// share the demo's server, and one test's photo would wait in the next's
+    /// composer. `-qaKeepDrafts` keeps them, as `Drafts` does.
     private static let demoFresh: Void = {
-        if ProcessInfo.processInfo.arguments.contains("-qaBotDemo") { try? FileManager.default.removeItem(at: root) }
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-qaBotDemo"), !arguments.contains("-qaKeepDrafts") { try? FileManager.default.removeItem(at: root) }
     }()
     #endif
 
