@@ -10,7 +10,8 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
 
     /// `-qaNoSoftDelete`: a Studio without Recently deleted, where Delete is BB's, for good.
     private func launch(_ extra: [String] = []) {
-        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaNoDemoApprovals"] + extra
+        // A longer pause than the app's 2 s, so "Delete waits" isn't a race on a busy machine.
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaNoDemoApprovals", "-qaDeleteArmSeconds", "6"] + extra
         app.launchOffline()
         XCTAssertTrue(home.waitForExistence(timeout: 60), "the app opens on Home")
     }
@@ -171,7 +172,7 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         app.menuItem("Delete conversation…").tap()
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         let armed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: confirm)
-        XCTAssertEqual(XCTWaiter.wait(for: [armed], timeout: 6), .completed, "Delete works after the pause")
+        XCTAssertEqual(XCTWaiter.wait(for: [armed], timeout: 12), .completed, "Delete works after the pause")
         confirm.tap()
         backOnHome("the deleted conversation closes")
         openConversations()
@@ -199,7 +200,7 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         let confirm = app.buttons["confirmDelete"]
         XCTAssertFalse(confirm.isEnabled, "Delete waits before it works")
         let armed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: confirm)
-        XCTAssertEqual(XCTWaiter.wait(for: [armed], timeout: 6), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [armed], timeout: 12), .completed)
         confirm.tap()
         backOnHome("the deleted conversation closes")
         openConversations()
@@ -269,7 +270,7 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "it asks first")
         XCTAssertFalse(confirm.isEnabled, "and waits")
         let armed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: confirm)
-        XCTAssertEqual(XCTWaiter.wait(for: [armed], timeout: 6), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [armed], timeout: 12), .completed)
         confirm.tap()
         XCTAssertTrue(app.descendants(matching: .any)["archive-page"].waitForExistence(timeout: 10), "back on the archive")
         XCTAssertTrue(lisbon.waitForNonExistence(timeout: 10), "without it")

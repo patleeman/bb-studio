@@ -718,10 +718,16 @@ enum BotSpacesDemo {
             return Self.row(id, "assistant", text, Self.now - 60_000, seq: 1)
         }
 
+        /// A Bot's conversation has no parent thread, as in Studio (a thread with one is an agent's); the rest hang off Main.
+        private func parent(of id: String) -> Any {
+            let conversation = id == "thr_demo_kitchen" || conversations.values.contains { list in list.contains { $0.id == id } }
+            return conversation ? NSNull() : BotDemo.threadId
+        }
+
         private func thread(_ id: String) -> [String: Any] {
             lock.withLock {
                 ["id": id, "projectId": "proj_personal", "providerId": "claude-code", "title": threads[id]?.title ?? "Thread",
-                 "status": threads[id]?.status ?? "idle", "createdAt": 1, "updatedAt": Self.now, "parentThreadId": BotDemo.threadId]
+                 "status": threads[id]?.status ?? "idle", "createdAt": 1, "updatedAt": Self.now, "parentThreadId": parent(of: id)]
             }
         }
 

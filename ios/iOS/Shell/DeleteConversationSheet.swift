@@ -19,7 +19,7 @@ struct DeleteConversationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var plan: ConversationDeletePlan?
     @State private var failure: String?
-    @State private var wait = ConversationFinish.deleteArmSeconds
+    @State private var wait = Self.armSeconds
     @FocusState private var cancelFocused: Bool
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -32,8 +32,10 @@ struct DeleteConversationSheet: View {
             .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
             .presentationDragIndicator(.visible)
             .sensoryFeedback(.warning, trigger: armed) { _, now in now }
-            .task { await arm() }
-            .task { await load() }
+            .task {
+                await load()
+                await arm()
+            }
             .onAppear { cancelFocused = true }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("deleteSheet")
@@ -104,7 +106,14 @@ struct DeleteConversationSheet: View {
         }
     }
 
+    /// The pause; UI tests lengthen it (`-qaDeleteArmSeconds`) so a busy machine can't outrun it. Never shorter.
+    private static var armSeconds: Int {
+        max(ConversationFinish.deleteArmSeconds, UserDefaults.standard.integer(forKey: "qaDeleteArmSeconds"))
+    }
+
+    /// Counts down once the message shows: the pause is for reading it.
     private func arm() async {
+        guard plan != nil else { return }
         while wait > 0 {
             try? await Task.sleep(for: .seconds(1))
             if Task.isCancelled { return }
