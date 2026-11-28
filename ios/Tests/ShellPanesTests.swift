@@ -121,4 +121,84 @@ final class ShellPanesTests: XCTestCase {
         pane.layoutChanged()
         XCTAssertFalse(pane.shown(fits: true), "Home hidden by hand stays hidden")
     }
+
+    // MARK: One stack to the trailing edge (round 8: the control strip)
+
+    /// The stack (the conversation and its Workbench) runs from Home's edge to
+    /// the window's in every state, so the system keeps its bar buttons in the
+    /// Duo's control strip: Home beside, hidden or over; the Workbench shown,
+    /// hidden by hand, or with no tab.
+    func testTheStackReachesTheTrailingEdgeInEveryState() {
+        for width in [duo, 1366] {
+            for body in [large, 19] {
+                for side in [true, false] {
+                    for home in [true, false] {
+                        let panes = ShellPanes.make(width: width, body: body, side: side, home: home)
+                        let state = "\(width) at \(body) pt, side \(side), home \(home)"
+                        XCTAssertEqual(panes.home + panes.stack, width, state)
+                        XCTAssertEqual(panes.stack, panes.conversation + panes.side, state)
+                        // Every screen on the stack splits it alike for the same thread.
+                        let split = ShellPanes.split(stack: panes.stack, body: body, side: side)
+                        XCTAssertEqual(split.conversation, panes.conversation, state)
+                        XCTAssertEqual(split.side, panes.side, state)
+                    }
+                }
+            }
+        }
+    }
+
+    /// The Workbench hidden by hand lays out as no tab: the conversation takes
+    /// its room, and Home fits beside it again.
+    func testAHiddenWorkbenchGivesTheConversationTheRoom() {
+        let shown = ShellPanes.make(width: duo, body: large, side: true, home: true)
+        let hidden = ShellPanes.make(width: duo, body: large, side: false, home: true)
+        XCTAssertGreaterThan(shown.side, 0)
+        XCTAssertEqual(hidden.side, 0)
+        XCTAssertGreaterThan(hidden.conversation, shown.conversation)
+        XCTAssertTrue(hidden.homeFits, "Home beside the conversation again")
+        XCTAssertEqual(ShellPanes.make(width: duo, body: large, side: false, home: false).conversation, duo,
+                       "and with Home hidden too, all of it")
+    }
+
+    /// A screen pushed over the conversation splits the stack for its own
+    /// thread: none where both can't be readable in the room it has.
+    func testAPushedScreenSplitsTheStackItself() {
+        let stack = duo - ShellPanes.homeMinimum(body: large)
+        let alone = ShellPanes.split(stack: stack, body: large, side: false)
+        XCTAssertEqual(alone.conversation, stack)
+        XCTAssertEqual(alone.side, 0)
+        let narrow = ShellPanes.conversationMinimum(body: large) + ShellPanes.sideMinimum(body: large) - 1
+        XCTAssertEqual(ShellPanes.split(stack: narrow, body: large, side: true).side, 0, "no squeezed Workbench")
+        let wide = ShellPanes.split(stack: duo, body: large, side: true)
+        XCTAssertEqual(wide.conversation + wide.side, duo)
+        XCTAssertGreaterThanOrEqual(wide.side, ShellPanes.sideMinimum(body: large))
+    }
+
+    @MainActor func testTheWorkbenchChoiceIsRememberedPerConversation() throws {
+        let suite = "ShellPanesTests.workbench"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let choice = WorkbenchPaneChoice(defaults: defaults)
+        XCTAssertTrue(choice.shown("thr_a"), "shown unless hidden")
+        choice.toggle("thr_a")
+        XCTAssertFalse(choice.shown("thr_a"))
+        XCTAssertTrue(choice.shown("thr_b"), "per conversation")
+        XCTAssertFalse(WorkbenchPaneChoice(defaults: defaults).shown("thr_a"), "kept across launches")
+        choice.toggle("thr_a")
+        XCTAssertTrue(choice.shown("thr_a"), "and brought back")
+        XCTAssertTrue(WorkbenchPaneChoice(defaults: defaults).shown("thr_a"))
+
+        choice.toggle("thr_a")
+        choice.show("thr_a")
+        XCTAssertTrue(choice.shown("thr_a"), "a tab you open yourself shows the pane again")
+        choice.show("thr_a")
+        XCTAssertTrue(choice.shown("thr_a"), "and showing a shown pane keeps it shown")
+
+        for n in 0...WorkbenchPaneChoice.kept { choice.toggle("thr_\(n)") }
+        XCTAssertEqual(choice.hidden.count, WorkbenchPaneChoice.kept, "a bounded list")
+        XCTAssertTrue(choice.shown("thr_0"), "the oldest choice goes first")
+        XCTAssertFalse(choice.shown("thr_\(WorkbenchPaneChoice.kept)"))
+    }
 }

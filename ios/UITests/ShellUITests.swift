@@ -17,7 +17,7 @@ final class ShellUITests: ServerIsolatedUITestCase {
     }
 
     private func launchConversation(_ extra: [String] = []) {
-        launch(["-qaConversation", "thr_botdemo01"] + extra)
+        launch(["-qaConversation", "thr_botdemo01", "-qaForgetWorkbenchPanes"] + extra)
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "the conversation")
     }
 

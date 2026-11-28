@@ -1093,11 +1093,11 @@ struct ThreadView: View {
         }
     }
 
-    /// The composer's status line: working and for how long, and the queue.
+    /// The composer's status line: working and for how long, background work, and the queue.
     private var composerStatus: ComposerStatus? {
         ComposerStatus(running: model.thread?.isRunning == true && !isWorker,
                        since: model.rows.last { $0.isConversation && $0.isUser }?.createdAt,
-                       queued: model.queued.count)
+                       queued: model.queued.count, background: model.shelf.background)
     }
 
     /// A Bot conversation's lasting states, as chips in the composer's top row.
@@ -1105,7 +1105,7 @@ struct ThreadView: View {
         guard let conversation else { return [] }
         return ComposerChip.chips(
             pause: conversation.botPause, planning: model.shelf.isPlanning, goal: model.shelf.goal?.objective,
-            todos: model.shelf.todos, background: model.shelf.background.count,
+            todos: model.shelf.todos,
             note: notes.note != nil && !editing, editing: editing, permission: editing ? nil : pendingPermission,
             handingOff: handoffStatus?.working == true)
     }
@@ -1127,7 +1127,7 @@ struct ThreadView: View {
         case .todos: showingTodos = true
         case .notes: if let note = notes.note { notes.editing = note }
         case .permission: choosingModel = true
-        case .editing, .background, .handingOff: break
+        case .editing, .handingOff: break
         }
     }
 

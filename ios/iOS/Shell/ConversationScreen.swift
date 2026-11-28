@@ -8,10 +8,11 @@ import SwiftUI
 /// a sideways swipe flips Chat and Workbench.
 ///
 /// Beside two pages (`pane`, the open Duo) the chat is alone: the Workbench
-/// is the side pane's, its tab's actions first in ⋯, and Home's button is
-/// the bar's first (`ShellPages`).
-/// Where the side pane is hidden (no tab the phone can show) the tab menu
-/// takes the Workbench button's place.
+/// is the side pane's, its tab's actions first in ⋯, and the Workbench
+/// button hides or shows that pane, remembered per conversation
+/// (`WorkbenchPaneChoice`). With no tab the phone can show there is no pane:
+/// the tab menu takes the button's place. Home's button and New are the
+/// stack's (`ShellPages`); the system puts them all in the control strip.
 struct ConversationScreen: View {
     let threadId: String
     var pane = false
@@ -19,9 +20,11 @@ struct ConversationScreen: View {
     @ObservedObject private var model: ThreadModel
     @ObservedObject private var router = Router.shared
     @State private var workbench = WorkbenchStore.shared
+    @State private var paneChoice = WorkbenchPaneChoice.shared
     @State private var addingTab = false
     @Environment(\.botConversation) private var shell
     @Environment(\.shellPaneAtEdge) private var atEdge
+    @Environment(\.shellSplit) private var split
     @Environment(\.shellPosture) private var posture
     @EnvironmentObject private var app: AppModel
 
@@ -54,7 +57,8 @@ struct ConversationScreen: View {
             // composer at the bottom, no tab bar under it. The Duo keeps the system's column.
             .toolbar(posture == .phone ? .hidden : .automatic, for: .tabBar)
             .sensoryFeedback(.selection, trigger: session.showsWorkbench)
-            .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
+            // A tab you add yourself is one you want to see: the pane comes back if you hid it.
+            .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) { paneChoice.show(threadId) } }
             .task(id: threadId) {
                 // A conversation is the one on screen (the open Duo's column); a worker or reply pushed over it isn't.
                 if shell?.threadId == threadId, shell?.kind == .conversation { router.shown(threadId) }
@@ -72,13 +76,18 @@ struct ConversationScreen: View {
         ToolbarItem(placement: .principal) {
             if showsWorkbench {
                 WorkbenchTitleMenu(threadId: threadId, subtitle: title) { addingTab = true }
+            } else if split.side > 0 {
+                PaneTitles(title: title, threadId: threadId, split: split) { addingTab = true }
             } else {
                 Text(title).font(.headline).lineLimit(1).accessibilityAddTraits(.isHeader).accessibilityIdentifier("conversationTitle")
             }
         }
         if !pane {
             ToolbarItem(placement: .topBarTrailing) { workbenchButton }
-        } else if atEdge {
+        } else if split.side > 0 || (workbench.selected(threadId) != nil && !paneChoice.shown(threadId)) {
+            // The pane beside the chat, or hidden by hand: its button. No pane to hide: the tab menu.
+            ToolbarItem(placement: .topBarTrailing) { workbenchPaneButton }
+        } else {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu { WorkbenchTabMenuItems(threadId: threadId) { addingTab = true } } label: {
                     Label(Self.tabs(workbench.count(threadId)), systemImage: "rectangle.split.2x1")
@@ -104,6 +113,17 @@ struct ConversationScreen: View {
         .accessibilityIdentifier("workbenchButton")
     }
 
+    /// Beside two pages: the Workbench pane beside the chat, hidden or shown again.
+    private var workbenchPaneButton: some View {
+        let shown = paneChoice.shown(threadId)
+        return Button { withAnimation(.snappy(duration: 0.25)) { paneChoice.toggle(threadId) } } label: {
+            Label(shown ? "Hide Workbench" : Self.tabs(workbench.count(threadId)), systemImage: "rectangle.split.2x1")
+                .symbolVariant(shown ? .fill : .none)
+        }
+        .sensoryFeedback(.selection, trigger: shown)
+        .accessibilityIdentifier("workbenchButton")
+    }
+
     // MARK: The Workbench in the chat's place
 
     private var workbenchView: some View {
@@ -123,6 +143,28 @@ struct ConversationScreen: View {
     private func flip(to workbench: Bool) {
         guard session.showsWorkbench != workbench else { return }
         withAnimation(.snappy(duration: 0.25)) { session.showsWorkbench = workbench }
+    }
+}
+
+/// The bar's title on the open Duo with the Workbench beside the chat (the
+/// stack's bar spans both): the chat's title over its page, the shown tab's
+/// over the Workbench, which opens the tab menu.
+private struct PaneTitles: View {
+    let title: String
+    let threadId: String
+    let split: ShellSplit
+    let newTab: () -> Void
+
+    var body: some View {
+        // As wide as the stack: centred in its bar, each title sits over its own page.
+        HStack(spacing: 0) {
+            Text(title).font(.headline).lineLimit(1).accessibilityAddTraits(.isHeader).accessibilityIdentifier("conversationTitle")
+                .padding(.horizontal, 16)
+                .frame(width: split.conversation)
+            WorkbenchTitleMenu(threadId: threadId, subtitle: nil, newTab: newTab)
+                .padding(.horizontal, 16)
+                .frame(width: split.side)
+        }
     }
 }
 

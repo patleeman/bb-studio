@@ -151,6 +151,8 @@ struct WorkbenchTabMenuItems: View {
 /// New tab: a Studio item, found by name, opened in this conversation's Workbench.
 struct WorkbenchNewTab: View {
     let threadId: String
+    /// After the tab opened: the open Duo shows a Workbench hidden by hand again.
+    var opened: () -> Void = {}
     @State private var query = ""
     @State private var found: [Studio.SearchAllOutputItem] = []
     @Environment(\.dismiss) private var dismiss
@@ -163,6 +165,7 @@ struct WorkbenchNewTab: View {
                 Button {
                     if let ref = Self.ref(item) {
                         WorkbenchStore.shared.open(ref, title: item.title ?? "Untitled", in: threadId)
+                        opened()
                         dismiss()
                     }
                 } label: {

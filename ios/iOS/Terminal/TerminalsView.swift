@@ -40,7 +40,7 @@ struct TerminalsView: View {
                 ProgressView().frame(maxWidth: .infinity)
             }
         }
-        .navigationTitle(title)
+        .screenTitle(title)
         .navigationDestination(item: $opening) { TerminalScreen(terminalId: $0) }
         .refreshable { await load() }
         .task { await load() }
