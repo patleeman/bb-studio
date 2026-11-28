@@ -5,6 +5,7 @@ import type { Automations } from "../automations";
 import { EXTERNAL_AGENTS_PLUGIN_ID, type Bots } from "../bot";
 import type { BotCacheWarmer } from "../bot-cache";
 import type { registerBotFinish } from "../bot-finish";
+import type { registerBotTrash } from "../bot-trash";
 import type { BotMaintenance } from "../bot-maintenance";
 import type { BotNudges } from "../bot-nudge";
 import type { BotOwnedThreads } from "../bot-owned";
@@ -64,6 +65,7 @@ export interface StudioRpcDeps {
   bots: Bots;
   botThreads: ReturnType<typeof registerBotThreads>;
   botFinish: ReturnType<typeof registerBotFinish>;
+  botTrash: ReturnType<typeof registerBotTrash>;
   nudges: BotNudges;
   ownedThreads: BotOwnedThreads;
   sideThreads: SideThreads;
@@ -121,6 +123,7 @@ export function registerStudioRpc({
   bots,
   botThreads,
   botFinish,
+  botTrash,
   nudges,
   ownedThreads,
   sideThreads,
@@ -258,9 +261,10 @@ export function registerStudioRpc({
       return projectLeads.get(projectId);
     },
     bot_list: () => ({ bots: bots.list() }),
-    // One Bot, many conversations (src/bot-threads-server.ts) and Finish (src/bot-finish.ts).
+    // One Bot, many conversations (src/bot-threads-server.ts), Finish (src/bot-finish.ts) and Recently deleted (src/bot-trash.ts).
     ...botThreads.rpc,
     ...botFinish.rpc,
+    ...botTrash.rpc,
     // A worker's approval as a card in its conversation (src/worker-approvals.ts).
     ...workerApprovalRpc({
       sdk: bb.sdk as never,

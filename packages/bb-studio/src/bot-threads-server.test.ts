@@ -508,3 +508,26 @@ it("lets a new thread still waiting on BB end quietly when Studio reloads: nothi
     process.off("unhandledRejection", onUnhandled);
   }
 });
+
+it("leaves a conversation in Recently deleted, and its workers, out of every list", async () => {
+  const { server, bb } = await setup();
+  bb.storage.database().prepare("INSERT INTO bot_deleted (thread_id, bot_id, title, deleted_at, purge_at, was_archived, archived_ids, workers) VALUES ('redesign', 'dot', 'Fork redesign', 1, 2, 0, '[]', 2)").run();
+  const view = await server.rpc.bot_threads_view({});
+  expect(view.conversations.map((each) => each.threadId)).toEqual(["thr_main"]);
+  expect(view.workers).toEqual([]);
+  const page = await server.rpc.bot_conversations_all({});
+  expect(page.conversations.map((each) => each.threadId)).toEqual(["thr_main"]);
+  expect(page.workers).toEqual([]);
+  expect((await server.rpc.bot_conversations_search({ query: "redesign" })).hits).toEqual([]);
+});
+
+it("a listed fork doesn't bring a deleted conversation back into Archive", async () => {
+  const { server, bb } = await setup();
+  const db = bb.storage.database();
+  db.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, source, created_at, updated_at, archived_at, finished_summary) VALUES ('gone', 'dot', 'conversation', 0, 'created', 1, 1, 70, 'Done.')").run();
+  db.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, forked_from_thread_id, forked_from_message_id, source, created_at, updated_at) VALUES ('kid', 'dot', 'conversation', 0, 'gone', 'msg_1', 'created', 2, 2)").run();
+  db.prepare("INSERT INTO bot_deleted (thread_id, bot_id, title, deleted_at, purge_at, was_archived, archived_ids, workers) VALUES ('gone', 'dot', 'Gone', 1, 2, 1, '[]', 0)").run();
+  const older = await server.rpc.bot_threads_older({});
+  expect(older.finished.map((each) => each.threadId)).not.toContain("gone");
+  expect((await server.rpc.bot_summaries({})).summaries.map((each) => each.threadId)).not.toContain("gone");
+});

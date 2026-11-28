@@ -143,6 +143,7 @@ import { ThreadSeeds } from "./src/thread-seeds";
 import { MoveHandoffs } from "./src/provider-move/handoff";
 import { moveProviderContract } from "./src/provider-move/contract";
 import { registerBotFinish } from "./src/bot-finish";
+import { registerBotTrash, TRASH_PURGE_EVERY_MS } from "./src/bot-trash";
 import { askModel } from "./src/kit/decisions";
 import type { ModelSelection } from "./src/decisions/contract";
 import { studioInstructions } from "./src/agent-instructions";
@@ -1387,6 +1388,15 @@ export default async function plugin(bb: BbPluginApi) {
   triggers.every("bot-threads", 2 * 60_000, () => botThreads.reconcile());
   triggers.every("mirror-catch-up", 60_000, () => void botThreads.catchUp().catch((error) => { if (!disposed) bb.log.warn(`Mirrored threads catch-up: ${errorText(error)}`); }));
   triggers.every("bot-finish", 60_000, () => botFinish.finish.sweep());
+  // Recently deleted (src/bot-trash.ts): the phone's deletes, kept 30 days, then deleted in BB.
+  const botTrash = registerBotTrash(bb, {
+    db, threads: botThreads.store, botOrCurrent: (botId) => botThreads.botOrCurrent(botId),
+    isBotThread: (threadId) => bots.list().some((bot) => bots.chain(bot.id).includes(threadId)),
+    isFinishing: (threadId) => botFinish.finish.state(threadId) === "finishing",
+    changed: botThreadsChanged,
+    log: (message) => bb.log.warn(message),
+  });
+  triggers.every("bot-trash", TRASH_PURGE_EVERY_MS, () => botTrash.trash.purge());
   /** A Studio bot's id for its learning settings (the primary without one). */
   const pageState = new BotPageState(db);
   const pageBotId = (botId?: string) => { const bot = bots.stored(botId); if (!bot) throw new Error(botId ? `No Bot "${botId}".` : "Make your Bot first."); return bot.id; };
@@ -1605,6 +1615,7 @@ export default async function plugin(bb: BbPluginApi) {
     bots,
     botThreads,
     botFinish,
+    botTrash,
     nudges,
     ownedThreads,
     sideThreads,

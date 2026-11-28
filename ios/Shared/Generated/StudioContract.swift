@@ -181,6 +181,10 @@ public enum Studio {
     public static let bot_conversation_start = "bot_conversation_start"
     public static let bot_ask = "bot_ask"
     public static let bot_reopen = "bot_reopen"
+    public static let bot_delete_preview = "bot_delete_preview"
+    public static let bot_delete = "bot_delete"
+    public static let bot_restore = "bot_restore"
+    public static let bot_deleted = "bot_deleted"
     public static let bot_finished = "bot_finished"
     public static let bot_library = "bot_library"
     public static let themes_list = "themes_list"
@@ -794,6 +798,14 @@ public enum Studio {
   public typealias BotAsk = BotAskOutput
 
   public typealias BotReopen = BotReopenOutput
+
+  public typealias BotDeletePreview = BotDeletePreviewOutput
+
+  public typealias BotDelete = BotDeleteOutput
+
+  public typealias BotRestore = BotRestoreOutput
+
+  public typealias BotDeleted = BotDeletedOutput
 
   public typealias BotFinished = BotFinishedOutput
 
@@ -18468,6 +18480,112 @@ public enum Studio {
 
     public init(ok: Bool? = nil) {
       self.ok = ok
+    }
+  }
+
+  public struct BotDeletePreviewInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotDeletePreviewOutput: Sendable, Hashable, Codable {
+    public var workers: Int?
+    public var keepDays: Int?
+
+    public init(workers: Int? = nil, keepDays: Int? = nil) {
+      self.workers = workers
+      self.keepDays = keepDays
+    }
+  }
+
+  public struct BotDeleteInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotDeleteOutputDeleted: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var botId: String?
+    public var title: String?
+    public var deletedAt: Double?
+    public var purgeAt: Double?
+    public var workers: Int?
+
+    public init(threadId: String? = nil, botId: String? = nil, title: String? = nil, deletedAt: Double? = nil, purgeAt: Double? = nil, workers: Int? = nil) {
+      self.threadId = threadId
+      self.botId = botId
+      self.title = title
+      self.deletedAt = deletedAt
+      self.purgeAt = purgeAt
+      self.workers = workers
+    }
+  }
+
+  public struct BotDeleteOutput: Sendable, Hashable, Codable {
+    public var deleted: BotDeleteOutputDeleted?
+
+    public init(deleted: BotDeleteOutputDeleted? = nil) {
+      self.deleted = deleted
+    }
+  }
+
+  public struct BotRestoreInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotRestoreOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct BotDeletedInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct BotDeletedOutputConversationsItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var botId: String?
+    public var title: String?
+    public var deletedAt: Double?
+    public var purgeAt: Double?
+    public var workers: Int?
+
+    public init(threadId: String? = nil, botId: String? = nil, title: String? = nil, deletedAt: Double? = nil, purgeAt: Double? = nil, workers: Int? = nil) {
+      self.threadId = threadId
+      self.botId = botId
+      self.title = title
+      self.deletedAt = deletedAt
+      self.purgeAt = purgeAt
+      self.workers = workers
+    }
+  }
+
+  public struct BotDeletedOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var keepDays: Int?
+    public var conversations: [BotDeletedOutputConversationsItem]?
+
+    public init(botId: String? = nil, keepDays: Int? = nil, conversations: [BotDeletedOutputConversationsItem]? = nil) {
+      self.botId = botId
+      self.keepDays = keepDays
+      self.conversations = conversations
     }
   }
 

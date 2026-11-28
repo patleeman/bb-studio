@@ -503,6 +503,31 @@ read-only: "✓ Archived on <date>. Read-only." with **Reopen** where the
 composer goes (back in the sidebar, unarchived in BB; the summary stays).
 These conversations are kept indefinitely: nothing cleans them up.
 
+### Recently deleted
+
+Deleting a conversation through Studio (the iOS app's **Delete
+conversation…**) is soft (`src/bot-trash.ts`): Studio records it in
+`bot_deleted` with the threads it is about to archive, archives it in
+Studio, then archives it and every thread below it (hidden ones too) in BB,
+with no summary step. No list shows it or its workers (the sidebar,
+Archive, History, search). The phone's Archive has a **Recently deleted**
+section that restores it as it was: owners are unarchived before what they
+own, a finished conversation goes back to the archive with the threads it
+owns, and a thread BB deleted meanwhile counts as done. If BB fails, the
+conversation stays listed and Restore can be tried again.
+
+Unarchiving it in BB any other way (the desktop, the CLI, Reopen) calls
+the delete off: it leaves the list and is never purged. Every hour the
+`bot-trash` trigger deletes in BB, for good and with its child threads, a
+conversation past its 30 days only while BB still has the delete's own
+archive (the same `archivedAt`, kept in `bb_archived_at`); when BB can't
+answer it skips, and each decision is logged. Main, a Bot's own threads, a
+working conversation and one being archived can't be deleted. The phone
+uses BB's own delete, for good, only when Studio has no
+`bot_delete_preview` (a 404); Studio not running is an error, never a
+permanent delete. BB's own Delete (the desktop's menus) is still
+immediate.
+
 ### The Bot sidebar
 
 Choose **Bot (Studio)** (`studio/everything`) in Settings → Appearance or
@@ -1492,6 +1517,15 @@ once, since signals sent while the socket was down are lost.
   an archived conversation and one that is working.
 - `bot_reopen({ threadId })` → `{ ok }`: a finished conversation back in the
   sidebar, unarchived in BB; its summary stays.
+- `bot_delete_preview({ threadId })` → `{ workers, keepDays }`: what the
+  delete confirm says (the threads that go with it, the days it is kept).
+  Refused for Main and a worker. The phone feature-detects soft delete with
+  it (see Recently deleted).
+- `bot_delete({ threadId })` → `{ deleted: { threadId, botId, title,
+  deletedAt, purgeAt, workers } }`: deletes a conversation softly.
+- `bot_restore({ threadId })` → `{ ok }`: back as it was before the delete.
+- `bot_deleted({ botId? })` → `{ botId, keepDays, conversations: Deleted[] }`:
+  the Bot's Recently deleted, newest first.
 - `bot_finished({ threadId })` → `{ finished: { threadId, botId, title,
   summary, startedAt, finishedAt, records, memoryHref, archived } | null }`:
   what Main's card shows; `records` is always 0 now (memory records are

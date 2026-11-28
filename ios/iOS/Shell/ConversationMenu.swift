@@ -70,11 +70,27 @@ struct ConversationMenuItems: View {
                 }
                 .disabled(session.finishing)
                 .accessibilityIdentifier("menuArchive")
+            }
+        }
+        if canDelete {
+            // Last, on its own: it asks again, with a pause, before it deletes.
+            Section {
                 Button(role: .destructive) { session.run(.delete) } label: { Label("Delete conversation…", systemImage: "trash") }
                     .disabled(session.finishing)
                     .accessibilityIdentifier("menuDelete")
             }
         }
+    }
+
+    /// Any of the Bot's conversations but Main, listed or not (an archived or
+    /// older one too, so none is undeletable), and not while it works. A
+    /// worker has a parent thread; it goes with its conversation.
+    private var canDelete: Bool {
+        guard let conversation, conversation.threadId == session.threadId, conversation.kind == .conversation,
+              let main = conversation.mainThreadId, main != session.threadId else { return false }
+        if let listed = conversation.conversation { return ConversationFinish.canRemove(listed, running: model.thread?.isRunning == true) }
+        guard let thread = model.thread else { return false }
+        return thread.parentThreadId == nil && !thread.isRunning
     }
 
     private func item(_ title: String, _ symbol: String, _ command: ConversationCommand, id: String) -> some View {

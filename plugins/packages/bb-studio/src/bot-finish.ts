@@ -31,6 +31,7 @@ import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { BotThreads, ThreadFacts } from "./bot-threads";
 import type { BotChange } from "./bot-signal";
+import { archivedByTrash } from "./bot-trash";
 import { memoryPath } from "./memory/shared";
 
 type Sdk = BbPluginApi["sdk"];
@@ -189,7 +190,7 @@ export class BotFinish {
   }
 
   async archived(threadId: string): Promise<void> {
-    if (quietArchives.delete(threadId)) return;
+    if (quietArchives.delete(threadId) || archivedByTrash(this.deps.db, threadId)) return;
     const rec = this.deps.threads.get(threadId);
     if (!rec || rec.kind !== "conversation" || rec.isMain || this.deps.isBotThread?.(threadId)) return;
     const state = this.state(threadId);

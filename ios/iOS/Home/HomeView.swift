@@ -12,7 +12,6 @@ struct HomeView: View {
     @ObservedObject private var router = Router.shared
     @EnvironmentObject private var app: AppModel
     @State private var removed: Set<String> = []
-    @State private var deleting: BotConversation?
     @StateObject private var projects = HomeProjects()
     @State private var projectsOpen = false
     @Environment(\.look) private var look
@@ -40,14 +39,6 @@ struct HomeView: View {
             if projectsOpen && !projects.loaded { await loadProjects() }
         }
         .onChange(of: view?.conversations.map(\.threadId)) { _, ids in removed.formIntersection(ids ?? []) }
-        .alert(ConversationFinish.deleteTitle(deleting?.title ?? ""),
-               isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { conversation in
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) { remove(conversation.threadId, delete: true) }
-                .accessibilityIdentifier("confirmDelete")
-        } message: { _ in
-            Text(ConversationFinish.deleteMessage)
-        }
         .accessibilityIdentifier("home")
     }
 
@@ -58,8 +49,8 @@ struct HomeView: View {
             ForEach(lines) { line in
                 HomeConversationRow(line: line, nest: nests.nests[line.threadId], current: line.threadId == router.conversation,
                                     open: open)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) { removeActions(line.threadId, swipe: true) }
-                    .contextMenu { removeActions(line.threadId, swipe: false) }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) { archiveAction(line.threadId) }
+                    .contextMenu { archiveAction(line.threadId) }
             }
             if let other = nests.other, !other.nodes.isEmpty {
                 HomeWorkerLines(nest: other, parent: "other", open: open)
@@ -91,31 +82,26 @@ struct HomeView: View {
         router.open(item: item)
     }
 
-    @ViewBuilder private func removeActions(_ threadId: String, swipe: Bool) -> some View {
+    /// Archive is the row's one action, behind a swipe or a long press. Delete
+    /// is only in the conversation's ⋯ menu, behind a confirm with a pause.
+    @ViewBuilder private func archiveAction(_ threadId: String) -> some View {
         if let conversation = view?.conversations.first(where: { $0.threadId == threadId }), ConversationFinish.canRemove(conversation) {
-            Button { remove(threadId, delete: false) } label: { Label("Archive", systemImage: "archivebox") }
+            Button { archive(threadId) } label: { Label("Archive", systemImage: "archivebox") }
                 .tint(.indigo)
                 .accessibilityIdentifier("homeArchive-\(threadId)")
-            Button(role: swipe ? nil : .destructive) { deleting = conversation } label: { Label("Delete", systemImage: "trash") }
-                .tint(.red)
-                .accessibilityIdentifier("homeDelete-\(threadId)")
         }
     }
 
-    private func remove(_ threadId: String, delete: Bool) {
+    private func archive(_ threadId: String) {
         withAnimation(.snappy) { _ = removed.insert(threadId) }
         let client = app.client
         Task {
             do {
-                if delete {
-                    try await client.delete(threadId, withChildren: true)
-                } else {
-                    try await client.finishConversation(threadId: threadId)
-                }
+                try await client.finishConversation(threadId: threadId)
                 await store.refresh()
             } catch {
                 withAnimation(.snappy) { _ = removed.remove(threadId) }
-                app.flash((delete ? "It didn't delete: " : "It didn't archive: ") + BBClient.describe(error, server: client.baseURL))
+                app.flash("It didn't archive: " + BBClient.describe(error, server: client.baseURL))
             }
         }
     }
