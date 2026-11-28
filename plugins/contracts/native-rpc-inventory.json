@@ -100,6 +100,12 @@
     {
       "file": "ios/Shared/BBClient+NewSurfaces.swift",
       "plugin": "studio",
+      "method": "drawings.newWhiteboardPage",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
       "method": "recordings.recording_get",
       "coverage": "generated method"
     },
