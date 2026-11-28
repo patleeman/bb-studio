@@ -3,7 +3,9 @@ import SwiftUI
 /// A conversation (or any thread) on a stack, under its native bar: the
 /// system's Back, the title, the Workbench button (the tab count in its
 /// label: SwiftUI's toolbar items take no badge), and ⋯
-/// (round 8). The Workbench shows in the chat's place with the composer
+/// (round 8). A long press on the Workbench button opens the Workbench
+/// menu: the tabs, the desktop's New page, New whiteboard, New design, New
+/// app, Open link and New tab…; what it adds opens shown. The Workbench shows in the chat's place with the composer
 /// kept; its title is then the tab, which opens the tab menu. The button or
 /// a sideways swipe flips Chat and Workbench.
 ///
@@ -21,7 +23,7 @@ struct ConversationScreen: View {
     @ObservedObject private var router = Router.shared
     @State private var workbench = WorkbenchStore.shared
     @State private var paneChoice = WorkbenchPaneChoice.shared
-    @State private var addingTab = false
+    @State private var adding: WorkbenchAdd?
     @Environment(\.botConversation) private var shell
     @Environment(\.shellPaneAtEdge) private var atEdge
     @Environment(\.shellSplit) private var split
@@ -57,8 +59,8 @@ struct ConversationScreen: View {
             // composer at the bottom, no tab bar under it. The Duo keeps the system's column.
             .toolbar(posture == .phone ? .hidden : .automatic, for: .tabBar)
             .sensoryFeedback(.selection, trigger: session.showsWorkbench)
-            // A tab you add yourself is one you want to see: the pane comes back if you hid it.
-            .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) { paneChoice.show(threadId) } }
+            // A tab you add yourself is one you want to see: the Workbench comes into view.
+            .workbenchAdding(threadId, projectId: model.thread?.projectId, request: $adding, reveal: reveal)
             .task(id: threadId) {
                 // A conversation is the one on screen (the open Duo's column); a worker or reply pushed over it isn't.
                 if shell?.threadId == threadId, shell?.kind == .conversation { router.shown(threadId) }
@@ -75,9 +77,9 @@ struct ConversationScreen: View {
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .principal) {
             if showsWorkbench {
-                WorkbenchTitleMenu(threadId: threadId, subtitle: title) { addingTab = true }
+                WorkbenchTitleMenu(threadId: threadId, subtitle: title) { adding = $0 }
             } else if split.side > 0 {
-                PaneTitles(title: title, threadId: threadId, split: split) { addingTab = true }
+                PaneTitles(title: title, threadId: threadId, split: split) { adding = $0 }
             } else {
                 Text(title).font(.headline).lineLimit(1).accessibilityAddTraits(.isHeader).accessibilityIdentifier("conversationTitle")
             }
@@ -89,7 +91,7 @@ struct ConversationScreen: View {
             ToolbarItem(placement: .topBarTrailing) { workbenchPaneButton }
         } else {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu { WorkbenchTabMenuItems(threadId: threadId) { addingTab = true } } label: {
+                Menu { WorkbenchTabMenuItems(threadId: threadId) { adding = $0 } } label: {
                     Label(Self.tabs(workbench.count(threadId)), systemImage: "rectangle.split.2x1")
                 }
                 .menuOrder(.fixed)
@@ -105,29 +107,43 @@ struct ConversationScreen: View {
         }
     }
 
-    @ViewBuilder private var workbenchButton: some View {
+    /// A tap flips Chat and Workbench; a long press opens the Workbench menu.
+    private var workbenchButton: some View {
         let count = workbench.count(threadId)
-        Button { flip(to: !showsWorkbench) } label: {
+        return Menu { WorkbenchTabMenuItems(threadId: threadId) { adding = $0 } } label: {
             Label(showsWorkbench ? "Show chat" : Self.tabs(count), systemImage: showsWorkbench ? "bubble.left" : "rectangle.split.2x1")
+        } primaryAction: {
+            flip(to: !showsWorkbench)
         }
+        .menuOrder(.fixed)
         .accessibilityIdentifier("workbenchButton")
     }
 
-    /// Beside two pages: the Workbench pane beside the chat, hidden or shown again.
+    /// Beside two pages: a tap hides the Workbench pane beside the chat, or
+    /// shows it again; a long press opens the Workbench menu.
     private var workbenchPaneButton: some View {
         let shown = paneChoice.shown(threadId)
-        return Button { withAnimation(.snappy(duration: 0.25)) { paneChoice.toggle(threadId) } } label: {
+        return Menu { WorkbenchTabMenuItems(threadId: threadId) { adding = $0 } } label: {
             Label(shown ? "Hide Workbench" : Self.tabs(workbench.count(threadId)), systemImage: "rectangle.split.2x1")
                 .symbolVariant(shown ? .fill : .none)
+        } primaryAction: {
+            withAnimation(.snappy(duration: 0.25)) { paneChoice.toggle(threadId) }
         }
+        .menuOrder(.fixed)
         .sensoryFeedback(.selection, trigger: shown)
         .accessibilityIdentifier("workbenchButton")
+    }
+
+    /// After the menu added a tab: the Workbench in the chat's place, or its pane beside two pages.
+    private func reveal() {
+        if pane { paneChoice.show(threadId) } else { flip(to: true) }
     }
 
     // MARK: The Workbench in the chat's place
 
     private var workbenchView: some View {
         WorkbenchView(threadId: threadId, webURL: model.thread.map { app.client.webURL(forThread: $0) },
+                      projectId: model.thread?.projectId,
                       openThread: { router.push(.thread(id: $0)) },
                       actionsChanged: { if session.tabActions != $0 { session.tabActions = $0 } })
             .simultaneousGesture(DragGesture(minimumDistance: 30).onEnded { drag in
@@ -153,7 +169,7 @@ private struct PaneTitles: View {
     let title: String
     let threadId: String
     let split: ShellSplit
-    let newTab: () -> Void
+    let add: (WorkbenchAdd) -> Void
 
     var body: some View {
         // As wide as the stack: centred in its bar, each title sits over its own page.
@@ -161,7 +177,7 @@ private struct PaneTitles: View {
             Text(title).font(.headline).lineLimit(1).accessibilityAddTraits(.isHeader).accessibilityIdentifier("conversationTitle")
                 .padding(.horizontal, 16)
                 .frame(width: split.conversation)
-            WorkbenchTitleMenu(threadId: threadId, subtitle: nil, newTab: newTab)
+            WorkbenchTitleMenu(threadId: threadId, subtitle: nil, add: add)
                 .padding(.horizontal, 16)
                 .frame(width: split.side)
         }
@@ -173,12 +189,12 @@ private struct PaneTitles: View {
 struct WorkbenchTitleMenu: View {
     let threadId: String
     let subtitle: String?
-    let newTab: () -> Void
+    let add: (WorkbenchAdd) -> Void
     @State private var workbench = WorkbenchStore.shared
 
     var body: some View {
         let tab = workbench.selected(threadId)
-        Menu { WorkbenchTabMenuItems(threadId: threadId, newTab: newTab) } label: {
+        Menu { WorkbenchTabMenuItems(threadId: threadId, add: add) } label: {
             VStack(spacing: 0) {
                 HStack(spacing: 4) {
                     Text(tab?.title ?? "Workbench").font(.headline).lineLimit(1)
