@@ -12,6 +12,9 @@
 # deletes it on exit. When BB_TEST_SIMULATOR_ID is unset, it creates a private
 # throwaway iPhone simulator and deletes it on exit.
 #
+# STAGED_SCHEME and STAGED_CONFIGURATION pick another scheme or build
+# configuration (scripts/test-release-launch.sh: BBStudioUITests, Release).
+#
 # Never touches ~/.bb-studio, ~/.bb, or the live BB port.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -41,7 +44,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help|-h)
-      sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
@@ -55,6 +58,8 @@ if [[ ${#suites[@]} -eq 0 ]]; then
 fi
 
 derived="${STAGED_DERIVED_DATA:-build/staged/DerivedData}"
+scheme="${STAGED_SCHEME:-BBStudio}"
+configuration="${STAGED_CONFIGURATION:-Debug}"
 result_bundle="${STAGED_XCRESULT:-build/staged/staged-ui.xcresult}"
 server="${TEST_RUNNER_BBGO_QA_SERVER:-${BBGO_QA_SERVER:-}}"
 mini_ids="${TEST_RUNNER_BBGO_QA_MINI_IDS:-${BBGO_QA_MINI_IDS:-}}"
@@ -157,7 +162,7 @@ done
 
 if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
   xcodegen generate -q
-  xcodebuild build-for-testing -scheme BBStudio -destination "id=$device_id" \
+  xcodebuild build-for-testing -scheme "$scheme" -configuration "$configuration" -destination "id=$device_id" \
     -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -quiet
 fi
 
@@ -177,8 +182,8 @@ env TEST_RUNNER_BBGO_QA_SERVER="$server" \
     TEST_RUNNER_BBGO_QA_SENT_THREAD="${qa_sent_thread:-${TEST_RUNNER_BBGO_QA_SENT_THREAD:-}}" \
     TEST_RUNNER_BBGO_QA_PAGE="${qa_page:-${TEST_RUNNER_BBGO_QA_PAGE:-}}" \
     TEST_RUNNER_BBGO_QA_RECORDING="${qa_recording:-${TEST_RUNNER_BBGO_QA_RECORDING:-}}" \
-    xcodebuild test-without-building -scheme BBStudio -destination "id=$device_id" \
-    -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -test-timeouts-enabled YES \
+    xcodebuild test-without-building -scheme "$scheme" -configuration "$configuration" -destination "id=$device_id" \
+    -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 \
     -resultBundlePath "$result_bundle" \
     "${only[@]}" ${extra_args[@]+"${extra_args[@]}"}
 status=$?

@@ -28,6 +28,9 @@ targets:
       - name: Guard test server isolation
         script: /usr/bin/python3 "$SRCROOT/scripts/check-test-servers.py"
         basedOnDependencyAnalysis: false
+      - name: Guard test time limits
+        script: /usr/bin/python3 "$SRCROOT/scripts/check-test-timeouts.py"
+        basedOnDependencyAnalysis: false
     sources:
       - path: iOS
         excludes:
@@ -160,3 +163,16 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.tests
         GENERATE_INFOPLIST_FILE: YES
+schemes:
+  # The UI tests alone, without the unit tests (which need Debug's
+  # testability): the scheme for a Release UI-test build, as
+  # scripts/test-release-launch.sh runs LaunchStackUITests.
+  BBStudioUITests:
+    build:
+      targets:
+        BBStudio: all
+        BBStudioUITests: [test]
+    test:
+      config: Debug
+      targets:
+        - BBStudioUITests

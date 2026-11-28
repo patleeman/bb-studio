@@ -399,9 +399,25 @@ Headless simulator runs: `-skipPushPrompt YES -openURL bbstudio://thread/<id>`.
 
 ### Testing
 
-Every UI test has a five-minute limit (`ServerIsolatedUITestCase.timeLimit`,
-XCTest's `executionTimeAllowance`); the scripts run with
-`-test-timeouts-enabled YES`, and a direct `xcodebuild` run should too.
+No test runs past five minutes. Every UI test class inherits
+`ServerIsolatedUITestCase`, which sets XCTest's `executionTimeAllowance` to
+its `timeLimit` (300 s) and starts a watchdog that stops the test runner 15 s
+after it, for a run without timeouts on (Xcode's test button, a bare
+`xcodebuild`). Every script runs with `-test-timeouts-enabled YES
+-default-test-execution-time-allowance 300
+-maximum-test-execution-time-allowance 300`, so XCTest fails the test first
+and records a spindump; pass them to a direct `xcodebuild test` too.
+`scripts/check-test-timeouts.py` (a build phase) fails the build when a UI
+test class skips the base class or its `setUp`, sets its own allowance, or a
+script runs tests without the flags.
+
+The `BBStudio` scheme tests in Debug (unit and UI tests). The
+`BBStudioUITests` scheme holds the UI tests alone, for a Release build: the
+unit tests need Debug's testability. `scripts/test-release-launch.sh` runs
+`LaunchStackUITests` on a Release build, where the launch crash of TestFlight
+20261126.0313 happened: an isolated staged BB's Bot and one of its threads
+open by deep link (no Debug demo) on the device's 1 MB main stack. Run it
+before every TestFlight upload.
 
 `ShellUITests` checks the app shell offline (`-qaSpacesDemo list -qaBotDemo
 chat -qaWorkbenchDemo`): on the iPhone, Home as the root with the tab bar

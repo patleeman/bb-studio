@@ -105,8 +105,6 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     /// A row id as the log writes it. An app whose ids could carry text
     /// passes a filter (BB: `ScrollLog.id`).
     var describe: (AnyHashable) -> String = { "\($0)" }
-    /// The rows' content frame in window coordinates, after each layout (Debug probes).
-    var probe: ((CGRect) -> Void)?
     /// Ends editing after a tap on the transcript. The default waits a run
     /// loop turn; an app can hold it further (BB waits out window resizes).
     var dismissKeyboard: (UIWindow) -> Void = { window in
@@ -486,10 +484,6 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         restoreSpot()
         keepInRange("layout")
         logGeometry()
-        if let probe, let rect = rowsFrameInWindow, rect != lastProbe {
-            lastProbe = rect
-            probe(rect)
-        }
     }
 
     private func applyRowMetrics() {
@@ -895,15 +889,6 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private var remeasureScheduled = false
     /// Inside a re-measure's offset adjustment.
     private var adjusting = false
-    private var lastProbe: CGRect?
-
-    /// Where the rows' content runs, in window coordinates: their leading and
-    /// trailing edges (the composer lines up with them beside two pages).
-    var rowsFrameInWindow: CGRect? {
-        guard let window = view.window, let first = layout.frames.first else { return nil }
-        let rect = CGRect(x: first.minX, y: 0, width: first.width, height: collectionView.bounds.height)
-        return collectionView.convert(rect.offsetBy(dx: 0, dy: collectionView.contentOffset.y), to: window)
-    }
 
     /// These rows measured now. Any that changed by more than 1 pt take
     /// their new heights together, in one invalidation (one layout pass),
@@ -1142,8 +1127,22 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     var isAnimating: Bool { animating }
 
     #if DEBUG
+    /// Where the rows' content runs, in window coordinates: their leading and
+    /// trailing edges (the composer lines up with them beside two pages).
+    /// Laid out first: `viewDidLayoutSubviews` writes the row metrics, which
+    /// rebuild the frames only on the collection view's next pass, so frames
+    /// read before it are the last width's.
+    var qaRowsFrame: CGRect? {
+        collectionView.layoutIfNeeded()
+        guard let window = view.window, let first = layout.frames.first else { return nil }
+        let rect = CGRect(x: first.minX, y: 0, width: first.width, height: collectionView.bounds.height)
+        return collectionView.convert(rect.offsetBy(dx: 0, dy: collectionView.contentOffset.y), to: window)
+    }
+
     var qaGeometry: [String: Any] {
         func box(_ rect: CGRect) -> [String: Any] { ["x": rect.minX, "y": rect.minY, "width": rect.width, "height": rect.height] }
+        // First: it lays the rows out, so the frames below are current too.
+        let rows = qaRowsFrame
         var out: [String: Any] = ["stack": box(composerHost.view.convert(composerHost.view.bounds, to: nil)), "atEnd": atEnd,
                                   "insetBottom": collectionView.contentInset.bottom, "pillShown": pill.shown]
         if pill.shown, chrome.pill != .inline { out["pill"] = box(pillHost.view.convert(pillHost.view.bounds, to: nil)) }
@@ -1155,6 +1154,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             out["bandOpaque"] = band.alpha >= 1 && alpha >= 1
         }
         if let last = layout.ids.last, let frame = layout.frame(of: last) { out["lastRow"] = box(collectionView.convert(frame, to: nil)) }
+        if let rows, !collectionView.isHidden { out["rows"] = box(rows) }
+        if let spotKey { out["key"] = spotKey }
         return out
     }
     #endif

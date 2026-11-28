@@ -67,7 +67,7 @@ target.setdefault('EnvironmentVariables', {}).update(BBGO_QA_SERVER=origin, BB_S
 path.write_bytes(plistlib.dumps(values))
 PY
 xctestrun=$(find "$run_dir/build/Build/Products" -maxdepth 1 -name '*.xctestrun' -print)
-xcodebuild test-without-building -xctestrun "$xctestrun" -destination "platform=iOS Simulator,id=$device_id" -only-testing:BBStudioUITests/ShareRuntimeUITests -parallel-testing-enabled NO -test-timeouts-enabled YES -resultBundlePath "$run_dir/share-runtime.xcresult" > "$run_dir/test.log" 2>&1
+xcodebuild test-without-building -xctestrun "$xctestrun" -destination "platform=iOS Simulator,id=$device_id" -only-testing:BBStudioUITests/ShareRuntimeUITests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 -resultBundlePath "$run_dir/share-runtime.xcresult" > "$run_dir/test.log" 2>&1
 xcrun xcresulttool get test-results summary --path "$run_dir/share-runtime.xcresult" > "$run_dir/summary.json"
 xcrun xcresulttool export attachments --path "$run_dir/share-runtime.xcresult" --output-path "$run_dir/attachments"
 printf 'Verified results and screenshots: %s\n' "$run_dir"
