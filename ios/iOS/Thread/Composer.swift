@@ -2,7 +2,8 @@ import SwiftUI
 import UIKit
 
 /// The message field. A `UITextView` rather than a `TextField` so Paste takes
-/// images (as attachments) as well as text. Grows to `maxLines`, then scrolls.
+/// images (as attachments) as well as text. Grows to `maxLines`, or to the
+/// height its container offers when that is less, then scrolls.
 struct ComposerField: UIViewRepresentable {
     @Binding var text: String
     @Binding var focused: Bool
@@ -80,7 +81,11 @@ struct ComposerField: UIViewRepresentable {
             fitting = view.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
             context.coordinator.measured = (key, fitting)
         }
-        let limit = font.lineHeight * CGFloat(maxLines) + view.textContainerInset.top + view.textContainerInset.bottom
+        let insets = view.textContainerInset.top + view.textContainerInset.bottom
+        var limit = font.lineHeight * CGFloat(maxLines) + insets
+        // Short of room (the keyboard up, large text, the folded Duo): only
+        // the height offered, never under a line, and the rest scrolls.
+        if let offered = proposal.height, offered.isFinite { limit = min(limit, max(offered, font.lineHeight + insets)) }
         let scrolls = fitting.height > limit
         if view.isScrollEnabled != scrolls { DispatchQueue.main.async { view.isScrollEnabled = scrolls } }
         return CGSize(width: width, height: min(fitting.height, limit))
@@ -228,8 +233,10 @@ struct ComposerBar<Settings: View, Send: View>: View {
                 .padding(.leading, oneRow ? (attaches ? 6 : 4) : 0)
                 .padding(.trailing, oneRow ? 6 : 0)
                 .padding(.vertical, oneRow ? 4 : 0)
+                // The field gives way: the rows around it keep their height.
+                .layoutPriority(-1)
             } else {
-                field(top: 4)
+                field(top: 4).layoutPriority(-1)
             }
             if !oneRow {
                 HStack(spacing: 2) {
