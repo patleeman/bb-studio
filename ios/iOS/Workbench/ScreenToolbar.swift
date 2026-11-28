@@ -51,29 +51,32 @@ private struct ScreenToolbarButtons: View {
             ScreenToolbarButton(action: action)
         }
         if actions.count > 2 {
-            Menu { ScreenActionItems(actions: Array(actions.dropFirst(2))) } label: { Image(systemName: "ellipsis") }
-                .accessibilityLabel("More")
+            Menu { ScreenActionItems(actions: Array(actions.dropFirst(2))) } label: { Label("More", systemImage: "ellipsis") }
                 .accessibilityIdentifier("screenMore")
         }
     }
 }
 
-/// One action as a bar button: a submenu, a share, or a tap.
+/// One action as a bar button: a submenu, a share, or a tap. A Label, not
+/// an icon alone: the bar draws the icon, and where the system folds bar
+/// buttons into its overflow (the open Duo's control strip) the title names
+/// it there; an untitled item is left out of the overflow altogether.
 private struct ScreenToolbarButton: View {
     let action: ScreenAction
 
     var body: some View {
         Group {
             if !action.children.isEmpty {
-                Menu { ScreenActionItems(actions: action.children) } label: { Image(systemName: action.systemImage) }
+                Menu { ScreenActionItems(actions: action.children) } label: { label }
             } else if let url = action.share {
-                ShareLink(item: url) { Image(systemName: action.systemImage) }
+                ShareLink(item: url) { label }
             } else {
-                Button(role: action.role) { action.run() } label: { Image(systemName: action.systemImage) }
+                Button(role: action.role) { action.run() } label: { label }
             }
         }
         .disabled(action.disabled)
-        .accessibilityLabel(action.title)
         .accessibilityIdentifier("screenAction-\(action.id)")
     }
+
+    private var label: some View { Label(action.title, systemImage: action.systemImage) }
 }

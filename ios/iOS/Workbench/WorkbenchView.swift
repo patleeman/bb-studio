@@ -8,11 +8,13 @@ struct WorkbenchView: View {
     let threadId: String
     /// The conversation in BB web: where tabs the phone has no view for open.
     var webURL: URL?
+    /// The conversation's project, where the menu's New page and the rest go.
+    var projectId: String?
     var openThread: (String) -> Void = { _ in }
     /// The shown tab's actions, for the shell's More menu.
     var actionsChanged: ([ScreenAction]) -> Void = { _ in }
     @State private var store = WorkbenchStore.shared
-    @State private var addingTab = false
+    @State private var adding: WorkbenchAdd?
     @EnvironmentObject private var app: AppModel
 
     var body: some View {
@@ -26,7 +28,7 @@ struct WorkbenchView: View {
                 WorkbenchTabContent(tab: tab).modifier(WorkbenchHiddenTab(hidden: tab.id != shown?.id))
             }
             if shown == nil {
-                WorkbenchEmpty(unsupported: store.unsupported, unshown: tabs.count) { addingTab = true }
+                WorkbenchEmpty(unsupported: store.unsupported, unshown: tabs.count) { adding = $0 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -34,7 +36,7 @@ struct WorkbenchView: View {
         .onPreferenceChange(ScreenActionsKey.self) { actions in
             MainActor.assumeIsolated { actionsChanged(shown == nil ? [] : actions) }
         }
-        .sheet(isPresented: $addingTab) { WorkbenchNewTab(threadId: threadId) }
+        .workbenchAdding(threadId, projectId: projectId, request: $adding)
         .task(id: threadId) {
             store.attach(app.realtime)
             await store.load(threadId)
@@ -58,14 +60,14 @@ struct WorkbenchHiddenTab: ViewModifier {
     }
 }
 
-/// No tabs open: what the Workbench is, and New tab.
+/// No tabs open: what the Workbench is, and the menu's New page, New design and the rest.
 /// Tabs the phone can't show count as none, as on the Workbench button;
 /// the tab menu still lists them.
 private struct WorkbenchEmpty: View {
     let unsupported: Bool
     /// Open tabs the phone can't show (shown is nil, so that is all of them).
     let unshown: Int
-    let add: () -> Void
+    let add: (WorkbenchAdd) -> Void
 
     var body: some View {
         ContentUnavailableView {
@@ -74,7 +76,8 @@ private struct WorkbenchEmpty: View {
             Text(Self.description(unsupported: unsupported, unshown: unshown))
         } actions: {
             if !unsupported {
-                Button("New tab…", action: add)
+                Menu { WorkbenchAddItems(add: add) } label: { Label("New tab", systemImage: "plus") }
+                    .menuOrder(.fixed)
                     .buttonStyle(.bordered)
                     .accessibilityIdentifier("workbenchNewTab")
             }
@@ -90,11 +93,12 @@ private struct WorkbenchEmpty: View {
     }
 }
 
-/// The tab menu (9b): the open tabs with a check on the shown one, then New
-/// tab and Close. From the Workbench's title, or the conversation's Workbench tabs button beside two pages.
+/// The Workbench menu (9b): the open tabs with a check on the shown one,
+/// then the desktop's New actions, Open link and New tab… (`WorkbenchAddItems`),
+/// then Close. From the Workbench's title and the Workbench button, on every posture.
 struct WorkbenchTabMenuItems: View {
     let threadId: String
-    let newTab: () -> Void
+    let add: (WorkbenchAdd) -> Void
     @State private var store = WorkbenchStore.shared
 
     var body: some View {
@@ -118,10 +122,9 @@ struct WorkbenchTabMenuItems: View {
             }
         }
         Section {
-            if !store.unsupported {
-                Button(action: newTab) { Label("New tab…", systemImage: "plus") }
-                    .accessibilityIdentifier("workbenchMenuNewTab")
-            }
+            if !store.unsupported { WorkbenchAddItems(add: add) }
+        }
+        Section {
             if let shown {
                 Button(role: .destructive) { store.close(shown.id, in: threadId) } label: {
                     Label("Close “\(shown.title)”", systemImage: "xmark")
