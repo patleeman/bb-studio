@@ -38,9 +38,16 @@ struct ArchivePageView: View {
     @State private var error: String?
     @State private var query = ""
     @State private var filter: ArchivePage.Filter = .all
-    @State private var deleting: ArchiveData.Conversation?
+    /// Studio's Recently deleted; empty on a Studio without it.
+    @State private var deleted: [DeletedConversation] = []
+    /// Restores on their way: one tap each.
+    @State private var restoring: Set<String> = []
 
     private var data: ArchiveData? { load.value }
+    private var shownDeleted: [DeletedConversation] {
+        guard filter == .all else { return [] }
+        return query.isEmpty ? deleted : deleted.filter { $0.title.localizedCaseInsensitiveContains(query) }
+    }
     private var scope: String { "\(app.client.baseURL.absoluteString)|\(botId ?? "")" }
 
     var body: some View {
@@ -63,7 +70,10 @@ struct ArchivePageView: View {
                     ForEach(shown.workers) { workerRow($0) }
                 } header: { Text(filter == .failed ? "Failed workers" : "Workers") }
             }
-            if data != nil, shown.conversations.isEmpty, shown.workers.isEmpty {
+            if !shownDeleted.isEmpty {
+                RecentlyDeletedSection(rows: shownDeleted, restoring: restoring) { threadId in Task { await restore(threadId) } }
+            }
+            if data != nil, shown.conversations.isEmpty, shown.workers.isEmpty, shownDeleted.isEmpty {
                 Section {
                     ContentUnavailableView(ArchivePage.emptyText(query: query, filter: filter), systemImage: "archivebox")
                 }
@@ -80,18 +90,16 @@ struct ArchivePageView: View {
                 }
             }
         }
-        .alert(ConversationFinish.deleteTitle(deleting?.title ?? ""),
-               isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { row in
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) { Task { await delete(row.threadId) } }
-                .accessibilityIdentifier("confirmDelete")
-        } message: { _ in
-            Text(ConversationFinish.deleteMessage)
-        }
         .shellSearchable(text: $query, prompt: "Search the archive")
         .screenToolbar("Archive", actions: [], displayMode: .large)
-        .refreshable { await load.reload() }
-        .task(id: scope) { start() }
+        .refreshable {
+            await load.reload()
+            await loadDeleted()
+        }
+        .task(id: scope) {
+            start()
+            await loadDeleted()
+        }
         .accessibilityIdentifier("archive-page")
     }
 
@@ -108,8 +116,8 @@ struct ArchivePageView: View {
                     }
                 }
             }
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) { archiveActions(row, swipe: true) }
-            .contextMenu { archiveActions(row, swipe: false) }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) { archiveAction(row) }
+            .contextMenu { archiveAction(row) }
             .accessibilityIdentifier("archive-finished-\(row.threadId)")
         } else {
             Button { open(.conversation(row.threadId)) } label: {
@@ -121,13 +129,15 @@ struct ArchivePageView: View {
                 }
             }
             .tint(.primary)
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) { archiveActions(row, swipe: true) }
-            .contextMenu { archiveActions(row, swipe: false) }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) { archiveAction(row) }
+            .contextMenu { archiveAction(row) }
             .accessibilityIdentifier("archive-conversation-\(row.threadId)")
         }
     }
 
-    @ViewBuilder private func archiveActions(_ row: ArchiveData.Conversation, swipe: Bool) -> some View {
+    /// Restore or Archive, the row's one action. Delete is on the conversation's
+    /// own page (⋯ in an open one, the bottom of a finished one's).
+    @ViewBuilder private func archiveAction(_ row: ArchiveData.Conversation) -> some View {
         if row.finished {
             Button { Task { await reopen(row.threadId) } } label: { Label("Restore", systemImage: "arrow.uturn.backward") }
                 .tint(.accentColor)
@@ -137,9 +147,6 @@ struct ArchivePageView: View {
                 .tint(.indigo)
                 .accessibilityIdentifier("archiveArchive-\(row.threadId)")
         }
-        Button(role: swipe ? nil : .destructive) { deleting = row } label: { Label("Delete", systemImage: "trash") }
-            .tint(.red)
-            .accessibilityIdentifier("archiveDelete-\(row.threadId)")
     }
 
     private func archive(_ threadId: String) async {
@@ -147,13 +154,6 @@ struct ArchivePageView: View {
             try await app.client.finishConversation(threadId: threadId)
             await reopened()
         } catch { self.error = "It didn't archive: " + BBClient.describe(error) }
-    }
-
-    private func delete(_ threadId: String) async {
-        do {
-            try await app.client.delete(threadId, withChildren: true)
-            await reopened()
-        } catch { self.error = "It didn't delete: " + BBClient.describe(error) }
     }
 
     private func workerRow(_ row: ArchiveData.Worker) -> some View {
@@ -193,6 +193,20 @@ struct ArchivePageView: View {
         refresh()
         error = nil
         await load.reload()
+        await loadDeleted()
+    }
+
+    private func loadDeleted() async {
+        deleted = (try? await app.client.recentlyDeleted(botId: botId)) ?? []
+    }
+
+    private func restore(_ threadId: String) async {
+        guard restoring.insert(threadId).inserted else { return }
+        defer { restoring.remove(threadId) }
+        do {
+            try await app.client.restoreDeleted(threadId: threadId)
+            await reopened()
+        } catch { self.error = "It didn't restore: " + BBClient.describe(error) }
     }
 
     private func start() {
@@ -200,6 +214,39 @@ struct ArchivePageView: View {
         let botId = botId
         load.describe = { BBClient.describe($0, server: client.baseURL) }
         load.run(key: scope) { try await client.botArchive(botId: botId) }
+    }
+}
+
+/// The Archive's Recently deleted (Studio's soft delete): each conversation
+/// with when it goes for good, and Restore.
+private struct RecentlyDeletedSection: View {
+    let rows: [DeletedConversation]
+    let restoring: Set<String>
+    let restore: (String) -> Void
+
+    var body: some View {
+        Section {
+            ForEach(rows) { row in
+                HStack(spacing: 12) {
+                    Image(systemName: "trash").foregroundStyle(.secondary).frame(width: 22)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.title).lineLimit(1)
+                            .accessibilityIdentifier("archive-deleted-\(row.threadId)")
+                        Text("Deleted \(MemoryFormat.shortDate(row.deletedAt)) · \(row.left())")
+                            .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer(minLength: 8)
+                    Button(restoring.contains(row.threadId) ? "Restoring…" : "Restore") { restore(row.threadId) }
+                        .buttonStyle(.borderless)
+                        .disabled(restoring.contains(row.threadId))
+                        .accessibilityIdentifier("deletedRestore-\(row.threadId)")
+                }
+            }
+        } header: {
+            Text("Recently deleted")
+        } footer: {
+            Text("Each one goes for good, with its workers, when its days run out.")
+        }
     }
 }
 
@@ -214,6 +261,7 @@ struct FinishedConversationScreen: View {
     @State private var loaded = false
     @State private var busy = false
     @State private var error: String?
+    @State private var deleting: ConversationDeletion?
 
     var body: some View {
         List {
@@ -238,7 +286,15 @@ struct FinishedConversationScreen: View {
                     .accessibilityIdentifier("archiveReopen")
                 Button("Open conversation", systemImage: "bubble.left") { open(.conversation(threadId)) }
             }
+            Section {
+                Button("Delete conversation…", systemImage: "trash", role: .destructive) {
+                    deleting = ConversationDeletion(threadId: threadId, title: finished?.title ?? title)
+                }
+                .disabled(busy)
+                .accessibilityIdentifier("archiveDelete")
+            }
         }
+        .deleteConversationSheet($deleting) { _, plan in Task { await delete(plan) } }
         .overlay { if !loaded { ProgressView() } }
         .navigationTitle(finished?.title ?? title)
         .navigationBarTitleDisplayMode(.inline)
@@ -256,6 +312,16 @@ struct FinishedConversationScreen: View {
             await reopened()
             open(.conversation(threadId))
         } catch { self.error = "It didn't reopen: " + BBClient.describe(error) }
+    }
+
+    private func delete(_ plan: ConversationDeletePlan) async {
+        busy = true
+        defer { busy = false }
+        do {
+            try await app.client.deleteConversation(threadId, plan: plan)
+            await reopened()
+            dismiss()
+        } catch { self.error = "It didn't delete: " + BBClient.describe(error) }
     }
 }
 

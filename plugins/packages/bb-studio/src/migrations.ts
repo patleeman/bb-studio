@@ -1260,4 +1260,18 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE bot_skill_reviews ADD COLUMN reason TEXT;`,
   // A queued review's failed starts before its fork existed (retried a few times, then dropped).
   `ALTER TABLE bot_skill_review_queue ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;`,
+  // Recently deleted (src/bot-trash.ts): a conversation deleted through Studio, kept until purge_at.
+  // archived_ids: the threads its delete archived in BB (restore unarchives only those).
+  // bb_archived_at: BB's archivedAt from that archive; the purge deletes only while BB still has it.
+  `CREATE TABLE bot_deleted (
+       thread_id TEXT PRIMARY KEY,
+       bot_id TEXT NOT NULL,
+       title TEXT NOT NULL,
+       deleted_at INTEGER NOT NULL,
+       purge_at INTEGER NOT NULL,
+       was_archived INTEGER NOT NULL,
+       archived_ids TEXT NOT NULL,
+       workers INTEGER NOT NULL,
+       bb_archived_at INTEGER
+     );`,
 ];

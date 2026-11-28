@@ -23,6 +23,7 @@ import { modelProblem } from "./thread-model";
 import { isFinishing } from "./bot-finish";
 import { kindOf, type BotChange } from "./bot-signal";
 import type { BotChangeKind } from "./bot-threads-contract";
+import { hiddenByTrash } from "./bot-trash";
 import type { MirroredBatch, MirrorLive } from "./mirror-live";
 import { SideThreads } from "./bot-side-threads";
 import { MessageThreads, type MessageRef } from "./message-threads";
@@ -275,18 +276,20 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
   /** One Bot's rows with BB's view of them, for the sidebar and its "N older" lists. */
   const botRows = async (id: string) => {
     await Promise.all([fillLatest(id).catch(() => {}), fillActivity(ACTIVITY_PER_VIEW).catch(() => 0)]);
-    const records = store.all(id);
+    // Recently deleted (src/bot-trash.ts): out of every list until restored or purged.
+    const trashed = hiddenByTrash(db);
+    const records = store.all(id).filter((rec) => !trashed.has(rec.threadId));
     const listed = records.filter((rec) => rec.archivedAt === null);
     const raisedBy = listed.flatMap((rec) => rec.needsYou?.source && store.get(rec.needsYou.source)?.kind === "worker" ? [rec.needsYou.source] : []);
     const links = [...listed.flatMap((rec) => [rec.forkedFrom?.threadId, rec.ownerConversationId].filter((each): each is string => !!each)), ...raisedBy];
     const threads = await facts([...listed.map((rec) => rec.threadId), ...links]);
     const readAt = factsCache?.at ?? Date.now();
-    const others = links.filter((link) => !records.some((rec) => rec.threadId === link)).flatMap((link) => store.get(link) ?? []);
+    const others = links.filter((link) => !trashed.has(link) && !records.some((rec) => rec.threadId === link)).flatMap((link) => store.get(link) ?? []);
     const all = [...records, ...others];
     // A worker's approval or question answered anywhere: the conversation it marked is clear.
     const stale = staleRaises(all, threads, readAt);
     for (const source of stale) store.clearNeedsYouFrom(source);
-    return { records: stale.length ? [...store.all(id), ...others] : all, threads };
+    return { records: stale.length ? [...store.all(id).filter((rec) => !trashed.has(rec.threadId)), ...others] : all, threads };
   };
   /** Reads the latest real activity of rows that have none yet, from their events, a few at a time. */
   const fillActivity = async (limit: number) => {
@@ -741,5 +744,5 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     return { classified, linked: linked.length };
   };
 
-  return { store, text, rpc, start, reconcile, threadChanged, catchUp, messageThreads, owner, pushIds, approvalPush, tools: ["bot_conversations", "bot_needs_you"] as const };
+  return { store, text, rpc, botOrCurrent, start, reconcile, threadChanged, catchUp, messageThreads, owner, pushIds, approvalPush, tools: ["bot_conversations", "bot_needs_you"] as const };
 }

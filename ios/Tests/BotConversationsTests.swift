@@ -143,7 +143,20 @@ final class BotConversationsTests: XCTestCase {
         XCTAssertFalse(ConversationFinish.canRemove(nil))
         XCTAssertEqual(ConversationFinish.deleteTitle("Launch prep"), "Delete “Launch prep”?")
         XCTAssertEqual(ConversationFinish.deleteTitle(""), "Delete “Untitled”?")
-        XCTAssertTrue(ConversationFinish.deleteMessage.hasPrefix("This can't be undone."))
+        XCTAssertEqual(ConversationFinish.deleteMessage("Launch prep", workers: 12), "Deletes “Launch prep” and its 12 workers. This can't be undone.")
+        XCTAssertEqual(ConversationFinish.deleteMessage("Launch prep", workers: 1), "Deletes “Launch prep” and its 1 worker. This can't be undone.")
+        XCTAssertEqual(ConversationFinish.deleteMessage("", workers: 0), "Deletes “Untitled”. This can't be undone.")
+        XCTAssertEqual(ConversationFinish.deleteMessage("Launch prep", workers: nil), "Deletes “Launch prep” and any workers it started. This can't be undone.")
+        XCTAssertGreaterThanOrEqual(ConversationFinish.deleteArmSeconds, 2, "a pause before Delete works")
+        XCTAssertEqual(ConversationFinish.deleteMessage("Launch prep", workers: 12, keepDays: 30),
+                       "Deletes “Launch prep” and its 12 workers. You can restore it from Archive for 30 days.")
+        XCTAssertTrue(ConversationDeletePlan(workers: 1, keepDays: 30).soft)
+        XCTAssertFalse(ConversationDeletePlan(workers: 1, keepDays: nil).soft)
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let deleted = { (days: Double) in DeletedConversation(threadId: "t", title: "T", deletedAt: 0, purgeAt: (1_000_000 + days * 86_400) * 1000) }
+        XCTAssertEqual(deleted(27.5).left(now: now), "27 days left")
+        XCTAssertEqual(deleted(1.2).left(now: now), "1 day left")
+        XCTAssertEqual(deleted(0.4).left(now: now), "Less than a day left")
     }
 
     func testDeleteConfirmsChildThreadsOnlyWhenAsked() async throws {
