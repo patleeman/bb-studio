@@ -71,7 +71,9 @@ final class WorkbenchMenuUITests: ServerIsolatedUITestCase {
         app.buttons["Open link…"].tap()
         let field = app.alerts.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5), "\(state): Open link asks for the address")
+        XCTAssertFalse(app.alerts.buttons["Open"].isEnabled, "\(state): nothing to open yet")
         field.typeText("example.org/a")
+        XCTAssertTrue(app.alerts.buttons["Open"].isEnabled, "\(state): a web address opens")
         app.alerts.buttons["Open"].tap()
         XCTAssertTrue(title.waitForExistence(timeout: 10), "\(state): the Workbench comes into view")
         let linked = NSPredicate { _, _ in title.label.contains("example.org") }

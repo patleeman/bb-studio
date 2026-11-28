@@ -102,10 +102,17 @@ final class WorkbenchStore {
 
     /// Shows a tab; a heavy one joins the loaded views, pushing out the oldest.
     func select(_ id: String, in threadId: String) {
-        guard let tab = tabs(threadId).first(where: { $0.id == id }), WorkbenchTabKind(tab).showsOnPhone else { return }
+        guard pick(id, in: threadId) else { return }
+        Task { await mutate(threadId, op: "focus", tabId: id) }
+    }
+
+    /// Shows a tab here only: Studio already has it focused (an open with `focus`).
+    @discardableResult
+    private func pick(_ id: String, in threadId: String) -> Bool {
+        guard let tab = tabs(threadId).first(where: { $0.id == id }), WorkbenchTabKind(tab).showsOnPhone else { return false }
         picked[threadId] = id
         mounted = WorkbenchMounted.touch(mounted, id, heavy: tab.heavy)
-        Task { await mutate(threadId, op: "focus", tabId: id) }
+        return true
     }
 
     func close(_ id: String, in threadId: String) {
@@ -125,6 +132,19 @@ final class WorkbenchStore {
         Task { await show(ref, title: title, in: threadId) }
     }
 
+    /// The conversations with a tab on its way from the Workbench menu.
+    private(set) var adding: Set<String> = []
+
+    /// Runs one add from the Workbench menu at a time per conversation, from
+    /// whichever menu: nil while another is on its way, so one tap makes one item.
+    func whileAdding(_ threadId: String, _ work: @escaping @MainActor () async throws -> Void) -> Task<Void, Error>? {
+        guard adding.insert(threadId).inserted else { return nil }
+        return Task {
+            defer { adding.remove(threadId) }
+            try await work()
+        }
+    }
+
     /// Makes a new item (the Workbench menu's New page, New design…) and opens it as the shown tab.
     func make(_ made: WorkbenchAdd.Made, title: String, projectId: String?, in threadId: String) async throws {
         try await add(try await create(made, projectId: projectId, in: threadId), title: title, in: threadId)
@@ -142,7 +162,7 @@ final class WorkbenchStore {
     private func show(_ ref: WorkbenchTab.Ref, title: String, in threadId: String) async -> Bool {
         guard let (result, tabId) = await mutate(threadId, op: "open", ref: ref, title: title, focus: true),
               result == .ok || result == .unchanged, let tabId else { return false }
-        select(tabId, in: threadId)
+        pick(tabId, in: threadId)
         return true
     }
 

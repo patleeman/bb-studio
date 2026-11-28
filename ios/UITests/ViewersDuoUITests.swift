@@ -37,10 +37,19 @@ final class ViewersDuoUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(onEitherPage("pageScroll"), "the page opens")
         XCTAssertTrue(app.buttons["pageCommentMark-aaaa0004"].waitForExistence(timeout: 10), "comment marks")
         shot("duo-unfolded-page")
-        // Pushed over the conversation; its bar's Comments is where the system puts the bar's buttons.
+        // Pushed over the conversation; its bar's buttons go to the control strip, and what
+        // doesn't fit to the strip's overflow, which lists them by title (an icon alone is dropped).
         let comments = app.screenAction("comments")
-        XCTAssertTrue(comments.waitForExistence(timeout: 10), "Comments in the page's bar")
-        app.press(comments, id: "screenAction-comments")
+        if !comments.waitForExistence(timeout: 5) {
+            let overflow = app.buttons["BottomOverflowBarButtonItem"].firstMatch
+            XCTAssertTrue(overflow.waitForExistence(timeout: 10), "the control strip's overflow")
+            overflow.tap()
+        }
+        let listed = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Comments'")).firstMatch
+        let shown = comments.exists ? comments : listed
+        XCTAssertTrue(shown.waitForExistence(timeout: 10), "Comments in the page's bar, or the strip's overflow")
+        // The overflow's list starts on the simulator's screen (466 wide) and runs past it: tap its start.
+        shown.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).tap()
         XCTAssertTrue(onEitherPage("Add the press kit."), "the comments")
         shot("duo-unfolded-page-comments")
     }

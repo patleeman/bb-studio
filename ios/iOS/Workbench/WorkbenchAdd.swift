@@ -82,7 +82,8 @@ struct WorkbenchAddItems: View {
 
 /// Runs what the Workbench menu picked for a conversation: makes the item
 /// and opens it as a tab, asks for a link, or finds one (New tab…). The tab
-/// opens shown, and `reveal` brings the Workbench into view.
+/// opens shown, and `reveal` brings the Workbench into view. One add runs at
+/// a time per conversation (`WorkbenchStore.whileAdding`), from any menu.
 struct WorkbenchAdding: ViewModifier {
     let threadId: String
     /// The conversation's project, where new items go (as on the desktop, BB's open project).
@@ -90,11 +91,12 @@ struct WorkbenchAdding: ViewModifier {
     @Binding var request: WorkbenchAdd?
     var reveal: () -> Void = {}
     @State private var finding = false
-    @State private var askingLink = false
     @State private var link = ""
-    @State private var failure: String?
-    /// A tab on its way: another pick waits, so one tap makes one item.
-    @State private var busy = false
+    /// The one alert: Open link's address, or why an add failed. One state,
+    /// so a failure never presents over the prompt as it goes.
+    @State private var alert: WorkbenchAddAlert?
+    /// When an alert last went, so the next one waits for it to finish leaving.
+    @State private var dismissedAt = Date.distantPast
     @EnvironmentObject private var app: AppModel
 
     func body(content: Content) -> some View {
@@ -102,22 +104,31 @@ struct WorkbenchAdding: ViewModifier {
             .onChange(of: request) { _, picked in
                 guard let picked else { return }
                 request = nil
-                if !busy { run(picked) }
+                run(picked)
             }
             .sheet(isPresented: $finding) { WorkbenchNewTab(threadId: threadId, opened: reveal) }
-            .alert("Open link", isPresented: $askingLink) {
-                TextField("example.com", text: $link)
-                    .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                Button("Cancel", role: .cancel) {}
-                Button("Open") { openLink() }
-            } message: {
-                Text("It opens as a tab here and on the desktop.")
+            .alert(alert?.title ?? "", isPresented: shown, presenting: alert) { alert in
+                if alert == .link {
+                    TextField("example.com", text: $link)
+                        .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    Button("Cancel", role: .cancel) {}
+                    Button("Open") { openLink() }.disabled(WorkbenchAdd.link(link) == nil)
+                } else {
+                    Button("OK", role: .cancel) {}
+                }
+            } message: { alert in
+                Text(alert.message)
             }
-            .alert("Couldn't add the tab", isPresented: .init { failure != nil } set: { if !$0 { failure = nil } }) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(failure ?? "")
-            }
+    }
+
+    private var shown: Binding<Bool> {
+        Binding {
+            alert != nil
+        } set: { on in
+            guard !on else { return }
+            alert = nil
+            dismissedAt = .now
+        }
     }
 
     private func run(_ picked: WorkbenchAdd) {
@@ -125,7 +136,7 @@ struct WorkbenchAdding: ViewModifier {
         case .find: finding = true
         case .link:
             link = ""
-            askingLink = true
+            alert = .link
         default:
             guard let made = picked.made, let title = picked.untitled else { return }
             adding { try await WorkbenchStore.shared.make(made, title: title, projectId: projectId, in: threadId) }
@@ -133,26 +144,48 @@ struct WorkbenchAdding: ViewModifier {
     }
 
     private func openLink() {
-        guard let url = WorkbenchAdd.link(link) else {
-            failure = "“\(link)” isn't a web address."
-            return
-        }
+        guard let url = WorkbenchAdd.link(link) else { return }
         adding {
             try await WorkbenchStore.shared.add(.init(kind: "browser", url: url.absoluteString), title: url.host() ?? url.absoluteString, in: threadId)
         }
     }
 
     /// Adds the tab, then brings the Workbench into view; or says why not.
+    /// Either waits for Open link's alert to finish leaving: a change made
+    /// under a leaving alert can be lost (the flip, or the next alert).
     private func adding(_ work: @escaping @MainActor () async throws -> Void) {
-        busy = true
+        guard let task = WorkbenchStore.shared.whileAdding(threadId, work) else { return }
         Task {
-            defer { busy = false }
-            do {
-                try await work()
-                reveal()
-            } catch {
-                failure = BBClient.describe(error, server: app.client.baseURL)
+            let result = await task.result
+            let settled = dismissedAt.addingTimeInterval(WorkbenchAddAlert.leaving)
+            if settled > .now { try? await Task.sleep(for: .seconds(settled.timeIntervalSinceNow)) }
+            switch result {
+            case .success: reveal()
+            case .failure(let error): alert = .failure(BBClient.describe(error, server: app.client.baseURL))
             }
+        }
+    }
+}
+
+/// The Workbench menu's alert: Open link's prompt, or an add that failed.
+enum WorkbenchAddAlert: Equatable {
+    case link
+    case failure(String)
+
+    /// How long an alert takes to leave: UIKit won't present another meanwhile.
+    static let leaving: TimeInterval = 0.5
+
+    var title: String {
+        switch self {
+        case .link: "Open link"
+        case .failure: "Couldn't add the tab"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .link: "It opens as a tab here and on the desktop."
+        case .failure(let message): message
         }
     }
 }
