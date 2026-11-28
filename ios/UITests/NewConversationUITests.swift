@@ -33,7 +33,7 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 10), "New conversation")
         shot("1-list")
         row.tap()
-        XCTAssertTrue(any("newConversationWith").waitForExistence(timeout: 10), "the New conversation sheet")
+        XCTAssertTrue(app.buttons["newConversationStart"].waitForExistence(timeout: 10), "New conversation")
     }
 
     /// The phone's, and the folded Duo's (the main device) too.
@@ -129,15 +129,138 @@ final class NewConversationUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("homeColumn").waitForExistence(timeout: 15), "Home's column on the left screen")
         XCTAssertTrue(app.buttons["botSwitcher"].exists, "with the Bot switcher")
         shot("10-duo")
-        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/activate?homeNew")!)
-        XCTAssertTrue(waitFor(any("newConversationWith"), label: "Juniper"), "New conversation with Juniper, from Home's bar")
-        app.buttons["Cancel"].tap()
+        app.press(app.homeNew, id: "homeNew")
+        XCTAssertTrue(app.textViews["Message Juniper"].waitForExistence(timeout: 10), "New conversation with Juniper, from Home's bar")
+        // Pushed in the conversation's column: its Back (Home's column stays, so `goHome` has nothing to do).
+        app.press(app.backButton, id: "BackButton")
+        XCTAssertTrue(app.textViews["Message Juniper"].waitForNonExistence(timeout: 10), "back to the conversation")
         app.buttons["botSwitcher"].tap()
-        let home = app.buttons["Home"]
+        // The Bot named Home, in the switcher's menu (not the Home tab).
+        let home = app.collectionViews.buttons["Home"].firstMatch
         XCTAssertTrue(home.waitForExistence(timeout: 5))
         home.tap()
         XCTAssertTrue(waitFor(app.buttons["botSwitcher"], label: "Home"), "Home's column is Home's")
         XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/outer")!)
+    }
+
+    // MARK: The composer above the keyboard, and its draft
+
+    /// Patrick's folded Duo at his large text: three short lines with blank
+    /// lines between pushed Send and the action row under the keyboard. Send
+    /// stays hittable above the keyboard there, and at 15 and 60 lines (the
+    /// field scrolls inside its cap), at large text and the default.
+    func testSendStaysAboveTheKeyboardAtEveryHeight() throws {
+        for size in ["UICTContentSizeCategoryXXXL", "UICTContentSizeCategoryL"] {
+            launch(["-UIPreferredContentSizeCategoryName", size])
+            openNewConversation()
+            let field = app.textViews["Message Juniper"]
+            XCTAssertTrue(field.waitForExistence(timeout: 5))
+            field.tap()
+            field.typeText("This is\n\nA\n\nMultiline message\n\n")
+            assertSendAboveKeyboard("\(size) 3 lines and blanks")
+            field.typeText((4...15).map { "Line \($0)" }.joined(separator: "\n"))
+            assertSendAboveKeyboard("\(size) 15 lines")
+            field.typeText((16...60).map { "\nLine \($0)" }.joined())
+            assertSendAboveKeyboard("\(size) 60 lines")
+            app.terminate()
+        }
+    }
+
+    /// The draft survives Back, another tab and a relaunch, and goes on a send.
+    func testTheNewConversationDraftComesBack() throws {
+        let draft = "Plan the garden\n\nwith the new beds"
+        launch()
+        openNewConversation()
+        type(draft, in: "Message Juniper")
+        app.goHome()
+        app.homeNew.tap()
+        let field = app.textViews["Message Juniper"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertEqual(field.value as? String, draft, "the draft came back after Back")
+
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/tab?library")!)
+        XCTAssertTrue(field.waitForNonExistence(timeout: 10), "on Library")
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/tab?home")!)
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertEqual(field.value as? String, draft, "and after another tab")
+
+        // Killed and launched again: still there. `-qaKeepDrafts` keeps the demo's fresh start from clearing it.
+        app.terminate()
+        launch(["-qaKeepDrafts"])
+        openNewConversation()
+        XCTAssertEqual(app.textViews["Message Juniper"].value as? String, draft, "and after a relaunch")
+        app.buttons["newConversationStart"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Plan the garden'")).firstMatch
+            .waitForExistence(timeout: 15), "it starts")
+        app.goHome()
+        app.homeNew.tap()
+        let empty = app.textViews["Message Juniper"]
+        XCTAssertTrue(empty.waitForExistence(timeout: 10))
+        XCTAssertNotEqual(empty.value as? String, draft, "a sent draft is gone")
+    }
+
+    /// A double tap on Send starts one conversation, not two.
+    func testADoubleTapOnSendStartsOneConversation() throws {
+        launch()
+        openNewConversation()
+        type("Book the table", in: "Message Juniper")
+        app.buttons["newConversationStart"].doubleTap()
+        XCTAssertTrue(app.staticTexts["Book the table"].waitForExistence(timeout: 15), "it starts")
+        app.goHome()
+        XCTAssertTrue(app.buttons["homeConversation-thr_demo_new1"].waitForExistence(timeout: 15), "the conversation")
+        XCTAssertFalse(app.buttons["homeConversation-thr_demo_new2"].waitForExistence(timeout: 3), "and no second one")
+    }
+
+    /// The With chip's Bot owns the message: switched to another Bot and
+    /// back out, it waits under that Bot, not the one New opened for.
+    func testTheDraftGoesWithTheBotItsFor() throws {
+        launch()
+        openNewConversation()
+        app.buttons["newConversationBot"].tap()
+        let research = app.buttons["Research"]
+        XCTAssertTrue(research.waitForExistence(timeout: 5))
+        research.tap()
+        type("For Research", in: "Message Research")
+        app.goHome()
+        app.homeNew.tap()
+        let juniper = app.textViews["Message Juniper"]
+        XCTAssertTrue(juniper.waitForExistence(timeout: 10))
+        XCTAssertNotEqual(juniper.value as? String, "For Research", "not left under Juniper")
+        app.buttons["newConversationBot"].tap()
+        XCTAssertTrue(research.waitForExistence(timeout: 5))
+        research.tap()
+        let field = app.textViews["Message Research"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertEqual(field.value as? String, "For Research", "it waits under Research")
+    }
+
+    /// A conversation's draft, in the round-8 navigation: Back to Home and
+    /// in again, and another tab and back, keep it.
+    func testAConversationsDraftSurvivesBackAndAnotherTab() throws {
+        launch()
+        let field = app.textViews["Message"]
+        field.tap()
+        field.typeText("Half a thought")
+        app.goHome()
+        XCTAssertTrue(app.waitForRoom(), "the conversation again")
+        XCTAssertEqual(app.textViews["Message"].value as? String, "Half a thought", "after Back")
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/tab?library")!)
+        XCTAssertTrue(app.textViews["Message"].waitForNonExistence(timeout: 10), "on Library")
+        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/tab?home")!)
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.textViews["Message"].value as? String, "Half a thought", "after another tab")
+    }
+
+    private func assertSendAboveKeyboard(_ name: String) {
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "\(name): keyboard up")
+        Thread.sleep(forTimeInterval: 1)
+        let send = app.buttons["newConversationStart"]
+        print("SEND \(name) send=\(send.frame) keyboard=\(keyboard.frame) window=\(app.windows.firstMatch.frame)")
+        shot("send-\(name.replacingOccurrences(of: " ", with: "-"))")
+        XCTAssertTrue(send.isHittable, "\(name): Send is hittable")
+        XCTAssertLessThanOrEqual(send.frame.maxY, keyboard.frame.minY + 1, "\(name): Send is above the keyboard")
+        XCTAssertGreaterThan(send.frame.minY, app.windows.firstMatch.frame.minY, "\(name): Send is on screen")
     }
 
     /// The sheet's field (its placeholder names the Bot), not the conversation's under it.

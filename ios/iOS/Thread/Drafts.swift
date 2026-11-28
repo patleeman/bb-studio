@@ -13,8 +13,10 @@ enum Drafts {
     #if DEBUG
     /// An offline demo launch (`-qaBotDemo`) starts with none: UI tests share
     /// the demo's server, and one test's draft would wait in the next's composer.
+    /// `-qaKeepDrafts` keeps them, for a test that relaunches to find its draft.
     private static let demoFresh: Void = {
-        guard ProcessInfo.processInfo.arguments.contains("-qaBotDemo") else { return }
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("-qaBotDemo"), !arguments.contains("-qaKeepDrafts") else { return }
         let prefix = ServerScope.key("draft.")
         for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix(prefix) {
             UserDefaults.standard.removeObject(forKey: key)

@@ -24,6 +24,8 @@ enum Route: Hashable {
     case visualChat(threadId: String?)
     /// A Bot conversation, over Home (in Chat or its Workbench).
     case conversation(id: String)
+    /// New conversation with the shown Bot, over Home, its message prefilled.
+    case newConversation(text: String)
     /// One of the Bot's places: Memory, Library, Schedules, Archive.
     case place(BotPage)
     /// A Memory skill, or a new one: pushed on the shown tab's stack.

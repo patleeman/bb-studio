@@ -100,7 +100,7 @@ struct DictationView: View {
                     }
                 }
             }
-            .sheet(isPresented: $creatingThread) { NewThreadView(text: text) }
+            .sheet(isPresented: $creatingThread) { NewThreadSheet(text: text) }
         }
         .interactiveDismissDisabled(recorder.phase == .recording || recorder.needsRecovery || recorder.starting)
         .task {

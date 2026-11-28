@@ -66,7 +66,7 @@ struct QuickWriteView: View {
                     focused = true
                 }
             }
-            .sheet(isPresented: $startingThread) { NewThreadView(text: trimmed) }
+            .sheet(isPresented: $startingThread) { NewThreadSheet(text: trimmed) }
             .onAppear { focused = true }
         }
     }
